@@ -1,7 +1,7 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Apps Rizkybor"/>
+    <!-- <img alt="Vue logo" src="./assets/logo.png"> -->
+    <HelloWorld msg="Timing System Desktop App by MAKOPALA MEMBER"/>
   </div>
 </template>
 

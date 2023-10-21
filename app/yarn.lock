@@ -789,6 +789,32 @@
   dependencies:
     "@hapi/hoek" "^8.3.0"
 
+"@iconify/iconify@^3.1.1":
+  version "3.1.1"
+  resolved "https://registry.npmjs.org/@iconify/iconify/-/iconify-3.1.1.tgz"
+  integrity sha512-1nemfyD/OJzh9ALepH7YfuuP8BdEB24Skhd8DXWh0hzcOxImbb1ZizSZkpCzAwSZSGcJFmscIBaBQu+yLyWaxQ==
+  dependencies:
+    "@iconify/types" "^2.0.0"
+
+"@iconify/icons-ic@^1.2.13":
+  version "1.2.13"
+  resolved "https://registry.npmjs.org/@iconify/icons-ic/-/icons-ic-1.2.13.tgz"
+  integrity sha512-TphrhwOvgd7CTmUhz6jgXF+SPnMtvTm03bZsAYbny2kwq4zlkhr9e16YEyPGMvKhjtTqNooA3iZ9Wa+pZ8moXQ==
+  dependencies:
+    "@iconify/types" "*"
+
+"@iconify/types@*", "@iconify/types@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.npmjs.org/@iconify/types/-/types-2.0.0.tgz"
+  integrity sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==
+
+"@iconify/vue2@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.npmjs.org/@iconify/vue2/-/vue2-2.1.0.tgz"
+  integrity sha512-+R4T9EqrUecMKh/tdiscju/mJS+HCzHFFuJ9XnNcFLaIj3lBOdh8RJolPY9n4k7XRG5V/tY16Lzx+mv+vOmjhA==
+  dependencies:
+    "@iconify/types" "^2.0.0"
+
 "@intervolga/optimize-cssnano-plugin@^1.0.5":
   version "1.0.6"
   resolved "https://registry.npmjs.org/@intervolga/optimize-cssnano-plugin/-/optimize-cssnano-plugin-1.0.6.tgz"
@@ -10507,7 +10533,7 @@ vue-template-es2015-compiler@^1.9.0:
   resolved "https://registry.npmjs.org/vue-template-es2015-compiler/-/vue-template-es2015-compiler-1.9.1.tgz"
   integrity sha512-4gDntzrifFnCEvyoO8PqyJDmguXgVPxKiIxrBKjIowvL9l+N66196+72XVYR8BBf1Uv1Fgt3bGevJ+sEmxfZzw==
 
-vue@*, vue@^2.5.18, vue@^2.6.10:
+vue@*, vue@^2.5.18, vue@^2.6.10, vue@2.x:
   version "2.7.14"
   resolved "https://registry.npmjs.org/vue/-/vue-2.7.14.tgz"
   integrity sha512-b2qkFyOM0kwqWFuQmgd4o+uHGU7T+2z3T+WQp8UBjADfEv2n4FEMffzBmCKNP0IGzOEEfYjvtcC62xaSKeQDrQ==

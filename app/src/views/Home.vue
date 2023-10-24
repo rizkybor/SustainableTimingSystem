@@ -25,6 +25,10 @@
         </div>
       </b-col>
     </b-row>
+
+    <p>ID Registrasi: {{ digitId }}</p>
+    <p>Time: {{ digitTime }}</p>
+
   </div>
 </template>
 
@@ -32,7 +36,6 @@
 import { Icon } from "@iconify/vue2";
 
 import { SerialPort } from "serialport";
-// import { DelimiterParser } from '@serialport/parser-delimiter'
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -47,45 +50,67 @@ export default {
         { event_name: "MOC", date: "DD-MM-YYYY", status: "Coming Soon" },
         { event_name: "UBL Run", date: "DD-MM-YYYY", status: "Coming Soon" },
       ],
-      serialData: null,
+      serialData: "",
+      digitId: null,
+      digitTime: null
     };
   },
 
   async mounted() {
+    let receivedData = "";
+    let a = '';
+    let b = '';
     try {
       // Read the list of serial ports
-      const ports = await SerialPort.list();
+      SerialPort.list()
+        .then((ports) => {
+          // Check if at least one port is available
+          if (ports && ports.length > 0) {
+            // console.log(ports, "<< cek");
+            const selectedPort = ports[1];
 
-      // Check if at least one port is available
-      if (ports && ports.length > 0) {
-        // Assuming you want to select the first port, change this logic as needed
-        const selectedPort = ports[5];
+            if (selectedPort && selectedPort.path) {
+              // Open the selected serial port
+              const port = new SerialPort({
+                path: selectedPort.path,
+                baudRate: 1200,
+              });
 
-        if (selectedPort.path) {
-          // Open the selected serial port
-          const port = new SerialPort(selectedPort.path, {
-            baudRate: 9600,
-          });
+              port.on("data", (data) => {
+                const newData = data.toString();
+                receivedData += newData;
 
-          // Add event listeners for the serial port
-          port.on("open", () => {
-            console.log("Port opened.");
-          });
+                // console.log("Final Result :", receivedData);
 
-          port.on("data", (data) => {
-            console.log("Data from serial port:", data.toString());
-            // Do something with the data, e.g., store it in a variable or process it as needed.
-          });
+                for (let i = 0; i < receivedData.length; i++) {
+                  const char = receivedData[i];
 
-          port.on("error", (err) => {
-            console.error("Error:", err.message);
-          });
-        } else {
-          console.error("Selected port path is undefined.");
-        }
-      } else {
-        console.error("No serial ports available.");
-      }
+                  if (char === "M") {
+                    a = receivedData.slice(0, i + 1); // Potong dari awal hingga karakter 'M' termasuk 'M'
+                    b = receivedData.slice(i + 1); // Potong dari setelah 'M' hingga akhir
+
+                    receivedData = "";
+                    break; // Keluar dari loop
+                  }
+
+                }
+
+                this.digitId = a
+                this.digitTime = receivedData
+
+                console.log('Time :',receivedData)
+                    console.log("ID Registrasi :", a);
+              });
+            } else {
+              console.error("Selected port path is undefined.");
+            }
+          } else {
+            console.error("No serial ports available.");
+          }
+        })
+        .catch((err) => {
+          console.error("Error:", err.message);
+        });
     } catch (err) {
       console.error("Error:", err.message);
     }

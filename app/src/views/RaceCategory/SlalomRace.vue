@@ -40,6 +40,8 @@
                 Print Result
               </button>
 
+
+
               <button type="button" class="btn btn-danger">
                 <Icon icon="ic:outline-delete-sweep" />
                 Reset
@@ -207,7 +209,7 @@
                             <tr>
                               <th scope="col">Team Name</th>
                               <th scope="col">BIB Number</th>
-                              <th scope="col">Session</th>
+                              <th scope="col">Run</th>
                               <th scope="col">Total Penalty</th>
 
                               <th
@@ -223,6 +225,9 @@
                               <th scope="col">Finish Time</th>
                               <th scope="col">Race Time</th>
                               <th scope="col">Total Time</th>
+                              <th scope="col">Best Time</th>
+                              <th scope="col">Edit</th>
+
                             </tr>
                           </thead>
                           <tbody>
@@ -234,7 +239,6 @@
                               <td>{{ team.bibNumber }}</td>
                               <td>
                                 <select v-model="selectedSession[team.id]">
-                                  <option value="Default">Pilih sesi</option>
                                   <option
                                     v-for="(
                                       session, sessionIndex
@@ -242,27 +246,64 @@
                                     :key="session.id"
                                     :value="sessionIndex"
                                   >
-                                    {{ sessionIndex + 1 }}
+                                    Run {{ sessionIndex + 1 }}
                                   </option>
                                 </select>
                               </td>
 
                               <td>
-                                {{ team.sessions[0].totalPenalty }}
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .totalPenalty
+                                }}
                               </td>
-                              
+
                               <td
-                                v-for="(penalty, index) in team.sessions[selectedSession[team.id]]
-                                  .penalties"
+                                v-for="(penalty, index) in team.sessions[
+                                  selectedSession[team.id]
+                                ].penalties"
                                 :key="index"
                               >
                                 {{ penalty }}
                               </td>
-                              <td>{{ team.sessions[0].penaltyTime }}</td>
-                              <td>{{ team.sessions[0].startTime }}</td>
-                              <td>{{ team.sessions[0].finishTime }}</td>
-                              <td>{{ team.sessions[0].raceTime }}</td>
-                              <td>{{ team.sessions[0].totalTime }}</td>
+                              <td>
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .penaltyTime
+                                }}
+                              </td>
+                              <td>
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .startTime
+                                }}
+                              </td>
+                              <td>
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .finishTime
+                                }}
+                              </td>
+                              <td>
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .raceTime
+                                }}
+                              </td>
+                              <td>
+                                {{
+                                  team.sessions[selectedSession[team.id]]
+                                    .totalTime
+                                }}
+                              </td>
+                              <td style="background-color: greenyellow">
+                                {{ calculateBestTime(team) }}
+                              </td>
+                              <td>
+                            <button type="button" class="btn btn-warning">
+                              Edit
+                            </button>
+                          </td>
                             </tr>
                           </tbody>
                         </table>
@@ -306,11 +347,11 @@ export default {
               id: 1,
               penalties: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
               totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
+              penaltyTime: "00:08:00",
+              startTime: "00:50:00",
+              finishTime: "00:30:00",
               raceTime: "00:30:00",
-              totalTime: "00:35:00",
+              totalTime: "00:25:00",
             },
           ],
         },
@@ -329,7 +370,7 @@ export default {
               startTime: "09:00:00",
               finishTime: "09:30:00",
               raceTime: "00:30:00",
-              totalTime: "00:35:00",
+              totalTime: "00:15:00",
             },
             {
               id: 1,
@@ -368,7 +409,7 @@ export default {
               startTime: "09:00:00",
               finishTime: "09:30:00",
               raceTime: "00:30:00",
-              totalTime: "00:35:00",
+              totalTime: "00:00:10",
             },
           ],
         },
@@ -406,13 +447,28 @@ export default {
     this.hasilKonversi = this.konversiFormatWaktu(this.waktuSaatIni);
 
     this.data.forEach((team) => {
-    this.$set(this.selectedSession, team.id, 0);
-  });
+      this.$set(this.selectedSession, team.id, 0);
+    });
   },
   destroyed() {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    calculateBestTime(team) {
+    if (team.sessions.length < 1) {
+      // Tidak ada sesi, gunakan sesi pertama sebagai waktu terbaik
+      return team.sessions[0].totalTime;
+    } else {
+      let bestTime = team.sessions[0].totalTime;
+      for (let i = 1; i < team.sessions.length; i++) {
+        const currentTime = team.sessions[i].totalTime;
+        if (currentTime < bestTime) {
+          bestTime = currentTime;
+        }
+      }
+      return bestTime;
+    }
+  },
     konversiFormatWaktu(waktu) {
       const milidetik = waktu % 1000;
       waktu = Math.floor(waktu / 1000); // Menghapus milidetik dari waktu

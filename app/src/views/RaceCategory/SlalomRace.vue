@@ -233,27 +233,31 @@
                               <td>{{ team.nameTeam }}</td>
                               <td>{{ team.bibNumber }}</td>
                               <td>
-                                <select>
+                                <select v-model="selectedSession[team.id]">
+                                  <option value="Default">Pilih sesi</option>
                                   <option
                                     v-for="(
                                       session, sessionIndex
                                     ) in team.sessions"
                                     :key="session.id"
+                                    :value="sessionIndex"
                                   >
                                     {{ sessionIndex + 1 }}
                                   </option>
                                 </select>
                               </td>
-                              <td>{{ team.sessions[0].totalPenalty }}</td>
+
+                              <td>
+                                {{ team.sessions[0].totalPenalty }}
+                              </td>
+                              
                               <td
-                                v-for="(penalty, index) in team.sessions[0]
+                                v-for="(penalty, index) in team.sessions[selectedSession[team.id]]
                                   .penalties"
                                 :key="index"
                               >
                                 {{ penalty }}
                               </td>
-                       <!-- <td style="color:red">{{ team.session }}</td>  -->
-
                               <td>{{ team.sessions[0].penaltyTime }}</td>
                               <td>{{ team.sessions[0].startTime }}</td>
                               <td>{{ team.sessions[0].finishTime }}</td>
@@ -290,7 +294,7 @@ export default {
           sessions: [
             {
               id: 0,
-              penalties: [5, 0, 0, 50, 5, 0, 0, 5, 0, 0, 0, 0, 0, 0],
+              penalties: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
               totalPenalty: 8,
               penaltyTime: "00:05:00",
               startTime: "09:00:00",
@@ -300,7 +304,7 @@ export default {
             },
             {
               id: 1,
-              penalties: [0, 0, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
+              penalties: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
               totalPenalty: 8,
               penaltyTime: "00:05:00",
               startTime: "09:00:00",
@@ -317,7 +321,9 @@ export default {
           sessions: [
             {
               id: 0,
-              penalties: [0, 50, 0, 50, 5, 0, 0, 5, 0, 0, 0, 0, 0, 0],
+              penalties: [
+                50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+              ],
               totalPenalty: 8,
               penaltyTime: "00:05:00",
               startTime: "09:00:00",
@@ -327,7 +333,36 @@ export default {
             },
             {
               id: 1,
-              penalties: [0, 0, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
+              penalties: [0, 50, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
+              totalPenalty: 8,
+              penaltyTime: "00:05:00",
+              startTime: "09:00:00",
+              finishTime: "09:30:00",
+              raceTime: "00:30:00",
+              totalTime: "00:35:00",
+            },
+          ],
+        },
+        {
+          id: 2,
+          nameTeam: "Eka Citra UNJ",
+          bibNumber: "003",
+          sessions: [
+            {
+              id: 0,
+              penalties: [
+                50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+              ],
+              totalPenalty: 8,
+              penaltyTime: "00:05:00",
+              startTime: "09:00:00",
+              finishTime: "09:30:00",
+              raceTime: "00:30:00",
+              totalTime: "00:35:00",
+            },
+            {
+              id: 1,
+              penalties: [0, 50, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
               totalPenalty: 8,
               penaltyTime: "00:05:00",
               startTime: "09:00:00",
@@ -338,9 +373,7 @@ export default {
           ],
         },
       ],
-      selectedSession: 0,
-      sessionOptions: [],
-
+      selectedSession: {},
       getItems: [{ time: "00:00:35.680", idReg: "000500070010000000M" }],
       buttons: [
         { label: "Team 1", class: "btn-dark" },
@@ -363,14 +396,6 @@ export default {
     },
   },
 
-  computed: {
-    currentSession() {
-      return this.data.sesion.find(
-        (session) => session.id === this.selectedSession
-      );
-    },
-  },
-
   mounted() {
     window.addEventListener("scroll", this.handleScroll);
 
@@ -380,11 +405,9 @@ export default {
     this.updateClock();
     this.hasilKonversi = this.konversiFormatWaktu(this.waktuSaatIni);
 
-    
-    this.sessionOptions = this.data.sesion.map((session) => ({
-      value: session.id,
-      text: `Session ${session.id}`,
-    }));
+    this.data.forEach((team) => {
+    this.$set(this.selectedSession, team.id, 0);
+  });
   },
   destroyed() {
     window.removeEventListener("scroll", this.handleScroll);

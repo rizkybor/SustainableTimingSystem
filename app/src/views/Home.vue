@@ -16,6 +16,16 @@
           <Icon icon="ic:baseline-add-circle" />
           BY PASS SPRINT RACE</b-button
         >
+
+        <br />
+
+        <br />
+        <br />
+
+        <b-button @click="goTo('slalom-race')" variant="warning">
+          <Icon icon="ic:baseline-add-circle" />
+          BY PASS Slalom RACE</b-button
+        >
         <br />
         <br />
       </b-col>
@@ -66,8 +76,8 @@ export default {
         .then((ports) => {
           // Check if at least one port is available
           if (ports && ports.length > 0) {
-            // console.log(ports, "<< cek");
-            const selectedPort = ports[1];
+            console.log(ports, "<< cek");
+            const selectedPort = ports[5];
 
             if (selectedPort && selectedPort.path) {
               // Open the selected serial port

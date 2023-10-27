@@ -36,9 +36,10 @@
             >
               <button
                 type="button"
-                class="btn btn-cyan"
+                class="btn btn-info"
                 @click="toggleSortRanked"
               >
+                <Icon icon="icon-park-outline:ranking" />
                 Sort Ranked
               </button>
 
@@ -143,7 +144,7 @@
                       :class="button.class"
                       @click="updateTime(digitTimeStart, button.id, 'start')"
                     >
-                      {{ "No BIB " + button.bibNumber }}
+                      {{ "BIB " + button.bibNumber }}
                     </button>
                   </b-col>
                 </b-row>
@@ -183,7 +184,7 @@
                       :class="button.class"
                       @click="updateTime(digitTimeFinish, button.id, 'finish')"
                     >
-                      {{ "No BIB " + button.bibNumber }}
+                      {{ "BIB " + button.bibNumber }}
                     </button>
                   </b-col>
                 </b-row>
@@ -204,6 +205,7 @@
                   class="btn btn-warning"
                   @click="checkingPenalties()"
                 >
+                  <Icon icon="iconamoon:flag-fill" />
                   Penalty Check
                 </button>
                 <b-row>
@@ -237,7 +239,7 @@
                           <td>{{ item.penaltiesTime }}</td>
                           <td>
                             {{
-                              item.penaltiesTime == "00:00:00.000"
+                              item.penaltiesTime == ""
                                 ? item.raceTime
                                 : item.timeResult
                             }}
@@ -282,61 +284,90 @@ export default {
       isPortConnected: false,
       items: [
         {
+          id: 0,
+          timeStart: "",
+          timeFinish: "",
+          nameTeam: "JAWA TENGAH",
+          bibNumber: "01",
+          raceTime: "",
+          penalties: "0",
+          penaltiesTime: "00:00:00.000",
+          timeResult: "",
+          ranked: null,
+          score: null,
+          class: "btn-info",
+        },
+        {
           id: 1,
           timeStart: "",
           timeFinish: "",
-          nameTeam: "Makopala",
-          bibNumber: "01",
-          raceTime: "00:02:30.000",
+          nameTeam: "JAWA BARAT",
+          bibNumber: "02",
+          raceTime: "",
           penalties: "0",
           penaltiesTime: "00:00:00.000",
-          timeResult: "00:00:00.000",
-          ranked: 4,
+          timeResult: "",
+          ranked: null,
           score: null,
-          class: "btn-dark",
+          class: "btn-info",
         },
         {
           id: 2,
           timeStart: "",
           timeFinish: "",
-          nameTeam: "Eka Citra UNJ",
-          bibNumber: "02",
+          nameTeam: "BANTEN",
+          bibNumber: "03",
           raceTime: "",
           penalties: "0",
           penaltiesTime: "00:00:00.000",
-          timeResult: "00:00:00.000",
-          ranked: 3,
+          timeResult: "",
+          ranked: null,
           score: null,
-          class: "btn-secondary",
+          class: "btn-info",
         },
         {
           id: 3,
           timeStart: "",
           timeFinish: "",
-          nameTeam: "Swatala Merchu Buana",
-          bibNumber: "03",
+          nameTeam: "DKI JAKARTA",
+          bibNumber: "04",
           raceTime: "",
           penalties: "0",
           penaltiesTime: "00:00:00.000",
-          timeResult: "00:00:00.000",
-          ranked: 1,
+          timeResult: "",
+          ranked: null,
           score: null,
-          class: "btn-secondary",
+          class: "btn-info",
         },
         {
           id: 4,
           timeStart: "",
           timeFinish: "",
-          nameTeam: "FAJI DKI",
-          bibNumber: "04",
+          nameTeam: "SULAWESI SELATAN",
+          bibNumber: "05",
           raceTime: "",
           penalties: "0",
           penaltiesTime: "00:00:00.000",
-          timeResult: "00:00:00.000",
-          ranked: 32,
+          timeResult: "",
+          ranked: null,
           score: null,
-          class: "btn-secondary",
+          class: "btn-info",
         },
+        {
+          id: 5,
+          timeStart: "",
+          timeFinish: "",
+          nameTeam: "SUMATERA SELATAN",
+          bibNumber: "06",
+          raceTime: "",
+          penalties: "0",
+          penaltiesTime: "00:00:00.000",
+          timeResult: "",
+          ranked: null,
+          score: null,
+          class: "btn-info",
+        },
+        
       ],
       penTeam: "",
       dataPenalties: [
@@ -512,18 +543,91 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
-    async checkingPenalties() {
-      this.items[0].penalties = this.dataPenalties[2].value;
-      this.items[0].penaltiesTime = this.dataPenalties[2].timePen;
+    async assignRanks(items) {
+      const itemsWithTimeResult = items.filter((item) => item.timeResult);
+      itemsWithTimeResult.sort( (a, b) => {
+        const timeA =  this.parsesTime(a.timeResult);
+        const timeB =  this.parsesTime(b.timeResult);
+        return timeA - timeB;
+      });
 
-      if(this.items[0].raceTime && this.items[0].penaltiesTime){
-        let a =await this.tambahWaktu(this.items[0].raceTime, this.items[0].penaltiesTime)
-        this.items[0].timeResult = a
-        console.log('final : ', a)
+      itemsWithTimeResult.forEach((item, index) => {
+        item.ranked = index + 1;
+        console.log("item", item.id);
+      });
+      // itemsWithTimeResult.forEach(async (item, index) => {
+      //   item.ranked = index + 1;
+      //   console.log("cek ranked, ",item.id)
+      //   // item.score = await this.calculateScore(item.ranked);
+      // });
+    },
+     parsesTime(timeStr) {
+      console.log('hkhhkhk',timeStr)
+      const [hours, minutes, seconds] = timeStr.split(":").map(parseFloat);
+      return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
+    },
+
+    // Fungsi untuk menghitung skor berdasarkan peringkat
+    async calculateScore(ranked) {
+      // Mencari data score berdasarkan ranking
+      const scoreData = this.dataScore.find((data) => data.ranking === ranked);
+
+      // Jika data ditemukan, maka kembalikan skor dari data tersebut
+      if (scoreData) {
+        return scoreData.score;
       } else {
-        alert('waktu belum ada')
+        // Jika data tidak ditemukan, kembalikan 0 atau nilai default yang Anda inginkan
+        return 0;
       }
     },
+
+    //BATAS TERAKHIR
+
+    // Fungsi untuk mengonversi format waktu "HH:mm:ss.SSS" ke milidetik
+    async parseTimeResult(timeResult) {
+      const parts = timeResult.split(":");
+      const hours = parseInt(parts[0]);
+      const minutes = parseInt(parts[1]);
+      const seconds = parseInt(parts[2]);
+      const milliseconds = parseInt(parts[3]);
+
+      return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
+    },
+
+    async checkingPenalties() {
+      console.log(this.items, "<<< cek dulu");
+
+      for (let i = 0; i < this.items.length; i++) {
+        const item = this.items[i];
+
+        item.penalties = this.dataPenalties[2].value;
+        item.penaltiesTime = this.dataPenalties[2].timePen;
+
+        if (item.raceTime && item.penaltiesTime) {
+          const newTimeResult = await this.tambahWaktu(
+            item.raceTime,
+            item.penaltiesTime
+          );
+          item.timeResult = newTimeResult;
+        }
+      }
+      await this.assignRanks(this.items);
+    },
+    // async checkingPenalties() {
+    //   this.items[0].penalties = this.dataPenalties[2].value;
+    //   this.items[0].penaltiesTime = this.dataPenalties[2].timePen;
+
+    //   if(this.items[0].raceTime && this.items[0].penaltiesTime){
+    //     let a =await this.tambahWaktu(this.items[0].raceTime, this.items[0].penaltiesTime)
+    //     this.items[0].timeResult = a
+
+    //     if(this.items[0].timeResult != ''){
+    //       await this.assignRanks()
+    //     }
+    //   } else {
+    //     alert('Waktu Race Time belum tampil')
+    //   }
+    // },
     getScoreByRanked(ranked) {
       const matchingRank = this.dataScore.find(
         (data) => data.ranking === ranked
@@ -710,31 +814,41 @@ export default {
       return angka < 10 ? "0" + angka : angka;
     },
 
-     async tambahWaktu(waktuA, waktuB) {
-    // Parsing waktu dalam format "HH:mm:ss.SSS"
-    const partsA = waktuA.split(':');
-    const partsB = waktuB.split(':');
-    
-    // Menghitung total milidetik
-    const milidetikA = parseInt(partsA[0]) * 3600000 + parseInt(partsA[1]) * 60000 + parseFloat(partsA[2]) * 1000;
-    const milidetikB = parseInt(partsB[0]) * 3600000 + parseInt(partsB[1]) * 60000 + parseFloat(partsB[2]) * 1000;
-    
-    // Menambahkan waktu bersama-sama
-    const totalMilidetik = milidetikA + milidetikB;
-    
-    // Mengonversi total milidetik menjadi format waktu
-    const jam = Math.floor(totalMilidetik / 3600000);
-    const sisaMilidetik = totalMilidetik % 3600000;
-    const menit = Math.floor(sisaMilidetik / 60000);
-    const sisaMilidetik2 = sisaMilidetik % 60000;
-    const detik = Math.floor(sisaMilidetik2 / 1000);
-    const milidetik = sisaMilidetik2 % 1000;
-    
-    // Mengonversi hasil ke dalam format yang diinginkan
-    const hasilFormat = `${String(jam).padStart(2, '0')}:${String(menit).padStart(2, '0')}:${String(detik).padStart(2, '0')}.${String(milidetik).padStart(3, '0')}`;
-    
-    return hasilFormat;
-},
+    async tambahWaktu(waktuA, waktuB) {
+      // Parsing waktu dalam format "HH:mm:ss.SSS"
+      const partsA = waktuA.split(":");
+      const partsB = waktuB.split(":");
+
+      // Menghitung total milidetik
+      const milidetikA =
+        parseInt(partsA[0]) * 3600000 +
+        parseInt(partsA[1]) * 60000 +
+        parseFloat(partsA[2]) * 1000;
+      const milidetikB =
+        parseInt(partsB[0]) * 3600000 +
+        parseInt(partsB[1]) * 60000 +
+        parseFloat(partsB[2]) * 1000;
+
+      // Menambahkan waktu bersama-sama
+      const totalMilidetik = milidetikA + milidetikB;
+
+      // Mengonversi total milidetik menjadi format waktu
+      const jam = Math.floor(totalMilidetik / 3600000);
+      const sisaMilidetik = totalMilidetik % 3600000;
+      const menit = Math.floor(sisaMilidetik / 60000);
+      const sisaMilidetik2 = sisaMilidetik % 60000;
+      const detik = Math.floor(sisaMilidetik2 / 1000);
+      const milidetik = sisaMilidetik2 % 1000;
+
+      // Mengonversi hasil ke dalam format yang diinginkan
+      const hasilFormat = `${String(jam).padStart(2, "0")}:${String(
+        menit
+      ).padStart(2, "0")}:${String(detik).padStart(2, "0")}.${String(
+        milidetik
+      ).padStart(3, "0")}`;
+
+      return hasilFormat;
+    },
     goTo() {
       this.$router.push("/");
     },

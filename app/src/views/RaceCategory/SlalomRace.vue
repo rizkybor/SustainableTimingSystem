@@ -18,6 +18,9 @@
             <h5 style="font-weight: 800; font-style: italic">
               Kejuaraan Arung Jeram 2024
             </h5>
+            <h6 style="font-weight: 800; font-style: italic">
+              Nomor Lomba : Slalom
+            </h6>
             <p style="font-style: italic">
               Tigaraksa, 01-January-2024 - 10-January-2024
             </p>
@@ -39,8 +42,6 @@
                 <Icon icon="ic:outline-local-printshop" />
                 Print Result
               </button>
-
-
 
               <button type="button" class="btn btn-danger">
                 <Icon icon="ic:outline-delete-sweep" />
@@ -227,7 +228,6 @@
                               <th scope="col">Total Time</th>
                               <th scope="col">Best Time</th>
                               <th scope="col">Edit</th>
-
                             </tr>
                           </thead>
                           <tbody>
@@ -300,10 +300,10 @@
                                 {{ calculateBestTime(team) }}
                               </td>
                               <td>
-                            <button type="button" class="btn btn-warning">
-                              Edit
-                            </button>
-                          </td>
+                                <button type="button" class="btn btn-warning">
+                                  Edit
+                                </button>
+                              </td>
                             </tr>
                           </tbody>
                         </table>
@@ -357,7 +357,7 @@ export default {
         },
         {
           id: 1,
-          nameTeam: "Swatala Mercu Buana",
+          nameTeam: "Budi Luhur",
           bibNumber: "002",
           sessions: [
             {
@@ -455,20 +455,20 @@ export default {
   },
   methods: {
     calculateBestTime(team) {
-    if (team.sessions.length < 1) {
-      // Tidak ada sesi, gunakan sesi pertama sebagai waktu terbaik
-      return team.sessions[0].totalTime;
-    } else {
-      let bestTime = team.sessions[0].totalTime;
-      for (let i = 1; i < team.sessions.length; i++) {
-        const currentTime = team.sessions[i].totalTime;
-        if (currentTime < bestTime) {
-          bestTime = currentTime;
+      if (team.sessions.length < 1) {
+        // Tidak ada sesi, gunakan sesi pertama sebagai waktu terbaik
+        return team.sessions[0].totalTime;
+      } else {
+        let bestTime = team.sessions[0].totalTime;
+        for (let i = 1; i < team.sessions.length; i++) {
+          const currentTime = team.sessions[i].totalTime;
+          if (currentTime < bestTime) {
+            bestTime = currentTime;
+          }
         }
+        return bestTime;
       }
-      return bestTime;
-    }
-  },
+    },
     konversiFormatWaktu(waktu) {
       const milidetik = waktu % 1000;
       waktu = Math.floor(waktu / 1000); // Menghapus milidetik dari waktu
@@ -557,7 +557,7 @@ export default {
   top: 0;
   z-index: 1;
   transition: box-shadow 0.3s ease;
-  background-color: rgb(30, 255, 83);
+  background-color: rgb(2, 102, 203);
 }
 
 /* Efek shadow ketika digulirkan */
@@ -577,9 +577,6 @@ th {
   background-color: #007bff;
   color: white;
   text-align: center;
-  position: sticky;
-  top: 0; /* Membuat header tetap di atas saat digulir */
-  z-index: 2; /* Menutupi konten yang berada di bawahnya */
 }
 
 /* Style untuk baris ganjil */

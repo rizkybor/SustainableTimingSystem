@@ -15,8 +15,16 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h5 style="font-weight: 800; font-style: italic;">Kejuaraan Arung Jeram 2024</h5>
-            <p style="font-style: italic;">Tigaraksa, 01-January-2024 - 10-January-2024</p>
+            <h5 style="font-weight: 800; font-style: italic">
+              Kejuaraan Arung Jeram 2024
+            </h5>
+
+            <h6 style="font-weight: 800; font-style: italic">
+              Nomor Lomba : Sprint
+            </h6>
+            <p style="font-style: italic">
+              Tigaraksa, 01-January-2024 - 10-January-2024
+            </p>
           </b-col>
           <b-col>
             <div
@@ -26,20 +34,34 @@
                 justify-content: flex-end !important;
               "
             >
+             
+            <button type="button" class="btn btn-secondary">
+              <Icon icon="ic:outline-delete-sweep" />
+              Reset
+            </button>
+             
               <button type="button" class="btn btn-warning">
-                <Icon icon="ic:baseline-sync" />
-
-                Connect Device
-              </button>
-              <button type="button" class="btn btn-info">
                 <Icon icon="ic:outline-local-printshop" />
                 Print Result
               </button>
 
-              <button type="button" class="btn btn-danger">
-                <Icon icon="ic:outline-delete-sweep" />
-                Reset
+              <button
+                type="button"
+                :class="{ 'btn-danger': isPortConnected, 'btn-success': !isPortConnected }"
+
+                class="btn "
+                @click="connectPort"
+              >
+                <Icon icon="ic:baseline-sync" />
+                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
               </button>
+              <span
+                class="status-indicator"
+                :class="{
+                  connected: isPortConnected,
+                  disconnected: !isPortConnected,
+                }"
+              ></span>
             </div>
           </b-col>
         </b-row>
@@ -71,9 +93,9 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(item, index) in getItems" :key="index">
-                    <td>{{ item.idReg }}</td>
-                    <td>{{ waktuSaatIni }}</td>
+                  <tr>
+                    <td style="color: black">{{ digitId }}</td>
+                    <td style="color: black">{{ digitTime }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -87,23 +109,11 @@
                   <b-col class="col">
                     <h5 class="card-title">Buffer-Timer-Start</h5>
                     <b-row>
-                      <!-- <b-col class="col-2">
-                        <p>Start</p>
-                        <div class="input-group mb-3">
-                          <input
-                            type="text"
-                            class="form-control"
-                            placeholder="Username"
-                            aria-label="Username"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                      </b-col> -->
                       <b-col class="col">
                         <p>Get Time Start</p>
                         <div class="input-group mb-3">
                           <input
-                            v-model="hasilKonversi"
+                            v-model="digitTimeStart"
                             type="text"
                             class="form-control"
                             placeholder="Timer"
@@ -111,21 +121,20 @@
                             aria-describedby="basic-addon1"
                           />
                         </div>
-                        <!-- <button type="button" class="btn btn-primary">
-                          Validate Start Time
-                        </button> -->
                       </b-col>
                     </b-row>
                   </b-col>
                   <b-col class="col-4">
                     <button
-                      v-for="(button, index) in buttons"
+                      v-for="(button, index) in items"
+                      id="btnStart"
                       :key="index"
                       type="button"
                       class="btn custom-btn"
                       :class="button.class"
+                      @click="inputTime(digitTimeStart, button.id,'start')"
                     >
-                      {{ button.label }}
+                      {{ button.bibNumber }}
                     </button>
                   </b-col>
                 </b-row>
@@ -140,23 +149,11 @@
                   <b-col class="col">
                     <h5 class="card-title">Buffer-Timer-Finish</h5>
                     <b-row>
-                      <!-- <b-col class="col-2">
-                        <p>Finish</p>
-                        <div class="input-group mb-3">
-                          <input
-                            type="text"
-                            class="form-control"
-                            placeholder="Username"
-                            aria-label="Username"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                      </b-col> -->
                       <b-col class="col">
                         <p>Get Time Finish</p>
                         <div class="input-group mb-3">
                           <input
-                          v-model=hasilKonversi
+                            v-model="digitTimeFinish"
                             type="text"
                             class="form-control"
                             placeholder="Timer"
@@ -164,21 +161,20 @@
                             aria-describedby="basic-addon1"
                           />
                         </div>
-                        <!-- <button type="button" class="btn btn-success">
-                          Validate Time Finish
-                        </button> -->
                       </b-col>
                     </b-row>
                   </b-col>
                   <b-col class="col-4">
                     <button
-                      v-for="(button, index) in buttons"
+                      v-for="(button, index) in items"
+                      id="btnFinish"
                       :key="index"
                       type="button"
                       class="btn custom-btn"
                       :class="button.class"
+                      @click="inputTime(digitTimeFinish, button.id, 'finish')"
                     >
-                      {{ button.label }}
+                      {{ 'No BIB ' + button.bibNumber }}
                     </button>
                   </b-col>
                 </b-row>
@@ -233,6 +229,10 @@
                         </tr>
                       </tbody>
                     </table>
+
+                    <ul>
+                      <li>{{ currentPort }}</li>
+                    </ul>
                   </b-col>
                 </b-row>
               </div>
@@ -245,37 +245,46 @@
 </template>
 
 <script>
+import { SerialPort } from "serialport";
+
 export default {
   name: "SustainableTimingSystemSprintRace",
 
   data() {
     return {
       isScrolled: false,
+      port: null,
+      isPortConnected: false,
       items: [
         {
-          timeStart: "00:00:35.680",
-          timeFinish: "00:00:35.680",
+          id: 0,
+          timeStart: "",
+          timeFinish: "",
           nameTeam: "Makopala",
-          bibNumber: 80,
+          bibNumber: "01",
           raceTime: "00:00:35.680",
           penalties: true,
           penaltiesTime: "00:00:35.680",
           timeResult: "00:00:35.680",
           ranked: 1,
           score: 80,
+          class: "btn-dark"
         },
         {
+          id: 1,
           timeStart: "00:00:35.680",
           timeFinish: "00:00:35.680",
-          nameTeam: "Makopala",
-          bibNumber: 80,
+          nameTeam: "Eka Citra UNJ",
+          bibNumber: "10",
           raceTime: "00:00:35.680",
           penalties: true,
           penaltiesTime: "00:00:35.680",
           timeResult: "00:00:35.680",
           ranked: 1,
           score: 80,
+          class: "btn-secondary"
         },
+        
       ],
       getItems: [{ time: "00:00:35.680", idReg: "000500070010000000M" }],
       buttons: [
@@ -288,55 +297,137 @@ export default {
         { label: "Team 7", class: "btn-secondary" },
         { label: "Team 8", class: "btn-dark" },
       ],
-      currentTime: "",
-      waktuSaatIni: "000000000",
-      hasilKonversi: "",
+      digitId: null,
+      digitTime: null,
+      digitTimeStart: null,
+      digitTimeFinish: null,
+      currentPort: "",
     };
-  },
-  watch: {
-    waktuSaatIni(newVal) {
-      this.hasilKonversi = this.konversiFormatWaktu(newVal);
-    },
   },
 
   mounted() {
     window.addEventListener("scroll", this.handleScroll);
-
-    setInterval(this.updateClock, 1000);
-
-    // Panggil fungsi updateClock sekali pada awalnya untuk menginisialisasi waktu
-    this.updateClock();
-    this.hasilKonversi = this.konversiFormatWaktu(this.waktuSaatIni);
   },
   destroyed() {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
-    konversiFormatWaktu(waktu) {
-      const milidetik = waktu % 1000;
-      waktu = Math.floor(waktu / 1000); // Menghapus milidetik dari waktu
-
-      const detik = waktu % 60;
-      waktu = Math.floor(waktu / 60); // Menghapus detik dari waktu
-
-      const menit = waktu % 60;
-      const jam = Math.floor(waktu / 60);
-
-      const formatJam = String(jam).padStart(2, "0");
-      const formatMenit = String(menit).padStart(2, "0");
-      const formatDetik = String(detik).padStart(2, "0");
-      const formatMilidetik = String(milidetik).padStart(3, "0");
-
-      return `${formatJam}:${formatMenit}:${formatDetik}.${formatMilidetik}`;
+    async connectPort() {
+      if (!this.isPortConnected) {
+        await this.setupSerialListener();
+        this.isPortConnected = true;
+        alert("Connected");
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
     },
-    updateClock() {
-      const now = new Date();
-      const totalSeconds = now.getSeconds(); // Batasi waktu hingga detik
-      this.waktuSaatIni = String(
-        totalSeconds * 1000 + now.getMilliseconds()
-      ).padStart(9, "0");
+    async disconnected() {
+      if (this.port && this.port.isOpen) {
+        this.port.close();
+      }
+      this.isPortConnected = false;
     },
+    async setupSerialListener() {
+      let receivedData = "";
+      let a = "";
+      let b = "";
+      try {
+        // Read the list of serial ports
+        SerialPort.list()
+          .then((ports) => {
+            // Check if at least one port is available
+            if (ports && ports.length > 0) {
+              this.currentPort = ports;
+              const selectedPort = ports[5];
 
+              console.log(JSON.stringify(ports),'<<')
+
+              if (selectedPort && selectedPort.path) {
+                // Open the selected serial port
+                this.port = new SerialPort({
+                  path: selectedPort.path,
+                  baudRate: 9600,
+                });
+
+                console.log(this.port, '<<')
+
+                this.port.on("data", (data) => {
+                  const newData = data.toString();
+                  receivedData += newData;
+
+                  // console.log("Final Result :", receivedData);
+
+                  for (let i = 0; i < receivedData.length; i++) {
+                    const char = receivedData[i];
+
+                    if (char === "M") {
+                      a = receivedData.slice(0, i + 1);
+                      b = receivedData.slice(i + 1);
+
+                      receivedData = "";
+                      break; // Keluar dari loop
+                    }
+                  }
+                  this.digitId = a;
+                  this.digitTime = b;
+
+
+                  console.log(a[11]);
+
+                  // Memeriksa waktu Start atau Finish
+                  if (a[11] == "0") {
+                    this.digitTimeStart = b.replace(
+                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
+                      "$1:$2:$3.$4"
+                    );
+                  } else if (a[11] == "2") {
+                    this.digitTimeFinish = b.replace(
+                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
+                      "$1:$2:$3.$4"
+                    );
+                  } else {
+                    // Kondisi jika digit ke-13 bukan 0 dan juga bukan lebih besar dari 0
+                    console.log(
+                      "Digit ke-13 bukan 0 dan juga bukan lebih besar dari 0."
+                    );
+                  }
+                });
+              } else {
+                console.error("Selected port path is undefined.");
+              }
+            } else {
+              console.error("No serial ports available.");
+            }
+          })
+          .catch((err) => {
+            console.error("Error:", err.message);
+          });
+      } catch (err) {
+        console.error("Error:", err.message);
+      }
+    },
+    formatTime(inputTime) {
+      console.log(inputTime, "<< cek");
+      const hours = inputTime.substr(0, 2);
+      const minutes = inputTime.substr(2, 2);
+      const seconds = inputTime.substr(4, 2);
+      const milliseconds = inputTime.substr(6);
+      
+      const correctedMinutes = Math.min(parseInt(minutes, 10), 59);
+      const correctedSeconds = Math.min(parseInt(seconds, 10), 59);
+      
+      return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
+    },
+    inputTime(val, title) {
+      if (title == "start") {
+        this.items[0].timeStart = val;
+      }
+      if (title == "finish") {
+        this.items[0].timeFinish = val;
+      }
+    },
     goTo() {
       this.$router.push("/");
     },
@@ -374,5 +465,97 @@ export default {
 .v-shadow-on-scroll {
   box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 1.5);
   background-color: rgb(2, 102, 203);
+}
+
+/* Style untuk tabel */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Style untuk header kolom */
+th {
+  background-color: #007bff;
+  color: white;
+  text-align: center;
+}
+
+/* Style untuk baris ganjil */
+tr:nth-child(odd) {
+  background-color: #f2f2f2;
+}
+
+/* Style untuk baris genap */
+tr:nth-child(even) {
+  background-color: #e0e0e0;
+}
+
+/* Style untuk sel data */
+td {
+  text-align: center;
+  padding: 8px;
+}
+
+/* Style untuk field "Penalty" */
+td.penalty {
+  display: flex;
+  gap: 28px;
+}
+
+/* Style untuk sel data dalam field "Penalty" */
+td.penalty span {
+  background-color: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+
+/* Style untuk sel data dalam field "Penalty" (Teks hitam) */
+td.penalty span.black {
+  background-color: black;
+}
+
+/* Style untuk sel data dalam field "Penalty" (Teks merah) */
+td.penalty span.red {
+  background-color: red;
+}
+
+/* Style untuk sel data dalam field "Penalty" (Teks biru) */
+td.penalty span.blue {
+  background-color: blue;
+}
+
+/* Style untuk sel data dalam field "Penalty" (Teks hijau) */
+td.penalty span.green {
+  background-color: green;
+}
+
+/* Style untuk total pinalty */
+td.totalPenalty {
+  font-weight: bold;
+}
+
+/* Style untuk waktu */
+td.time {
+  font-style: italic;
+}
+
+/* Tambahkan ini ke dalam file CSS Anda */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%; /* Membuat lingkaran */
+  margin-left: 0px; /* Atur margin sesuai kebutuhan Anda */
+  transition: background-color 0.3s; /* Efek transisi untuk perubahan warna */
+}
+
+.connected {
+  background-color: rgb(0, 255, 0); /* Warna saat terhubung (misalnya, hijau) */
+}
+
+/* Warna saat tidak terhubung (misalnya, merah) */
+.disconnected {
+  background-color: red;
 }
 </style>

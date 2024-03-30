@@ -1,5 +1,9 @@
 {
   "name": "app",
+  "author": {
+    "name": "Rizky Ajie Kurniawan"
+  },
+  "productName": "Sustainable-Timing-System",
   "version": "0.1.0",
   "private": true,
   "scripts": {

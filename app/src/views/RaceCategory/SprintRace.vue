@@ -674,9 +674,8 @@ export default {
             // Check if at least one port is available
             if (ports && ports.length > 0) {
               this.currentPort = ports;
-              const selectedPort = ports[1];
-
-              console.log(JSON.stringify(ports), "<<");
+              console.log(ports[5],'<< ceks')
+              const selectedPort = ports[5];
 
               if (selectedPort && selectedPort.path) {
                 // Open the selected serial port
@@ -685,13 +684,9 @@ export default {
                   baudRate: 9600,
                 });
 
-                console.log(this.port, "<<");
-
                 this.port.on("data", (data) => {
                   const newData = data.toString();
                   receivedData += newData;
-
-                  // console.log("Final Result :", receivedData);
 
                   for (let i = 0; i < receivedData.length; i++) {
                     const char = receivedData[i];
@@ -706,8 +701,6 @@ export default {
                   }
                   this.digitId = a;
                   this.digitTime = b;
-
-                  console.log(a[11]);
 
                   // Memeriksa waktu Start atau Finish
                   if (a[11] == "0") {

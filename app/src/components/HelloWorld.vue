@@ -1,8 +1,7 @@
 <template>
-  <div class="hello">
+  <div class="d-flex justify-content-center">
     <h1 style="font-weight: 800;">{{ msg }}</h1>
     <!-- <b-button @click="helo()" variant="danger"><Icon icon="ic:baseline-add-circle" />Create New Event</b-button> -->
-    
   </div>
 </template>
 

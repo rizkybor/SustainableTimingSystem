@@ -1,8 +1,15 @@
 <template>
   <div id="app">
     <!-- <img alt="Vue logo" src="./assets/logo.png"> -->
-    <Navbar />
+    <div v-if="showNavbar">
+      <Navbar />
+    </div>
     <div>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+
       <HelloWorld msg="Desktop Based Timing System" />
       <router-view></router-view>
     </div>
@@ -24,7 +31,16 @@ export default {
     FooterVue,
     Banner
   },
+  computed: {
+    showNavbar() {
+      // Mengembalikan nilai false jika router berada di /hello
+      return this.$route.path !== '/event-detail/PON/sprint-race';
+    }
+  }
+
+
 };
+
 </script>
 
 <style>

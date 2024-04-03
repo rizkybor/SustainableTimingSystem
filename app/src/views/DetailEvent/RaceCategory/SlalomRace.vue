@@ -180,6 +180,7 @@
                   <b-col class="col-4">
                     <button
                       v-for="(button, index) in buttons"
+                      id="btnFinish"
                       :key="index"
                       type="button"
                       class="btn custom-btn"

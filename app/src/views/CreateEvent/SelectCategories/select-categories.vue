@@ -4,12 +4,131 @@
       <b-col cols="10" offset="1" class="mb-5">
         <div>
           <b-card
-            title="Select Categories"
+            title="Add Teams"
             sub-title="Added Information Event Details"
             class="m-5"
             style="border-radius: 15px; border-color: black"
           >
-            
+         
+            <!-- R4 MEN -->
+            <b-row>
+              <b-col>
+                <b-card
+                  title="R4 MEN"
+                  sub-title="Added Information Event Details"
+                  class="m-5 cardHover"
+                  style="border-radius: 15px; border-color: black"
+                >
+                  <template #header>
+                    <b-row class="justify-content-end">
+                      <b-col cols="auto">
+                        <b-button variant="primary" @click="handleButtonClick"
+                          >Add New</b-button
+                        >
+                      </b-col>
+                    </b-row>
+                  </template>
+
+                  <b-table striped hover :items="teams" :fields="fields">
+                    <template #cell(Action)="row">
+                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
+                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
+                    </template>
+                  </b-table>
+                </b-card>
+              </b-col>
+            </b-row>
+
+            <!-- R4 WOMEN  -->
+            <b-row>
+              <b-col>
+                <b-card
+                  title="R4 WOMEN"
+                  sub-title="Added Information Event Details"
+                  class="m-5 cardHover"
+                  style="border-radius: 15px; border-color: black"
+                >
+                  <template #header>
+                    <b-row class="justify-content-end">
+                      <b-col cols="auto">
+                        <b-button variant="primary" @click="handleButtonClick"
+                          >Add New</b-button
+                        >
+                      </b-col>
+                    </b-row>
+                  </template>
+
+                  <b-table striped hover :items="teams" :fields="fields">
+                    <template #cell(Action)="row">
+                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
+                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
+                    </template>
+                  </b-table>
+                </b-card>
+              </b-col>
+            </b-row>
+
+            <hr/>
+
+            <!-- R6 MEN  -->
+            <b-row>
+              <b-col>
+                <b-card
+                  title="R6 MEN"
+                  sub-title="Added Information Event Details"
+                  class="m-5 cardHover"
+                  style="border-radius: 15px; border-color: black"
+                >
+                  <template #header>
+                    <b-row class="justify-content-end">
+                      <b-col cols="auto">
+                        <b-button variant="primary" @click="handleButtonClick"
+                          >Add New</b-button
+                        >
+                      </b-col>
+                    </b-row>
+                  </template>
+
+                  <b-table striped hover :items="teams" :fields="fields">
+                    <template #cell(Action)="row">
+                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
+                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
+                    </template>
+                  </b-table>
+                </b-card>
+              </b-col>
+            </b-row>
+
+            <!-- R6 WOMEN  -->
+            <b-row>
+              <b-col>
+                <b-card
+                  title="R6 WOMEN"
+                  sub-title="Added Information Event Details"
+                  class="m-5 cardHover"
+                  style="border-radius: 15px; border-color: black"
+                >
+                  <template #header>
+                    <b-row class="justify-content-end">
+                      <b-col cols="auto">
+                        <b-button variant="primary" @click="handleButtonClick"
+                          >Add New</b-button
+                        >
+                      </b-col>
+                    </b-row>
+                  </template>
+
+                  <b-table striped hover :items="teams" :fields="fields">
+                    <template #cell(Action)="row">
+                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
+                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
+                    </template>
+                  </b-table>
+                </b-card>
+              </b-col>
+            </b-row>
+        
+
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
@@ -21,7 +140,7 @@
               </div>
               <div>
                 <b-button @click="save()" type="input" variant="primary">
-                  Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
+                  Simpan Data Event <Icon icon="ic:baseline-keyboard-double-arrow-right"
                 /></b-button>
               </div>
             </div>
@@ -34,64 +153,42 @@
 
 <script>
 export default {
-  name: 'SustainableTimingSystemRaftingSelectCategories',
+  name: "SustainableTimingSystemRaftingSelectCategories",
 
   data() {
     return {
-        text: "",
+      text: "",
       name: "",
-      formEvent: {
-        eventLevel: null,
-        eventName: "",
-        location: "",
-        eventDate: null,
-        eventCategory: [],
-        divisionCategory: [],
-        raceCategory: [],
-        initialCategory: [],
-        chiefJudge: "",
-        raceDirector: "",
-        safetyDirector: "",
-        eventDirector: "",
-      },
-      optionLevels: [
-        { name: "select", text: "Select Level Event" },
-        { value: 0, text: "PON" },
-        { value: 1, text: "KEJURNAS" },
-        { value: 2, text: "KEJURDA" },
-      ],
-      optionCategorys: [
-        { value: null, name: "Select Event Category" },
-        { value: 0, name: "SPRINT" },
-        { value: 1, name: "H2H" },
-        { value: 2, name: "SLALOM" },
-        { value: 3, name: "DRR" },
-      ],
-      optionDivisions: [
-        { value: null, text: "Select Division Category" },
-        { value: 0, text: "R4" },
-        { value: 1, text: "R6" },
-      ],
-      optionRaces: [
-        { value: null, text: "Select Race Category" },
-        { value: 0, text: "MEN" },
-        { value: 1, text: "WOMEN" },
-      ],
-      optionInitials: [
-        { value: null, text: "Select Initial Category" },
-        { value: 0, text: "OPEN" },
+      fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
+      teams: [
+        { No: 1, "Nama Team": "Team A", BIB: "001", Categories: "R4" },
+        { No: 2, "Nama Team": "Team B", BIB: "002", Categories: "R4" },
+        { No: 3, "Nama Team": "Team C", BIB: "003", Categories: "R4" },
+        // Tambahkan data tim lainnya sesuai kebutuhan
       ],
     };
   },
 
-  mounted() {
-    
-  },
+  mounted() {},
 
   methods: {
     goTo() {
-        this.$emit("backForm");
+      this.$emit("backForm");
+    },
+    handleButtonClick() {
+        
     }
   },
 };
 </script>
+
+<style scoped>
+.cardHover {
+  cursor: pointer;
+  background-color: var(--black) !important;
+}
+
+.cardHover:hover {
+  background-color: var(--black) !important;
+}
+</style>

@@ -103,10 +103,15 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
+                  <!-- <tr>
                     <td style="color: black">{{ digitId }}</td>
                     <td style="color: black">{{ digitTime }}</td>
+                  </tr> -->
+                  <tr v-for="(id, index) in digitId" :key="index">
+                    <td style="color: black">{{ id }}</td>
+                    <td style="color: black">{{ digitTime[index] }}</td>
                   </tr>
+
                 </tbody>
               </table>
             </div>
@@ -135,13 +140,15 @@
                     </b-row>
                   </b-col>
                   <b-col class="col-4">
+
                     <button
                       v-for="(button, index) in items"
                       id="btnStart"
                       :key="index"
                       type="button"
                       class="btn custom-btn"
-                      :class="button.class"
+                      :disabled="button.timeStart ? true : false"
+                      :class="button.timeStart ? 'btn-secondary' : 'btn-info'"
                       @click="updateTime(digitTimeStart, button.id, 'start')"
                     >
                       {{ "BIB " + button.bibNumber }}
@@ -180,8 +187,9 @@
                       id="btnFinish"
                       :key="index"
                       type="button"
+                      :disabled="button.timeFinish ? true : false"
                       class="btn custom-btn"
-                      :class="button.class"
+                      :class="button.timeFinish ? 'btn-secondary' : 'btn-info'"
                       @click="updateTime(digitTimeFinish, button.id, 'finish')"
                     >
                       {{ "BIB " + button.bibNumber }}
@@ -282,6 +290,8 @@ export default {
       isScrolled: false,
       port: null,
       isPortConnected: false,
+      digitId: [],
+      digitTime: [],
       items: [
         {
           id: 0,
@@ -295,7 +305,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         {
           id: 1,
@@ -309,7 +318,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         {
           id: 2,
@@ -323,7 +331,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         {
           id: 3,
@@ -337,7 +344,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         {
           id: 4,
@@ -351,7 +357,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         {
           id: 5,
@@ -365,7 +370,6 @@ export default {
           timeResult: "",
           ranked: null,
           score: null,
-          class: "btn-info",
         },
         
       ],
@@ -528,8 +532,8 @@ export default {
         { label: "Team 7", class: "btn-secondary" },
         { label: "Team 8", class: "btn-dark" },
       ],
-      digitId: null,
-      digitTime: null,
+      // digitId: null,
+      // digitTime: null,
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -699,8 +703,11 @@ export default {
                       break; // Keluar dari loop
                     }
                   }
-                  this.digitId = a;
-                  this.digitTime = b;
+                  // this.digitId = a;
+                  // this.digitTime = b;
+
+                  this.digitId.unshift(a);
+      this.digitTime.unshift(b);
 
                   // Memeriksa waktu Start atau Finish
                   if (a[11] == "0") {

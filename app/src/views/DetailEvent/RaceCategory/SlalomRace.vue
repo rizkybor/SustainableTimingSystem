@@ -254,7 +254,8 @@
                               <td>
                                 {{
                                   team.sessions[selectedSession[team.id]]
-                                    .totalPenalty
+                                    .totalPenalty ? team.sessions[selectedSession[team.id]]
+                                    .totalPenalty : '-'
                                 }}
                               </td>
 
@@ -495,7 +496,7 @@ export default {
     },
 
     goTo() {
-      this.$router.push("/");
+      this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
     handleScroll() {
       if (window.scrollY > 0) {

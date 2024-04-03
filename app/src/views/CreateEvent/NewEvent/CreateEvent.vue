@@ -1,7 +1,7 @@
 <template>
   <div>
     <b-row>
-      <b-col cols="10" offset="1">
+      <b-col cols="10" offset="1" class="mb-5">
         <div>
           <b-card
             title="Create New Event"
@@ -9,7 +9,7 @@
             class="m-5"
             style="border-radius: 15px; border-color: black"
           >
-            <form ref="form-newEvent" @click="save()">
+            <form ref="form-newEvent">
               <br />
               <div>
                 <!-- EVENT LEVEL  -->
@@ -145,13 +145,8 @@
                 >
               </div>
               <div>
-                <!-- <b-button @click="goTo()" variant="primary">
-                  <Icon
-                    icon="ic:baseline-keyboard-double-arrow-left"
-                  />Back</b-button
-                > -->
-                <b-button type="input" variant="primary">
-                  Simpan <Icon icon="ic:baseline-keyboard-double-arrow-right"
+                <b-button @click="save()" type="input" variant="primary">
+                  Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
                 /></b-button>
               </div>
             </div>
@@ -236,7 +231,7 @@ export default {
       this.$router.push("/");
     },
     save() {
-      console.log(this.formEvent, "<< cek form Event");
+      this.$emit("enterForm");
     },
   },
 };

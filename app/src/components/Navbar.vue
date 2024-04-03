@@ -2,7 +2,7 @@
   <div>
     <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: var(--blue);">
       <div class="container">
-        <a style="color: var(--white);" class="navbar-brand" href="#">DBTS</a>
+        <a style="color: var(--white);" class="navbar-brand" @click="goTo()">DBTS</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -36,7 +36,9 @@ export default {
   },
 
   methods: {
-    
+    goTo() {
+      this.$router.router.push({name: "home"});
+    }
   },
 };
 </script>

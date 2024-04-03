@@ -843,7 +843,7 @@ export default {
       return hasilFormat;
     },
     goTo() {
-      this.$router.push("/");
+      this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
     handleScroll() {
       if (window.scrollY > 0) {

@@ -9,8 +9,7 @@
       <br/>
       <br/>
       <br/>
-
-      <HelloWorld msg="Desktop Based Timing System" />
+      <!-- <HelloWorld msg="Desktop Based Timing System" /> -->
       <router-view></router-view>
     </div>
     <FooterVue />

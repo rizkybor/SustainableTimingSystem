@@ -2,7 +2,7 @@
   <div>
     <footer class="footer mt-auto py-3">
       <div class="container">
-        <span>FEDERASI ARUNG JERAM DKI JAKARTA</span>
+        <span style="font-weight: bold;">SUSTAINABLE TIMING SYSTEM</span>
       </div>
     </footer>
   </div>

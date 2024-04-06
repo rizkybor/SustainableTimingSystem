@@ -196,9 +196,12 @@ export default {
       },
       optionLevels: [
         { name: "select", text: "Select Level Event" },
-        { value: 0, text: "PON" },
-        { value: 1, text: "KEJURNAS" },
-        { value: 2, text: "KEJURDA" },
+        { value: 0, text: "Classification - D" },
+        { value: 1, text: "Classification - E" },
+        { value: 2, text: "Classification - F" },
+        { value: 0, text: "Classification - G" },
+        { value: 1, text: "Classification - H" },
+        { value: 2, text: "Classification - I" },
       ],
       optionCategorys: [
         { value: null, name: "Select Event Category" },

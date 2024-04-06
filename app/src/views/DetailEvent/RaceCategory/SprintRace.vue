@@ -707,7 +707,7 @@ export default {
                   // this.digitTime = b;
 
                   this.digitId.unshift(a);
-      this.digitTime.unshift(b);
+                  this.digitTime.unshift(b);
 
                   // Memeriksa waktu Start atau Finish
                   if (a[11] == "0") {

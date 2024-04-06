@@ -2,7 +2,9 @@
   <div>
     <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: var(--blue);">
       <div class="container">
-        <a style="color: var(--white);" class="navbar-brand" @click="goTo()">DBTS</a>
+        <a class="navbar-brand" @click="goTo()">
+          <img src="@/assets/images/logo-sts.png" alt="Logo" style="height: 80px;">
+        </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>

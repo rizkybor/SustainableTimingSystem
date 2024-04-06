@@ -57,11 +57,11 @@ export default {
   },
   data() {
     return {
-      fields: ['No', 'Nama', 'Status', 'Description'],
+      fields: ['No', 'Event Name', 'Level Name', 'Date', 'Status'],
       items: [
-        { No: 1, Nama: 'PON', Status: 'Active', Description: 'Deskripsi Item 1' },
-        { No: 2, Nama: 'Kejurda', Status: 'Inactive', Description: 'Deskripsi Item 2' },
-        { No: 3, Nama: 'Kejurnas', Status: 'Active', Description: 'Deskripsi Item 3' },
+        { No: 1, "Event Name": 'PON', "Level Name": 'Classification - F', Date: '01 Januari 2025', Status: 'Active' },
+        { No: 2, "Event Name": 'Kejurda', "Level Name": 'Classification - E', Date: '01 Januari 2026', Status: 'Inactive' },
+        { No: 3, "Event Name": 'Kejurnas', "Level Name": 'Classification - D', Date: '01 Januari 2027', Status: 'Active' },
         // Tambahkan item lain sesuai kebutuhan
       ]
     };

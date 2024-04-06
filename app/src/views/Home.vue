@@ -30,7 +30,6 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import Banner from "../components/Banner.vue";
-import { getEvents } from '../server/services/events';
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -52,16 +51,6 @@ export default {
   },
 
   async mounted() {},
-  async created() {
-    try {
-      // Panggil fungsi getEvents untuk mendapatkan daftar event
-      const events = await getEvents();
-
-      this.events = events;
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  },
 
   methods: {
     goTo(val) {

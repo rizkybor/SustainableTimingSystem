@@ -21,24 +21,6 @@
           <b-card> 
             <b-table striped hover :items="items" :fields="fields" style="cursor: pointer;" @row-clicked="clickRow"></b-table>
           </b-card>
-          <!-- <b-carousel
-            id="carousel1"
-            v-model="slide"
-            :interval="3000"
-            controls
-            indicators
-            style="margin-bottom: 10vh;"
-          >
-            <b-carousel-slide
-              v-for="(item, index) in items"
-              :key="index"
-              :img-src="item.img"
-              :caption="item.caption"
-            >
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.description }}</p>
-            </b-carousel-slide>
-          </b-carousel> -->
         </b-col>
       </div>
     </b-container>
@@ -48,6 +30,7 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import Banner from "../components/Banner.vue";
+import { getEvents } from '../server/services/events';
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -63,11 +46,22 @@ export default {
         { No: 2, "Event Name": 'Kejurda', "Level Name": 'Classification - E', Date: '01 Januari 2026', Status: 'Inactive' },
         { No: 3, "Event Name": 'Kejurnas', "Level Name": 'Classification - D', Date: '01 Januari 2027', Status: 'Active' },
         // Tambahkan item lain sesuai kebutuhan
-      ]
+      ],
+      events:{}
     };
   },
 
   async mounted() {},
+  async created() {
+    try {
+      // Panggil fungsi getEvents untuk mendapatkan daftar event
+      const events = await getEvents();
+
+      this.events = events;
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  },
 
   methods: {
     goTo(val) {
@@ -85,3 +79,4 @@ export default {
 </script>
 
 <style lang="scss" scoped></style>
+../server/index.js../../server/services/events

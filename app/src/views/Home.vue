@@ -31,7 +31,6 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import Banner from "../components/Banner.vue";
-import { ipcRenderer } from 'electron';
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -53,17 +52,6 @@ export default {
   },
 
   async mounted() {
-    ipcRenderer.send('get-all-customers');
-
-    ipcRenderer.on('customers-data', (event, data) => {
-      if (data) {
-        console.log("Data from customers table:", data);
-        this.events = data
-        // Lakukan sesuatu dengan data yang diterima
-      } else {
-        console.error("Failed to retrieve data from customers table");
-      }
-    });
   },
 
   methods: {

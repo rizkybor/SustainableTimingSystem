@@ -5,63 +5,6 @@ import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
-
-const db = require('electron-db');
-const path = require('path');
-const fs = require('fs');
-
-
-// Set path untuk folder userData aplikasi
-const userDataPath = app.getPath('userData');
-const tableFilePath = path.join(userDataPath);
-
-console.log("userDataPath:", userDataPath);
-
-// Buat tabel 'customers' di dalam file JSON
-if (!fs.existsSync(tableFilePath)) {
-  db.createTable('customers', tableFilePath, (succ, msg) => {
-    console.log("Success: " + succ);
-    console.log("Message: " + msg);
-
-    
-  });
-} else {
-  db.getAll("customers", (succ, data) => {
-    if (succ) {
-      console.log("Data from customers table:", data);
-    } else {
-      console.error("Failed to retrieve data from customers table");
-    }
-  });
-  console.log("Database file already exists at: " + tableFilePath);
-}
-
-ipcMain.on('get-all-customers', (event) => {
-  db.getAll("customers", (succ, data) => {
-    if (succ) {
-      event.reply('customers-data', data);
-    } else {
-      event.reply('customers-data', null);
-    }
-  });
-});
-
-
-// let obj = new Object();
- 
-// obj.name = "Alexius Academia";
-// obj.address = "Paco, Botolan, Zambales";
-
-// if (db.valid('customers')) {
-//   db.insertTableContent('customers', obj, (succ, msg) => {
-//     console.log("Success ADD: " + succ);
-//     console.log("Message: " + msg);
-
-//   })
-// }
-
-
-
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true } }

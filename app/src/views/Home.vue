@@ -52,9 +52,30 @@ export default {
   },
 
   async mounted() {
+    this.getDataFromMongoDB();
   },
 
   methods: {
+    async getDataFromMongoDB() {
+      try {
+        // Gunakan koneksi MongoDB dari aplikasi Electron
+        const mongodbClient = window.require('electron').remote.app.mongodbClient;
+        console.log(mongodbClient,'<< cek')
+        if (mongodbClient) {
+          // Lakukan operasi MongoDB di sini, misalnya membaca data dari koleksi tertentu
+          const database = mongodbClient.db();
+          const collection = database.collection('stsCollection');
+          const result = await collection.find({}).toArray();
+
+          // Simpan data yang diterima dari MongoDB ke dalam variabel komponen
+          this.mongoData = result;
+        } else {
+          console.error('Koneksi MongoDB tidak tersedia.');
+        }
+      } catch (error) {
+        console.error('Gagal mendapatkan data dari MongoDB:', error);
+      }
+    },
     goTo(val) {
       this.$router.push(`${val}`);
     },

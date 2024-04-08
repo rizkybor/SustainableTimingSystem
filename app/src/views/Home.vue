@@ -19,12 +19,13 @@
       <div>
         <b-col md="10" offset-md="1">
           <b-card> 
-            <b-table striped hover :items="items" :fields="fields" style="cursor: pointer;" @row-clicked="clickRow"></b-table>
+            <b-table striped hover :items="events" :fields="fields" style="cursor: pointer;" @row-clicked="clickRow"></b-table>
           </b-card>
         </b-col>
-        {{ events }}
       </div>
     </b-container>
+    <br/>
+    <br/>
   </div>
 </template>
 
@@ -42,35 +43,25 @@ export default {
   },
   data() {
     return {
-      fields: ['No', 'Event Name', 'Level Name', 'Date', 'Status'],
-      items: [
-        { No: 1, "Event Name": 'PON', "Level Name": 'Classification - F', Date: '01 Januari 2025', Status: 'Active' },
-        { No: 2, "Event Name": 'Kejurda', "Level Name": 'Classification - E', Date: '01 Januari 2026', Status: 'Inactive' },
-        { No: 3, "Event Name": 'Kejurnas', "Level Name": 'Classification - D', Date: '01 Januari 2027', Status: 'Active' },
-        // Tambahkan item lain sesuai kebutuhan
-      ],
+      fields: ['ids', 'eventName', 'levelName', 'startDateEvent', 'endDateEvent', 'statusEvent'],
       events:{}
     };
   },
 
   async mounted() {
     this.getEvents()
-    // ipcRenderer.send('get-events');
-    // ipcRenderer.on('events-data', (event, data) => {
-    //   console.log('heloo')
-    //   if (data) {
-    //     console.log("Data from events table:", data);
-    //     this.events = data
-    //     // Lakukan sesuatu dengan data yang diterima
-    //   } else {
-    //     console.error("Failed to retrieve data from events table");
-    //   }
-    // });
   },
   methods: {
     async getEvents() {
-      const events = await ipcRenderer.sendSync('get-events');
-      this.events = events;
+    ipcRenderer.send('get-events');
+    ipcRenderer.on('get-events-reply', (event, data) => {
+      if (data) {
+        console.log("Data from events table:", data);
+        this.events = data
+      } else {
+        console.error("Failed to retrieve data from events table");
+      }
+    });
     },
     goTo(val) {
       this.$router.push(`${val}`);

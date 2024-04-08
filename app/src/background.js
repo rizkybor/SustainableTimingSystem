@@ -22,8 +22,8 @@ async function connectToDatabase() {
 async function getDataFromMongoDB() {
   try {
     await connectToDatabase();
-    const database = client.db('sustainabledb'); // Ganti 'nama_database' dengan nama database Anda
-    const collection = database.collection('stscollection'); // Ganti 'nama_collection' dengan nama koleksi Anda
+    const database = client.db('sustainabledb'); 
+    const collection = database.collection('eventsCollection');
     const data = await collection.find({}).toArray();
     return data;
   } catch (error) {
@@ -36,21 +36,13 @@ ipcMain.on("get-events", async (event) => {
   console.log('GET IPC MAIN')
   try {
     const data = await getDataFromMongoDB();
-    console.log(data,'<< cek DATANYA')
+    // console.log(data,'<< cek DATANYA')
     event.reply('get-events-reply', data);
   } catch (error) {
-    console.error('Error fetching data:', error);
+    // console.error('Error fetching data:', error);
     event.reply('get-events-reply', []);
   }
 });
-
-// db.getAll("events", (succ, data) => {
-  //   if (succ) {
-  //     event.reply("events-data", data);
-  //   } else {
-  //     event.reply("events-data", null);
-  //   }
-  // });
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([

@@ -54,20 +54,24 @@ export default {
   },
 
   async mounted() {
-    ipcRenderer.send('get-events');
-    ipcRenderer.on('events-data', (event, data) => {
-      console.log('heloo')
-      if (data) {
-        console.log("Data from events table:", data);
-        this.events = data
-        // Lakukan sesuatu dengan data yang diterima
-      } else {
-        console.error("Failed to retrieve data from events table");
-      }
-    });
+    this.getEvents()
+    // ipcRenderer.send('get-events');
+    // ipcRenderer.on('events-data', (event, data) => {
+    //   console.log('heloo')
+    //   if (data) {
+    //     console.log("Data from events table:", data);
+    //     this.events = data
+    //     // Lakukan sesuatu dengan data yang diterima
+    //   } else {
+    //     console.error("Failed to retrieve data from events table");
+    //   }
+    // });
   },
-
   methods: {
+    async getEvents() {
+      const events = await ipcRenderer.sendSync('get-events');
+      this.events = events;
+    },
     goTo(val) {
       this.$router.push(`${val}`);
     },

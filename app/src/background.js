@@ -18,20 +18,39 @@ async function connectToDatabase() {
   }
 }
 
-connectToDatabase();
+// connectToDatabase();
+async function getDataFromMongoDB() {
+  try {
+    await connectToDatabase();
+    const database = client.db('sustainabledb'); // Ganti 'nama_database' dengan nama database Anda
+    const collection = database.collection('stscollection'); // Ganti 'nama_collection' dengan nama koleksi Anda
+    const data = await collection.find({}).toArray();
+    return data;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return [];
+  }
+}
 
-ipcMain.on("get-events", (event) => {
+ipcMain.on("get-events", async (event) => {
   console.log('GET IPC MAIN')
-      event.reply("events-data", []);
+  try {
+    const data = await getDataFromMongoDB();
+    console.log(data,'<< cek DATANYA')
+    event.reply('get-events-reply', data);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    event.reply('get-events-reply', []);
+  }
+});
 
-  // db.getAll("events", (succ, data) => {
+// db.getAll("events", (succ, data) => {
   //   if (succ) {
   //     event.reply("events-data", data);
   //   } else {
   //     event.reply("events-data", null);
   //   }
   // });
-});
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([

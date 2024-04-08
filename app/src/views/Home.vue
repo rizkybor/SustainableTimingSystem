@@ -19,18 +19,21 @@
       <div>
         <b-col md="10" offset-md="1">
           <b-card> 
-            <b-table striped hover :items="items" :fields="fields" style="cursor: pointer;" @row-clicked="clickRow"></b-table>
+            <b-table striped hover :items="events" :fields="fields" style="cursor: pointer;" @row-clicked="clickRow"></b-table>
           </b-card>
         </b-col>
-        {{ events }}
       </div>
     </b-container>
+    <br/>
+    <br/>
   </div>
 </template>
 
 <script>
 import { Icon } from "@iconify/vue2";
 import Banner from "../components/Banner.vue";
+import { ipcRenderer } from 'electron';
+
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -40,41 +43,25 @@ export default {
   },
   data() {
     return {
-      fields: ['No', 'Event Name', 'Level Name', 'Date', 'Status'],
-      items: [
-        { No: 1, "Event Name": 'PON', "Level Name": 'Classification - F', Date: '01 Januari 2025', Status: 'Active' },
-        { No: 2, "Event Name": 'Kejurda', "Level Name": 'Classification - E', Date: '01 Januari 2026', Status: 'Inactive' },
-        { No: 3, "Event Name": 'Kejurnas', "Level Name": 'Classification - D', Date: '01 Januari 2027', Status: 'Active' },
-        // Tambahkan item lain sesuai kebutuhan
-      ],
+      fields: ['ids', 'eventName', 'levelName', 'startDateEvent', 'endDateEvent', 'statusEvent'],
       events:{}
     };
   },
 
   async mounted() {
-    this.getDataFromMongoDB();
+    this.getEvents()
   },
-
   methods: {
-    async getDataFromMongoDB() {
-      try {
-        // Gunakan koneksi MongoDB dari aplikasi Electron
-        const mongodbClient = window.require('electron').remote.app.mongodbClient;
-        console.log(mongodbClient,'<< cek')
-        if (mongodbClient) {
-          // Lakukan operasi MongoDB di sini, misalnya membaca data dari koleksi tertentu
-          const database = mongodbClient.db();
-          const collection = database.collection('stsCollection');
-          const result = await collection.find({}).toArray();
-
-          // Simpan data yang diterima dari MongoDB ke dalam variabel komponen
-          this.mongoData = result;
-        } else {
-          console.error('Koneksi MongoDB tidak tersedia.');
-        }
-      } catch (error) {
-        console.error('Gagal mendapatkan data dari MongoDB:', error);
+    async getEvents() {
+    ipcRenderer.send('get-events');
+    ipcRenderer.on('get-events-reply', (event, data) => {
+      if (data) {
+        console.log("Data from events table:", data);
+        this.events = data
+      } else {
+        console.error("Failed to retrieve data from events table");
       }
+    });
     },
     goTo(val) {
       this.$router.push(`${val}`);

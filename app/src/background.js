@@ -4,63 +4,45 @@ import { app, protocol, BrowserWindow, ipcMain } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
+const { MongoClient } = require('mongodb');
 
+const uri = 'mongodb://localhost:27017';
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
-const db = require('electron-db');
-const path = require('path');
-const fs = require('fs');
-
-
-// Set path untuk folder userData aplikasi
-const userDataPath = app.getPath('userData');
-const tableFilePath = path.join(userDataPath);
-
-console.log("userDataPath:", userDataPath);
-
-// Buat tabel 'customers' di dalam file JSON
-if (!fs.existsSync(tableFilePath)) {
-  db.createTable('customers', tableFilePath, (succ, msg) => {
-    console.log("Success: " + succ);
-    console.log("Message: " + msg);
-
-    
-  });
-} else {
-  db.getAll("customers", (succ, data) => {
-    if (succ) {
-      console.log("Data from customers table:", data);
-    } else {
-      console.error("Failed to retrieve data from customers table");
-    }
-  });
-  console.log("Database file already exists at: " + tableFilePath);
+async function connectToDatabase() {
+  try {
+    await client.connect();
+    console.log('Connected to database');
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+  }
 }
 
-ipcMain.on('get-all-customers', (event) => {
-  db.getAll("customers", (succ, data) => {
-    if (succ) {
-      event.reply('customers-data', data);
-    } else {
-      event.reply('customers-data', null);
-    }
-  });
+// connectToDatabase();
+async function getDataFromMongoDB() {
+  try {
+    await connectToDatabase();
+    const database = client.db('sustainabledb'); 
+    const collection = database.collection('eventsCollection');
+    const data = await collection.find({}).toArray();
+    return data;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return [];
+  }
+}
+
+ipcMain.on("get-events", async (event) => {
+  console.log('GET IPC MAIN')
+  try {
+    const data = await getDataFromMongoDB();
+    // console.log(data,'<< cek DATANYA')
+    event.reply('get-events-reply', data);
+  } catch (error) {
+    // console.error('Error fetching data:', error);
+    event.reply('get-events-reply', []);
+  }
 });
-
-
-// let obj = new Object();
- 
-// obj.name = "Alexius Academia";
-// obj.address = "Paco, Botolan, Zambales";
-
-// if (db.valid('customers')) {
-//   db.insertTableContent('customers', obj, (succ, msg) => {
-//     console.log("Success ADD: " + succ);
-//     console.log("Message: " + msg);
-
-//   })
-// }
-
-
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([

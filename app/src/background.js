@@ -1,9 +1,48 @@
 'use strict'
 
-import { app, protocol, BrowserWindow } from 'electron'
+import { app, protocol, BrowserWindow, ipcMain } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
+const { MongoClient } = require('mongodb');
+
+const uri = 'mongodb://localhost:27017';
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+
+async function connectToDatabase() {
+  try {
+    await client.connect();
+    console.log('Connected to database');
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+  }
+}
+
+// connectToDatabase();
+async function getDataFromMongoDB() {
+  try {
+    await connectToDatabase();
+    const database = client.db('sustainabledb'); 
+    const collection = database.collection('eventsCollection');
+    const data = await collection.find({}).toArray();
+    return data;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return [];
+  }
+}
+
+ipcMain.on("get-events", async (event) => {
+  console.log('GET IPC MAIN')
+  try {
+    const data = await getDataFromMongoDB();
+    // console.log(data,'<< cek DATANYA')
+    event.reply('get-events-reply', data);
+  } catch (error) {
+    // console.error('Error fetching data:', error);
+    event.reply('get-events-reply', []);
+  }
+});
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([

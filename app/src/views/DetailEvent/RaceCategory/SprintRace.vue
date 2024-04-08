@@ -695,16 +695,24 @@ export default {
                   for (let i = 0; i < receivedData.length; i++) {
                     const char = receivedData[i];
 
+                    //  TIME BY RACETIME
                     if (char === "M") {
                       a = receivedData.slice(0, i + 1);
                       b = receivedData.slice(i + 1);
 
                       receivedData = "";
-                      break; // Keluar dari loop
+                      break; 
+                    }
+                    
+                    //  TIME BY SENSOR
+                    if (char === "R") {
+                      a = receivedData.slice(0, i + 1);
+                      b = receivedData.slice(i + 1);
+
+                      receivedData = "";
+                      break; 
                     }
                   }
-                  // this.digitId = a;
-                  // this.digitTime = b;
 
                   this.digitId.unshift(a);
                   this.digitTime.unshift(b);

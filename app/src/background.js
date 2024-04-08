@@ -20,6 +20,19 @@ async function connectToDatabase() {
 
 connectToDatabase();
 
+ipcMain.on("get-events", (event) => {
+  console.log('GET IPC MAIN')
+      event.reply("events-data", []);
+
+  // db.getAll("events", (succ, data) => {
+  //   if (succ) {
+  //     event.reply("events-data", data);
+  //   } else {
+  //     event.reply("events-data", null);
+  //   }
+  // });
+});
+
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true } }

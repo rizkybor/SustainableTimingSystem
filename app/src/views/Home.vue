@@ -31,6 +31,8 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import Banner from "../components/Banner.vue";
+import { ipcRenderer } from 'electron';
+
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -52,30 +54,20 @@ export default {
   },
 
   async mounted() {
-    this.getDataFromMongoDB();
+    ipcRenderer.send('get-events');
+    ipcRenderer.on('events-data', (event, data) => {
+      console.log('heloo')
+      if (data) {
+        console.log("Data from events table:", data);
+        this.events = data
+        // Lakukan sesuatu dengan data yang diterima
+      } else {
+        console.error("Failed to retrieve data from events table");
+      }
+    });
   },
 
   methods: {
-    async getDataFromMongoDB() {
-      try {
-        // Gunakan koneksi MongoDB dari aplikasi Electron
-        const mongodbClient = window.require('electron').remote.app.mongodbClient;
-        console.log(mongodbClient,'<< cek')
-        if (mongodbClient) {
-          // Lakukan operasi MongoDB di sini, misalnya membaca data dari koleksi tertentu
-          const database = mongodbClient.db();
-          const collection = database.collection('stsCollection');
-          const result = await collection.find({}).toArray();
-
-          // Simpan data yang diterima dari MongoDB ke dalam variabel komponen
-          this.mongoData = result;
-        } else {
-          console.error('Koneksi MongoDB tidak tersedia.');
-        }
-      } catch (error) {
-        console.error('Gagal mendapatkan data dari MongoDB:', error);
-      }
-    },
     goTo(val) {
       this.$router.push(`${val}`);
     },

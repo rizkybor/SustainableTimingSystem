@@ -20,7 +20,7 @@
                 </div>
                 <b-button
                 style="border-radius: 20px"
-                  class="btn-sm"
+                  class="btn-md"
                   variant="primary"
                   @click="goTo('create-new')"
                 >

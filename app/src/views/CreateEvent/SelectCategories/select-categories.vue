@@ -26,7 +26,6 @@
                   <b-button
                     style="border-radius: 20px"
                     variant="primary"
-                    disabled
                   >
                     <img
                       src="../../../assets/icons/sprint.png"
@@ -38,7 +37,6 @@
                   <b-button
                     style="border-radius: 20px"
                     variant="primary"
-                    disabled
                   >
                     <img
                       src="../../../assets/icons/h2h.png"
@@ -50,7 +48,6 @@
                   <b-button
                     style="border-radius: 20px"
                     variant="primary"
-                    disabled
                   >
                     <img
                       src="../../../assets/icons/slalom.png"
@@ -61,6 +58,8 @@
                   </b-button>
                 </div>
               </div>
+             
+             <!-- CARD COMPONENT TABLE  -->
               <b-card class="shadow" style="border-radius: 20px">
                 <template #header>
                   <div style="display: flex; justify-content: space-between">
@@ -69,12 +68,11 @@
                     </div>
                     <b-button
                       style="border-radius: 20px"
-                      class="btn-sm"
+                      class="btn-md"
                       variant="primary"
                       @click="$bvModal.show('bv-modal-add-team')"
                     >
-                      <Icon icon="ic:baseline-add-circle" /> Add New
-                      Team</b-button
+                      <Icon icon="ic:baseline-add-circle" /> New Team</b-button
                     >
                   </div>
                 </template>
@@ -100,6 +98,9 @@
                   </template>
                 </b-table>
               </b-card>
+             <!-- CARD COMPONENT TABLE  -->
+
+
             </b-col>
           </b-row>
 
@@ -109,6 +110,7 @@
                 style="border-radius: 20px"
                 @click="goTo()"
                 variant="secondary"
+                class="btn-md"
               >
                 <Icon
                   icon="ic:baseline-keyboard-double-arrow-left"
@@ -121,9 +123,10 @@
                 @click="save()"
                 type="input"
                 variant="success"
+                class="btn-md"
               >
-                Simpan Data Event
                 <Icon icon="material-symbols-light:save" />
+                Save Event
               </b-button>
             </div>
           </div>
@@ -165,6 +168,7 @@
       </div>
       <div class="mt-5 p-4" style="display: flex; gap: 2vh">
         <b-button
+          class="btn-md"
           style="border-radius: 20px"
           block
           @click="$bvModal.hide('bv-modal-add-team')"
@@ -172,6 +176,7 @@
         >
         <br />
         <b-button
+          class="btn-md"
           style="border-radius: 20px"
           variant="primary"
           block

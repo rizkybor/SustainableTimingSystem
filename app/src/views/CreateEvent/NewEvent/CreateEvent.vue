@@ -262,14 +262,14 @@
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
-                <b-button style="border-radius: 20px" @click="goTo()" variant="secondary">
+                <b-button class="btn-md" style="border-radius: 20px" @click="goTo()" variant="secondary">
                   <Icon
                     icon="ic:baseline-keyboard-double-arrow-left"
                   />Back</b-button
                 >
               </div>
               <div>
-                <b-button style="border-radius: 20px" @click="save()" type="input" variant="primary">
+                <b-button class="btn-md" style="border-radius: 20px" @click="save()" type="input" variant="primary">
                   Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
                 /></b-button>
               </div>

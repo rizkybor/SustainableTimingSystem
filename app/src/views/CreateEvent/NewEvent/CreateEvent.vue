@@ -6,8 +6,8 @@
           <b-card
             title="Create New Event"
             sub-title="Added Information Event Details"
-            class="m-5 shadow"
-            style="border-radius: 15px;"
+            class="m-5 shadow px-3 py-4"
+            style="border-radius: 25px;"
           >
             <form ref="form-newEvent">
               <br />
@@ -259,14 +259,14 @@
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
-                <b-button @click="goTo()" class="rounded" variant="primary">
+                <b-button style="border-radius: 20px" @click="goTo()" variant="secondary">
                   <Icon
                     icon="ic:baseline-keyboard-double-arrow-left"
                   />Back</b-button
                 >
               </div>
               <div>
-                <b-button @click="save()" type="input" variant="primary">
+                <b-button style="border-radius: 20px" @click="save()" type="input" variant="primary">
                   Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
                 /></b-button>
               </div>

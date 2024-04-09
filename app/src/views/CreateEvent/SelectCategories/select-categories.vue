@@ -48,7 +48,7 @@
                     <div style="display: flex; gap: 1vh">
                       <b-button
                         style="border-radius: 20px"
-                        variant="primary"
+                        variant="warning"
                         size="sm"
                         @click="editTeam(row.item)"
                         >Edit</b-button
@@ -72,7 +72,7 @@
               <b-button
                 style="border-radius: 20px"
                 @click="goTo()"
-                variant="primary"
+                variant="secondary"
               >
                 <Icon
                   icon="ic:baseline-keyboard-double-arrow-left"
@@ -84,7 +84,7 @@
                 style="border-radius: 20px"
                 @click="save()"
                 type="input"
-                variant="primary"
+                variant="success"
               >
                 Simpan Data Event
                 <Icon icon="ic:baseline-keyboard-double-arrow-right"

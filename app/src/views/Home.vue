@@ -6,18 +6,46 @@
       <b-row>
         <b-col md="10" offset-md="1"> </b-col>
       </b-row>
-      <b-row class="justify-content-md-center m-5">
+      <br />
+      <br />
+      <br />
+      <br />
+
+      <!-- <b-row class="justify-content-md-center m-5">
         <b-col cols="12" md="auto">
-          <b-button @click="goTo('create-new')" variant="primary">
+          <b-button
+            style="border-radius: 20px"
+            @click="goTo('create-new')"
+            variant="primary"
+          >
             <Icon icon="ic:baseline-add-circle" />
             Create New Event</b-button
           >
         </b-col>
-      </b-row>
+      </b-row> -->
 
       <div>
         <b-col md="10" offset-md="1">
-          <b-card>
+          <!-- <div class="mx-2 my-3 text-left">
+                <p class="h3 font-weight-bold">List Event</p>
+              </div> -->
+          <b-card class="shadow" style="border-radius: 20px">
+            <template #header>
+              <div style="display: flex; justify-content: space-between">
+                <div class="mx-2 mt-3">
+                  <p class="h5 font-weight-bold">All Event</p>
+                </div>
+                <b-button
+                style="border-radius: 20px"
+                  class="btn-sm"
+                  variant="primary"
+                  @click="goTo('create-new')"
+                >
+                  <Icon icon="ic:baseline-add-circle" />
+                  Create New Event</b-button
+                >
+              </div>
+            </template>
             <b-table
               striped
               hover
@@ -25,7 +53,8 @@
               :fields="fields"
               style="cursor: pointer"
               @row-clicked="clickRow"
-            ></b-table>
+            >
+            </b-table>
           </b-card>
         </b-col>
       </div>

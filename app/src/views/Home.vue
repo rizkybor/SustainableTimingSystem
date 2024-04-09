@@ -68,7 +68,6 @@ export default {
       ipcRenderer.send("get-events");
       ipcRenderer.on("get-events-reply", (event, data) => {
         if (data) {
-          console.log("Data from events table:", data);
           this.events = data;
         } else {
           console.error("Failed to retrieve data from events table");

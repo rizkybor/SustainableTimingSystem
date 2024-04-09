@@ -6,8 +6,8 @@
           <b-card
             title="Create New Event"
             sub-title="Added Information Event Details"
-            class="m-5"
-            style="border-radius: 15px; border-color: black"
+            class="m-5 shadow"
+            style="border-radius: 15px;"
           >
             <form ref="form-newEvent">
               <br />
@@ -259,7 +259,7 @@
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
-                <b-button @click="goTo()" variant="primary">
+                <b-button @click="goTo()" class="rounded" variant="primary">
                   <Icon
                     icon="ic:baseline-keyboard-double-arrow-left"
                   />Back</b-button
@@ -325,14 +325,17 @@ export default {
   },
 
   async mounted() {
-    await this.setOptionLevel();
-    await this.setOptionCategoriesEvent();
-    await this.setOptionCategoriesDivision();
-    await this.setOptionCategoriesInitial();
-    await this.setOptionCategoriesRace();
+    await this.loadOptions();
   },
 
   methods: {
+    async loadOptions() {
+      await this.setOptionLevel();
+      await this.setOptionCategoriesEvent();
+      await this.setOptionCategoriesDivision();
+      await this.setOptionCategoriesInitial();
+      await this.setOptionCategoriesRace();
+    },
     async setOptionLevel() {
       ipcRenderer.send("option-level");
       ipcRenderer.on("option-level-reply", (event, data) => {
@@ -384,10 +387,45 @@ export default {
       });
     },
     goTo() {
+      localStorage.removeItem('formNewEvent');
       this.$router.push("/");
+    },
+    validateForm() {
+      const {
+        eventLevel,
+        eventName,
+        location,
+        eventDate,
+        chiefJudge,
+        raceDirector,
+        safetyDirector,
+        eventDirector,
+      } = this.formEvent;
+
+      if (
+        !eventLevel ||
+        !eventName ||
+        !location ||
+        !eventDate ||
+        !chiefJudge ||
+        !raceDirector ||
+        !safetyDirector ||
+        !eventDirector
+      ) {
+        return false;
+      }
+      return true; 
     },
     save() {
       this.$emit("enterForm");
+
+      // const formValid = this.validateForm();
+      // if (formValid) {
+      //   localStorage.setItem('formNewEvent', this.formEvent);
+      //   this.$emit("enterForm");
+      // } else {
+      //   console.error("Please fill out all the form fields.");
+      // }
     },
   },
 };

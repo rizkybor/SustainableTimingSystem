@@ -1,150 +1,96 @@
 <template>
-  <div>
+  <div class="m-4">
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
         <div>
-          <b-card
-            title="Add Teams"
-            sub-title="Added Information Event Details"
-            class="m-5"
-            style="border-radius: 15px; border-color: black"
-          >
-         
-            <!-- R4 MEN -->
-            <b-row>
-              <b-col>
-                <b-card
-                  title="R4 MEN"
-                  sub-title="Added Information Event Details"
-                  class="m-5 cardHover"
-                  style="border-radius: 15px; border-color: black"
-                >
-                  <template #header>
-                    <b-row class="justify-content-end">
-                      <b-col cols="auto">
-                        <b-button variant="primary" @click="handleButtonClick"
-                          >Add New</b-button
-                        >
-                      </b-col>
-                    </b-row>
-                  </template>
-
-                  <b-table striped hover :items="teams" :fields="fields">
-                    <template #cell(Action)="row">
-                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
-                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
-                    </template>
-                  </b-table>
-                </b-card>
-              </b-col>
-            </b-row>
-
-            <!-- R4 WOMEN  -->
-            <b-row>
-              <b-col>
-                <b-card
-                  title="R4 WOMEN"
-                  sub-title="Added Information Event Details"
-                  class="m-5 cardHover"
-                  style="border-radius: 15px; border-color: black"
-                >
-                  <template #header>
-                    <b-row class="justify-content-end">
-                      <b-col cols="auto">
-                        <b-button variant="primary" @click="handleButtonClick"
-                          >Add New</b-button
-                        >
-                      </b-col>
-                    </b-row>
-                  </template>
-
-                  <b-table striped hover :items="teams" :fields="fields">
-                    <template #cell(Action)="row">
-                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
-                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
-                    </template>
-                  </b-table>
-                </b-card>
-              </b-col>
-            </b-row>
-
-            <hr/>
-
-            <!-- R6 MEN  -->
-            <b-row>
-              <b-col>
-                <b-card
-                  title="R6 MEN"
-                  sub-title="Added Information Event Details"
-                  class="m-5 cardHover"
-                  style="border-radius: 15px; border-color: black"
-                >
-                  <template #header>
-                    <b-row class="justify-content-end">
-                      <b-col cols="auto">
-                        <b-button variant="primary" @click="handleButtonClick"
-                          >Add New</b-button
-                        >
-                      </b-col>
-                    </b-row>
-                  </template>
-
-                  <b-table striped hover :items="teams" :fields="fields">
-                    <template #cell(Action)="row">
-                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
-                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
-                    </template>
-                  </b-table>
-                </b-card>
-              </b-col>
-            </b-row>
-
-            <!-- R6 WOMEN  -->
-            <b-row>
-              <b-col>
-                <b-card
-                  title="R6 WOMEN"
-                  sub-title="Added Information Event Details"
-                  class="m-5 cardHover"
-                  style="border-radius: 15px; border-color: black"
-                >
-                  <template #header>
-                    <b-row class="justify-content-end">
-                      <b-col cols="auto">
-                        <b-button variant="primary" @click="handleButtonClick"
-                          >Add New</b-button
-                        >
-                      </b-col>
-                    </b-row>
-                  </template>
-
-                  <b-table striped hover :items="teams" :fields="fields">
-                    <template #cell(Action)="row">
-                      <b-button variant="primary" size="sm" @click="editTeam(row.item)">Edit</b-button>
-                      <b-button variant="danger" size="sm" @click="deleteTeam(row.item)">Delete</b-button>
-                    </template>
-                  </b-table>
-                </b-card>
-              </b-col>
-            </b-row>
-        
-
-
-            <div class="d-flex mt-5" style="justify-content: space-between">
-              <div>
-                <b-button @click="goTo()" variant="primary">
-                  <Icon
-                    icon="ic:baseline-keyboard-double-arrow-left"
-                  />Back</b-button
-                >
+          <b-row>
+            <b-col>
+              <div class="mx-2 mt-3">
+                <p class="h6">Home / Add Team</p>
               </div>
-              <div>
-                <b-button @click="save()" type="input" variant="primary">
-                  Simpan Data Event <Icon icon="ic:baseline-keyboard-double-arrow-right"
-                /></b-button>
+              <div class="mx-2 my-5 mt-2">
+                <p class="h2">Add Team</p>
               </div>
+              <div class="my-4">
+                <div class="text-left" style="display: flex; gap: 1vh">
+                  <b-button style="border-radius: 20px" variant="primary">
+                    DDR
+                  </b-button>
+                  <b-button style="border-radius: 20px" variant="primary">
+                    SPRINT
+                  </b-button>
+                  <b-button style="border-radius: 20px" variant="primary">
+                    H2H
+                  </b-button>
+                  <b-button style="border-radius: 20px" variant="primary">
+                    SLALOM
+                  </b-button>
+                </div>
+              </div>
+              <b-card class="shadow" style="border-radius: 20px">
+                <template #header>
+                  <div style="display: flex; justify-content: space-between">
+                    <div class="mx-2 mt-3">
+                      <p class="h5 font-weight-bold">TEAM R4 - DDR MEN</p>
+                    </div>
+                    <b-button
+                      style="border-radius: 20px"
+                      class="btn-sm"
+                      variant="primary"
+                      @click="handleButtonClick"
+                      >Add New Team</b-button
+                    >
+                  </div>
+                </template>
+
+                <b-table striped hover :items="teams" :fields="fields">
+                  <template #cell(Action)="row">
+                    <div style="display: flex; gap: 1vh">
+                      <b-button
+                        style="border-radius: 20px"
+                        variant="primary"
+                        size="sm"
+                        @click="editTeam(row.item)"
+                        >Edit</b-button
+                      >
+                      <b-button
+                        style="border-radius: 20px"
+                        variant="danger"
+                        size="sm"
+                        @click="deleteTeam(row.item)"
+                        >Delete</b-button
+                      >
+                    </div>
+                  </template>
+                </b-table>
+              </b-card>
+            </b-col>
+          </b-row>
+
+          <div class="d-flex mt-5" style="justify-content: space-between">
+            <div>
+              <b-button
+                style="border-radius: 20px"
+                @click="goTo()"
+                variant="primary"
+              >
+                <Icon
+                  icon="ic:baseline-keyboard-double-arrow-left"
+                />Back</b-button
+              >
             </div>
-          </b-card>
+            <div>
+              <b-button
+                style="border-radius: 20px"
+                @click="save()"
+                type="input"
+                variant="primary"
+              >
+                Simpan Data Event
+                <Icon icon="ic:baseline-keyboard-double-arrow-right"
+              /></b-button>
+            </div>
+          </div>
         </div>
       </b-col>
     </b-row>
@@ -175,9 +121,7 @@ export default {
     goTo() {
       this.$emit("backForm");
     },
-    handleButtonClick() {
-        
-    }
+    handleButtonClick() {},
   },
 };
 </script>

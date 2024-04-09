@@ -1,5 +1,12 @@
 const { ipcMain } = require("electron");
-const { getAllEvents } = require("../models/mongos");
+const {
+  getAllEvents,
+  getOptionLevel,
+  getOptionCategoriesEvent,
+  getOptionCategoriesDivision,
+  getOptionCategoriesInitial,
+  getOptionCategoriesRace,
+} = require("../models/mongos");
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -9,6 +16,51 @@ function setupIPCMainHandlers() {
       event.reply("get-events-reply", data);
     } catch (error) {
       event.reply("get-events-reply", []);
+    }
+  });
+
+  ipcMain.on("option-level", async (event) => {
+    try {
+      const data = await getOptionLevel();
+      event.reply("option-level-reply", data);
+    } catch (error) {
+      event.reply("option-level-reply", []);
+    }
+  });
+
+  ipcMain.on("option-categories-event", async (event) => {
+    try {
+      const data = await getOptionCategoriesEvent();
+      event.reply("option-categories-event-reply", data);
+    } catch (error) {
+      event.reply("option-categories-event-reply", []);
+    }
+  });
+
+  ipcMain.on("option-categories-division", async (event) => {
+    try {
+      const data = await getOptionCategoriesDivision();
+      event.reply("option-categories-division-reply", data);
+    } catch (error) {
+      event.reply("option-categories-division-reply", []);
+    }
+  });
+
+  ipcMain.on("option-categories-initial", async (event) => {
+    try {
+      const data = await getOptionCategoriesInitial();
+      event.reply("option-categories-initial-reply", data);
+    } catch (error) {
+      event.reply("option-categories-initial-reply", []);
+    }
+  });
+
+  ipcMain.on("option-categories-race", async (event) => {
+    try {
+      const data = await getOptionCategoriesRace();
+      event.reply("option-categories-race-reply", data);
+    } catch (error) {
+      event.reply("option-categories-race-reply", []);
     }
   });
 }

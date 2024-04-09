@@ -12,6 +12,7 @@
             <form ref="form-newEvent">
               <br />
               <div>
+                <p class="h5 my-2">Event Information</p>
                 <!-- EVENT LEVEL  -->
                 <b-form-group label="Event Level">
                   <b-form-select
@@ -19,6 +20,8 @@
                     placeholder="Event Level"
                     v-model="formEvent.eventLevel"
                     :options="optionLevels"
+                    value-field="id"
+                    text-field="name"
                   ></b-form-select>
                 </b-form-group>
 
@@ -31,110 +34,228 @@
                   ></b-form-input>
                 </b-form-group>
 
-                <!-- LOCATION  -->
-                <b-form-group label="Location">
+                <!-- RIVER NAME  -->
+                <b-form-group label="River Name">
                   <b-form-input
                     size="sm"
                     v-model="formEvent.location"
-                    placeholder="Enter event location"
+                    placeholder="Enter river name"
                   ></b-form-input>
                 </b-form-group>
 
-                <!-- EVENT DATE -->
-                <b-form-group label="Event Date">
-                  <b-form-datepicker
+                <br />
+                <p class="h5 my-2">Date & Location</p>
+
+                <!-- DISTRICT  -->
+                <b-form-group label="District">
+                  <b-form-input
                     size="sm"
-                    v-model="formEvent.eventDate"
-                    placeholder="Select event date"
-                    class="mb-2"
-                  ></b-form-datepicker>
+                    v-model="formEvent.location"
+                    placeholder="Enter District"
+                  ></b-form-input>
                 </b-form-group>
 
-                <!-- EVENT CATEGORY -->
-                <b-form-group label="Event Category">
+                <b-row>
+                  <!-- SUBDISTRICT  -->
+                  <b-col cols="6">
+                    <b-form-group label="Sub District">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter Sub District"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+
+                  <!-- VILLAGE  -->
+                  <b-col cols="6">
+                    <b-form-group label="Village">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter Village"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
+
+                <b-row>
+                  <!-- CITY  -->
+                  <b-col cols="6">
+                    <b-form-group label="City">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter City"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+
+                  <!-- PROVINCE  -->
+                  <b-col cols="6">
+                    <b-form-group label="Province">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter Province"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
+
+                <b-row>
+                  <!-- ZIP CODE  -->
+                  <b-col cols="6">
+                    <b-form-group label="ZIP Code">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter ZIP Code"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+
+                  <b-col>
+                    <!-- STATE -->
+                    <b-form-group label="State">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.location"
+                        placeholder="Enter State"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
+
+                <b-row>
+                  <b-col cols="6">
+                    <!-- EVENT DATE -->
+                    <b-form-group label="Start Date">
+                      <b-form-datepicker
+                        size="sm"
+                        v-model="formEvent.eventDate"
+                        placeholder="Select start date"
+                        class="mb-2"
+                      ></b-form-datepicker>
+                    </b-form-group>
+                  </b-col>
+                  <b-col cols="6">
+                    <!-- EVENT DATE -->
+                    <b-form-group label="End Date">
+                      <b-form-datepicker
+                        size="sm"
+                        v-model="formEvent.eventDate"
+                        placeholder="Select end date"
+                        class="mb-2"
+                      ></b-form-datepicker>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
+
+                <br />
+                <p class="h5 my-2">Race Details</p>
+
+                <!-- EVENT CATEGORIES -->
+                <b-form-group label="Event Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.eventCategory"
-                    :options="optionCategorys"
-                    placeholder="Select event category"
+                    v-model="formEvent.eventCategories"
+                    :options="optionCategories"
+                    placeholder="Select event categories"
                     multiple
                     track-by="value"
                     label="name"
                   ></multiselect>
                 </b-form-group>
 
-                <!-- DIVISION CATEGORY -->
-                <b-form-group label="Division Category">
+                <!-- DIVISION CATEGORIES -->
+                <b-form-group label="Division Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.divisionCategory"
+                    v-model="formEvent.divisionCategories"
                     :options="optionDivisions"
-                    placeholder="Select division category"
+                    placeholder="Select division categories"
                     multiple
                     track-by="value"
-                    label="text"
+                    label="name"
                   ></multiselect>
                 </b-form-group>
 
-                <!-- RACE CATEGORY -->
-                <b-form-group label="Race Category">
+                <!-- RACE CATEGORIES -->
+                <b-form-group label="Race Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.raceCategory"
+                    v-model="formEvent.raceCategories"
                     :options="optionRaces"
-                    placeholder="Select race category"
+                    placeholder="Select race categories"
                     multiple
                     track-by="value"
-                    label="text"
+                    label="name"
                   ></multiselect>
                 </b-form-group>
 
-                <!-- INITIAL CATEGORY -->
-                <b-form-group label="Initial Category">
+                <!-- INITIAL CATEGORIES -->
+                <b-form-group label="Initial Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.initialCategory"
+                    v-model="formEvent.initialCategories"
                     :options="optionInitials"
-                    placeholder="Select initial category"
+                    placeholder="Select initial categories"
                     multiple
                     track-by="value"
-                    label="text"
+                    label="name"
                   ></multiselect>
                 </b-form-group>
 
-                <!-- CHIEF JUDGE  -->
-                <b-form-group label="Chief Judge">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.chiefJudge"
-                    placeholder="Enter chief judge name"
-                  ></b-form-input>
-                </b-form-group>
+                <br />
 
-                <!-- RACE DIRECTOR  -->
-                <b-form-group label="Race Director">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.raceDirector"
-                    placeholder="Enter race director name"
-                  ></b-form-input>
-                </b-form-group>
+                <b-row>
+                  <b-col cols="6">
+                    <!-- CHIEF JUDGE  -->
+                    <b-form-group label="Chief Judge">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.chiefJudge"
+                        placeholder="Enter chief judge name"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
 
-                <!-- SAFETY DIRECTOR  -->
-                <b-form-group label="Safety Director">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.safetyDirector"
-                    placeholder="Enter safety director name"
-                  ></b-form-input>
-                </b-form-group>
+                  <b-col>
+                    <!-- RACE DIRECTOR  -->
+                    <b-form-group label="Race Director">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.raceDirector"
+                        placeholder="Enter race director name"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
 
-                <!-- EVENT DIRECTOR  -->
-                <b-form-group label="Event Director">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.eventDirector"
-                    placeholder="Enter event director name"
-                  ></b-form-input>
-                </b-form-group>
+                <b-row>
+                  <b-col cols="6">
+                    <!-- SAFETY DIRECTOR  -->
+                    <b-form-group label="Safety Director">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.safetyDirector"
+                        placeholder="Enter safety director name"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+
+                  <b-col>
+                    <!-- EVENT DIRECTOR  -->
+                    <b-form-group label="Event Director">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.eventDirector"
+                        placeholder="Enter event director name"
+                      ></b-form-input>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
               </div>
             </form>
+
+            <br />
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
@@ -159,6 +280,7 @@
 
 <script>
 import Multiselect from "vue-multiselect";
+import { ipcRenderer } from "electron";
 
 export default {
   name: "SustainableTimingSystemCreateEvent",
@@ -185,51 +307,82 @@ export default {
         eventName: "",
         location: "",
         eventDate: null,
-        eventCategory: [],
-        divisionCategory: [],
-        raceCategory: [],
-        initialCategory: [],
+        eventCategories: [],
+        divisionCategories: [],
+        raceCategories: [],
+        initialCategories: [],
         chiefJudge: "",
         raceDirector: "",
         safetyDirector: "",
         eventDirector: "",
       },
-      optionLevels: [
-        { name: "select", text: "Select Level Event" },
-        { value: 0, text: "Classification - D" },
-        { value: 1, text: "Classification - E" },
-        { value: 2, text: "Classification - F" },
-        { value: 0, text: "Classification - G" },
-        { value: 1, text: "Classification - H" },
-        { value: 2, text: "Classification - I" },
-      ],
-      optionCategorys: [
-        { value: null, name: "Select Event Category" },
-        { value: 0, name: "SPRINT" },
-        { value: 1, name: "H2H" },
-        { value: 2, name: "SLALOM" },
-        { value: 3, name: "DRR" },
-      ],
-      optionDivisions: [
-        { value: null, text: "Select Division Category" },
-        { value: 0, text: "R4" },
-        { value: 1, text: "R6" },
-      ],
-      optionRaces: [
-        { value: null, text: "Select Race Category" },
-        { value: 0, text: "MEN" },
-        { value: 1, text: "WOMEN" },
-      ],
-      optionInitials: [
-        { value: null, text: "Select Initial Category" },
-        { value: 0, text: "OPEN" },
-      ],
+      optionLevels: [],
+      optionCategories: [],
+      optionDivisions: [],
+      optionRaces: [],
+      optionInitials: [],
     };
   },
 
-  mounted() {},
+  async mounted() {
+    await this.setOptionLevel();
+    await this.setOptionCategoriesEvent();
+    await this.setOptionCategoriesDivision();
+    await this.setOptionCategoriesInitial();
+    await this.setOptionCategoriesRace();
+  },
 
   methods: {
+    async setOptionLevel() {
+      ipcRenderer.send("option-level");
+      ipcRenderer.on("option-level-reply", (event, data) => {
+        if (data) {
+          this.optionLevels = data;
+        } else {
+          console.error("Failed to retrieve data from events table");
+        }
+      });
+    },
+    async setOptionCategoriesEvent() {
+      ipcRenderer.send("option-categories-event");
+      ipcRenderer.on("option-categories-event-reply", (event, data) => {
+        if (data) {
+          this.optionCategories = data;
+        } else {
+          console.error("Failed to retrieve data from events table");
+        }
+      });
+    },
+    async setOptionCategoriesDivision() {
+      ipcRenderer.send("option-categories-division");
+      ipcRenderer.on("option-categories-division-reply", (event, data) => {
+        if (data) {
+          this.optionDivisions = data;
+        } else {
+          console.error("Failed to retrieve data from events table");
+        }
+      });
+    },
+    async setOptionCategoriesInitial() {
+      ipcRenderer.send("option-categories-initial");
+      ipcRenderer.on("option-categories-initial-reply", (event, data) => {
+        if (data) {
+          this.optionInitials = data;
+        } else {
+          console.error("Failed to retrieve data from events table");
+        }
+      });
+    },
+    async setOptionCategoriesRace() {
+      ipcRenderer.send("option-categories-race");
+      ipcRenderer.on("option-categories-race-reply", (event, data) => {
+        if (data) {
+          this.optionRaces = data;
+        } else {
+          console.error("Failed to retrieve data from events table");
+        }
+      });
+    },
     goTo() {
       this.$router.push("/");
     },

@@ -6,23 +6,57 @@
           <b-row>
             <b-col>
               <div class="mx-2 mt-3">
-                <p class="h6">Home / Add Team</p>
+                <p class="h6 text-muted">
+                  Home / Create New Event / List All Teams
+                </p>
               </div>
               <div class="mx-2 my-5 mt-2">
-                <p class="h2">Add Team</p>
+                <p class="h2">All Teams</p>
               </div>
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
                   <b-button style="border-radius: 20px" variant="primary">
-                    DDR
+                    <img
+                      src="../../../assets/icons/drr.png"
+                      alt="DDR"
+                      style="height: 50px; margin-right: 5px"
+                    />
+                    DRR
                   </b-button>
-                  <b-button style="border-radius: 20px" variant="primary">
+                  <b-button
+                    style="border-radius: 20px"
+                    variant="primary"
+                    disabled
+                  >
+                    <img
+                      src="../../../assets/icons/sprint.png"
+                      alt="DDR"
+                      style="height: 50px; margin-right: 5px"
+                    />
                     SPRINT
                   </b-button>
-                  <b-button style="border-radius: 20px" variant="primary">
+                  <b-button
+                    style="border-radius: 20px"
+                    variant="primary"
+                    disabled
+                  >
+                    <img
+                      src="../../../assets/icons/h2h.png"
+                      alt="DDR"
+                      style="height: 50px; margin-right: 5px"
+                    />
                     H2H
                   </b-button>
-                  <b-button style="border-radius: 20px" variant="primary">
+                  <b-button
+                    style="border-radius: 20px"
+                    variant="primary"
+                    disabled
+                  >
+                    <img
+                      src="../../../assets/icons/slalom.png"
+                      alt="DDR"
+                      style="height: 50px; margin-right: 5px"
+                    />
                     SLALOM
                   </b-button>
                 </div>
@@ -37,8 +71,10 @@
                       style="border-radius: 20px"
                       class="btn-sm"
                       variant="primary"
-                      @click="handleButtonClick"
-                      >Add New Team</b-button
+                      @click="$bvModal.show('bv-modal-add-team')"
+                    >
+                      <Icon icon="ic:baseline-add-circle" /> Add New
+                      Team</b-button
                     >
                   </div>
                 </template>
@@ -87,20 +123,77 @@
                 variant="success"
               >
                 Simpan Data Event
-                <Icon icon="ic:baseline-keyboard-double-arrow-right"
-              /></b-button>
+                <Icon icon="material-symbols-light:save" />
+              </b-button>
             </div>
           </div>
         </div>
+        <div></div>
       </b-col>
     </b-row>
+    <!-- // AREA MODAL  -->
+    <b-modal id="bv-modal-add-team" hide-footer no-close-on-backdrop centered>
+      <template #modal-title> Add New Team </template>
+      <div class="d-block text-left mx-4 my-3">
+        <!-- TEAM NAME  -->
+        <b-form-group label="Name Team">
+          <b-form-input
+            v-model="formModal.nameTeam"
+            placeholder="Enter team"
+          ></b-form-input>
+        </b-form-group>
+
+        <!-- TEAM BIB  -->
+        <b-form-group label="BIB Number Team">
+          <b-form-input
+            v-model="formModal.bibTeam"
+            placeholder="Enter bib"
+          ></b-form-input>
+        </b-form-group>
+
+        <!-- TEAM CATEGORIES  -->
+        <b-form-group label="Categories">
+          <multiselect
+            v-model="formModal.categoriesTeam"
+            :options="optionCategories"
+            placeholder="Select categories"
+            multiple
+            track-by="value"
+            label="name"
+          ></multiselect>
+        </b-form-group>
+      </div>
+      <div class="mt-5 p-4" style="display: flex; gap: 2vh">
+        <b-button
+          style="border-radius: 20px"
+          block
+          @click="$bvModal.hide('bv-modal-add-team')"
+          >Close</b-button
+        >
+        <br />
+        <b-button
+          style="border-radius: 20px"
+          variant="primary"
+          block
+          @click="simpanNewTeam"
+          >Save Team</b-button
+        >
+      </div>
+    </b-modal>
+    <!-- // AREA MODAL  -->
   </div>
 </template>
 
 <script>
+import Multiselect from "vue-multiselect";
+
+import modalAddTeamVue from "../../../components/modals/modal-addTeam.vue";
 export default {
   name: "SustainableTimingSystemRaftingSelectCategories",
-
+  components: {
+    modalAddTeamVue,
+    Multiselect,
+  },
   data() {
     return {
       text: "",
@@ -110,8 +203,13 @@ export default {
         { No: 1, "Nama Team": "Team A", BIB: "001", Categories: "R4" },
         { No: 2, "Nama Team": "Team B", BIB: "002", Categories: "R4" },
         { No: 3, "Nama Team": "Team C", BIB: "003", Categories: "R4" },
-        // Tambahkan data tim lainnya sesuai kebutuhan
       ],
+      optionCategories: [],
+      formModal: {
+        nameTeam: "",
+        bibTeam: "",
+        categoriesTeam: [],
+      },
     };
   },
 
@@ -121,7 +219,9 @@ export default {
     goTo() {
       this.$emit("backForm");
     },
-    handleButtonClick() {},
+    simpanNewTeam() {
+      console.log("simpan team");
+    },
   },
 };
 </script>

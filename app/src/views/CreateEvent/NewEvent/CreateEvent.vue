@@ -3,10 +3,13 @@
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
         <div>
+          <div class="mx-5 mt-5">
+                <p class="h6 text-muted">Home / Create New Event</p>
+              </div>
           <b-card
             title="Create New Event"
             sub-title="Added Information Event Details"
-            class="m-5 shadow px-3 py-4"
+            class="m-3 shadow px-3 py-4"
             style="border-radius: 25px;"
           >
             <form ref="form-newEvent">
@@ -275,6 +278,9 @@
         </div>
       </b-col>
     </b-row>
+    <br/>
+    <br/>
+    <br/>
   </div>
 </template>
 

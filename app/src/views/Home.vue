@@ -1,6 +1,5 @@
 <template>
   <div>
-    <!-- <h1>Halaman Home</h1> -->
     <Banner />
     <b-container fluid class="bv-example-row mb-5">
       <b-row>
@@ -11,24 +10,8 @@
       <br />
       <br />
 
-      <!-- <b-row class="justify-content-md-center m-5">
-        <b-col cols="12" md="auto">
-          <b-button
-            style="border-radius: 20px"
-            @click="goTo('create-new')"
-            variant="primary"
-          >
-            <Icon icon="ic:baseline-add-circle" />
-            Create New Event</b-button
-          >
-        </b-col>
-      </b-row> -->
-
       <div>
         <b-col md="10" offset-md="1">
-          <!-- <div class="mx-2 my-3 text-left">
-                <p class="h3 font-weight-bold">List Event</p>
-              </div> -->
           <b-card class="shadow" style="border-radius: 20px">
             <template #header>
               <div style="display: flex; justify-content: space-between">

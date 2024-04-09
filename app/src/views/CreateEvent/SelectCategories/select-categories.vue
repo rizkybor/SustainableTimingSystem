@@ -15,92 +15,80 @@
               </div>
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
-                  <b-button style="border-radius: 20px" variant="primary">
+
+                  <!-- BTN DRR  -->
+                  <b-button
+                    style="border-radius: 20px"
+                    :style="{ background: isActivated == 'DRR' ? '#027BFE' : '#C4C4C4' }"
+                    @click="loadTeams('DRR')"
+                  >
                     <img
                       src="../../../assets/icons/drr.png"
-                      alt="DDR"
+                      alt="DRR"
                       style="height: 50px; margin-right: 5px"
                     />
                     DRR
                   </b-button>
+
+                  <!-- BTN SPRINT  -->
                   <b-button
                     style="border-radius: 20px"
-                    variant="primary"
+                    :style="{ background: isActivated == 'SPRINT' ? '#027BFE' : '#C4C4C4' }"
+                    @click="loadTeams('SPRINT')"
                   >
                     <img
                       src="../../../assets/icons/sprint.png"
-                      alt="DDR"
+                      alt="SPRINT"
                       style="height: 50px; margin-right: 5px"
                     />
                     SPRINT
                   </b-button>
+
+                  <!-- BTN H2H  -->
                   <b-button
                     style="border-radius: 20px"
-                    variant="primary"
+                    :style="{ background: isActivated == 'H2H' ? '#027BFE' : '#C4C4C4' }"
+                    @click="loadTeams('H2H')"
                   >
                     <img
                       src="../../../assets/icons/h2h.png"
-                      alt="DDR"
+                      alt="H2H"
                       style="height: 50px; margin-right: 5px"
                     />
                     H2H
                   </b-button>
+
+                  <!-- BTN SLALOM  -->
                   <b-button
                     style="border-radius: 20px"
-                    variant="primary"
+                    :style="{ background: isActivated == 'SLALOM' ? '#027BFE' : '#C4C4C4' }"
+                    @click="loadTeams('SLALOM')"
                   >
                     <img
                       src="../../../assets/icons/slalom.png"
-                      alt="DDR"
+                      alt="SLALOM"
                       style="height: 50px; margin-right: 5px"
                     />
                     SLALOM
                   </b-button>
                 </div>
               </div>
-             
-             <!-- CARD COMPONENT TABLE  -->
-              <b-card class="shadow" style="border-radius: 20px">
-                <template #header>
-                  <div style="display: flex; justify-content: space-between">
-                    <div class="mx-2 mt-3">
-                      <p class="h5 font-weight-bold">TEAM R4 - DDR MEN</p>
-                    </div>
-                    <b-button
-                      style="border-radius: 20px"
-                      class="btn-md"
-                      variant="primary"
-                      @click="$bvModal.show('bv-modal-add-team')"
-                    >
-                      <Icon icon="ic:baseline-add-circle" /> New Team</b-button
-                    >
-                  </div>
-                </template>
 
-                <b-table striped hover :items="teams" :fields="fields">
-                  <template #cell(Action)="row">
-                    <div style="display: flex; gap: 1vh">
-                      <b-button
-                        style="border-radius: 20px"
-                        variant="warning"
-                        size="sm"
-                        @click="editTeam(row.item)"
-                        >Edit</b-button
-                      >
-                      <b-button
-                        style="border-radius: 20px"
-                        variant="danger"
-                        size="sm"
-                        @click="deleteTeam(row.item)"
-                        >Delete</b-button
-                      >
-                    </div>
-                  </template>
-                </b-table>
-              </b-card>
-             <!-- CARD COMPONENT TABLE  -->
+              <cardTeamVue
+                :teamTitle="teamsComponent.title"
+                :teams="teamsComponent.team"
+                :fields="teamsComponent.fields"
+                @open-modal="$bvModal.show('bv-modal-add-team')"
+              />
 
+              <br />
 
+              <cardTeamVue
+                :teamTitle="teamsComponentW.title"
+                :teams="teamsComponentW.team"
+                :fields="teamsComponent.fields"
+                @open-modal="$bvModal.show('bv-modal-add-team')"
+              />
             </b-col>
           </b-row>
 
@@ -112,10 +100,8 @@
                 variant="secondary"
                 class="btn-md"
               >
-                <Icon
-                  icon="ic:baseline-keyboard-double-arrow-left"
-                />Back</b-button
-              >
+                <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
+              </b-button>
             </div>
             <div>
               <b-button
@@ -134,6 +120,8 @@
         <div></div>
       </b-col>
     </b-row>
+
+
     <!-- // AREA MODAL  -->
     <b-modal id="bv-modal-add-team" hide-footer no-close-on-backdrop centered>
       <template #modal-title> Add New Team </template>
@@ -191,19 +179,15 @@
 
 <script>
 import Multiselect from "vue-multiselect";
-
-import modalAddTeamVue from "../../../components/modals/modal-addTeam.vue";
+import cardTeamVue from "../../../components/cards/card-team.vue";
 export default {
   name: "SustainableTimingSystemRaftingSelectCategories",
   components: {
-    modalAddTeamVue,
     Multiselect,
+    cardTeamVue,
   },
   data() {
     return {
-      text: "",
-      name: "",
-      fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
       teams: [
         { No: 1, "Nama Team": "Team A", BIB: "001", Categories: "R4" },
         { No: 2, "Nama Team": "Team B", BIB: "002", Categories: "R4" },
@@ -215,12 +199,33 @@ export default {
         bibTeam: "",
         categoriesTeam: [],
       },
+      teamsComponent: {
+        title: "",
+        team: [],
+        fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
+      },
+      teamsComponentW: {
+        title: "",
+        team: [],
+        fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
+      },
+      isActivated: "",
     };
   },
 
-  mounted() {},
+  mounted() {
+    this.isActivated == '' ? 'DRR' : '';
+  },
 
   methods: {
+    loadTeams(category) {
+      this.isActivated = category
+      this.teamsComponent.title = `TEAM R4 - ${category} MEN`;
+      this.teamsComponent.team = this.teams[category];
+
+      this.teamsComponentW.title = `TEAM R4 - ${category} WOMEN`;
+      this.teamsComponentW.team = this.teams[category];
+    },
     goTo() {
       this.$emit("backForm");
     },

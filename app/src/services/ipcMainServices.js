@@ -10,18 +10,23 @@ const {
 
 // communication with database
 function setupIPCMainHandlers() {
+  ipcMain.on("get-alert", async (event) => {
+    try {
+      const options = {
+        type: 'warning',
+        detail: 'To go to the next page, all fields must be filled in',
+        message: 'Ups Sorry',
+        buttons: ['OK']
+      };
+      dialog.showMessageBox(null, options, (response) => {
+        console.log('You clicked:', options.buttons[response]);
+      });
+    } catch (error) {
+      event.reply("get-events-reply", []);
+    }
+  });
   ipcMain.on("get-events", async (event) => {
     try {
-      // const options = {
-      //   type: 'info',
-      //   title: 'Information',
-      //   message: 'Welcome to Sustainable Timing System Apps',
-      //   buttons: ['OK']
-      // };
-      // dialog.showMessageBox(null, options, (response) => {
-      //   console.log('You clicked:', options.buttons[response]);
-      // });
-    
       const data = await getAllEvents();
       event.reply("get-events-reply", data);
     } catch (error) {

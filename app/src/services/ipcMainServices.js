@@ -1,12 +1,12 @@
 const { ipcMain, dialog } = require("electron");
+const { getAllEvents } = require("../controllers/GET/getAllEvent.js")
 const {
-  getAllEvents,
   getOptionLevel,
   getOptionCategoriesEvent,
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
-} = require("../models/mongos");
+} = require("../controllers/GET/getOptionEvent.js")
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -15,7 +15,7 @@ function setupIPCMainHandlers() {
       const options = {
         type: 'info',
         title: 'Information',
-        message: 'Popup Alert dari Aplikasi Sustainable Timing System berhasil dipanggil',
+        message: 'Welcome to Sustainable Timing System Apps',
         buttons: ['OK']
       };
       dialog.showMessageBox(null, options, (response) => {

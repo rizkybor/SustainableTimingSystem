@@ -1,4 +1,4 @@
-const { ipcMain } = require("electron");
+const { ipcMain, dialog } = require("electron");
 const {
   getAllEvents,
   getOptionLevel,
@@ -12,6 +12,16 @@ const {
 function setupIPCMainHandlers() {
   ipcMain.on("get-events", async (event) => {
     try {
+      const options = {
+        type: 'info',
+        title: 'Information',
+        message: 'Popup Alert dari Aplikasi Sustainable Timing System berhasil dipanggil',
+        buttons: ['OK']
+      };
+      dialog.showMessageBox(null, options, (response) => {
+        console.log('You clicked:', options.buttons[response]);
+      });
+    
       const data = await getAllEvents();
       event.reply("get-events-reply", data);
     } catch (error) {

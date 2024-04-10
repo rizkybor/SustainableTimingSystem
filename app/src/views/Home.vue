@@ -19,7 +19,7 @@
                   <p class="h5 font-weight-bold">All Event</p>
                 </div>
                 <b-button
-                style="border-radius: 20px"
+                  style="border-radius: 20px"
                   class="btn-md"
                   variant="primary"
                   @click="goTo('create-new')"
@@ -30,6 +30,7 @@
               </div>
             </template>
             <b-table
+              v-if="!loading"
               striped
               hover
               :items="events"
@@ -38,6 +39,13 @@
               @row-clicked="clickRow"
             >
             </b-table>
+
+            <b-skeleton-table
+              v-if="loading"
+              :rows="3"
+              :columns="6"
+              :table-props="{ bordered: true, striped: true }"
+            ></b-skeleton-table>
           </b-card>
         </b-col>
       </div>
@@ -69,6 +77,7 @@ export default {
         "statusEvent",
       ],
       events: {},
+      loading: false,
     };
   },
 
@@ -77,14 +86,18 @@ export default {
   },
   methods: {
     async getEvents() {
-      ipcRenderer.send("get-events");
-      ipcRenderer.on("get-events-reply", (event, data) => {
-        if (data) {
-          this.events = data;
-        } else {
-          console.error("Failed to retrieve data from events table");
-        }
-      });
+      this.loading = true;
+      setTimeout(() => {
+        ipcRenderer.send("get-events");
+        ipcRenderer.on("get-events-reply", (event, data) => {
+          if (data) {
+            this.events = data;
+          } else {
+            console.error("Failed to retrieve data from events table");
+          }
+          this.loading = false;
+        });
+      }, 1000);
     },
     goTo(val) {
       this.$router.push(`${val}`);

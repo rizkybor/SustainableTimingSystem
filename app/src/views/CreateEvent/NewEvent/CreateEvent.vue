@@ -353,9 +353,17 @@ export default {
 
   async mounted() {
     await this.loadOptions();
+    await this.checkValueStorage();
   },
 
   methods: {
+    async checkValueStorage() {
+      const dataStorage = localStorage.getItem("formNewEvent");
+      const datas = JSON.parse(dataStorage);
+      if (datas) {
+        this.formEvent = datas;
+      }
+    },
     async loadOptions() {
       await this.setOptionLevel();
       await this.setOptionCategoriesEvent();
@@ -470,7 +478,8 @@ export default {
     save() {
       const formValid = this.validateForm();
       if (formValid) {
-        localStorage.setItem("formNewEvent", this.formEvent);
+        const obj = JSON.stringify(this.formEvent);
+        localStorage.setItem("formNewEvent", obj);
         this.$emit("enterForm");
       } else {
         ipcRenderer.send("get-alert");
@@ -481,28 +490,3 @@ export default {
 </script>
 
 <style lang="scss" scoped></style>
-
-<!-- PAYLOAD LS 
-  "levelName": "Classification-E",
-  "eventName": "Kejurnas",
-  "riverName": "Sungai Cianten",
-  "addressDistrict": "",
-  "addressSubDistrict": "",
-  "addressVillage": "",
-  "addessCity": "",
-  "addressProvince": "",
-  "addressZipCode": "999",
-  "addressState": "",
-  "startDateEvent": "15 April 2024",
-  "endDateEvent": "20 April 2024",
-  "OTR": "14 April 2024",
-  "categoriesEvent": [],
-  "categoriesDivision": [],
-  "categoriesRace": [],
-  "categoriesInitial": [],
-  "chiefJudge": "",
-  "raceDirector": "",
-  "safetyDirector": "",
-  "eventDirector": "",
-  "participant": [],
-  "statusEvent": "Activated" -->

@@ -142,17 +142,6 @@
           ></b-form-input>
         </b-form-group>
 
-        <!-- TEAM CATEGORIES  -->
-        <b-form-group label="Categories">
-          <multiselect
-            v-model="formModal.categoriesTeam"
-            :options="optionCategories"
-            placeholder="Select categories"
-            multiple
-            track-by="value"
-            label="name"
-          ></multiselect>
-        </b-form-group>
       </div>
       <div class="mt-5 p-4" style="display: flex; gap: 2vh">
         <b-button
@@ -189,25 +178,24 @@ export default {
   data() {
     return {
       teams: [
-        { No: 1, "Nama Team": "Team A", BIB: "001", Categories: "R4" },
-        { No: 2, "Nama Team": "Team B", BIB: "002", Categories: "R4" },
-        { No: 3, "Nama Team": "Team C", BIB: "003", Categories: "R4" },
+        { No: 1, "Nama Team": "Team A", BIB: "001" },
+        { No: 2, "Nama Team": "Team B", BIB: "002" },
+        { No: 3, "Nama Team": "Team C", BIB: "003" },
       ],
       optionCategories: [],
       formModal: {
         nameTeam: "",
         bibTeam: "",
-        categoriesTeam: [],
       },
       teamsComponent: {
         title: "",
         team: [],
-        fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
+        fields: ["No", "Nama Team", "BIB", "Action"],
       },
       teamsComponentW: {
         title: "",
         team: [],
-        fields: ["No", "Nama Team", "BIB", "Categories", "Action"],
+        fields: ["No", "Nama Team", "BIB", "Action"],
       },
       isActivated: "",
     };

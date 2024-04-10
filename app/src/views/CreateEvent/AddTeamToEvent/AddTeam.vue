@@ -13,13 +13,16 @@
               <div class="mx-2 my-5 mt-2">
                 <p class="h2">All Teams</p>
               </div>
+              {{ showCategories }}
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
-
                   <!-- BTN DRR  -->
                   <b-button
+                    v-show="showCategoriesDRR"
                     style="border-radius: 20px"
-                    :style="{ background: isActivated == 'DRR' ? '#027BFE' : '#C4C4C4' }"
+                    :style="{
+                      background: isActivated == 'DRR' ? '#027BFE' : '#C4C4C4',
+                    }"
                     @click="loadTeams('DRR')"
                   >
                     <img
@@ -32,8 +35,12 @@
 
                   <!-- BTN SPRINT  -->
                   <b-button
+                    v-show="showCategoriesSprint"
                     style="border-radius: 20px"
-                    :style="{ background: isActivated == 'SPRINT' ? '#027BFE' : '#C4C4C4' }"
+                    :style="{
+                      background:
+                        isActivated == 'SPRINT' ? '#027BFE' : '#C4C4C4',
+                    }"
                     @click="loadTeams('SPRINT')"
                   >
                     <img
@@ -46,8 +53,11 @@
 
                   <!-- BTN H2H  -->
                   <b-button
+                    v-show="showCategoriesHead2Head"
                     style="border-radius: 20px"
-                    :style="{ background: isActivated == 'H2H' ? '#027BFE' : '#C4C4C4' }"
+                    :style="{
+                      background: isActivated == 'H2H' ? '#027BFE' : '#C4C4C4',
+                    }"
                     @click="loadTeams('H2H')"
                   >
                     <img
@@ -60,8 +70,12 @@
 
                   <!-- BTN SLALOM  -->
                   <b-button
+                    v-show="showCategoriesSlalom"
                     style="border-radius: 20px"
-                    :style="{ background: isActivated == 'SLALOM' ? '#027BFE' : '#C4C4C4' }"
+                    :style="{
+                      background:
+                        isActivated == 'SLALOM' ? '#027BFE' : '#C4C4C4',
+                    }"
                     @click="loadTeams('SLALOM')"
                   >
                     <img
@@ -121,7 +135,6 @@
       </b-col>
     </b-row>
 
-
     <!-- // AREA MODAL  -->
     <b-modal id="bv-modal-add-team" hide-footer no-close-on-backdrop centered>
       <template #modal-title> Add New Team </template>
@@ -141,7 +154,6 @@
             placeholder="Enter bib"
           ></b-form-input>
         </b-form-group>
-
       </div>
       <div class="mt-5 p-4" style="display: flex; gap: 2vh">
         <b-button
@@ -171,6 +183,9 @@ import Multiselect from "vue-multiselect";
 import cardTeamVue from "../../../components/cards/card-team.vue";
 export default {
   name: "SustainableTimingSystemRaftingSelectCategories",
+  props: {
+    open: Boolean,
+  },
   components: {
     Multiselect,
     cardTeamVue,
@@ -198,19 +213,50 @@ export default {
         fields: ["No", "Nama Team", "BIB", "Action"],
       },
       isActivated: "",
+      formEvent: {},
+      showCategoriesSprint: false,
+      showCategoriesHead2Head: false,
+      showCategoriesSlalom: false,
+      showCategoriesDRR: false
     };
   },
-
-  mounted() {
-    this.isActivated == '' ? 'DRR' : '';
+  async mounted() {
+    if (this.open) {
+      await this.checkValueStorage();
+    }
+    this.isActivated == "" ? "DRR" : "";
   },
-
   methods: {
+    loadOptions() {},
+    checkValueStorage() {
+      const dataStorage = localStorage.getItem("formNewEvent");
+      const datas = JSON.parse(dataStorage);
+      if (datas) {
+        this.formEvent = datas;
+      }
+
+      datas.categoriesEvent.map((e) => {
+        if(e.name == "SPRINT") {
+          this.showCategoriesSprint = true
+        } 
+
+        if(e.name == "DRR") {
+          this.showCategoriesDRR = true 
+        }
+        
+        if(e.name == "HEAD 2 HEAD") {
+          this.showCategoriesHead2Head = true 
+        }
+        
+        if(e.name == "SLALOM") {
+          this.showCategoriesSlalom = true 
+        }
+      });
+    },
     loadTeams(category) {
-      this.isActivated = category
+      this.isActivated = category;
       this.teamsComponent.title = `TEAM R4 - ${category} MEN`;
       this.teamsComponent.team = this.teams[category];
-
       this.teamsComponentW.title = `TEAM R4 - ${category} WOMEN`;
       this.teamsComponentW.team = this.teams[category];
     },

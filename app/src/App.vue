@@ -9,7 +9,6 @@
       <br/>
       <br/>
       <br/>
-      <!-- <HelloWorld msg="Desktop Based Timing System" /> -->
       <router-view></router-view>
     </div>
     <FooterVue />
@@ -18,14 +17,12 @@
 
 <script>
 import FooterVue from "./components/Footer.vue";
-import HelloWorld from "./components/HelloWorld.vue";
 import Navbar from "./components/Navbar.vue";
 import Banner from "./components/Banner.vue";
 
 export default {
   name: "app",
   components: {
-    HelloWorld,
     Navbar,
     FooterVue,
     Banner

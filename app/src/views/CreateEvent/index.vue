@@ -1,19 +1,19 @@
 <template>
   <div>
     <CreateEvent @enterForm="enterForm" v-if="pageFormActive" />
-    <selectCategories @backForm="backForm" v-if="pageSelectActive" />
+    <AddTeam :open="pageSelectActive" @backForm="backForm" v-if="pageSelectActive" />
   </div>
 </template>
 
 <script>
 import CreateEvent from "./NewEvent/CreateEvent.vue";
-import selectCategories from './SelectCategories/select-categories.vue';
+import AddTeam from "./AddTeamToEvent/AddTeam.vue";
 
 export default {
   name: "SustainableTimingSystemRaftingIndex",
   components: {
     CreateEvent,
-    selectCategories
+    AddTeam
   },
   data() {
     return {

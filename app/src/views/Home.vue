@@ -1,31 +1,51 @@
 <template>
   <div>
-    <!-- <h1>Halaman Home</h1> -->
     <Banner />
     <b-container fluid class="bv-example-row mb-5">
       <b-row>
         <b-col md="10" offset-md="1"> </b-col>
       </b-row>
-      <b-row class="justify-content-md-center m-5">
-        <b-col cols="12" md="auto">
-          <b-button @click="goTo('create-new')" variant="primary">
-            <Icon icon="ic:baseline-add-circle" />
-            Create New Event</b-button
-          >
-        </b-col>
-      </b-row>
+      <br />
+      <br />
+      <br />
+      <br />
 
       <div>
         <b-col md="10" offset-md="1">
-          <b-card>
+          <b-card class="shadow" style="border-radius: 20px">
+            <template #header>
+              <div style="display: flex; justify-content: space-between">
+                <div class="mx-2 mt-3">
+                  <p class="h5 font-weight-bold">All Event</p>
+                </div>
+                <b-button
+                  style="border-radius: 20px"
+                  class="btn-md"
+                  variant="primary"
+                  @click="goTo('create-new')"
+                >
+                  <Icon icon="ic:baseline-add-circle" />
+                  Create New Event</b-button
+                >
+              </div>
+            </template>
             <b-table
+              v-if="!loading"
               striped
               hover
               :items="events"
               :fields="fields"
               style="cursor: pointer"
               @row-clicked="clickRow"
-            ></b-table>
+            >
+            </b-table>
+
+            <b-skeleton-table
+              v-if="loading"
+              :rows="3"
+              :columns="6"
+              :table-props="{ bordered: true, striped: true }"
+            ></b-skeleton-table>
           </b-card>
         </b-col>
       </div>
@@ -57,6 +77,7 @@ export default {
         "statusEvent",
       ],
       events: {},
+      loading: false,
     };
   },
 
@@ -65,15 +86,18 @@ export default {
   },
   methods: {
     async getEvents() {
-      ipcRenderer.send("get-events");
-      ipcRenderer.on("get-events-reply", (event, data) => {
-        if (data) {
-          console.log("Data from events table:", data);
-          this.events = data;
-        } else {
-          console.error("Failed to retrieve data from events table");
-        }
-      });
+      this.loading = true;
+      setTimeout(() => {
+        ipcRenderer.send("get-events");
+        ipcRenderer.on("get-events-reply", (event, data) => {
+          if (data) {
+            this.events = data;
+          } else {
+            console.error("Failed to retrieve data from events table");
+          }
+          this.loading = false;
+        });
+      }, 1000);
     },
     goTo(val) {
       this.$router.push(`${val}`);

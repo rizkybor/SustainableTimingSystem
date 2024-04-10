@@ -1,17 +1,27 @@
-const { ipcMain } = require("electron");
+const { ipcMain, dialog } = require("electron");
+const { getAllEvents } = require("../controllers/GET/getAllEvent.js")
 const {
-  getAllEvents,
   getOptionLevel,
   getOptionCategoriesEvent,
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
-} = require("../models/mongos");
+} = require("../controllers/GET/getOptionEvent.js")
 
 // communication with database
 function setupIPCMainHandlers() {
   ipcMain.on("get-events", async (event) => {
     try {
+      // const options = {
+      //   type: 'info',
+      //   title: 'Information',
+      //   message: 'Welcome to Sustainable Timing System Apps',
+      //   buttons: ['OK']
+      // };
+      // dialog.showMessageBox(null, options, (response) => {
+      //   console.log('You clicked:', options.buttons[response]);
+      // });
+    
       const data = await getAllEvents();
       event.reply("get-events-reply", data);
     } catch (error) {

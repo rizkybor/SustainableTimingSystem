@@ -1,8 +1,12 @@
 <template>
   <div>
-    <footer class="footer mt-auto py-3">
+    <footer class="footer mt-auto py-4">
       <div class="container">
-        <span style="font-weight: bold;">SUSTAINABLE TIMING SYSTEM</span>
+        <div style="display: flex; justify-content: space-between;"> 
+          <span >Copyright © 2024 kikiaka.id - All Rights Reserved</span>
+
+          <span style="font-weight: bold;">SUSTAINABLE TIMING SYSTEM</span>
+        </div>
       </div>
     </footer>
   </div>

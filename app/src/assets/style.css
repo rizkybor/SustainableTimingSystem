@@ -1,4 +1,22 @@
+:root {
+    --blue: #345ef8;
+    --white: #ffffff;
+    --black: rgb(68, 68, 68);
+  }
+
 body {
     padding: 3vw;
     background-color: black;
 }
+
+
+.link-to {
+    cursor: pointer;
+    color: var(--white) !important;
+}
+
+.link-to:hover {
+    color: var(--black)
+}
+
+

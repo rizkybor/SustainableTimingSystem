@@ -13,7 +13,6 @@
               <div class="mx-2 my-5 mt-2">
                 <p class="h2">All Teams</p>
               </div>
-              {{ showCategories }}
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
                   <!-- BTN DRR  -->
@@ -88,21 +87,29 @@
                 </div>
               </div>
 
-              <cardTeamVue
-                :teamTitle="teamsComponent.title"
-                :teams="teamsComponent.team"
-                :fields="teamsComponent.fields"
-                @open-modal="$bvModal.show('bv-modal-add-team')"
-              />
+              <div v-if="!formEvent.participant.length != 0">
+                <cardEmptyVue
+                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                />
+              </div>
 
-              <br />
+              <div v-else>
+                <cardTeamVue
+                  :teamTitle="teamsComponent.title"
+                  :teams="teamsComponent.team"
+                  :fields="teamsComponent.fields"
+                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                />
 
-              <cardTeamVue
-                :teamTitle="teamsComponentW.title"
-                :teams="teamsComponentW.team"
-                :fields="teamsComponent.fields"
-                @open-modal="$bvModal.show('bv-modal-add-team')"
-              />
+                <br />
+
+                <cardTeamVue
+                  :teamTitle="teamsComponentW.title"
+                  :teams="teamsComponentW.team"
+                  :fields="teamsComponent.fields"
+                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                />
+              </div>
             </b-col>
           </b-row>
 
@@ -137,7 +144,20 @@
 
     <!-- // AREA MODAL  -->
     <b-modal id="bv-modal-add-team" hide-footer no-close-on-backdrop centered>
-      <template #modal-title> Add New Team </template>
+      <template #modal-title>
+        Add New Team -
+        {{
+          isActivated == "SPRINT"
+            ? "Sprint Categories"
+            : isActivated == "DRR"
+            ? "DRR Categories"
+            : isActivated == "H2H"
+            ? "Head 2 Head Categories"
+            : isActivated == "SLALOM"
+            ? "Slalom Categories"
+            : ""
+        }}</template
+      >
       <div class="d-block text-left mx-4 my-3">
         <!-- TEAM NAME  -->
         <b-form-group label="Name Team">
@@ -180,7 +200,9 @@
 
 <script>
 import Multiselect from "vue-multiselect";
+import cardEmptyVue from "../../../components/cards/card-empty.vue";
 import cardTeamVue from "../../../components/cards/card-team.vue";
+
 export default {
   name: "SustainableTimingSystemRaftingSelectCategories",
   props: {
@@ -189,6 +211,7 @@ export default {
   components: {
     Multiselect,
     cardTeamVue,
+    cardEmptyVue,
   },
   data() {
     return {
@@ -217,7 +240,7 @@ export default {
       showCategoriesSprint: false,
       showCategoriesHead2Head: false,
       showCategoriesSlalom: false,
-      showCategoriesDRR: false
+      showCategoriesDRR: false,
     };
   },
   async mounted() {
@@ -236,20 +259,20 @@ export default {
       }
 
       datas.categoriesEvent.map((e) => {
-        if(e.name == "SPRINT") {
-          this.showCategoriesSprint = true
-        } 
+        if (e.name == "SPRINT") {
+          this.showCategoriesSprint = true;
+        }
 
-        if(e.name == "DRR") {
-          this.showCategoriesDRR = true 
+        if (e.name == "DRR") {
+          this.showCategoriesDRR = true;
         }
-        
-        if(e.name == "HEAD 2 HEAD") {
-          this.showCategoriesHead2Head = true 
+
+        if (e.name == "HEAD 2 HEAD") {
+          this.showCategoriesHead2Head = true;
         }
-        
-        if(e.name == "SLALOM") {
-          this.showCategoriesSlalom = true 
+
+        if (e.name == "SLALOM") {
+          this.showCategoriesSlalom = true;
         }
       });
     },

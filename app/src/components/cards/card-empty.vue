@@ -16,8 +16,11 @@
           </b-button> -->
         </div>
       </template>
-      <div class="text-center my-5"> 
-          <h3 class="font-weight-bold">There are no teams registered for this event yet</h3>
+      <div class="text-center my-5">
+        <h5 class="font-weight-bold">
+          There are no teams registered for this event yet ! <br/><br/>please Select
+          Category to Add Teams by Categories
+        </h5>
       </div>
     </b-card>
   </div>
@@ -25,20 +28,14 @@
 
 <script>
 export default {
-  name: 'SustainableTimingSystemRaftingCardEmpty',
+  name: "SustainableTimingSystemRaftingCardEmpty",
 
   data() {
-    return {
-      
-    };
+    return {};
   },
 
-  mounted() {
-    
-  },
+  mounted() {},
 
-  methods: {
-    
-  },
+  methods: {},
 };
 </script>

@@ -88,7 +88,12 @@
                 </div>
               </div>
               <!-- {{ formEvent }} -->
-              <div>
+
+              <div v-if="showEmptyCards">
+                <cardEmptyVue/>
+              </div>
+              
+              <div v-else>
                 <cardTeamVue
                   v-if="team.R4men"
                   :teamTitle="'R4 - MEN'"
@@ -209,6 +214,7 @@ export default {
   },
   data() {
     return {
+      showEmptyCards: true,
       teams: [
         { No: 1, "Nama Team": "Team A", BIB: "001" },
         { No: 2, "Nama Team": "Team B", BIB: "002" },
@@ -360,15 +366,23 @@ export default {
       });
     },
     loadTeams(payload) {
+      this.showEmptyCards = false
       let ev = this.formEvent.participant;
       this.isActivated = payload.name;
 
       for (const obj of ev) {
         for (const [key, value] of Object.entries(obj)) {
           if (key === payload.name.toLowerCase()) {
+            // R4 Men
             value[0].details[0].teams;
+
+            // R4 Women
             value[0].details[1].teams;
+
+            // R6 Men
             value[1].details[0].teams;
+
+            // R6 Women
             value[1].details[1].teams;
           }
         }

@@ -1,11 +1,34 @@
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="../src/assets/splash.css" />
-  </head>
 
-  <body>
-    <h3>Sustainable Timing System is Starting...</h3>
-    <div class="loader"></div>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="../src/assets/splash.css" />
+</head>
+
+<body>
+  <h3 style="
+    display: flex;
+    justify-content: center;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+  ">
+    Sustainable Timing System is Starting...
+  </h3>
+  <p style="
+  display: flex;
+  justify-content: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+">
+  We are using node :
+  <script>document.write(process.versions.node)</script>,
+  Chrome :
+  <script>document.write(process.versions.chrome)</script>,
+  and Electron :
+  <script>document.write(process.versions.electron)</script>.
+</p>
+  <div class="loader"></div>
+  
+</body>
+
 </html>

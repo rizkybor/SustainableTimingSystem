@@ -16,7 +16,7 @@ protocol.registerSchemesAsPrivileged([
 
 async function createWindow() {
   const win = new BrowserWindow({ 
-    width: 1200,
+    width: 1000,
     height: 800,
     show: false,
     webPreferences: {
@@ -35,7 +35,6 @@ async function createWindow() {
     alwaysOnTop: false 
   });
   splash.loadFile(path.join(__dirname, '../public/splash.html'));
-  splash.center();
   setTimeout(function () {
     splash.close();
     win.center();
@@ -62,7 +61,6 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-
 })
 
 app.on('ready', async () => {

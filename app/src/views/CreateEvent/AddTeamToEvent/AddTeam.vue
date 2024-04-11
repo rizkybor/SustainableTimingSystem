@@ -89,16 +89,16 @@
                     v-show="showCategoriesHead2Head"
                     style="border-radius: 20px"
                     :style="{
-                      background: isActivated == 'H2H' ? '#027BFE' : '#C4C4C4',
+                      background: isActivated == 'HEAD2HEAD' ? '#027BFE' : '#C4C4C4',
                     }"
-                    @click="loadTeams('H2H')"
+                    @click="loadTeams('HEAD2HEAD')"
                   >
                     <img
                       src="../../../assets/icons/h2h.png"
-                      alt="H2H"
+                      alt="HEAD2HEAD"
                       style="height: 50px; margin-right: 5px"
                     />
-                    H2H
+                    HEAD 2 HEAD
                   </b-button>
 
                   <!-- BTN SLALOM  -->
@@ -174,7 +174,7 @@
             ? "Sprint Categories"
             : isActivated == "DRR"
             ? "DRR Categories"
-            : isActivated == "H2H"
+            : isActivated == "HEAD2HEAD"
             ? "Head 2 Head Categories"
             : isActivated == "SLALOM"
             ? "Slalom Categories"
@@ -309,7 +309,7 @@ export default {
           this.showCategoriesDRR = true;
         }
 
-        if (e.name == "HEAD 2 HEAD") {
+        if (e.name == "HEAD2HEAD") {
           this.showCategoriesHead2Head = true;
         }
 
@@ -319,10 +319,7 @@ export default {
 
         // Menambahkan Array Categories ke dalam Object Event Participant
         const participantEntry = {};
-        participantEntry[e.name] = [];
-        if (e.name == "HEAD 2 HEAD") {
-          e.name = "H2H";
-        }
+        participantEntry[e.name.toLowerCase()] = [];
         this.formEvent.participant.push(participantEntry);
       });
 
@@ -333,14 +330,67 @@ export default {
             division: division.name,
             details: [],
           };
-          if (participant.SPRINT) participant.SPRINT.push(divisionEntry);
-          if (participant.DRR) participant.DRR.push(divisionEntry);
-          if (participant.SLALOM) participant.SLALOM.push(divisionEntry);
-          if (participant.H2H) participant.H2H.push(divisionEntry);
+          if (participant.sprint) participant.sprint.push(divisionEntry);
+          if (participant.drr) participant.drr.push(divisionEntry);
+          if (participant.slalom) participant.slalom.push(divisionEntry);
+          if (participant.head2head) participant.head2head.push(divisionEntry);
         });
       });
 
-      console.log(this.formEvent.participant, "<< cek form event");
+      // Menambahkan Array Race Categories ke dalam Array Setiap Categories
+      this.formEvent.participant.forEach((participant) => {
+        if (participant.sprint) {
+          participant.sprint.forEach((e) => {
+            datas.categoriesRace.forEach((r) => {
+              const catRaceEntry = {
+                categoriesRace: r.name,
+                teams: [],
+              };
+              if (e.division == "R4") e.details.push(catRaceEntry);
+              if (e.division == "R6") e.details.push(catRaceEntry);
+            });
+          });
+        }
+
+        if (participant.drr) {
+          participant.drr.forEach((e) => {
+            datas.categoriesRace.forEach((r) => {
+              const catRaceEntry = {
+                categoriesRace: r.name,
+                teams: [],
+              };
+              if (e.division == "R4") e.details.push(catRaceEntry);
+              if (e.division == "R6") e.details.push(catRaceEntry);
+            });
+          });
+        }
+
+        if (participant.slalom) {
+          participant.slalom.forEach((e) => {
+            datas.categoriesRace.forEach((r) => {
+              const catRaceEntry = {
+                categoriesRace: r.name,
+                teams: [],
+              };
+              if (e.division == "R4") e.details.push(catRaceEntry);
+              if (e.division == "R6") e.details.push(catRaceEntry);
+            });
+          });
+        }
+
+        if (participant.head2head) {
+          participant.head2head.forEach((e) => {
+            datas.categoriesRace.forEach((r) => {
+              const catRaceEntry = {
+                categoriesRace: r.name,
+                teams: [],
+              };
+              if (e.division == "R4") e.details.push(catRaceEntry);
+              if (e.division == "R6") e.details.push(catRaceEntry);
+            });
+          });
+        }
+      });
     },
     loadTeams(category) {
       this.isActivated = category;

@@ -44,7 +44,7 @@ async function createWindow() {
     splash.close();
     win.center();
     win.show();
-  }, 6000);
+  }, 7000);
 
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {

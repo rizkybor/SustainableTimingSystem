@@ -5,6 +5,7 @@ import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 const { setupIPCMainHandlers } = require('./services/ipcMainServices');
+import path from 'path';
 
 // Function to Services Communication to Database
 setupIPCMainHandlers()
@@ -14,13 +15,30 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true } }
 ])
 
+let loadingWindow;
+
+function createLoadingWindow() {
+  loadingWindow = new BrowserWindow({
+    width: 300,
+    height: 100,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: false,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
+      contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
+    }
+  });
+  loadingWindow.loadURL(`file://${path.join(__dirname, '../public/loading.html')}`);
+}
+
 async function createWindow() {
   // Create the browser window.
-  const win = new BrowserWindow({
+  const win = new BrowserWindow({ 
     width: 800,
     height: 600,
     webPreferences: {
-      
       // Use pluginOptions.nodeIntegration, leave this alone
       // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info
       nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
@@ -39,6 +57,12 @@ async function createWindow() {
     // Load the index.html when not in development
     win.loadURL('app://./index.html')
   }
+
+   // Close the loading window
+   if (loadingWindow) {
+    loadingWindow.close();
+    loadingWindow = null;
+  }
 }
 
 // Quit when all windows are closed.
@@ -53,7 +77,12 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  // if (BrowserWindow.getAllWindows().length === 0) createWindow() 
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createLoadingWindow();
+    setTimeout(createWindow, 1000)
+  }
+
 })
 
 // This method will be called when Electron has finished
@@ -68,7 +97,9 @@ app.on('ready', async () => {
       console.error('Vue Devtools failed to install:', e.toString())
     }
   }
-  createWindow()
+  createLoadingWindow();
+  setTimeout(createWindow, 2000)
+  // createWindow()
 })
 
 // Exit cleanly on request from parent process in development mode.

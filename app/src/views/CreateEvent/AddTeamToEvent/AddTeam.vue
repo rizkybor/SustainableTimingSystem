@@ -92,14 +92,14 @@
               <div v-if="showEmptyCards">
                 <cardEmptyVue/>
               </div>
-              
+
               <div v-else>
                 <cardTeamVue
                   v-if="team.R4men"
                   :teamTitle="'R4 - MEN'"
                   :datas="team.R4men"
                   :fields="headersTable"
-                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                  @open-modal="openModal(formEvent.participant,'R4', 'MEN')"
                 />
 
                 <br />
@@ -109,7 +109,7 @@
                   :teamTitle="'R4 - WOMEN'"
                   :teams="team.R4women"
                   :fields="headersTable"
-                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                  @open-modal="openModal(formEvent.participant,'R4', 'WOMEN')"
                 />
 
                 <br />
@@ -119,7 +119,7 @@
                   :teamTitle="'R6 - MEN'"
                   :teams="team.R6men"
                   :fields="headersTable"
-                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                  @open-modal="openModal(formEvent.participant,'R6', 'MEN')"
                 />
 
                 <br />
@@ -129,7 +129,7 @@
                   :teamTitle="'R6 - WOMEN'"
                   :teams="team.R6women"
                   :fields="headersTable"
-                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                  @open-modal="openModal(formEvent.participant,'R6', 'WOMEN')"
                 />
               </div>
             </b-col>
@@ -157,6 +157,7 @@
             : ""
         }}</template
       >
+      {{ modalDatas }}
       <div class="d-block text-left mx-4 my-3">
         <!-- TEAM NAME  -->
         <b-form-group label="Name Team">
@@ -214,6 +215,9 @@ export default {
   },
   data() {
     return {
+      modalRaceCategories: '',
+      modalDivision: '',
+      modalDatas: [],
       showEmptyCards: true,
       teams: [
         { No: 1, "Nama Team": "Team A", BIB: "001" },
@@ -391,8 +395,26 @@ export default {
     goTo() {
       this.$emit("backForm");
     },
+    openModal(datas, division, gender) {
+      this.modalRaceCategories = gender;
+      this.modalDivision = division;
+      this.modalDatas = datas;
+      this.$bvModal.show('bv-modal-add-team');
+    },
     simpanNewTeam() {
-      console.log("simpan team");
+      let ev = this.formEvent.participant
+      let searchBy = this.isActivated.toLowerCase()
+
+      const byCategories = ev.find(item => item.hasOwnProperty(searchBy));
+
+      if (byCategories) {
+        // LANJUTKAN UNTUK SIMPAN VALUENYA
+        console.log(byCategories,'ALL DATA')
+        console.log(this.modalDivision,'DIVISION')
+        console.log(this.modalRaceCategories,'GENDER')
+      } else {
+        console.log('Array tidak ditemukan.');
+      }
     },
   },
 };

@@ -266,7 +266,6 @@ export default {
     if (this.open) {
       await this.checkValueStorage();
     }
-    this.isActivated == "" ? "DRR" : "";
   },
   methods: {
     loadOptions() {},

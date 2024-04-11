@@ -49,74 +49,40 @@
 
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
-                  <!-- BTN DRR  -->
                   <b-button
-                    v-show="showCategoriesDRR"
+                    v-for="category in formEvent.categoriesEvent"
+                    :key="category.name"
                     style="border-radius: 20px"
                     :style="{
-                      background: isActivated == 'DRR' ? '#027BFE' : '#C4C4C4',
+                      background: isActivated === category.name ? '#027BFE' : '#C4C4C4',
                     }"
-                    @click="loadTeams('DRR')"
+                    @click="loadTeams(category.name)"
                   >
-                    <img
+                  <img
+                      v-if="category.name == 'DRR'"
                       src="../../../assets/icons/drr.png"
                       alt="DRR"
                       style="height: 50px; margin-right: 5px"
                     />
-                    DRR
-                  </b-button>
-
-                  <!-- BTN SPRINT  -->
-                  <b-button
-                    v-show="showCategoriesSprint"
-                    style="border-radius: 20px"
-                    :style="{
-                      background:
-                        isActivated == 'SPRINT' ? '#027BFE' : '#C4C4C4',
-                    }"
-                    @click="loadTeams('SPRINT')"
-                  >
                     <img
+                    v-if="category.name == 'SPRINT'"
                       src="../../../assets/icons/sprint.png"
                       alt="SPRINT"
                       style="height: 50px; margin-right: 5px"
                     />
-                    SPRINT
-                  </b-button>
-
-                  <!-- BTN H2H  -->
-                  <b-button
-                    v-show="showCategoriesHead2Head"
-                    style="border-radius: 20px"
-                    :style="{
-                      background: isActivated == 'HEAD2HEAD' ? '#027BFE' : '#C4C4C4',
-                    }"
-                    @click="loadTeams('HEAD2HEAD')"
-                  >
                     <img
+                    v-if="category.name == 'HEAD2HEAD'"
                       src="../../../assets/icons/h2h.png"
                       alt="HEAD2HEAD"
                       style="height: 50px; margin-right: 5px"
                     />
-                    HEAD 2 HEAD
-                  </b-button>
-
-                  <!-- BTN SLALOM  -->
-                  <b-button
-                    v-show="showCategoriesSlalom"
-                    style="border-radius: 20px"
-                    :style="{
-                      background:
-                        isActivated == 'SLALOM' ? '#027BFE' : '#C4C4C4',
-                    }"
-                    @click="loadTeams('SLALOM')"
-                  >
                     <img
+                    v-if="category.name == 'SLALOM'"
                       src="../../../assets/icons/slalom.png"
                       alt="SLALOM"
                       style="height: 50px; margin-right: 5px"
                     />
-                    SLALOM
+                    {{ category.name }}
                   </b-button>
                 </div>
               </div>

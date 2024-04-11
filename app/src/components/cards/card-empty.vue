@@ -6,14 +6,14 @@
           <div class="mx-2 mt-3">
             <p class="h5 font-weight-bold">{{ teamTitle }}</p>
           </div>
-          <b-button
+          <!-- <b-button
             style="border-radius: 20px"
             class="btn-md"
             variant="primary"
             @click="$emit('open-modal')"
           >
             <Icon icon="ic:baseline-add-circle" /> New Team
-          </b-button>
+          </b-button> -->
         </div>
       </template>
       <div class="text-center my-5"> 

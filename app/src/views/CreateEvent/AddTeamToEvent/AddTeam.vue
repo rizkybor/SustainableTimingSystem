@@ -10,9 +10,43 @@
                   Home / Create New Event / List All Teams
                 </p>
               </div>
-              <div class="mx-2 my-5 mt-2">
-                <p class="h2">All Teams</p>
+              <div style="display: flex; justify-content: space-between">
+                <div class="mx-2 my-5 mt-2">
+                  <p class="h2">All Teams</p>
+                </div>
+                <div class="mx-2 my-5 mt-2">
+                  <div
+                    class="d-flex"
+                    style="justify-content: space-between; gap: 1vh"
+                  >
+                    <div>
+                      <b-button
+                        style="border-radius: 20px"
+                        @click="goTo()"
+                        variant="secondary"
+                        class="btn-md"
+                      >
+                        <Icon
+                          icon="ic:baseline-keyboard-double-arrow-left"
+                        />Back
+                      </b-button>
+                    </div>
+                    <div>
+                      <b-button
+                        style="border-radius: 20px"
+                        @click="save()"
+                        type="input"
+                        variant="success"
+                        class="btn-md"
+                      >
+                        <Icon icon="material-symbols-light:save" />
+                        Save Event
+                      </b-button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
                   <!-- BTN DRR  -->
@@ -86,61 +120,50 @@
                   </b-button>
                 </div>
               </div>
-
-              <div v-if="!formEvent.participant.length != 0">
-                <cardEmptyVue
-                  @open-modal="$bvModal.show('bv-modal-add-team')"
-                />
-              </div>
-
-              <div v-else>
+              {{ formEvent }}
+              <div>
                 <cardTeamVue
-                  :teamTitle="teamsComponent.title"
-                  :teams="teamsComponent.team"
-                  :fields="teamsComponent.fields"
+                  :teamTitle="'R4 - MEN'"
+                  :datas="teamsComponent.team"
+                  :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
 
                 <br />
 
                 <cardTeamVue
-                  :teamTitle="teamsComponentW.title"
+                  :teamTitle="'R4 - WOMEN'"
                   :teams="teamsComponentW.team"
-                  :fields="teamsComponent.fields"
+                  :fields="headersTable"
+                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                />
+
+                <br />
+
+                <cardTeamVue
+                  :teamTitle="'R6 - MEN'"
+                  :teams="teamsComponentW.team"
+                  :fields="headersTable"
+                  @open-modal="$bvModal.show('bv-modal-add-team')"
+                />
+
+                <br />
+
+                <cardTeamVue
+                  :teamTitle="'R6 - WOMEN'"
+                  :teams="teamsComponentW.team"
+                  :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
               </div>
             </b-col>
           </b-row>
-
-          <div class="d-flex mt-5" style="justify-content: space-between">
-            <div>
-              <b-button
-                style="border-radius: 20px"
-                @click="goTo()"
-                variant="secondary"
-                class="btn-md"
-              >
-                <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-              </b-button>
-            </div>
-            <div>
-              <b-button
-                style="border-radius: 20px"
-                @click="save()"
-                type="input"
-                variant="success"
-                class="btn-md"
-              >
-                <Icon icon="material-symbols-light:save" />
-                Save Event
-              </b-button>
-            </div>
-          </div>
         </div>
-        <div></div>
       </b-col>
     </b-row>
+
+    <br />
+    <br />
 
     <!-- // AREA MODAL  -->
     <b-modal id="bv-modal-add-team" hide-footer no-close-on-backdrop centered>
@@ -220,6 +243,7 @@ export default {
         { No: 2, "Nama Team": "Team B", BIB: "002" },
         { No: 3, "Nama Team": "Team C", BIB: "003" },
       ],
+      headersTable: ["No", "Nama Team", "BIB", "Action"],
       optionCategories: [],
       formModal: {
         nameTeam: "",
@@ -241,6 +265,24 @@ export default {
       showCategoriesHead2Head: false,
       showCategoriesSlalom: false,
       showCategoriesDRR: false,
+      showTable: {
+        showR4MenSprint: false,
+        showR4WomenSprint: false,
+        showR6MenSprint: false,
+        showR6WomenSprint: false,
+        showR4MenDDR: false,
+        showR4WomenDDR: false,
+        showR6MenDDR: false,
+        showR6WomenDDR: false,
+        showR4MenH2H: false,
+        showR4WomenH2H: false,
+        showR6MenH2H: false,
+        showR6WomenH2H: false,
+        showR4MenSlalom: false,
+        showR4WomenSlalom: false,
+        showR6MenSlalom: false,
+        showR6WomenSlalom: false,
+      },
     };
   },
   async mounted() {
@@ -274,7 +316,31 @@ export default {
         if (e.name == "SLALOM") {
           this.showCategoriesSlalom = true;
         }
+
+        // Menambahkan Array Categories ke dalam Object Event Participant
+        const participantEntry = {};
+        participantEntry[e.name] = [];
+        if (e.name == "HEAD 2 HEAD") {
+          e.name = "H2H";
+        }
+        this.formEvent.participant.push(participantEntry);
       });
+
+      // Menambahkan Array Division ke dalam Array Setiap Categories
+      this.formEvent.participant.forEach((participant) => {
+        datas.categoriesDivision.forEach((division) => {
+          const divisionEntry = {
+            division: division.name,
+            details: [],
+          };
+          if (participant.SPRINT) participant.SPRINT.push(divisionEntry);
+          if (participant.DRR) participant.DRR.push(divisionEntry);
+          if (participant.SLALOM) participant.SLALOM.push(divisionEntry);
+          if (participant.H2H) participant.H2H.push(divisionEntry);
+        });
+      });
+
+      console.log(this.formEvent.participant, "<< cek form event");
     },
     loadTeams(category) {
       this.isActivated = category;

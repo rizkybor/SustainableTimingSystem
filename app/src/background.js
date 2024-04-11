@@ -20,7 +20,7 @@ async function createWindow() {
     height: 800,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../src/preload.js'),
       nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
       contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
     }
@@ -32,14 +32,19 @@ async function createWindow() {
     height: 200, 
     transparent: true, 
     frame: false, 
-    alwaysOnTop: false 
+    alwaysOnTop: false ,
+    webPreferences: {
+      preload: path.join(__dirname, '../src/preload.js'),
+      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
+      contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
+    }
   });
   splash.loadFile(path.join(__dirname, '../public/splash.html'));
   setTimeout(function () {
     splash.close();
     win.center();
     win.show();
-  }, 5000);
+  }, 6000);
 
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {

@@ -131,24 +131,27 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <!-- EVENT DATE -->
+                    <!-- START DATE -->
                     <b-form-group label="Start Date">
                       <b-form-datepicker
                         size="sm"
                         v-model="formEvent.startDateEvent"
                         placeholder="Select start date"
                         class="mb-2"
+                        :min="minDate"
                       ></b-form-datepicker>
                     </b-form-group>
                   </b-col>
                   <b-col cols="6">
-                    <!-- EVENT DATE -->
+                    <!-- END DATE -->
                     <b-form-group label="End Date">
                       <b-form-datepicker
+                        :disabled="formEvent.startDateEvent == ''"
                         size="sm"
                         v-model="formEvent.endDateEvent"
                         placeholder="Select end date"
                         class="mb-2"
+                        :min="formEvent.startDateEvent"
                       ></b-form-datepicker>
                     </b-form-group>
                   </b-col>
@@ -348,6 +351,7 @@ export default {
       optionDivisions: [],
       optionRaces: [],
       optionInitials: [],
+      minDate: new Date(),
     };
   },
 

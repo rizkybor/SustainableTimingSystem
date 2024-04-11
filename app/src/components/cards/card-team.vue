@@ -44,7 +44,7 @@
   export default {
     props: {
       teamTitle: String,
-      datas: Array,
+      teams: Array,
       fields: Array
     },
     methods: {

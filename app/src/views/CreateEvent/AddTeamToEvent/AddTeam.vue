@@ -54,30 +54,31 @@
                     :key="category.name"
                     style="border-radius: 20px"
                     :style="{
-                      background: isActivated === category.name ? '#027BFE' : '#C4C4C4',
+                      background:
+                        isActivated === category.name ? '#027BFE' : '#C4C4C4',
                     }"
-                    @click="loadTeams(category.name)"
+                    @click="loadTeams(category)"
                   >
-                  <img
+                    <img
                       v-if="category.name == 'DRR'"
                       src="../../../assets/icons/drr.png"
                       alt="DRR"
                       style="height: 50px; margin-right: 5px"
                     />
                     <img
-                    v-if="category.name == 'SPRINT'"
+                      v-if="category.name == 'SPRINT'"
                       src="../../../assets/icons/sprint.png"
                       alt="SPRINT"
                       style="height: 50px; margin-right: 5px"
                     />
                     <img
-                    v-if="category.name == 'HEAD2HEAD'"
+                      v-if="category.name == 'HEAD2HEAD'"
                       src="../../../assets/icons/h2h.png"
                       alt="HEAD2HEAD"
                       style="height: 50px; margin-right: 5px"
                     />
                     <img
-                    v-if="category.name == 'SLALOM'"
+                      v-if="category.name == 'SLALOM'"
                       src="../../../assets/icons/slalom.png"
                       alt="SLALOM"
                       style="height: 50px; margin-right: 5px"
@@ -86,11 +87,12 @@
                   </b-button>
                 </div>
               </div>
-              {{ formEvent }}
+              <!-- {{ formEvent }} -->
               <div>
                 <cardTeamVue
+                  v-if="team.R4men"
                   :teamTitle="'R4 - MEN'"
-                  :datas="teamsComponent.team"
+                  :datas="team.R4men"
                   :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
@@ -98,8 +100,9 @@
                 <br />
 
                 <cardTeamVue
+                  v-if="team.R4women"
                   :teamTitle="'R4 - WOMEN'"
-                  :teams="teamsComponentW.team"
+                  :teams="team.R4women"
                   :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
@@ -107,8 +110,9 @@
                 <br />
 
                 <cardTeamVue
+                  v-if="team.R6men"
                   :teamTitle="'R6 - MEN'"
-                  :teams="teamsComponentW.team"
+                  :teams="team.R6men"
                   :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
@@ -116,8 +120,9 @@
                 <br />
 
                 <cardTeamVue
+                  v-if="team.R6women"
                   :teamTitle="'R6 - WOMEN'"
-                  :teams="teamsComponentW.team"
+                  :teams="team.R6women"
                   :fields="headersTable"
                   @open-modal="$bvModal.show('bv-modal-add-team')"
                 />
@@ -215,15 +220,11 @@ export default {
         nameTeam: "",
         bibTeam: "",
       },
-      teamsComponent: {
-        title: "",
-        team: [],
-        fields: ["No", "Nama Team", "BIB", "Action"],
-      },
-      teamsComponentW: {
-        title: "",
-        team: [],
-        fields: ["No", "Nama Team", "BIB", "Action"],
+      team: {
+        R4men: [],
+        R4women: [],
+        R6men: [],
+        R6women: [],
       },
       isActivated: "",
       formEvent: {},
@@ -358,12 +359,20 @@ export default {
         }
       });
     },
-    loadTeams(category) {
-      this.isActivated = category;
-      this.teamsComponent.title = `TEAM R4 - ${category} MEN`;
-      this.teamsComponent.team = this.teams[category];
-      this.teamsComponentW.title = `TEAM R4 - ${category} WOMEN`;
-      this.teamsComponentW.team = this.teams[category];
+    loadTeams(payload) {
+      let ev = this.formEvent.participant;
+      this.isActivated = payload.name;
+
+      for (const obj of ev) {
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === payload.name.toLowerCase()) {
+            value[0].details[0].teams;
+            value[0].details[1].teams;
+            value[1].details[0].teams;
+            value[1].details[1].teams;
+          }
+        }
+      }
     },
     goTo() {
       this.$emit("backForm");

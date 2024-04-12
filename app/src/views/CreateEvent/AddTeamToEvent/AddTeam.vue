@@ -415,11 +415,6 @@ export default {
           intervalRace: "",
           result: [],
         };
-        // LANJUTKAN UNTUK SIMPAN VALUENYA
-
-        // console.log(byCategories, "ALL DATA");
-        // console.log(this.modalDivision, "DIVISION");
-        // console.log(this.modalRaceCategories, "GENDER");
 
         let type = this.isActivated.toLowerCase();
 
@@ -436,11 +431,7 @@ export default {
         ev[dataIndex][type][detailIndex].details[teamsIndex].teams.push(
           newData
         );
-
-        console.log(this.tempParticipant,'<< BEFORE')
-
         this.tempParticipant = ev
-
         console.log(this.tempParticipant,'<< AFTER')
       } else {
         console.log("Array tidak ditemukan.");

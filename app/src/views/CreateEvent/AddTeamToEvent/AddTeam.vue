@@ -90,7 +90,7 @@
               <!-- {{ formEvent }} -->
 
               <div v-if="showEmptyCards">
-                <cardEmptyVue/>
+                <cardEmptyVue />
               </div>
 
               <div v-else>
@@ -99,7 +99,7 @@
                   :teamTitle="'R4 - MEN'"
                   :datas="team.R4men"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R4', 'MEN')"
+                  @open-modal="openModal(formEvent.participant, 'R4', 'MEN')"
                 />
 
                 <br />
@@ -109,7 +109,7 @@
                   :teamTitle="'R4 - WOMEN'"
                   :teams="team.R4women"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R4', 'WOMEN')"
+                  @open-modal="openModal(formEvent.participant, 'R4', 'WOMEN')"
                 />
 
                 <br />
@@ -119,7 +119,7 @@
                   :teamTitle="'R6 - MEN'"
                   :teams="team.R6men"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R6', 'MEN')"
+                  @open-modal="openModal(formEvent.participant, 'R6', 'MEN')"
                 />
 
                 <br />
@@ -129,7 +129,7 @@
                   :teamTitle="'R6 - WOMEN'"
                   :teams="team.R6women"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R6', 'WOMEN')"
+                  @open-modal="openModal(formEvent.participant, 'R6', 'WOMEN')"
                 />
               </div>
             </b-col>
@@ -157,7 +157,6 @@
             : ""
         }}</template
       >
-      {{ modalDatas }}
       <div class="d-block text-left mx-4 my-3">
         <!-- TEAM NAME  -->
         <b-form-group label="Name Team">
@@ -215,8 +214,8 @@ export default {
   },
   data() {
     return {
-      modalRaceCategories: '',
-      modalDivision: '',
+      modalRaceCategories: "",
+      modalDivision: "",
       modalDatas: [],
       showEmptyCards: true,
       teams: [
@@ -236,6 +235,7 @@ export default {
         R6men: [],
         R6women: [],
       },
+      tempParticipant: [],
       isActivated: "",
       formEvent: {},
       showCategoriesSprint: false,
@@ -369,7 +369,7 @@ export default {
       });
     },
     loadTeams(payload) {
-      this.showEmptyCards = false
+      this.showEmptyCards = false;
       let ev = this.formEvent.participant;
       this.isActivated = payload.name;
 
@@ -398,21 +398,52 @@ export default {
       this.modalRaceCategories = gender;
       this.modalDivision = division;
       this.modalDatas = datas;
-      this.$bvModal.show('bv-modal-add-team');
+      this.$bvModal.show("bv-modal-add-team");
     },
     simpanNewTeam() {
-      let ev = this.formEvent.participant
-      let searchBy = this.isActivated.toLowerCase()
+      let ev = this.formEvent.participant;
+      let searchBy = this.isActivated.toLowerCase();
 
-      const byCategories = ev.find(item => item.hasOwnProperty(searchBy));
+      const byCategories = ev.find((item) => item.hasOwnProperty(searchBy));
 
       if (byCategories) {
+        const newData = {
+          nameTeam: `${this.formModal.nameTeam}`,
+          bibTeam: `${this.formModal.bibTeam}`,
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: [],
+        };
         // LANJUTKAN UNTUK SIMPAN VALUENYA
-        console.log(byCategories,'ALL DATA')
-        console.log(this.modalDivision,'DIVISION')
-        console.log(this.modalRaceCategories,'GENDER')
+
+        // console.log(byCategories, "ALL DATA");
+        // console.log(this.modalDivision, "DIVISION");
+        // console.log(this.modalRaceCategories, "GENDER");
+
+        let type = this.isActivated.toLowerCase();
+
+        // Mencari index untuk menyisipkan data
+        const dataIndex = ev.findIndex((item) => Object.keys(item)[0] === type);
+        const detailIndex = ev[dataIndex][type].findIndex(
+          (item) => item.division === this.modalDivision
+        );
+        const teamsIndex = ev[dataIndex][type][detailIndex].details.findIndex(
+          (item) => item.categoriesRace === this.modalRaceCategories
+        );
+
+        // Memasukkan data
+        ev[dataIndex][type][detailIndex].details[teamsIndex].teams.push(
+          newData
+        );
+
+        console.log(this.tempParticipant,'<< BEFORE')
+
+        this.tempParticipant = ev
+
+        console.log(this.tempParticipant,'<< AFTER')
       } else {
-        console.log('Array tidak ditemukan.');
+        console.log("Array tidak ditemukan.");
       }
     },
   },

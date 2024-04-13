@@ -90,7 +90,7 @@
               <!-- {{ formEvent }} -->
 
               <div v-if="showEmptyCards">
-                <cardEmptyVue/>
+                <cardEmptyVue />
               </div>
 
               <div v-else>
@@ -99,7 +99,7 @@
                   :teamTitle="'R4 - MEN'"
                   :datas="team.R4men"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R4', 'MEN')"
+                  @open-modal="openModal(formEvent.participant, 'R4men')"
                 />
 
                 <br />
@@ -109,7 +109,7 @@
                   :teamTitle="'R4 - WOMEN'"
                   :teams="team.R4women"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R4', 'WOMEN')"
+                  @open-modal="openModal(formEvent.participant, 'R4women')"
                 />
 
                 <br />
@@ -119,7 +119,7 @@
                   :teamTitle="'R6 - MEN'"
                   :teams="team.R6men"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R6', 'MEN')"
+                  @open-modal="openModal(formEvent.participant, 'R6men')"
                 />
 
                 <br />
@@ -129,7 +129,7 @@
                   :teamTitle="'R6 - WOMEN'"
                   :teams="team.R6women"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant,'R6', 'WOMEN')"
+                  @open-modal="openModal(formEvent.participant, 'R6women')"
                 />
               </div>
             </b-col>
@@ -215,8 +215,8 @@ export default {
   },
   data() {
     return {
-      modalRaceCategories: '',
-      modalDivision: '',
+      modalRaceCategories: "",
+      modalDivision: "",
       modalDatas: [],
       showEmptyCards: true,
       teams: [
@@ -277,100 +277,41 @@ export default {
         this.formEvent = datas;
       }
 
-      datas.categoriesEvent.map((e) => {
-        if (e.name == "SPRINT") {
-          this.showCategoriesSprint = true;
-        }
+      // Definisikan kategori baru
+      const newCategories = ["SPRINT", "SLALOM", "HEAD2HEAD", "DRR"];
 
-        if (e.name == "DRR") {
-          this.showCategoriesDRR = true;
-        }
+      newCategories.forEach((category) => {
+        // Periksa apakah kategori baru tersebut ada dalam data
+        const categoryData = datas.categoriesEvent.find(
+          (e) => e.name === category
+        );
+        if (categoryData) {
+          // Jika ada, tampilkan kategori tersebut
+          if (category === "SPRINT") {
+            this.showCategoriesSprint = true;
+          } else if (category === "DRR") {
+            this.showCategoriesDRR = true;
+          } else if (category === "HEAD2HEAD") {
+            this.showCategoriesHead2Head = true;
+          } else if (category === "SLALOM") {
+            this.showCategoriesSlalom = true;
+          }
 
-        if (e.name == "HEAD2HEAD") {
-          this.showCategoriesHead2Head = true;
-        }
+          // Buat array baru untuk setiap divisi dengan kategori baru
+          const divisiTypes = ["R4men", "R4women", "R6men", "R6women"];
+          const result = divisiTypes.map((divisiType) => ({
+            categories: category,
+            divisiType: divisiType,
+            teams: [],
+          }));
 
-        if (e.name == "SLALOM") {
-          this.showCategoriesSlalom = true;
-        }
-
-        // Menambahkan Array Categories ke dalam Object Event Participant
-        const participantEntry = {};
-        participantEntry[e.name.toLowerCase()] = [];
-        this.formEvent.participant.push(participantEntry);
-      });
-
-      // Menambahkan Array Division ke dalam Array Setiap Categories
-      this.formEvent.participant.forEach((participant) => {
-        datas.categoriesDivision.forEach((division) => {
-          const divisionEntry = {
-            division: division.name,
-            details: [],
-          };
-          if (participant.sprint) participant.sprint.push(divisionEntry);
-          if (participant.drr) participant.drr.push(divisionEntry);
-          if (participant.slalom) participant.slalom.push(divisionEntry);
-          if (participant.head2head) participant.head2head.push(divisionEntry);
-        });
-      });
-
-      // Menambahkan Array Race Categories ke dalam Array Setiap Categories
-      this.formEvent.participant.forEach((participant) => {
-        if (participant.sprint) {
-          participant.sprint.forEach((e) => {
-            datas.categoriesRace.forEach((r) => {
-              const catRaceEntry = {
-                categoriesRace: r.name,
-                teams: [],
-              };
-              if (e.division == "R4") e.details.push(catRaceEntry);
-              if (e.division == "R6") e.details.push(catRaceEntry);
-            });
-          });
-        }
-
-        if (participant.drr) {
-          participant.drr.forEach((e) => {
-            datas.categoriesRace.forEach((r) => {
-              const catRaceEntry = {
-                categoriesRace: r.name,
-                teams: [],
-              };
-              if (e.division == "R4") e.details.push(catRaceEntry);
-              if (e.division == "R6") e.details.push(catRaceEntry);
-            });
-          });
-        }
-
-        if (participant.slalom) {
-          participant.slalom.forEach((e) => {
-            datas.categoriesRace.forEach((r) => {
-              const catRaceEntry = {
-                categoriesRace: r.name,
-                teams: [],
-              };
-              if (e.division == "R4") e.details.push(catRaceEntry);
-              if (e.division == "R6") e.details.push(catRaceEntry);
-            });
-          });
-        }
-
-        if (participant.head2head) {
-          participant.head2head.forEach((e) => {
-            datas.categoriesRace.forEach((r) => {
-              const catRaceEntry = {
-                categoriesRace: r.name,
-                teams: [],
-              };
-              if (e.division == "R4") e.details.push(catRaceEntry);
-              if (e.division == "R6") e.details.push(catRaceEntry);
-            });
-          });
+          // Tambahkan array hasil ke formEvent.participant
+          this.formEvent.participant.push(...result);
         }
       });
     },
     loadTeams(payload) {
-      this.showEmptyCards = false
+      this.showEmptyCards = false;
       let ev = this.formEvent.participant;
       this.isActivated = payload.name;
 
@@ -395,26 +336,31 @@ export default {
     goTo() {
       this.$emit("backForm");
     },
-    openModal(datas, division, gender) {
-      this.modalRaceCategories = gender;
+    openModal(datas, division, ) {
       this.modalDivision = division;
       this.modalDatas = datas;
-      this.$bvModal.show('bv-modal-add-team');
+      this.$bvModal.show("bv-modal-add-team");
     },
     simpanNewTeam() {
-      let ev = this.formEvent.participant
-      let searchBy = this.isActivated.toLowerCase()
+      // Data tim yang akan ditambahkan
+      const addTeams = {
+        name: "tes",
+        bib: "0909",
+      };
 
-      const byCategories = ev.find(item => item.hasOwnProperty(searchBy));
+      // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
+      const matchingData = modalDatas.find(
+        (data) => data.divisiType === this.modalDivision
+      );
 
-      if (byCategories) {
-        // LANJUTKAN UNTUK SIMPAN VALUENYA
-        console.log(byCategories,'ALL DATA')
-        console.log(this.modalDivision,'DIVISION')
-        console.log(this.modalRaceCategories,'GENDER')
-      } else {
-        console.log('Array tidak ditemukan.');
+      console.log(matchingData)
+
+      // Jika ditemukan objek yang sesuai, tambahkan tim baru ke dalam array teams
+      if (matchingData) {
+        matchingData.teams.push(addTeams);
       }
+
+      console.log(matchingData);
     },
   },
 };

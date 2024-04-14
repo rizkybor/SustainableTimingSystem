@@ -93,6 +93,7 @@
               </div>
               <div v-else>
                 <cardTeamVue
+                  v-if="team.R4men"
                   :teamTitle="'R4 - MEN'"
                   :teams="teamsR4men"
                   :fields="headersTable"
@@ -227,10 +228,10 @@ export default {
         bibTeam: "",
       },
       team: {
-        R4men: [],
-        R4women: [],
-        R6men: [],
-        R6women: [],
+        R4men: false,
+        R4women: false,
+        R6men: false,
+        R6women: false,
       },
       isActivated: "",
       indexCategories: 0,
@@ -292,8 +293,17 @@ export default {
     this.isActivated == "" ? "DRR" : "";
   },
   methods: {
-    loadOptions() {},
-    checkValueStorage() {
+    generateDivisiTypes(cat, gen) {
+      const divisiTypes = [];
+      cat.forEach(category => {
+        gen.forEach(gender => {
+          const divisiType = category.name + gender.name.toLowerCase();
+          divisiTypes.push(divisiType);
+        });
+      });
+      return divisiTypes;
+    },
+    async checkValueStorage() {
       const dataStorage = localStorage.getItem("formNewEvent");
       const datas = JSON.parse(dataStorage);
       if (datas) {
@@ -302,6 +312,7 @@ export default {
 
       // Definisikan kategori baru
       const newCategories = ["SPRINT", "SLALOM", "HEAD2HEAD", "DRR"];
+      const divisiTypes = await this.generateDivisiTypes(this.formEvent.categoriesDivision, this.formEvent.categoriesRace)
 
       newCategories.forEach((category) => {
         // Periksa apakah kategori baru tersebut ada dalam data
@@ -319,9 +330,24 @@ export default {
           } else if (category === "SLALOM") {
             this.showCategoriesSlalom = true;
           }
+          console.log(category)
 
           // Buat array baru untuk setiap divisi dengan kategori baru
-          const divisiTypes = ["R4men", "R4women", "R6men", "R6women"];
+
+          divisiTypes.forEach((e) => {
+            if(e == "R4men"){
+              this.team.R4men = true
+            }
+            if(e == "R4women"){
+              this.team.R4women = true
+            }
+            if(e == "R6men"){
+              this.team.R6men = true
+            }
+            if(e == "R6women"){
+              this.team.R6women = true
+            }
+          })
           const result = divisiTypes.map((divisiType) => ({
             categories: category,
             divisiType: divisiType,

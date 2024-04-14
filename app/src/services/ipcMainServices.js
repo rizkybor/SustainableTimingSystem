@@ -1,27 +1,54 @@
 const { ipcMain, dialog } = require("electron");
-const { getAllEvents } = require("../controllers/GET/getAllEvent.js")
+const { getAllEvents } = require("../controllers/GET/getAllEvent.js");
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
-} = require("../controllers/GET/getOptionEvent.js")
+} = require("../controllers/GET/getOptionEvent.js");
+const { insertNewEvent } = require("../controllers/INSERT/insertNewEvent.js");
 
 // communication with database
 function setupIPCMainHandlers() {
+  // GET DB
+  ipcMain.on("get-alert", async (event, options) => {
+    try {
+      const defaultOptions = {
+        type: "info",
+        detail: "Default detail",
+        message: "Default message",
+        buttons: ["OK"],
+      };
+
+      // Menggabungkan default options dengan options yang diterima dari renderer
+      const mergedOptions = { ...defaultOptions, ...options };
+      dialog.showMessageBox(null, mergedOptions, (response) => {
+        console.log("You clicked:", mergedOptions.buttons[response]);
+      });
+    } catch (error) {
+      event.reply("get-events-reply", []);
+    }
+  });
+  ipcMain.on("get-alert-saved", async (event, options) => {
+    try {
+      const defaultOptions = {
+        type: "info",
+        detail: "Default detail",
+        message: "Default message",
+      };
+
+      // Menggabungkan default options dengan options yang diterima dari renderer
+      const mergedOptions = { ...defaultOptions, ...options };
+      dialog.showMessageBox(null, mergedOptions, (response) => {
+        console.log("You clicked:", mergedOptions.buttons[response]);
+      });
+    } catch (error) {
+      event.reply("get-question-reply", []);
+    }
+  });
   ipcMain.on("get-events", async (event) => {
     try {
-      // const options = {
-      //   type: 'info',
-      //   title: 'Information',
-      //   message: 'Welcome to Sustainable Timing System Apps',
-      //   buttons: ['OK']
-      // };
-      // dialog.showMessageBox(null, options, (response) => {
-      //   console.log('You clicked:', options.buttons[response]);
-      // });
-    
       const data = await getAllEvents();
       event.reply("get-events-reply", data);
     } catch (error) {
@@ -29,6 +56,7 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // OPTION DB
   ipcMain.on("option-level", async (event) => {
     try {
       const data = await getOptionLevel();
@@ -71,6 +99,16 @@ function setupIPCMainHandlers() {
       event.reply("option-categories-race-reply", data);
     } catch (error) {
       event.reply("option-categories-race-reply", []);
+    }
+  });
+
+  // INSERT DB
+  ipcMain.on("insert-new-event", async (event, datas) => {
+    try {
+      const data = await insertNewEvent(datas);
+      event.reply("insert-new-event-reply", data);
+    } catch (error) {
+      event.reply("insert-new-event-reply", []);
     }
   });
 }

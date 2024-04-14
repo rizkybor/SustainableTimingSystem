@@ -12,7 +12,6 @@ Vue.use(VueRouter);
 const routes = [
   { path: "/", name: "home", component: Home },
   { path: "/create-new", component: CreateEvent },
-  // { path: "/sprint-race", component: SprintRace },
   { path: "/slalom-race", component: SlalomRace },
   {
     path: "/event-detail/:id",

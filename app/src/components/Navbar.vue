@@ -1,46 +1,52 @@
 <template>
   <div>
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: var(--blue);">
+    <b-navbar
+      toggleable="lg"
+      type="dark"
+      variant="primary"
+      class="navbar navbar-expand-lg navbar-dark fixed-top"
+      style="background-color: var(--blue)"
+    >
       <div class="container">
         <a class="navbar-brand" @click="goTo()">
-          <img src="@/assets/images/logo-sts.png" alt="Logo" style="height: 80px;">
+          <img
+            src="@/assets/images/logo-sts.png"
+            alt="Logo"
+            style="height: 80px"
+          />
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-          <ul class="navbar-nav">
-            <li class="nav-item">
-              <a class="nav-link link-to" href="#">Home</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link link-to" href="#">List Events</a>
-            </li>
-          </ul>
-        </div>
+
+        <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
+        
+
+        <b-collapse id="nav-collapse" is-nav class="justify-content-end">
+          <b-navbar-nav>
+            <b-nav-item @click="goTo('home')">Home</b-nav-item>
+
+            <b-nav-item @click="goTo('')">List Events</b-nav-item>
+          </b-navbar-nav>
+        </b-collapse>
       </div>
-    </nav>
+    </b-navbar>
   </div>
 </template>
 
 <script>
 export default {
-  name: 'SustainableTimingSystemRaftingNavbar',
+  name: "SustainableTimingSystemRaftingNavbar",
 
   data() {
-    return {
-      
-    };
+    return {};
   },
 
-  mounted() {
-    
-  },
+  mounted() {},
 
   methods: {
-    goTo() {
-      this.$router.router.push({name: "home"});
-    }
+    goTo(payload) {
+      if (payload == "home") {
+        this.$router.push({ name: payload });
+      }
+    },
   },
 };
 </script>

@@ -4,13 +4,13 @@
       <b-col cols="10" offset="1" class="mb-5">
         <div>
           <div class="mx-5 mt-5">
-                <p class="h6 text-muted">Home / Create New Event</p>
-              </div>
+            <p class="h6 text-muted">Home / Create New Event</p>
+          </div>
           <b-card
             title="Create New Event"
             sub-title="Added Information Event Details"
             class="m-3 shadow px-3 py-4"
-            style="border-radius: 25px;"
+            style="border-radius: 25px"
           >
             <form ref="form-newEvent">
               <br />
@@ -20,10 +20,9 @@
                 <b-form-group label="Event Level">
                   <b-form-select
                     size="sm"
-                    placeholder="Event Level"
-                    v-model="formEvent.eventLevel"
+                    v-model="formEvent.levelName"
                     :options="optionLevels"
-                    value-field="id"
+                    value-field="name"
                     text-field="name"
                   ></b-form-select>
                 </b-form-group>
@@ -41,7 +40,7 @@
                 <b-form-group label="River Name">
                   <b-form-input
                     size="sm"
-                    v-model="formEvent.location"
+                    v-model="formEvent.riverName"
                     placeholder="Enter river name"
                   ></b-form-input>
                 </b-form-group>
@@ -53,7 +52,7 @@
                 <b-form-group label="District">
                   <b-form-input
                     size="sm"
-                    v-model="formEvent.location"
+                    v-model="formEvent.addressDistrict"
                     placeholder="Enter District"
                   ></b-form-input>
                 </b-form-group>
@@ -64,7 +63,7 @@
                     <b-form-group label="Sub District">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addressSubDistrict"
                         placeholder="Enter Sub District"
                       ></b-form-input>
                     </b-form-group>
@@ -75,7 +74,7 @@
                     <b-form-group label="Village">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addressVillage"
                         placeholder="Enter Village"
                       ></b-form-input>
                     </b-form-group>
@@ -88,7 +87,7 @@
                     <b-form-group label="City">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addessCity"
                         placeholder="Enter City"
                       ></b-form-input>
                     </b-form-group>
@@ -99,7 +98,7 @@
                     <b-form-group label="Province">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addressProvince"
                         placeholder="Enter Province"
                       ></b-form-input>
                     </b-form-group>
@@ -112,7 +111,7 @@
                     <b-form-group label="ZIP Code">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addressZipCode"
                         placeholder="Enter ZIP Code"
                       ></b-form-input>
                     </b-form-group>
@@ -123,7 +122,7 @@
                     <b-form-group label="State">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.location"
+                        v-model="formEvent.addressState"
                         placeholder="Enter State"
                       ></b-form-input>
                     </b-form-group>
@@ -132,24 +131,27 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <!-- EVENT DATE -->
+                    <!-- START DATE -->
                     <b-form-group label="Start Date">
                       <b-form-datepicker
                         size="sm"
-                        v-model="formEvent.eventDate"
+                        v-model="formEvent.startDateEvent"
                         placeholder="Select start date"
                         class="mb-2"
+                        :min="minDate"
                       ></b-form-datepicker>
                     </b-form-group>
                   </b-col>
                   <b-col cols="6">
-                    <!-- EVENT DATE -->
+                    <!-- END DATE -->
                     <b-form-group label="End Date">
                       <b-form-datepicker
+                        :disabled="formEvent.startDateEvent == ''"
                         size="sm"
-                        v-model="formEvent.eventDate"
+                        v-model="formEvent.endDateEvent"
                         placeholder="Select end date"
                         class="mb-2"
+                        :min="formEvent.startDateEvent"
                       ></b-form-datepicker>
                     </b-form-group>
                   </b-col>
@@ -161,7 +163,7 @@
                 <!-- EVENT CATEGORIES -->
                 <b-form-group label="Event Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.eventCategories"
+                    v-model="formEvent.categoriesEvent"
                     :options="optionCategories"
                     placeholder="Select event categories"
                     multiple
@@ -173,7 +175,7 @@
                 <!-- DIVISION CATEGORIES -->
                 <b-form-group label="Division Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.divisionCategories"
+                    v-model="formEvent.categoriesDivision"
                     :options="optionDivisions"
                     placeholder="Select division categories"
                     multiple
@@ -185,7 +187,7 @@
                 <!-- RACE CATEGORIES -->
                 <b-form-group label="Race Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.raceCategories"
+                    v-model="formEvent.categoriesRace"
                     :options="optionRaces"
                     placeholder="Select race categories"
                     multiple
@@ -197,7 +199,7 @@
                 <!-- INITIAL CATEGORIES -->
                 <b-form-group label="Initial Categories" label-cols="3">
                   <multiselect
-                    v-model="formEvent.initialCategories"
+                    v-model="formEvent.categoriesInitial"
                     :options="optionInitials"
                     placeholder="Select initial categories"
                     multiple
@@ -262,14 +264,25 @@
 
             <div class="d-flex mt-5" style="justify-content: space-between">
               <div>
-                <b-button class="btn-md" style="border-radius: 20px" @click="goTo()" variant="secondary">
+                <b-button
+                  class="btn-md"
+                  style="border-radius: 20px"
+                  @click="goTo()"
+                  variant="secondary"
+                >
                   <Icon
                     icon="ic:baseline-keyboard-double-arrow-left"
                   />Back</b-button
                 >
               </div>
               <div>
-                <b-button class="btn-md" style="border-radius: 20px" @click="save()" type="input" variant="primary">
+                <b-button
+                  class="btn-md"
+                  style="border-radius: 20px"
+                  @click="save()"
+                  type="input"
+                  variant="primary"
+                >
                   Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
                 /></b-button>
               </div>
@@ -278,9 +291,9 @@
         </div>
       </b-col>
     </b-row>
-    <br/>
-    <br/>
-    <br/>
+    <br />
+    <br />
+    <br />
   </div>
 </template>
 
@@ -309,32 +322,52 @@ export default {
       text: "",
       name: "",
       formEvent: {
-        eventLevel: null,
+        levelName: null,
         eventName: "",
-        location: "",
-        eventDate: null,
-        eventCategories: [],
-        divisionCategories: [],
-        raceCategories: [],
-        initialCategories: [],
+        riverName: "",
+        addressDistrict: "",
+        addressSubDistrict: "",
+        addressVillage: "",
+        addessCity: "",
+        addressProvince: "",
+        addressZipCode: "",
+        addressState: "",
+        startDateEvent: "",
+        endDateEvent: "",
+        OTR: "",
+        categoriesEvent: [],
+        categoriesDivision: [],
+        categoriesRace: [],
+        categoriesInitial: [],
         chiefJudge: "",
         raceDirector: "",
         safetyDirector: "",
         eventDirector: "",
+        participant: [],
+        statusEvent: "Activated",
       },
       optionLevels: [],
       optionCategories: [],
       optionDivisions: [],
       optionRaces: [],
       optionInitials: [],
+      minDate: new Date(),
     };
   },
 
   async mounted() {
     await this.loadOptions();
+    await this.checkValueStorage();
   },
 
   methods: {
+    async checkValueStorage() {
+      const dataStorage = localStorage.getItem("formNewEvent");
+      const datas = JSON.parse(dataStorage);
+      if (datas) {
+        this.formEvent = datas;
+      }
+    },
     async loadOptions() {
       await this.setOptionLevel();
       await this.setOptionCategoriesEvent();
@@ -393,15 +426,27 @@ export default {
       });
     },
     goTo() {
-      localStorage.removeItem('formNewEvent');
+      localStorage.removeItem("formNewEvent");
       this.$router.push("/");
     },
     validateForm() {
       const {
-        eventLevel,
+        levelName,
         eventName,
-        location,
-        eventDate,
+        riverName,
+        addressDistrict,
+        addressSubDistrict,
+        addressVillage,
+        addessCity,
+        addressProvince,
+        addressZipCode,
+        addressState,
+        startDateEvent,
+        endDateEvent,
+        categoriesEvent,
+        categoriesDivision,
+        categoriesRace,
+        categoriesInitial,
         chiefJudge,
         raceDirector,
         safetyDirector,
@@ -409,10 +454,22 @@ export default {
       } = this.formEvent;
 
       if (
-        !eventLevel ||
+        !levelName ||
         !eventName ||
-        !location ||
-        !eventDate ||
+        !riverName ||
+        !addressDistrict ||
+        !addressSubDistrict ||
+        !addressVillage ||
+        !addessCity ||
+        !addressProvince ||
+        !addressZipCode ||
+        !addressState ||
+        !startDateEvent ||
+        !endDateEvent ||
+        !categoriesEvent ||
+        !categoriesDivision ||
+        !categoriesRace ||
+        !categoriesInitial ||
         !chiefJudge ||
         !raceDirector ||
         !safetyDirector ||
@@ -420,18 +477,21 @@ export default {
       ) {
         return false;
       }
-      return true; 
+      return true;
     },
     save() {
-      this.$emit("enterForm");
-
-      // const formValid = this.validateForm();
-      // if (formValid) {
-      //   localStorage.setItem('formNewEvent', this.formEvent);
-      //   this.$emit("enterForm");
-      // } else {
-      //   console.error("Please fill out all the form fields.");
-      // }
+      const formValid = this.validateForm();
+      if (formValid) {
+        const obj = JSON.stringify(this.formEvent);
+        localStorage.setItem("formNewEvent", obj);
+        this.$emit("enterForm");
+      } else {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "To go to the next page, all fields must be filled in",
+          message: "Ups Sorry",
+        });
+      }
     },
   },
 };

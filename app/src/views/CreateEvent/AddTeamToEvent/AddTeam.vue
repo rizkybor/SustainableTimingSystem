@@ -88,16 +88,13 @@
                 </div>
               </div>
               <!-- {{ formEvent }} -->
-
               <div v-if="showEmptyCards">
                 <cardEmptyVue />
               </div>
-
               <div v-else>
                 <cardTeamVue
-                  v-if="team.R4men"
                   :teamTitle="'R4 - MEN'"
-                  :datas="team.R4men"
+                  :teams="teamsR4men"
                   :fields="headersTable"
                   @open-modal="openModal(formEvent.participant, 'R4men')"
                 />
@@ -107,7 +104,7 @@
                 <cardTeamVue
                   v-if="team.R4women"
                   :teamTitle="'R4 - WOMEN'"
-                  :teams="team.R4women"
+                  :teams="teamsR4women"
                   :fields="headersTable"
                   @open-modal="openModal(formEvent.participant, 'R4women')"
                 />
@@ -117,7 +114,7 @@
                 <cardTeamVue
                   v-if="team.R6men"
                   :teamTitle="'R6 - MEN'"
-                  :teams="team.R6men"
+                  :teams="teamsR6men"
                   :fields="headersTable"
                   @open-modal="openModal(formEvent.participant, 'R6men')"
                 />
@@ -127,7 +124,7 @@
                 <cardTeamVue
                   v-if="team.R6women"
                   :teamTitle="'R6 - WOMEN'"
-                  :teams="team.R6women"
+                  :teams="teamsR6women"
                   :fields="headersTable"
                   @open-modal="openModal(formEvent.participant, 'R6women')"
                 />
@@ -157,7 +154,6 @@
             : ""
         }}</template
       >
-      {{ modalDatas }}
       <div class="d-block text-left mx-4 my-3">
         <!-- TEAM NAME  -->
         <b-form-group label="Name Team">
@@ -224,7 +220,7 @@ export default {
         { No: 2, "Nama Team": "Team B", BIB: "002" },
         { No: 3, "Nama Team": "Team C", BIB: "003" },
       ],
-      headersTable: ["No", "Nama Team", "BIB", "Action"],
+      headersTable: ["No", "name", "bib", "Action"],
       optionCategories: [],
       formModal: {
         nameTeam: "",
@@ -237,6 +233,7 @@ export default {
         R6women: [],
       },
       isActivated: "",
+      indexCategories: 0,
       formEvent: {},
       showCategoriesSprint: false,
       showCategoriesHead2Head: false,
@@ -261,6 +258,32 @@ export default {
         showR6WomenSlalom: false,
       },
     };
+  },
+  computed: {
+    teamsR4men() {
+      return this.formEvent.participant.find(
+        (item) =>
+          item.divisiType === "R4men" && item.categories === this.isActivated
+      ).teams;
+    },
+    teamsR4women() {
+      return this.formEvent.participant.find(
+        (item) =>
+          item.divisiType === "R4women" && item.categories === this.isActivated
+      ).teams;
+    },
+    teamsR6men() {
+      return this.formEvent.participant.find(
+        (item) =>
+          item.divisiType === "R6men" && item.categories === this.isActivated
+      ).teams;
+    },
+    teamsR6women() {
+      return this.formEvent.participant.find(
+        (item) =>
+          item.divisiType === "R6women" && item.categories === this.isActivated
+      ).teams;
+    },
   },
   async mounted() {
     if (this.open) {
@@ -310,10 +333,14 @@ export default {
         }
       });
     },
+    getIndex(payload) {
+      console.log(payload, "<< pay");
+    },
     loadTeams(payload) {
       this.showEmptyCards = false;
       let ev = this.formEvent.participant;
-      this.isActivated = payload.name;
+
+      this.isActivated = payload.name; //get current name categories
 
       for (const obj of ev) {
         for (const [key, value] of Object.entries(obj)) {
@@ -336,7 +363,7 @@ export default {
     goTo() {
       this.$emit("backForm");
     },
-    openModal(datas, division, ) {
+    openModal(datas, division) {
       this.modalDivision = division;
       this.modalDatas = datas;
       this.$bvModal.show("bv-modal-add-team");
@@ -344,24 +371,25 @@ export default {
     simpanNewTeam() {
       // Data tim yang akan ditambahkan
       const addTeams = {
-        name: "tes",
-        bib: "0909",
+        name: this.formModal.nameTeam,
+        bib: this.formModal.bibTeam,
       };
 
       // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
-      const matchingData = modalDatas.find(
-        (data) => data.divisiType === this.modalDivision
+      const matchingData = this.modalDatas.find(
+        (data) =>
+          data.divisiType === this.modalDivision &&
+          data.categories == this.isActivated
       );
-
-      console.log(matchingData)
 
       // Jika ditemukan objek yang sesuai, tambahkan tim baru ke dalam array teams
       if (matchingData) {
         matchingData.teams.push(addTeams);
       }
-
-      console.log(matchingData);
     },
+    save(){
+      console.log(JSON.stringify(this.formEvent))
+    }
   },
 };
 </script>

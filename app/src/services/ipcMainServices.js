@@ -7,9 +7,11 @@ const {
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
 } = require("../controllers/GET/getOptionEvent.js");
+const { insertNewEvent } = require("../controllers/INSERT/insertNewEvent.js")
 
 // communication with database
 function setupIPCMainHandlers() {
+  // GET DB
   ipcMain.on("get-alert", async (event, options) => {
     try {
       const defaultOptions = {
@@ -37,6 +39,7 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // OPTION DB
   ipcMain.on("option-level", async (event) => {
     try {
       const data = await getOptionLevel();
@@ -79,6 +82,16 @@ function setupIPCMainHandlers() {
       event.reply("option-categories-race-reply", data);
     } catch (error) {
       event.reply("option-categories-race-reply", []);
+    }
+  });
+
+  // INSERT DB
+  ipcMain.on("insert-new-event", async (event, datas) => {
+    try {
+      const data = await insertNewEvent(datas);
+      event.reply("insert-new-event-reply", data);
+    } catch (error) {
+      event.reply("insert-new-event-reply", []);
     }
   });
 }

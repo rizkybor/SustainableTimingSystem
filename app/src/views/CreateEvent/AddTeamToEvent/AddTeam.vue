@@ -378,8 +378,6 @@ export default {
       return true;
     },
     simpanNewTeam() {
-      console.log(this.formModal.nameTeam);
-      console.log(this.formModal.bibTeam);
       const formValid = this.validateForm();
       if (formValid) {
         // Data tim yang akan ditambahkan
@@ -403,7 +401,6 @@ export default {
         };
 
         const slalomTeams = {
-          id: "",
           nameTeam: this.formModal.nameTeam,
           bibTeam: this.formModal.bibTeam,
           startOrder: "",
@@ -452,14 +449,38 @@ export default {
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",
-          detail: "Fields name and bib must be filled in",
+          detail: "Fields Name Team and BIB Number Team must be filled",
           message: "Ups Sorry",
         });
       }
     },
-    validateSave() {},
+    validateSave() {
+      return this.formEvent.participant.every((item) => item.teams.length > 0);
+    },
     save() {
-      console.log(JSON.stringify(this.formEvent));
+      const saveValid = this.validateSave();
+      if (saveValid) {
+        let payload = this.formEvent;
+        ipcRenderer.send("insert-new-event", payload);
+        ipcRenderer.on("insert-new-event-reply", (event, data) => {
+          console.log(data,'<<<< cek datanya ya')
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: "Event data has been successfully saved",
+            message: "Success",
+          });
+          setTimeout(() => {
+            localStorage.removeItem("formEvent");
+            this.$router.push("/");
+          }, 5000); // Timeout 3000ms (3 detik)
+        });
+      } else {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Kategoris belum meemiliki tim",
+          message: "Ups Sorry",
+        });
+      }
     },
   },
 };

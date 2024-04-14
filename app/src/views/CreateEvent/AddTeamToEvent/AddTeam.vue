@@ -463,17 +463,16 @@ export default {
         let payload = this.formEvent;
         ipcRenderer.send("insert-new-event", payload);
         ipcRenderer.on("insert-new-event-reply", (event, data) => {
-          console.log(data,'<<<< cek datanya ya')
-          ipcRenderer.send("get-alert", {
-            type: "success",
-            detail: "Event data has been successfully saved",
-            message: "Success",
+          ipcRenderer.send("get-alert-saved", {
+            type: "question",
+            detail: `Event data has been successfully saved`,
+            message: "Successfully",
           });
-          setTimeout(() => {
-            localStorage.removeItem("formEvent");
-            this.$router.push("/");
-          }, 5000); // Timeout 3000ms (3 detik)
         });
+        setTimeout(() => {
+          localStorage.removeItem("formNewEvent");
+          this.$router.push("/");
+        }, 2000);
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",

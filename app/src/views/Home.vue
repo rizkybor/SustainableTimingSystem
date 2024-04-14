@@ -38,6 +38,9 @@
               style="cursor: pointer"
               @row-clicked="clickRow"
             >
+              <template v-slot:cell(no)="row">
+                {{ row.index + 1 }}
+              </template>
             </b-table>
 
             <b-skeleton-table
@@ -50,7 +53,7 @@
 
           <div
             class="d-flex justify-content-center mt-5"
-            style="align-items: center; gap: 5vh; z-index: 1;"
+            style="align-items: center; gap: 5vh; z-index: 1"
           >
             <img
               src="@/assets/images/ic_makopala.png"
@@ -92,7 +95,7 @@ export default {
   data() {
     return {
       fields: [
-        "ids",
+        "no",
         "eventName",
         "levelName",
         "startDateEvent",
@@ -129,7 +132,6 @@ export default {
       this.hasilValidasi = this.result;
     },
     clickRow(item) {
-      console.log(item.No);
       this.$router.push(`/event-detail/${item.Nama}`);
     },
   },

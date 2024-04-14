@@ -7,7 +7,7 @@ const {
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
 } = require("../controllers/GET/getOptionEvent.js");
-const { insertNewEvent } = require("../controllers/INSERT/insertNewEvent.js")
+const { insertNewEvent } = require("../controllers/INSERT/insertNewEvent.js");
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -28,6 +28,23 @@ function setupIPCMainHandlers() {
       });
     } catch (error) {
       event.reply("get-events-reply", []);
+    }
+  });
+  ipcMain.on("get-alert-saved", async (event, options) => {
+    try {
+      const defaultOptions = {
+        type: "info",
+        detail: "Default detail",
+        message: "Default message",
+      };
+
+      // Menggabungkan default options dengan options yang diterima dari renderer
+      const mergedOptions = { ...defaultOptions, ...options };
+      dialog.showMessageBox(null, mergedOptions, (response) => {
+        event.reply("get-question-reply", response);
+      });
+    } catch (error) {
+      event.reply("get-question-reply", []);
     }
   });
   ipcMain.on("get-events", async (event) => {

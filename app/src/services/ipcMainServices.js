@@ -1,25 +1,28 @@
 const { ipcMain, dialog } = require("electron");
-const { getAllEvents } = require("../controllers/GET/getAllEvent.js")
+const { getAllEvents } = require("../controllers/GET/getAllEvent.js");
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
-} = require("../controllers/GET/getOptionEvent.js")
+} = require("../controllers/GET/getOptionEvent.js");
 
 // communication with database
 function setupIPCMainHandlers() {
-  ipcMain.on("get-alert", async (event) => {
+  ipcMain.on("get-alert", async (event, options) => {
     try {
-      const options = {
-        type: 'warning',
-        detail: 'To go to the next page, all fields must be filled in',
-        message: 'Ups Sorry',
-        buttons: ['OK']
+      const defaultOptions = {
+        type: "info",
+        detail: "Default detail",
+        message: "Default message",
+        buttons: ["OK"],
       };
-      dialog.showMessageBox(null, options, (response) => {
-        console.log('You clicked:', options.buttons[response]);
+
+      // Menggabungkan default options dengan options yang diterima dari renderer
+      const mergedOptions = { ...defaultOptions, ...options };
+      dialog.showMessageBox(null, mergedOptions, (response) => {
+        console.log("You clicked:", mergedOptions.buttons[response]);
       });
     } catch (error) {
       event.reply("get-events-reply", []);

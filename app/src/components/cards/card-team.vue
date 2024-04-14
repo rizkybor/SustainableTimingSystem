@@ -18,6 +18,9 @@
       </template>
   
       <b-table striped hover :items="teams" :fields="fields">
+        <template v-slot:cell(No)="row">
+        {{ row.index + 1 }}
+      </template>
         <template #cell(Action)="row">
           <div style="display: flex; gap: 1vh">
             <b-button

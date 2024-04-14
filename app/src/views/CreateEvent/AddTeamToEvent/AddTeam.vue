@@ -199,6 +199,7 @@
 import Multiselect from "vue-multiselect";
 import cardEmptyVue from "../../../components/cards/card-empty.vue";
 import cardTeamVue from "../../../components/cards/card-team.vue";
+import { ipcRenderer } from "electron";
 
 export default {
   name: "SustainableTimingSystemRaftingSelectCategories",
@@ -216,12 +217,7 @@ export default {
       modalDivision: "",
       modalDatas: [],
       showEmptyCards: true,
-      teams: [
-        { No: 1, "Nama Team": "Team A", BIB: "001" },
-        { No: 2, "Nama Team": "Team B", BIB: "002" },
-        { No: 3, "Nama Team": "Team C", BIB: "003" },
-      ],
-      headersTable: ["No", "name", "bib", "Action"],
+      headersTable: ["No", "nameTeam", "bibTeam", "Action"],
       optionCategories: [],
       formModal: {
         nameTeam: "",
@@ -240,24 +236,6 @@ export default {
       showCategoriesHead2Head: false,
       showCategoriesSlalom: false,
       showCategoriesDRR: false,
-      showTable: {
-        showR4MenSprint: false,
-        showR4WomenSprint: false,
-        showR6MenSprint: false,
-        showR6WomenSprint: false,
-        showR4MenDDR: false,
-        showR4WomenDDR: false,
-        showR6MenDDR: false,
-        showR6WomenDDR: false,
-        showR4MenH2H: false,
-        showR4WomenH2H: false,
-        showR6MenH2H: false,
-        showR6WomenH2H: false,
-        showR4MenSlalom: false,
-        showR4WomenSlalom: false,
-        showR6MenSlalom: false,
-        showR6WomenSlalom: false,
-      },
     };
   },
   computed: {
@@ -295,8 +273,8 @@ export default {
   methods: {
     generateDivisiTypes(cat, gen) {
       const divisiTypes = [];
-      cat.forEach(category => {
-        gen.forEach(gender => {
+      cat.forEach((category) => {
+        gen.forEach((gender) => {
           const divisiType = category.name + gender.name.toLowerCase();
           divisiTypes.push(divisiType);
         });
@@ -312,7 +290,10 @@ export default {
 
       // Definisikan kategori baru
       const newCategories = ["SPRINT", "SLALOM", "HEAD2HEAD", "DRR"];
-      const divisiTypes = await this.generateDivisiTypes(this.formEvent.categoriesDivision, this.formEvent.categoriesRace)
+      const divisiTypes = await this.generateDivisiTypes(
+        this.formEvent.categoriesDivision,
+        this.formEvent.categoriesRace
+      );
 
       newCategories.forEach((category) => {
         // Periksa apakah kategori baru tersebut ada dalam data
@@ -330,24 +311,21 @@ export default {
           } else if (category === "SLALOM") {
             this.showCategoriesSlalom = true;
           }
-          console.log(category)
-
           // Buat array baru untuk setiap divisi dengan kategori baru
-
           divisiTypes.forEach((e) => {
-            if(e == "R4men"){
-              this.team.R4men = true
+            if (e == "R4men") {
+              this.team.R4men = true;
             }
-            if(e == "R4women"){
-              this.team.R4women = true
+            if (e == "R4women") {
+              this.team.R4women = true;
             }
-            if(e == "R6men"){
-              this.team.R6men = true
+            if (e == "R6men") {
+              this.team.R6men = true;
             }
-            if(e == "R6women"){
-              this.team.R6women = true
+            if (e == "R6women") {
+              this.team.R6women = true;
             }
-          })
+          });
           const result = divisiTypes.map((divisiType) => ({
             categories: category,
             divisiType: divisiType,
@@ -358,9 +336,6 @@ export default {
           this.formEvent.participant.push(...result);
         }
       });
-    },
-    getIndex(payload) {
-      console.log(payload, "<< pay");
     },
     loadTeams(payload) {
       this.showEmptyCards = false;
@@ -390,32 +365,102 @@ export default {
       this.$emit("backForm");
     },
     openModal(datas, division) {
+      this.formModal.nameTeam = "";
+      this.formModal.bibTeam = "";
       this.modalDivision = division;
       this.modalDatas = datas;
       this.$bvModal.show("bv-modal-add-team");
     },
+    validateForm() {
+      if (!this.formModal.nameTeam || !this.formModal.bibTeam) {
+        return false;
+      }
+      return true;
+    },
     simpanNewTeam() {
-      // Data tim yang akan ditambahkan
-      const addTeams = {
-        name: this.formModal.nameTeam,
-        bib: this.formModal.bibTeam,
-      };
+      console.log(this.formModal.nameTeam);
+      console.log(this.formModal.bibTeam);
+      const formValid = this.validateForm();
+      if (formValid) {
+        // Data tim yang akan ditambahkan
+        const nonSlalomTeams = {
+          id: "",
+          nameTeam: this.formModal.nameTeam,
+          bibTeam: this.formModal.bibTeam,
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
+        };
 
-      // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
-      const matchingData = this.modalDatas.find(
-        (data) =>
-          data.divisiType === this.modalDivision &&
-          data.categories == this.isActivated
-      );
+        const slalomTeams = {
+          id: "",
+          nameTeam: this.formModal.nameTeam,
+          bibTeam: this.formModal.bibTeam,
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: [
+            {
+              startTime: "",
+              finishTime: "",
+              raceTime: "",
+              penaltyTime: "",
+              penalty: "",
+              totalTime: "",
+              ranked: "",
+              score: "",
+            },
+            {
+              startTime: "",
+              finishTime: "",
+              raceTime: "",
+              penaltyTime: "",
+              penalty: "",
+              totalTime: "",
+              ranked: "",
+              score: "",
+            },
+          ],
+        };
 
-      // Jika ditemukan objek yang sesuai, tambahkan tim baru ke dalam array teams
-      if (matchingData) {
-        matchingData.teams.push(addTeams);
+        // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
+        const matchingData = this.modalDatas.find(
+          (data) =>
+            data.divisiType === this.modalDivision &&
+            data.categories == this.isActivated
+        );
+
+        // Jika ditemukan objek yang sesuai, tambahkan tim baru ke dalam array teams
+        if (matchingData) {
+          if (matchingData.categories == "SLALOM") {
+            matchingData.teams.push(slalomTeams);
+          } else {
+            matchingData.teams.push(nonSlalomTeams);
+          }
+        }
+        this.$bvModal.hide("bv-modal-add-team");
+      } else {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Fields name and bib must be filled in",
+          message: "Ups Sorry",
+        });
       }
     },
-    save(){
-      console.log(JSON.stringify(this.formEvent))
-    }
+    validateSave() {},
+    save() {
+      console.log(JSON.stringify(this.formEvent));
+    },
   },
 };
 </script>

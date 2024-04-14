@@ -41,6 +41,12 @@
               <template v-slot:cell(no)="row">
                 {{ row.index + 1 }}
               </template>
+              <template v-slot:cell(startDateEvent)="row">
+                  {{ formatDate(row.item.startDateEvent) }}
+              </template>
+              <template v-slot:cell(endDateEvent)="row">
+                  {{ formatDate(row.item.endDateEvent) }}
+              </template>
             </b-table>
 
             <b-skeleton-table
@@ -111,6 +117,38 @@ export default {
     this.getEvents();
   },
   methods: {
+    formatDate(inputDate) {
+      // Pisahkan tanggal, bulan, dan tahun dari inputDate
+      const parts = inputDate.split("-");
+      const year = parseInt(parts[0]);
+      const month = parseInt(parts[1]);
+      const day = parseInt(parts[2]);
+
+      // Buat objek Date dari tanggal yang diberikan
+      const date = new Date(year, month - 1, day); // Perhatikan bahwa bulan dimulai dari 0, jadi kurangi 1 dari nilai bulan
+
+      // Buat daftar nama bulan dalam Bahasa Indonesia
+      const monthNames = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+
+      // Format tanggal dengan menggunakan nilai tanggal, nama bulan, dan tahun
+      const formattedDate =
+        day + " " + monthNames[date.getMonth()] + " " + year;
+
+      return formattedDate;
+    },
     async getEvents() {
       this.loading = true;
       setTimeout(() => {

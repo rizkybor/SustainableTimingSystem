@@ -486,7 +486,11 @@ export default {
         localStorage.setItem("formNewEvent", obj);
         this.$emit("enterForm");
       } else {
-        ipcRenderer.send("get-alert");
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "To go to the next page, all fields must be filled in",
+          message: "Ups Sorry",
+        });
       }
     },
   },

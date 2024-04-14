@@ -18,6 +18,9 @@
       </template>
   
       <b-table striped hover :items="teams" :fields="fields">
+        <template v-slot:cell(No)="row">
+        {{ row.index + 1 }}
+      </template>
         <template #cell(Action)="row">
           <div style="display: flex; gap: 1vh">
             <b-button
@@ -25,14 +28,18 @@
               variant="warning"
               size="sm"
               @click="editTeam(row.item)"
-              >Edit</b-button
+              >
+              <Icon icon="ph:note-pencil-bold" />
+              </b-button
             >
             <b-button
               style="border-radius: 20px"
               variant="danger"
               size="sm"
               @click="deleteTeam(row.item)"
-              >Delete</b-button
+              >
+              <Icon icon="tabler:trash"/>
+              </b-button
             >
           </div>
         </template>

@@ -41,7 +41,7 @@ function setupIPCMainHandlers() {
       // Menggabungkan default options dengan options yang diterima dari renderer
       const mergedOptions = { ...defaultOptions, ...options };
       dialog.showMessageBox(null, mergedOptions, (response) => {
-        event.reply("get-question-reply", response);
+        console.log("You clicked:", mergedOptions.buttons[response]);
       });
     } catch (error) {
       event.reply("get-question-reply", []);

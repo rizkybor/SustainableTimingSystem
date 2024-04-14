@@ -472,7 +472,7 @@ export default {
         setTimeout(() => {
           localStorage.removeItem("formNewEvent");
           this.$router.push("/");
-        }, 2000);
+        }, 1500);
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",

@@ -44,6 +44,7 @@ export default {
   methods: {
     goTo(payload) {
       if (payload == "home") {
+        localStorage.removeItem("formNewEvent");
         this.$router.push({ name: payload });
       }
     },

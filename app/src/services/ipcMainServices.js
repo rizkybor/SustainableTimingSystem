@@ -61,7 +61,6 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-events-byid", async (event, datas) => {
     try {
       const data = await getEventById(datas);
-      console.log(data,'<< TESTESTES')
       event.reply("get-events-byid-reply", data);
     } catch (error) {
       event.reply("get-events-byid-reply", []);

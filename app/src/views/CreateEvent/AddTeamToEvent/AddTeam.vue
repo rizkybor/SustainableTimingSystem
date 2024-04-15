@@ -381,7 +381,7 @@ export default {
       const formValid = this.validateForm();
       if (formValid) {
         // Data tim yang akan ditambahkan
-        const nonSlalomTeams = {
+        const defaultTeams = {
           id: "",
           nameTeam: this.formModal.nameTeam,
           bibTeam: this.formModal.bibTeam,
@@ -430,6 +430,26 @@ export default {
           ],
         };
 
+        const head2headTeams = {
+          nameTeam: this.formModal.nameTeam,
+          bibTeam: this.formModal.bibTeam,
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: [
+            {
+              startTime: "",
+              finishTime: "",
+              raceTime: "",
+              penaltyTime: "",
+              penalty: "",
+              totalTime: "",
+              ranked: "",
+              score: "",
+            }
+          ],
+        };
+
         // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
         const matchingData = this.modalDatas.find(
           (data) =>
@@ -441,8 +461,10 @@ export default {
         if (matchingData) {
           if (matchingData.categories == "SLALOM") {
             matchingData.teams.push(slalomTeams);
+          } else if(matchingData.categories == "HEAD2HEAD"){
+            matchingData.teams.push(head2headTeams);
           } else {
-            matchingData.teams.push(nonSlalomTeams);
+            matchingData.teams.push(defaultTeams);
           }
         }
         this.$bvModal.hide("bv-modal-add-team");

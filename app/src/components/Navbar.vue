@@ -21,9 +21,7 @@
 
         <b-collapse id="nav-collapse" is-nav class="justify-content-end">
           <b-navbar-nav>
-            <b-nav-item @click="goTo('home')">Home</b-nav-item>
-
-            <b-nav-item @click="goTo('')">List Events</b-nav-item>
+            <b-nav-item @click="goTo('home')">Homepage</b-nav-item>
           </b-navbar-nav>
         </b-collapse>
       </div>

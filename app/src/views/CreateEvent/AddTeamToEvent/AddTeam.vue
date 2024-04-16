@@ -46,6 +46,7 @@
                   </div>
                 </div>
               </div>
+              <p>{{ team }}</p>
 
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">

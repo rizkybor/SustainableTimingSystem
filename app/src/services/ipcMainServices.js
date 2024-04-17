@@ -1,5 +1,5 @@
 const { ipcMain, dialog } = require("electron");
-const { getAllEvents } = require("../controllers/GET/getAllEvent.js");
+const { getAllEvents, getEventById } = require("../controllers/GET/getEvent.js");
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
@@ -30,6 +30,7 @@ function setupIPCMainHandlers() {
       event.reply("get-events-reply", []);
     }
   });
+
   ipcMain.on("get-alert-saved", async (event, options) => {
     try {
       const defaultOptions = {
@@ -47,12 +48,22 @@ function setupIPCMainHandlers() {
       event.reply("get-question-reply", []);
     }
   });
+
   ipcMain.on("get-events", async (event) => {
     try {
       const data = await getAllEvents();
       event.reply("get-events-reply", data);
     } catch (error) {
       event.reply("get-events-reply", []);
+    }
+  });
+
+  ipcMain.on("get-events-byid", async (event, datas) => {
+    try {
+      const data = await getEventById(datas);
+      event.reply("get-events-byid-reply", data);
+    } catch (error) {
+      event.reply("get-events-byid-reply", []);
     }
   });
 

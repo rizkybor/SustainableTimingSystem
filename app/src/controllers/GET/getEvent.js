@@ -1,4 +1,5 @@
 const { connectToDatabase } = require("../index");
+const { ObjectId } = require('mongodb');
 
 // get All Events
 async function getAllEvents() {
@@ -13,6 +14,20 @@ async function getAllEvents() {
   }
 }
 
+// get Events By Id
+async function getEventById(payload) {
+  try {
+    const database = await connectToDatabase();
+    const collection = database.collection("eventsCollection");
+    const result = await collection.findOne({ _id: ObjectId(payload) });
+    return result;
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    return [];
+  }
+}
+
 module.exports = {
   getAllEvents,
+  getEventById
 };

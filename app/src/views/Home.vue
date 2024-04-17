@@ -42,10 +42,10 @@
                 {{ row.index + 1 }}
               </template>
               <template v-slot:cell(startDateEvent)="row">
-                  {{ formatDate(row.item.startDateEvent) }}
+                {{ formatDate(row.item.startDateEvent) }}
               </template>
               <template v-slot:cell(endDateEvent)="row">
-                  {{ formatDate(row.item.endDateEvent) }}
+                {{ formatDate(row.item.endDateEvent) }}
               </template>
             </b-table>
 
@@ -170,7 +170,9 @@ export default {
       this.hasilValidasi = this.result;
     },
     clickRow(item) {
-      this.$router.push(`/event-detail/${item.Nama}`);
+      //get id hexadecimal
+      const idHex = Array.from(item._id.id).map((b) => b.toString(16).padStart(2, "0")).join("");;
+      this.$router.push(`/event-detail/${idHex}`);
     },
   },
 };

@@ -31,6 +31,7 @@
           ></b-form-input>
         </template>
         <template v-slot:cell(interval)="row">
+          <!-- {{ row }} -->
           <b-form-input
             v-model="row.intervalRace"
             type="time"

@@ -34,7 +34,7 @@
         </div>
 
         <div>
-          <b-card header="Event Detail">
+          <b-card header="Event Detail"  class="shadow" style="border-radius: 20px">
             <template #header>
               <div
                 class="d-flex"

@@ -25,6 +25,7 @@
             <p style="font-style: italic">
               Tigaraksa, 01-January-2024 - 10-January-2024
             </p>
+            <p>{{ participant }}</p>
           </b-col>
           <b-col>
             <div
@@ -111,7 +112,6 @@
                     <td style="color: black">{{ id }}</td>
                     <td style="color: black">{{ digitTime[index] }}</td>
                   </tr>
-
                 </tbody>
               </table>
             </div>
@@ -140,7 +140,6 @@
                     </b-row>
                   </b-col>
                   <b-col class="col-4">
-
                     <button
                       v-for="(button, index) in items"
                       id="btnStart"
@@ -371,7 +370,6 @@ export default {
           ranked: null,
           score: null,
         },
-        
       ],
       penTeam: "",
       dataPenalties: [
@@ -538,20 +536,29 @@ export default {
       digitTimeFinish: null,
       currentPort: "",
       isRankedDescending: false,
+      participant: {},
     };
   },
-  mounted() {
+  async mounted() {
     window.addEventListener("scroll", this.handleScroll);
+    await this.checkValueStorage();
   },
   destroyed() {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    async checkValueStorage() {
+      const dataStorage = localStorage.getItem("participantByCategories");
+      const datas = JSON.parse(dataStorage);
+      if (datas) {
+        this.participant = datas;
+      }
+    },
     async assignRanks(items) {
       const itemsWithTimeResult = items.filter((item) => item.timeResult);
-      itemsWithTimeResult.sort( (a, b) => {
-        const timeA =  this.parsesTime(a.timeResult);
-        const timeB =  this.parsesTime(b.timeResult);
+      itemsWithTimeResult.sort((a, b) => {
+        const timeA = this.parsesTime(a.timeResult);
+        const timeB = this.parsesTime(b.timeResult);
         return timeA - timeB;
       });
 
@@ -565,8 +572,8 @@ export default {
       //   // item.score = await this.calculateScore(item.ranked);
       // });
     },
-     parsesTime(timeStr) {
-      console.log('hkhhkhk',timeStr)
+    parsesTime(timeStr) {
+      console.log("hkhhkhk", timeStr);
       const [hours, minutes, seconds] = timeStr.split(":").map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
     },
@@ -678,7 +685,7 @@ export default {
             // Check if at least one port is available
             if (ports && ports.length > 0) {
               this.currentPort = ports;
-              console.log(ports[5],'<< ceks')
+              console.log(ports[5], "<< ceks");
               const selectedPort = ports[5];
 
               if (selectedPort && selectedPort.path) {
@@ -701,16 +708,16 @@ export default {
                       b = receivedData.slice(i + 1);
 
                       receivedData = "";
-                      break; 
+                      break;
                     }
-                    
+
                     //  TIME BY SENSOR
                     if (char === "R") {
                       a = receivedData.slice(0, i + 1);
                       b = receivedData.slice(i + 1);
 
                       receivedData = "";
-                      break; 
+                      break;
                     }
                   }
 

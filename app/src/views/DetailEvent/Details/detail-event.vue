@@ -157,11 +157,11 @@
           </div>
         </div>
 
-        <!-- <p>{{ events }}</p> -->
         <div>
           <teamParticipantVue
             :teamTitle="'R4 - MEN'"
             :teams="teamsR4men"
+            :categories="isActivated"
             :fields="headersTable"
             @open-modal="openModal(formEvent.participant, 'R4men')"
           />
@@ -169,6 +169,7 @@
           <teamParticipantVue
             :teamTitle="'R4 - WOMEN'"
             :teams="teamsR4women"
+            :categories="isActivated"
             :fields="headersTable"
             @open-modal="openModal(formEvent.participant, 'R4women')"
           />
@@ -176,6 +177,7 @@
           <teamParticipantVue
             :teamTitle="'R6 - MEN'"
             :teams="teamsR6men"
+            :categories="isActivated"
             :fields="headersTable"
             @open-modal="openModal(formEvent.participant, 'R6men')"
           />
@@ -183,6 +185,7 @@
           <teamParticipantVue
             :teamTitle="'R6 - WOMEN'"
             :teams="teamsR6women"
+            :categories="isActivated"
             :fields="headersTable"
             @open-modal="openModal(formEvent.participant, 'R6women')"
           />
@@ -249,7 +252,6 @@ export default {
     const eventId = this.$route.params.id;
     await this.loadData(eventId);
   },
-
   methods: {
     async loadData(payload) {
       this.loading = true;
@@ -259,6 +261,7 @@ export default {
         ipcRenderer.on("get-events-byid-reply", (event, data) => {
           if (data) {
             this.events = data;
+            localStorage.setItem("eventDetails", data);
           } else {
             console.error("Failed to retrieve data from events table");
           }

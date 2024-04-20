@@ -29,8 +29,8 @@ export default {
   },
   computed: {
     showNavbar() {
-      // Mengembalikan nilai false jika router berada di /hello
-      return this.$route.path !== '/event-detail/PON/sprint-race';
+      let currentPath = this.$route.path;
+      return !(currentPath.includes("sprint-race") || currentPath.includes("slalom"));
     }
   }
 

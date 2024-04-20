@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="px-3">
     <div style="display: flex; justify-content: space-between">
       <b-button @click="goTo()" variant="primary">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
@@ -25,7 +25,6 @@
             <p style="font-style: italic">
               Tigaraksa, 01-January-2024 - 10-January-2024
             </p>
-            <p>{{ participant }}</p>
           </b-col>
           <b-col>
             <div
@@ -82,7 +81,6 @@
     <br />
 
     <!-- SPRINT OPERATION TIME  -->
-
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
         <b-row>
@@ -104,10 +102,6 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- <tr>
-                    <td style="color: black">{{ digitId }}</td>
-                    <td style="color: black">{{ digitTime }}</td>
-                  </tr> -->
                   <tr v-for="(id, index) in digitId" :key="index">
                     <td style="color: black">{{ id }}</td>
                     <td style="color: black">{{ digitTime[index] }}</td>
@@ -141,16 +135,18 @@
                   </b-col>
                   <b-col class="col-4">
                     <button
-                      v-for="(button, index) in items"
+                      v-for="(button, index) in participant"
                       id="btnStart"
                       :key="index"
                       type="button"
                       class="btn custom-btn"
-                      :disabled="button.timeStart ? true : false"
-                      :class="button.timeStart ? 'btn-secondary' : 'btn-info'"
-                      @click="updateTime(digitTimeStart, button.id, 'start')"
+                      :disabled="button.result.startTime ? true : false"
+                      :class="
+                        button.result.startTime ? 'btn-secondary' : 'btn-info'
+                      "
+                      @click="updateTime(digitTimeStart, index, 'start')"
                     >
-                      {{ "BIB " + button.bibNumber }}
+                      {{ "BIB " + button.bibTeam }}
                     </button>
                   </b-col>
                 </b-row>
@@ -182,16 +178,18 @@
                   </b-col>
                   <b-col class="col-4">
                     <button
-                      v-for="(button, index) in items"
+                      v-for="(button, index) in participant"
                       id="btnFinish"
                       :key="index"
                       type="button"
-                      :disabled="button.timeFinish ? true : false"
+                      :disabled="button.result.finishTime ? true : false"
                       class="btn custom-btn"
-                      :class="button.timeFinish ? 'btn-secondary' : 'btn-info'"
-                      @click="updateTime(digitTimeFinish, button.id, 'finish')"
+                      :class="
+                        button.result.finishTime ? 'btn-secondary' : 'btn-info'
+                      "
+                      @click="updateTime(digitTimeFinish, index, 'finish')"
                     >
-                      {{ "BIB " + button.bibNumber }}
+                      {{ "BIB " + button.bibTeam }}
                     </button>
                   </b-col>
                 </b-row>
@@ -235,26 +233,24 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(item, index) in items" :key="index">
+                        <tr v-for="(item, index) in participant" :key="index">
                           <td>{{ index + 1 }}</td>
                           <td>{{ item.nameTeam }}</td>
-                          <td>{{ item.bibNumber }}</td>
-                          <td>{{ item.timeStart }}</td>
-                          <td>{{ item.timeFinish }}</td>
-                          <td>{{ item.raceTime }}</td>
-                          <td>{{ item.penalties }}</td>
-                          <td>{{ item.penaltiesTime }}</td>
+                          <td>{{ item.bibTeam }}</td>
+                          <td>{{ item.result.startTime }}</td>
+                          <td>{{ item.result.finishTime }}</td>
+                          <td>{{ item.result.raceTime }}</td>
+                          <td>{{ item.result.penalty }}</td>
+                          <td>{{ item.result.penaltyTime }}</td>
                           <td>
                             {{
-                              item.penaltiesTime == ""
-                                ? item.raceTime
-                                : item.timeResult
+                              item.result.penaltyTime == ""
+                                ? item.result.raceTime
+                                : item.result.totalTime
                             }}
                           </td>
-                          <td>{{ item.ranked }}</td>
-                          <td>{{ getScoreByRanked(item.ranked) }}</td>
-                          <!-- <td>{{ item.score }}</td> -->
-
+                          <td>{{ item.result.ranked }}</td>
+                          <td>{{ getScoreByRanked(item.result.ranked) }}</td>
                           <td>
                             <button type="button" class="btn btn-warning">
                               Edit
@@ -264,9 +260,10 @@
                       </tbody>
                     </table>
 
-                    <ul>
+                    <!-- <ul>
                       <li>{{ currentPort }}</li>
-                    </ul>
+                    </ul> -->
+                    <br />
                   </b-col>
                 </b-row>
               </div>
@@ -275,6 +272,12 @@
         </b-row>
       </div>
     </div>
+    <br />
+    <br />
+    <br />
+    <br />
+    <br />
+    <br />
   </div>
 </template>
 
@@ -519,19 +522,6 @@ export default {
           score: 12,
         },
       ],
-      getItems: [{ time: "00:00:35.680", idReg: "000500070010000000M" }],
-      buttons: [
-        { label: "Team 1", class: "btn-dark" },
-        { label: "Team 2", class: "btn-secondary" },
-        { label: "Team 3", class: "btn-secondary" },
-        { label: "Team 4", class: "btn-dark" },
-        { label: "Team 5", class: "btn-dark" },
-        { label: "Team 6", class: "btn-secondary" },
-        { label: "Team 7", class: "btn-secondary" },
-        { label: "Team 8", class: "btn-dark" },
-      ],
-      // digitId: null,
-      // digitTime: null,
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -555,22 +545,23 @@ export default {
       }
     },
     async assignRanks(items) {
-      const itemsWithTimeResult = items.filter((item) => item.timeResult);
+      console.log(items, "<< CEK ITEMS YA");
+      const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
+      console.log(itemsWithTimeResult, "<< CEK ITEMS RESULT");
+
       itemsWithTimeResult.sort((a, b) => {
-        const timeA = this.parsesTime(a.timeResult);
-        const timeB = this.parsesTime(b.timeResult);
+        console.log(a, "<< AAAAA");
+        console.log(b, "<< BBBBB");
+
+        const timeA = this.parsesTime(a.result.totalTime);
+        const timeB = this.parsesTime(b.result.totalTime);
         return timeA - timeB;
       });
 
       itemsWithTimeResult.forEach((item, index) => {
-        item.ranked = index + 1;
+        item.result.ranked = index + 1;
         console.log("item", item.id);
       });
-      // itemsWithTimeResult.forEach(async (item, index) => {
-      //   item.ranked = index + 1;
-      //   console.log("cek ranked, ",item.id)
-      //   // item.score = await this.calculateScore(item.ranked);
-      // });
     },
     parsesTime(timeStr) {
       console.log("hkhhkhk", timeStr);
@@ -606,39 +597,22 @@ export default {
     },
 
     async checkingPenalties() {
-      console.log(this.items, "<<< cek dulu");
+      for (let i = 0; i < this.participant.length; i++) {
+        const item = this.participant[i];
+        console.log(item, "<<< cek");
+        item.result.penalty = this.dataPenalties[2].value;
+        item.result.penaltyTime = this.dataPenalties[2].timePen;
 
-      for (let i = 0; i < this.items.length; i++) {
-        const item = this.items[i];
-
-        item.penalties = this.dataPenalties[2].value;
-        item.penaltiesTime = this.dataPenalties[2].timePen;
-
-        if (item.raceTime && item.penaltiesTime) {
+        if (item.result.raceTime && item.result.penaltyTime) {
           const newTimeResult = await this.tambahWaktu(
-            item.raceTime,
-            item.penaltiesTime
+            item.result.raceTime,
+            item.result.penaltyTime
           );
-          item.timeResult = newTimeResult;
+          item.result.totalTime = newTimeResult;
         }
       }
-      await this.assignRanks(this.items);
+      await this.assignRanks(this.participant);
     },
-    // async checkingPenalties() {
-    //   this.items[0].penalties = this.dataPenalties[2].value;
-    //   this.items[0].penaltiesTime = this.dataPenalties[2].timePen;
-
-    //   if(this.items[0].raceTime && this.items[0].penaltiesTime){
-    //     let a =await this.tambahWaktu(this.items[0].raceTime, this.items[0].penaltiesTime)
-    //     this.items[0].timeResult = a
-
-    //     if(this.items[0].timeResult != ''){
-    //       await this.assignRanks()
-    //     }
-    //   } else {
-    //     alert('Waktu Race Time belum tampil')
-    //   }
-    // },
     getScoreByRanked(ranked) {
       const matchingRank = this.dataScore.find(
         (data) => data.ranking === ranked
@@ -652,14 +626,15 @@ export default {
     },
     sortRanked() {
       if (this.isRankedDescending) {
-        this.items.sort((a, b) => b.ranked - a.ranked);
+        this.participant.sort((a, b) => b.result.ranked - a.result.ranked);
       } else {
-        this.items.sort((a, b) => a.ranked - b.ranked);
+        this.participant.sort((a, b) => a.result.ranked - b.result.ranked);
       }
     },
     async connectPort() {
       if (!this.isPortConnected) {
-        await this.setupSerialListener();
+        let connectCheck = await this.setupSerialListener();
+        console.log(connectCheck, "<< check");
         this.isPortConnected = true;
         alert("Connected");
       } else {
@@ -685,8 +660,9 @@ export default {
             // Check if at least one port is available
             if (ports && ports.length > 0) {
               this.currentPort = ports;
-              console.log(ports[5], "<< ceks");
               const selectedPort = ports[5];
+
+              console.log(selectedPort, "<<< SELECT");
 
               if (selectedPort && selectedPort.path) {
                 // Open the selected serial port
@@ -741,6 +717,7 @@ export default {
                       "Digit ke-13 bukan 0 dan juga bukan lebih besar dari 0."
                     );
                   }
+                  return true;
                 });
               } else {
                 console.error("Selected port path is undefined.");
@@ -769,15 +746,19 @@ export default {
       return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
     },
     async updateTime(val, id, title) {
+      console.log(val, id);
       if (title == "start") {
-        this.items[id].timeStart = val;
+        this.participant[id].result.startTime = val;
       }
       if (title == "finish") {
-        this.items[id].timeFinish = val;
-        if (this.items[id].timeStart && this.items[id].timeFinish) {
-          this.items[id].raceTime = await this.hitungSelisihWaktu(
-            this.items[id].timeStart,
-            this.items[id].timeFinish
+        this.participant[id].result.finishTime = val;
+        if (
+          this.participant[id].result.startTime &&
+          this.participant[id].result.finishTime
+        ) {
+          this.participant[id].result.raceTime = await this.hitungSelisihWaktu(
+            this.participant[id].result.startTime,
+            this.participant[id].result.finishTime
           );
         }
       }

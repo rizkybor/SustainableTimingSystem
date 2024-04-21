@@ -241,13 +241,17 @@
                           <td>{{ item.result.finishTime }}</td>
                           <td>{{ item.result.raceTime }}</td>
                           <td>
-                            {{ item.result.penalty }}
-                            <!-- <b-input v-model="item.result.penalty" type="text"></b-input> -->
-                            <b-select v-model="item.result.penalty">
-                              <option value="None">None</option>
-                              <option value="5 seconds">5 seconds</option>
-                              <option value="10 seconds">10 seconds</option>
-                              <!-- Tambahkan option lainnya sesuai kebutuhan -->
+                            <b-select
+                              v-model="item.result.penalty"
+                              @change="updateTimePen($event, item)"
+                            >
+                              <option
+                                v-for="penalty in dataPenalties"
+                                :key="penalty.value"
+                                :value="penalty.value"
+                              >
+                                {{ penalty.value }}
+                              </option>
                             </b-select>
                           </td>
                           <td>{{ item.result.penaltyTime }}</td>
@@ -605,12 +609,20 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
+    updateTimePen(selectedValue, item) {
+      const selectedPenaltyData = this.dataPenalties.find(
+        (penalty) => penalty.value === selectedValue
+      );
+      if (selectedPenaltyData) {
+        item.result.penaltyTime = selectedPenaltyData.timePen;
+      }
+    },
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
         const item = this.participant[i];
-        console.log(item, "<<< cek");
-        item.result.penalty = this.dataPenalties[2].value;
-        item.result.penaltyTime = this.dataPenalties[2].timePen;
+        console.log(item, "<<< cek BOR");
+        // item.result.penalty = this.dataPenalties[2].value;
+        // item.result.penaltyTime = this.dataPenalties[2].timePen;
 
         if (item.result.raceTime && item.result.penaltyTime) {
           const newTimeResult = await this.tambahWaktu(

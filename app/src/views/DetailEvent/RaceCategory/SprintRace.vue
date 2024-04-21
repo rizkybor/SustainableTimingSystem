@@ -4,10 +4,10 @@
       <b-button @click="goTo()" variant="primary">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
       >
-      <b-button @click="goTo()" variant="primary">
+      <!-- <b-button @click="goTo()" variant="primary">
         New Category
         <Icon icon="ic:baseline-add-circle-outline" />
-      </b-button>
+      </b-button> -->
     </div>
     <br />
 
@@ -211,7 +211,7 @@
                   @click="checkingPenalties()"
                 >
                   <Icon icon="iconamoon:flag-fill" />
-                  Penalty Check
+                  Penalty Confirm
                 </button>
                 <b-row>
                   <b-col>
@@ -240,7 +240,16 @@
                           <td>{{ item.result.startTime }}</td>
                           <td>{{ item.result.finishTime }}</td>
                           <td>{{ item.result.raceTime }}</td>
-                          <td>{{ item.result.penalty }}</td>
+                          <td>
+                            {{ item.result.penalty }}
+                            <!-- <b-input v-model="item.result.penalty" type="text"></b-input> -->
+                            <b-select v-model="item.result.penalty">
+                              <option value="None">None</option>
+                              <option value="5 seconds">5 seconds</option>
+                              <option value="10 seconds">10 seconds</option>
+                              <!-- Tambahkan option lainnya sesuai kebutuhan -->
+                            </b-select>
+                          </td>
                           <td>{{ item.result.penaltyTime }}</td>
                           <td>
                             {{

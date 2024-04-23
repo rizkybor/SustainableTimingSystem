@@ -285,6 +285,7 @@
         </b-row>
       </div>
     </div>
+    <sprintResult/>
     <br />
     <br />
     <br />
@@ -296,10 +297,13 @@
 
 <script>
 import { SerialPort } from "serialport";
+import sprintResult from "../ResultComponent/sprint-result.vue";
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-
+  components: {
+    sprintResult
+  },
   data() {
     return {
       isScrolled: false,

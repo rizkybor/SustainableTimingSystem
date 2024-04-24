@@ -270,7 +270,7 @@
                             <th scope="col">Result</th>
                             <th scope="col">Ranked</th>
                             <th scope="col">Score</th>
-                            <th scope="col">Action</th>
+                            <th scope="col" v-if="editResult">Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -306,9 +306,8 @@
                             </td>
                             <td>{{ item.result.ranked }}</td>
                             <td>{{ getScoreByRanked(item.result.ranked) }}</td>
-                            <td>
+                            <td v-if="editResult">
                               <button
-                                :disabled="item.result.score"
                                 type="button"
                                 class="btn btn-warning"
                               >

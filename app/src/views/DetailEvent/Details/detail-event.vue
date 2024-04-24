@@ -221,7 +221,7 @@ export default {
       events: {},
       headersTable: [
       { key: 'No', label: 'NO' },
-      { key: 'nameTeam', label: 'NAME' },
+      { key: 'nameTeam', label: 'TEAM NAME' },
       { key: 'bibTeam', label: 'BIB' },
       { key: 'startingTime', label: 'STARTING TIME' },
       { key: 'interval', label: 'INTERVAL' },

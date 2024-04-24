@@ -41,39 +41,39 @@
       >
     </p>
 
-    <b-table striped bordered hover :items="teams" :fields="fields">
+    <b-table striped bordered hover :items="teams" :fields="fields" :key="index">
       <template v-slot:cell(num)="data">
-        {{ data.item.num }}
+        {{ data.index+1 }}
       </template>
       <template v-slot:cell(team)="data">
-        {{ data.item.team }}
+        {{ data.item.nameTeam }}
       </template>
       <template v-slot:cell(bib)="data">
-        {{ data.item.bib }}
+        {{ data.item.bibTeam }}
       </template>
       <template v-slot:cell(startTime)="data">
-        {{ data.item.startTime }}
+        {{ data.item.result.startTime }}
       </template>
       <template v-slot:cell(finishTime)="data">
-        {{ data.item.finishTime }}
+        {{ data.item.result.startFinish }}
       </template>
       <template v-slot:cell(raceTime)="data">
-        {{ data.item.raceTime }}
+        {{ data.item.result.raceTime }}
       </template>
       <template v-slot:cell(penalties)="data">
-        {{ data.item.penalties }}
+        {{ data.item.result.penalty }}
       </template>
       <template v-slot:cell(teamPenalties)="data">
-        {{ data.item.teamPenalties }}
+        {{ data.item.result.penaltyTime }}
       </template>
       <template v-slot:cell(result)="data">
-        {{ data.item.result }}
+        {{ data.item.result.totalTime }}
       </template>
       <template v-slot:cell(rank)="data">
-        {{ data.item.rank }}
+        {{ data.item.result.ranked }}
       </template>
       <template v-slot:cell(score)="data">
-        {{ data.item.score }}
+        {{ data.item.result.score }}
       </template>
     </b-table>
 
@@ -101,6 +101,9 @@
 
 <script>
 export default {
+  props: {
+    data: Object,
+  },
   data() {
     return {
       fields: [
@@ -118,82 +121,55 @@ export default {
       ],
       teams: [
         {
-          num: 1,
-          team: "JAMBI",
-          bib: 5,
-          startTime: "04:01:37,89",
-          finishTime: "04:02:56,71",
-          raceTime: "00:01:18,82",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:18,82",
-          rank: 1,
-          score: 100,
+          nameTeam: "gg",
+          bibTeam: "7",
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
         },
         {
-          num: 2,
-          team: "SUMATERA SELATAN",
-          bib: 7,
-          startTime: "03:58:37,99",
-          finishTime: "03:59:56,95",
-          raceTime: "00:01:18,96",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:18,96",
-          rank: 2,
-          score: 92,
+          nameTeam: "gg",
+          bibTeam: "7",
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
         },
         {
-          num: 3,
-          team: "SUMATERA BARAT",
-          bib: 3,
-          startTime: "03:49:38,74",
-          finishTime: "03:50:58,87",
-          raceTime: "00:01:20,13",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:20,13",
-          rank: 3,
-          score: 86,
-        },
-        {
-          num: 4,
-          team: "LAMPUNG",
-          bib: 11,
-          startTime: "03:52:38,74",
-          finishTime: "03:53:59,70",
-          raceTime: "00:01:20,97",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:20,97",
-          rank: 4,
-          score: 82,
-        },
-        {
-          num: 5,
-          team: "RIAU",
-          bib: 1,
-          startTime: "04:04:38,07",
-          finishTime: "04:05:59,73",
-          raceTime: "00:01:21,66",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:21,66",
-          rank: 5,
-          score: 79,
-        },
-        {
-          num: 6,
-          team: "BENGKULU",
-          bib: 9,
-          startTime: "03:55:37,87",
-          finishTime: "03:57:05,62",
-          raceTime: "00:01:27,75",
-          penalties: 0,
-          teamPenalties: "00:00:00,00",
-          result: "00:01:27,75",
-          rank: 6,
-          score: 76,
+          nameTeam: "gg",
+          bibTeam: "7",
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          result: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
         },
       ],
     };

@@ -1,5 +1,29 @@
 <template>
   <div class="px-3">
+
+    <vue-html2pdf
+      :show-layout="false"
+      :float-layout="true"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :filename="tes"
+      :pdf-quality="2"
+      :manual-pagination="false"
+      pdf-format="a4"
+      :pdf-margin="1"
+      pdf-orientation="landscape"
+      pdf-content-width="800px"
+      @progress="onProgress($event)"
+      ref="html2Pdf"
+    >
+      <section slot="pdf-content">
+        <!-- <ContentToPrint :data="updateDataforPDF" /> -->
+        <sprintResult/>
+      </section>
+    </vue-html2pdf>
+
+
     <div style="display: flex; justify-content: space-between">
       <b-button @click="goTo()" variant="primary">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
@@ -48,7 +72,7 @@
                 Reset
               </button>
 
-              <button type="button" class="btn btn-warning">
+              <button type="button" class="btn btn-warning" @click="generatePDF()">
                 <Icon icon="ic:outline-local-printshop" />
                 Print Result
               </button>
@@ -242,6 +266,7 @@
                           <td>{{ item.result.raceTime }}</td>
                           <td>
                             <b-select
+                              :disabled="item.result.raceTime"
                               v-model="item.result.penalty"
                               @change="updateTimePen($event, item)"
                             >
@@ -265,7 +290,7 @@
                           <td>{{ item.result.ranked }}</td>
                           <td>{{ getScoreByRanked(item.result.ranked) }}</td>
                           <td>
-                            <button type="button" class="btn btn-warning">
+                            <button :disabled="item.result.score" type="button" class="btn btn-warning">
                               Edit
                             </button>
                           </td>
@@ -285,7 +310,6 @@
         </b-row>
       </div>
     </div>
-    <sprintResult/>
     <br />
     <br />
     <br />
@@ -296,13 +320,15 @@
 </template>
 
 <script>
+import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
-import sprintResult from "../ResultComponent/sprint-result.vue";
+import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
 
 export default {
   name: "SustainableTimingSystemSprintRace",
   components: {
-    sprintResult
+    sprintResult,
+    VueHtml2pdf
   },
   data() {
     return {
@@ -879,6 +905,17 @@ export default {
       } else {
         this.isScrolled = false;
       }
+    },
+    onProgress(event) {
+      console.log(`Processed: ${event} / 100`);
+    },
+    hasGenerated() {
+      alert("PDF generated successfully!");
+    },
+    generatePDF() {
+
+      // this.updateDataforPDF = updatedData
+      this.$refs.html2Pdf.generatePdf();
     },
   },
 };

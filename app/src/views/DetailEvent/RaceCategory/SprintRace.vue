@@ -311,7 +311,11 @@
                             <td>{{ item.result.ranked }}</td>
                             <td>{{ getScoreByRanked(item.result.ranked) }}</td>
                             <td v-if="editResult">
-                              <button type="button" class="btn btn-warning">
+                              <button
+                                type="button"
+                                class="btn btn-warning"
+                                @click="openModal(item, 'R4men')"
+                              >
                                 Edit
                               </button>
                             </td>
@@ -338,6 +342,49 @@
     <br />
     <br />
     <br />
+    <!-- // AREA MODAL  -->
+    <b-modal id="bv-modal-edit-team" hide-footer no-close-on-backdrop centered>
+      <template #modal-title>
+        Edit Result - {{ editForm.nameTeam }} Team
+      </template>
+      <div class="d-block text-left mx-4 my-3">
+        <!-- TEAM NAME  -->
+        <b-form-group label="Name Team">
+          <b-form-input v-model="editForm.nameTeam" disabled></b-form-input>
+        </b-form-group>
+
+        <!-- TEAM BIB  -->
+        <b-form-group label="BIB Number Team">
+          <b-form-input v-model="editForm.bibTeam" disabled></b-form-input>
+        </b-form-group>
+
+        <!-- START TIME  -->
+        <b-form-group label="Start Time">
+          <b-form-input v-model="editForm.result.startTime"></b-form-input>
+        </b-form-group>
+
+        <!-- FINISH TIME  -->
+        <b-form-group label="Finish Time">
+          <b-form-input v-model="editForm.result.finishTime"></b-form-input>
+        </b-form-group>
+
+        <!-- PENALTIES  -->
+        <b-form-group label="Penalties Team">
+          <b-form-input v-model="editForm.result.penalties"></b-form-input>
+        </b-form-group>
+      </div>
+      <div class="mt-5 p-4" style="display: flex; gap: 2vh">
+        <b-button
+          class="btn-md"
+          style="border-radius: 20px"
+          variant="primary"
+          block
+          @click="simpanNewTeam"
+          >Save Result by Team</b-button
+        >
+      </div>
+    </b-modal>
+    <!-- // AREA MODAL  -->
   </div>
 </template>
 
@@ -354,6 +401,7 @@ export default {
   },
   data() {
     return {
+      editForm: "",
       editResult: false,
       isScrolled: false,
       port: null,
@@ -604,6 +652,11 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    openModal(datas, division) {
+      console.log(datas);
+      this.editForm = datas;
+      this.$bvModal.show("bv-modal-edit-team");
+    },
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("participantByCategories");
       const events = localStorage.getItem("eventDetails");
@@ -949,7 +1002,7 @@ export default {
     },
     generatePDF() {
       // this.updateDataforPDF = updatedData
-      
+
       this.$refs.html2Pdf.generatePdf();
     },
   },

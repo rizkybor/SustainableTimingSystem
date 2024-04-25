@@ -3,22 +3,22 @@
     <vue-html2pdf
       :show-layout="false"
       :float-layout="true"
-      :enable-download="true"
-      :preview-modal="false"
-      :paginate-elements-by-height="1400"
+      :enable-download="false"
+      :preview-modal="true"
+      :paginate-elements-by-height="500000"
       :filename="tes"
-      :pdf-quality="2"
       :manual-pagination="false"
-      pdf-format="a4"
       :pdf-margin="1"
+      :pdf-quality="2"
+      pdf-format="a4"
+      pdf-content-width="100%"
       pdf-orientation="landscape"
-      pdf-content-width="800px"
       @progress="onProgress($event)"
       ref="html2Pdf"
     >
       <section slot="pdf-content">
         <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult />
+        <sprintResult :data="dataEvent" :dataParticipant="participant" />
       </section>
     </vue-html2pdf>
 
@@ -46,7 +46,10 @@
             </h6>
             <p style="font-style: italic">
               <span>{{ dataEvent.addressCity }}, </span>
-             <span>{{ dataEvent.startDateEvent }} - {{ dataEvent.endDateEvent }}</span>
+              <span
+                >{{ dataEvent.startDateEvent }} -
+                {{ dataEvent.endDateEvent }}</span
+              >
             </p>
           </b-col>
           <b-col>
@@ -110,127 +113,128 @@
     <!-- SPRINT OPERATION TIME  -->
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
-       <div v-if="!editResult"> 
-         <b-row>
-           <b-col class="col-3">
-             <div
-               class="card"
-               style="
-                 padding: 10px;
-                 height: auto;
-                 min-height: 500px;
-                 background-color: rgb(32, 32, 32);
-               "
-             >
-               <table class="table table-dark table-sm">
-                 <thead>
-                   <tr>
-                     <th scope="col">Id Registrasi</th>
-                     <th scope="col">Racetime</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   <tr v-for="(id, index) in digitId" :key="index">
-                     <td style="color: black">{{ id }}</td>
-                     <td style="color: black">{{ digitTime[index] }}</td>
-                   </tr>
-                 </tbody>
-               </table>
-             </div>
-           </b-col>
- 
-           <b-col class="col">
-             <div class="card">
-               <div class="card-body">
-                 <b-row>
-                   <b-col class="col">
-                     <h5 class="card-title">Buffer-Timer-Start</h5>
-                     <b-row>
-                       <b-col class="col">
-                         <p>Get Time Start</p>
-                         <div class="input-group mb-3">
-                           <input
-                             v-model="digitTimeStart"
-                             type="text"
-                             class="form-control"
-                             placeholder="Timer"
-                             aria-label="Timer"
-                             aria-describedby="basic-addon1"
-                           />
-                         </div>
-                       </b-col>
-                     </b-row>
-                   </b-col>
-                   <b-col class="col-4">
-                     <button
-                       v-for="(button, index) in participant"
-                       id="btnStart"
-                       :key="index"
-                       type="button"
-                       class="btn custom-btn"
-                       :disabled="button.result.startTime ? true : false"
-                       :class="
-                         button.result.startTime ? 'btn-secondary' : 'btn-info'
-                       "
-                       @click="updateTime(digitTimeStart, index, 'start')"
-                     >
-                       {{ "BIB " + button.bibTeam }}
-                     </button>
-                   </b-col>
-                 </b-row>
-               </div>
-             </div>
- 
-             <br />
- 
-             <div class="card">
-               <div class="card-body">
-                 <b-row>
-                   <b-col class="col">
-                     <h5 class="card-title">Buffer-Timer-Finish</h5>
-                     <b-row>
-                       <b-col class="col">
-                         <p>Get Time Finish</p>
-                         <div class="input-group mb-3">
-                           <input
-                             v-model="digitTimeFinish"
-                             type="text"
-                             class="form-control"
-                             placeholder="Timer"
-                             aria-label="Timer"
-                             aria-describedby="basic-addon1"
-                           />
-                         </div>
-                       </b-col>
-                     </b-row>
-                   </b-col>
-                   <b-col class="col-4">
-                     <button
-                       v-for="(button, index) in participant"
-                       id="btnFinish"
-                       :key="index"
-                       type="button"
-                       :disabled="button.result.finishTime ? true : false"
-                       class="btn custom-btn"
-                       :class="
-                         button.result.finishTime ? 'btn-secondary' : 'btn-info'
-                       "
-                       @click="updateTime(digitTimeFinish, index, 'finish')"
-                     >
-                       {{ "BIB " + button.bibTeam }}
-                     </button>
-                   </b-col>
-                 </b-row>
-               </div>
-             </div>
-           </b-col>
-         </b-row>
-         <br />
-         <br />
+        <div v-if="!editResult">
+          <b-row>
+            <b-col class="col-3">
+              <div
+                class="card"
+                style="
+                  padding: 10px;
+                  height: auto;
+                  min-height: 500px;
+                  background-color: rgb(32, 32, 32);
+                "
+              >
+                <table class="table table-dark table-sm">
+                  <thead>
+                    <tr>
+                      <th scope="col">Id Registrasi</th>
+                      <th scope="col">Racetime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(id, index) in digitId" :key="index">
+                      <td style="color: black">{{ id }}</td>
+                      <td style="color: black">{{ digitTime[index] }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </b-col>
 
-       </div>
+            <b-col class="col">
+              <div class="card">
+                <div class="card-body">
+                  <b-row>
+                    <b-col class="col">
+                      <h5 class="card-title">Buffer-Timer-Start</h5>
+                      <b-row>
+                        <b-col class="col">
+                          <p>Get Time Start</p>
+                          <div class="input-group mb-3">
+                            <input
+                              v-model="digitTimeStart"
+                              type="text"
+                              class="form-control"
+                              placeholder="Timer"
+                              aria-label="Timer"
+                              aria-describedby="basic-addon1"
+                            />
+                          </div>
+                        </b-col>
+                      </b-row>
+                    </b-col>
+                    <b-col class="col-4">
+                      <button
+                        v-for="(button, index) in participant"
+                        id="btnStart"
+                        :key="index"
+                        type="button"
+                        class="btn custom-btn"
+                        :disabled="button.result.startTime ? true : false"
+                        :class="
+                          button.result.startTime ? 'btn-secondary' : 'btn-info'
+                        "
+                        @click="updateTime(digitTimeStart, index, 'start')"
+                      >
+                        {{ "BIB " + button.bibTeam }}
+                      </button>
+                    </b-col>
+                  </b-row>
+                </div>
+              </div>
 
-        <div> 
+              <br />
+
+              <div class="card">
+                <div class="card-body">
+                  <b-row>
+                    <b-col class="col">
+                      <h5 class="card-title">Buffer-Timer-Finish</h5>
+                      <b-row>
+                        <b-col class="col">
+                          <p>Get Time Finish</p>
+                          <div class="input-group mb-3">
+                            <input
+                              v-model="digitTimeFinish"
+                              type="text"
+                              class="form-control"
+                              placeholder="Timer"
+                              aria-label="Timer"
+                              aria-describedby="basic-addon1"
+                            />
+                          </div>
+                        </b-col>
+                      </b-row>
+                    </b-col>
+                    <b-col class="col-4">
+                      <button
+                        v-for="(button, index) in participant"
+                        id="btnFinish"
+                        :key="index"
+                        type="button"
+                        :disabled="button.result.finishTime ? true : false"
+                        class="btn custom-btn"
+                        :class="
+                          button.result.finishTime
+                            ? 'btn-secondary'
+                            : 'btn-info'
+                        "
+                        @click="updateTime(digitTimeFinish, index, 'finish')"
+                      >
+                        {{ "BIB " + button.bibTeam }}
+                      </button>
+                    </b-col>
+                  </b-row>
+                </div>
+              </div>
+            </b-col>
+          </b-row>
+          <br />
+          <br />
+        </div>
+
+        <div>
           <b-row>
             <b-col class="col">
               <div class="card">
@@ -307,17 +311,14 @@
                             <td>{{ item.result.ranked }}</td>
                             <td>{{ getScoreByRanked(item.result.ranked) }}</td>
                             <td v-if="editResult">
-                              <button
-                                type="button"
-                                class="btn btn-warning"
-                              >
+                              <button type="button" class="btn btn-warning">
                                 Edit
                               </button>
                             </td>
                           </tr>
                         </tbody>
                       </table>
-  
+
                       <!-- <ul>
                         <li>{{ currentPort }}</li>
                       </ul> -->
@@ -592,8 +593,7 @@ export default {
       currentPort: "",
       isRankedDescending: false,
       participant: {},
-      dataEvent: ""
-
+      dataEvent: "",
     };
   },
   async mounted() {
@@ -607,7 +607,7 @@ export default {
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("participantByCategories");
       const events = localStorage.getItem("eventDetails");
-      this.dataEvent = JSON.parse(events)
+      this.dataEvent = JSON.parse(events);
 
       let datas = JSON.parse(dataStorage);
       if (datas) {
@@ -680,13 +680,11 @@ export default {
       }
     },
     async resetRace() {
-      this.editResult = false
-
+      this.editResult = false;
     },
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
         const item = this.participant[i];
-        console.log(item, "<<< cek BOR");
         // item.result.penalty = this.dataPenalties[2].value;
         // item.result.penaltyTime = this.dataPenalties[2].timePen;
 
@@ -698,7 +696,7 @@ export default {
           item.result.totalTime = newTimeResult;
         }
       }
-      this.editResult = true
+      this.editResult = true;
       await this.assignRanks(this.participant);
     },
     getScoreByRanked(ranked) {
@@ -951,6 +949,7 @@ export default {
     },
     generatePDF() {
       // this.updateDataforPDF = updatedData
+      
       this.$refs.html2Pdf.generatePdf();
     },
   },

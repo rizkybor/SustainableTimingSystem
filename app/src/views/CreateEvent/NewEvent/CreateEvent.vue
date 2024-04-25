@@ -334,7 +334,6 @@ export default {
         addressState: "",
         startDateEvent: "",
         endDateEvent: "",
-        OTR: "",
         categoriesEvent: [],
         categoriesDivision: [],
         categoriesRace: [],

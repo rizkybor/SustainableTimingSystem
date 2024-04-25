@@ -1,11 +1,12 @@
 <template>
-  <div>
+  <div class="p-5">
     <h3 style="text-align: center">
       <span
         style="text-align: center; color: #ffffff; background-color: #99cc00"
-        ><strong>NASIONAL RAFTING CHAMPIONSIP/ IRF Level E</strong></span
+        ><strong>{{ data.levelName }}</strong></span
       >
     </h3>
+    <!-- <p>{{ data }}</p> -->
     <p style="text-align: center">&nbsp;</p>
     <p style="text-align: center">
       <strong
@@ -22,28 +23,38 @@
         ><span style="background-color: #99cc00; color: #ffffff"
           >SPRINT RESULT&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
           &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 22-Agus-2023</span
+          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+          {{ new Date().toLocaleDateString() }}</span
         ></strong
       >
     </p>
     <p style="text-align: center">
       <strong
-        ><span style="color: #99cc00"
-          >BABAK KUALIFIKASI PON XXI ACEH-SUMUT TAHUN 2024</span
-        ></strong
+        ><span style="color: #99cc00">{{ data.eventName }}</span></strong
       >
     </p>
     <p style="text-align: center">
       <strong
         ><span style="color: #99cc00"
-          >SUNGAI BATANG ANAI, PADANG PARIAMAN, SUMATERA BARAT</span
+          >Kp/Ds.{{ data.addressVillage }}, Kel.{{ data.addressDistrict }},
+          Kec.{{ data.addressSubDistrict }}, Kota {{ data.addressCity }},
+          {{ data.addressProvince }} - {{ data.addressState }} ( {{ data.addressZipCode }} ) - {{ data.riverName }}</span
         ></strong
       >
     </p>
+   
 
-    <b-table striped bordered hover :items="teams" :fields="fields" :key="index">
+    <b-table
+      striped
+      bordered
+      hover
+      :items="dataParticipant"
+      :fields="fields"
+      :key="index"
+      style="font-size: 8px"
+    >
       <template v-slot:cell(num)="data">
-        {{ data.index+1 }}
+        {{ data.index + 1 }}
       </template>
       <template v-slot:cell(team)="data">
         {{ data.item.nameTeam }}
@@ -90,9 +101,9 @@
     <p>
       <span style="color: #99cc00"
         ><strong
-          >Adi Ruswin&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+          >{{ data.raceDirector }}&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
           &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-          &nbsp; &nbsp; &nbsp; Ismed Ramdhan</strong
+          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {{ data.chiefJudge }}</strong
         ></span
       >
     </p>
@@ -103,6 +114,7 @@
 export default {
   props: {
     data: Object,
+    dataParticipant: Object,
   },
   data() {
     return {
@@ -179,4 +191,7 @@ export default {
 
 <style scoped>
 /* Add your custom CSS styles here */
+p{
+  font-size: 12px;
+}
 </style>

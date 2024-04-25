@@ -330,6 +330,7 @@ export default {
           const result = divisiTypes.map((divisiType) => ({
             categories: category,
             divisiType: divisiType,
+            statusRaceId: 0,
             teams: [],
           }));
 
@@ -383,12 +384,12 @@ export default {
       if (formValid) {
         // Data tim yang akan ditambahkan
         const defaultTeams = {
-          id: "",
           nameTeam: this.formModal.nameTeam,
           bibTeam: this.formModal.bibTeam,
           startOrder: "",
           praStart: "",
           intervalRace: "",
+          statusId: 0,
           result: {
             startTime: "",
             finishTime: "",
@@ -407,6 +408,7 @@ export default {
           startOrder: "",
           praStart: "",
           intervalRace: "",
+          statusId: 0,
           result: [
             {
               startTime: "",
@@ -437,6 +439,7 @@ export default {
           startOrder: "",
           praStart: "",
           intervalRace: "",
+          statusId: 0,
           result: [
             {
               startTime: "",
@@ -447,6 +450,7 @@ export default {
               totalTime: "",
               ranked: "",
               score: "",
+              bracket: 16
             }
           ],
         };

@@ -87,7 +87,7 @@
                     <b-form-group label="City">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.addessCity"
+                        v-model="formEvent.addressCity"
                         placeholder="Enter City"
                       ></b-form-input>
                     </b-form-group>
@@ -328,13 +328,12 @@ export default {
         addressDistrict: "",
         addressSubDistrict: "",
         addressVillage: "",
-        addessCity: "",
+        addressCity: "",
         addressProvince: "",
         addressZipCode: "",
         addressState: "",
         startDateEvent: "",
         endDateEvent: "",
-        OTR: "",
         categoriesEvent: [],
         categoriesDivision: [],
         categoriesRace: [],
@@ -437,7 +436,7 @@ export default {
         addressDistrict,
         addressSubDistrict,
         addressVillage,
-        addessCity,
+        addressCity,
         addressProvince,
         addressZipCode,
         addressState,
@@ -460,7 +459,7 @@ export default {
         !addressDistrict ||
         !addressSubDistrict ||
         !addressVillage ||
-        !addessCity ||
+        !addressCity ||
         !addressProvince ||
         !addressZipCode ||
         !addressState ||

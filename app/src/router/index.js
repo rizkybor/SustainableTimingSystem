@@ -6,6 +6,8 @@ import DetailEvent from "../views/DetailEvent/index.vue";
 import DetailsEventId from "../views/DetailEvent/Details/detail-event.vue"
 import SprintRace from "../views/DetailEvent/RaceCategory/SprintRace.vue";
 import SlalomRace from "../views/DetailEvent/RaceCategory/SlalomRace.vue";
+import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
+import Head2Head from "../views/DetailEvent/RaceCategory/HeadToHead.vue";
 
 Vue.use(VueRouter);
 
@@ -32,6 +34,16 @@ const routes = [
         path: "slalom-race",
         name: "slalom-race",
         component: SlalomRace,
+      },
+      {
+        path: "drr-race",
+        name: "drr-race",
+        component: DownRiverRace,
+      },
+      {
+        path: "head2head-race",
+        name: "head2head-race",
+        component: Head2Head,
       },
     ],
   },

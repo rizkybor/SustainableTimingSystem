@@ -34,7 +34,11 @@
         </div>
 
         <div>
-          <b-card header="Event Detail"  class="shadow" style="border-radius: 20px">
+          <b-card
+            header="Event Detail"
+            class="shadow"
+            style="border-radius: 20px"
+          >
             <template #header>
               <div
                 class="d-flex"
@@ -115,7 +119,7 @@
         </div>
         <br />
         <br />
-        
+
         <div class="my-4">
           <div class="text-left" style="display: flex; gap: 1vh">
             <b-button
@@ -159,6 +163,7 @@
 
         <div>
           <teamParticipantVue
+            v-if="!nothingR4men"
             :teamTitle="'R4 - MEN'"
             :teams="teamsR4men"
             :categories="isActivated"
@@ -167,6 +172,7 @@
           />
           <br />
           <teamParticipantVue
+            v-if="!nothingR4women"
             :teamTitle="'R4 - WOMEN'"
             :teams="teamsR4women"
             :categories="isActivated"
@@ -175,6 +181,7 @@
           />
           <br />
           <teamParticipantVue
+            v-if="!nothingR6men"
             :teamTitle="'R6 - MEN'"
             :teams="teamsR6men"
             :categories="isActivated"
@@ -183,6 +190,7 @@
           />
           <br />
           <teamParticipantVue
+            v-if="!nothingR6women"
             :teamTitle="'R6 - WOMEN'"
             :teams="teamsR6women"
             :categories="isActivated"
@@ -211,7 +219,14 @@ export default {
     return {
       loading: false,
       events: {},
-      headersTable: ["No", "nameTeam", "bibTeam", "startingTime", "interval", "Action"],
+      headersTable: [
+      { key: 'No', label: 'NO' },
+      { key: 'nameTeam', label: 'TEAM NAME' },
+      { key: 'bibTeam', label: 'BIB' },
+      { key: 'startingTime', label: 'STARTING TIME' },
+      { key: 'interval', label: 'INTERVAL' },
+      { key: 'Action', label: 'ACTION', class: 'text-right' }
+    ],
       team: {
         R4men: false,
         R4women: false,
@@ -219,32 +234,75 @@ export default {
         R6women: false,
       },
       isActivated: "SPRINT",
+      nothingR4men: false,
+      nothingR4women: false,
+      nothingR6men: false,
+      nothingR6women: false,
     };
   },
   computed: {
     teamsR4men() {
-      return this.events.participant.find(
-        (item) =>
-          item.divisiType === "R4men" && item.categories === this.isActivated
-      ).teams;
+      const division = this.events.participant.find(
+        (item) => item.divisiType === "R4men"
+      );
+      if (division) {
+        this.nothingR4men = false;
+        return this.events.participant.find(
+          (item) =>
+            item.divisiType === "R4men" && item.categories === this.isActivated
+        ).teams;
+      } else {
+        this.nothingR4men = true;
+        return [];
+      }
     },
     teamsR4women() {
-      return this.events.participant.find(
-        (item) =>
-          item.divisiType === "R4women" && item.categories === this.isActivated
-      ).teams;
+      const division = this.events.participant.find(
+        (item) => item.divisiType === "R4women"
+      );
+      if (division) {
+        this.nothingR4women = false;
+        return this.events.participant.find(
+          (item) =>
+            item.divisiType === "R4women" &&
+            item.categories === this.isActivated
+        ).teams;
+      } else {
+        this.nothingR4women = true;
+        return [];
+      }
     },
     teamsR6men() {
-      return this.events.participant.find(
-        (item) =>
-          item.divisiType === "R6men" && item.categories === this.isActivated
-      ).teams;
+      const division = this.events.participant.find(
+        (item) => item.divisiType === "R6men"
+      );
+      if (division) {
+        this.nothingR6men = false;
+        return this.events.participant.find(
+          (item) =>
+            item.divisiType === "R6men" && item.categories === this.isActivated
+        ).teams;
+      } else {
+        this.nothingR6men = true;
+        return [];
+      }
     },
     teamsR6women() {
-      return this.events.participant.find(
-        (item) =>
-          item.divisiType === "R6women" && item.categories === this.isActivated
-      ).teams;
+      const division = this.events.participant.find(
+        (item) => item.divisiType === "R6women"
+      );
+      if (division) {
+        this.nothingR6women = false;
+
+        return this.events.participant.find(
+          (item) =>
+            item.divisiType === "R6women" &&
+            item.categories === this.isActivated
+        ).teams;
+      } else {
+        this.nothingR6women = true;
+        return [];
+      }
     },
   },
 
@@ -261,7 +319,7 @@ export default {
         ipcRenderer.on("get-events-byid-reply", (event, data) => {
           if (data) {
             this.events = data;
-            localStorage.setItem("eventDetails", data);
+            localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");
           }
@@ -333,3 +391,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.name-team-width {
+  width: 800px !important;
+}
+</style>

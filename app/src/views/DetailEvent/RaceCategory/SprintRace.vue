@@ -1,5 +1,27 @@
 <template>
   <div class="px-3">
+    <vue-html2pdf
+      :show-layout="false"
+      :float-layout="true"
+      :enable-download="false"
+      :preview-modal="true"
+      :paginate-elements-by-height="500000"
+      :filename="tes"
+      :manual-pagination="false"
+      :pdf-margin="1"
+      :pdf-quality="2"
+      pdf-format="a4"
+      pdf-content-width="100%"
+      pdf-orientation="landscape"
+      @progress="onProgress($event)"
+      ref="html2Pdf"
+    >
+      <section slot="pdf-content">
+        <!-- <ContentToPrint :data="updateDataforPDF" /> -->
+        <sprintResult :data="dataEvent" :dataParticipant="participant" />
+      </section>
+    </vue-html2pdf>
+
     <div style="display: flex; justify-content: space-between">
       <b-button @click="goTo()" variant="primary">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
@@ -16,14 +38,18 @@
         <b-row>
           <b-col>
             <h5 style="font-weight: 800; font-style: italic">
-              Kejuaraan Arung Jeram 2024
+              {{ dataEvent.eventName }}
             </h5>
 
             <h6 style="font-weight: 800; font-style: italic">
               Nomor Lomba : Sprint
             </h6>
             <p style="font-style: italic">
-              Tigaraksa, 01-January-2024 - 10-January-2024
+              <span>{{ dataEvent.addressCity }}, </span>
+              <span
+                >{{ dataEvent.startDateEvent }} -
+                {{ dataEvent.endDateEvent }}</span
+              >
             </p>
           </b-col>
           <b-col>
@@ -43,12 +69,16 @@
                 Sort Ranked
               </button>
 
-              <button type="button" class="btn btn-secondary">
+              <!-- <button type="button" class="btn btn-secondary">
                 <Icon icon="ic:outline-delete-sweep" />
                 Reset
-              </button>
+              </button> -->
 
-              <button type="button" class="btn btn-warning">
+              <button
+                type="button"
+                class="btn btn-warning"
+                @click="generatePDF()"
+              >
                 <Icon icon="ic:outline-local-printshop" />
                 Print Result
               </button>
@@ -83,206 +113,227 @@
     <!-- SPRINT OPERATION TIME  -->
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
-        <b-row>
-          <b-col class="col-3">
-            <div
-              class="card"
-              style="
-                padding: 10px;
-                height: auto;
-                min-height: 500px;
-                background-color: rgb(32, 32, 32);
-              "
-            >
-              <table class="table table-dark table-sm">
-                <thead>
-                  <tr>
-                    <th scope="col">Id Registrasi</th>
-                    <th scope="col">Racetime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(id, index) in digitId" :key="index">
-                    <td style="color: black">{{ id }}</td>
-                    <td style="color: black">{{ digitTime[index] }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </b-col>
-
-          <b-col class="col">
-            <div class="card">
-              <div class="card-body">
-                <b-row>
-                  <b-col class="col">
-                    <h5 class="card-title">Buffer-Timer-Start</h5>
-                    <b-row>
-                      <b-col class="col">
-                        <p>Get Time Start</p>
-                        <div class="input-group mb-3">
-                          <input
-                            v-model="digitTimeStart"
-                            type="text"
-                            class="form-control"
-                            placeholder="Timer"
-                            aria-label="Timer"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                      </b-col>
-                    </b-row>
-                  </b-col>
-                  <b-col class="col-4">
-                    <button
-                      v-for="(button, index) in participant"
-                      id="btnStart"
-                      :key="index"
-                      type="button"
-                      class="btn custom-btn"
-                      :disabled="button.result.startTime ? true : false"
-                      :class="
-                        button.result.startTime ? 'btn-secondary' : 'btn-info'
-                      "
-                      @click="updateTime(digitTimeStart, index, 'start')"
-                    >
-                      {{ "BIB " + button.bibTeam }}
-                    </button>
-                  </b-col>
-                </b-row>
+        <div v-if="!editResult">
+          <b-row>
+            <b-col class="col-3">
+              <div
+                class="card"
+                style="
+                  padding: 10px;
+                  height: auto;
+                  min-height: 500px;
+                  background-color: rgb(32, 32, 32);
+                "
+              >
+                <table class="table table-dark table-sm">
+                  <thead>
+                    <tr>
+                      <th scope="col">Id Registrasi</th>
+                      <th scope="col">Racetime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(id, index) in digitId" :key="index">
+                      <td style="color: black">{{ id }}</td>
+                      <td style="color: black">{{ digitTime[index] }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
+            </b-col>
 
-            <br />
-
-            <div class="card">
-              <div class="card-body">
-                <b-row>
-                  <b-col class="col">
-                    <h5 class="card-title">Buffer-Timer-Finish</h5>
-                    <b-row>
-                      <b-col class="col">
-                        <p>Get Time Finish</p>
-                        <div class="input-group mb-3">
-                          <input
-                            v-model="digitTimeFinish"
-                            type="text"
-                            class="form-control"
-                            placeholder="Timer"
-                            aria-label="Timer"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                      </b-col>
-                    </b-row>
-                  </b-col>
-                  <b-col class="col-4">
-                    <button
-                      v-for="(button, index) in participant"
-                      id="btnFinish"
-                      :key="index"
-                      type="button"
-                      :disabled="button.result.finishTime ? true : false"
-                      class="btn custom-btn"
-                      :class="
-                        button.result.finishTime ? 'btn-secondary' : 'btn-info'
-                      "
-                      @click="updateTime(digitTimeFinish, index, 'finish')"
-                    >
-                      {{ "BIB " + button.bibTeam }}
-                    </button>
-                  </b-col>
-                </b-row>
+            <b-col class="col">
+              <div class="card">
+                <div class="card-body">
+                  <b-row>
+                    <b-col class="col">
+                      <h5 class="card-title">Buffer-Timer-Start</h5>
+                      <b-row>
+                        <b-col class="col">
+                          <p>Get Time Start</p>
+                          <div class="input-group mb-3">
+                            <input
+                              v-model="digitTimeStart"
+                              type="text"
+                              class="form-control"
+                              placeholder="Timer"
+                              aria-label="Timer"
+                              aria-describedby="basic-addon1"
+                            />
+                          </div>
+                        </b-col>
+                      </b-row>
+                    </b-col>
+                    <b-col class="col-4">
+                      <button
+                        v-for="(button, index) in participant"
+                        id="btnStart"
+                        :key="index"
+                        type="button"
+                        class="btn custom-btn"
+                        :disabled="button.result.startTime ? true : false"
+                        :class="
+                          button.result.startTime ? 'btn-secondary' : 'btn-info'
+                        "
+                        @click="updateTime(digitTimeStart, index, 'start')"
+                      >
+                        {{ "BIB " + button.bibTeam }}
+                      </button>
+                    </b-col>
+                  </b-row>
+                </div>
               </div>
-            </div>
-          </b-col>
-        </b-row>
-        <br />
-        <br />
-        <b-row>
-          <b-col class="col">
-            <div class="card">
-              <div class="card-body">
-                <h4>List Result</h4>
-                <button
-                  id="btnCheckPen"
-                  type="button"
-                  class="btn btn-warning"
-                  @click="checkingPenalties()"
-                >
-                  <Icon icon="iconamoon:flag-fill" />
-                  Penalty Confirm
-                </button>
-                <b-row>
-                  <b-col>
-                    <table class="table">
-                      <thead>
-                        <tr>
-                          <th scope="col">No</th>
-                          <th scope="col">Team Name</th>
-                          <th scope="col">BIB Number</th>
-                          <th scope="col">Start Time</th>
-                          <th scope="col">Finish Time</th>
-                          <th scope="col">Race Time</th>
-                          <th scope="col">Penalties</th>
-                          <th scope="col">Penalty Time</th>
-                          <th scope="col">Result</th>
-                          <th scope="col">Ranked</th>
-                          <th scope="col">Score</th>
-                          <th scope="col">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(item, index) in participant" :key="index">
-                          <td>{{ index + 1 }}</td>
-                          <td>{{ item.nameTeam }}</td>
-                          <td>{{ item.bibTeam }}</td>
-                          <td>{{ item.result.startTime }}</td>
-                          <td>{{ item.result.finishTime }}</td>
-                          <td>{{ item.result.raceTime }}</td>
-                          <td>
-                            <b-select
-                              v-model="item.result.penalty"
-                              @change="updateTimePen($event, item)"
-                            >
-                              <option
-                                v-for="penalty in dataPenalties"
-                                :key="penalty.value"
-                                :value="penalty.value"
+
+              <br />
+
+              <div class="card">
+                <div class="card-body">
+                  <b-row>
+                    <b-col class="col">
+                      <h5 class="card-title">Buffer-Timer-Finish</h5>
+                      <b-row>
+                        <b-col class="col">
+                          <p>Get Time Finish</p>
+                          <div class="input-group mb-3">
+                            <input
+                              v-model="digitTimeFinish"
+                              type="text"
+                              class="form-control"
+                              placeholder="Timer"
+                              aria-label="Timer"
+                              aria-describedby="basic-addon1"
+                            />
+                          </div>
+                        </b-col>
+                      </b-row>
+                    </b-col>
+                    <b-col class="col-4">
+                      <button
+                        v-for="(button, index) in participant"
+                        id="btnFinish"
+                        :key="index"
+                        type="button"
+                        :disabled="button.result.finishTime ? true : false"
+                        class="btn custom-btn"
+                        :class="
+                          button.result.finishTime
+                            ? 'btn-secondary'
+                            : 'btn-info'
+                        "
+                        @click="updateTime(digitTimeFinish, index, 'finish')"
+                      >
+                        {{ "BIB " + button.bibTeam }}
+                      </button>
+                    </b-col>
+                  </b-row>
+                </div>
+              </div>
+            </b-col>
+          </b-row>
+          <br />
+          <br />
+        </div>
+
+        <div>
+          <b-row>
+            <b-col class="col">
+              <div class="card">
+                <div class="card-body">
+                  <h4>List Result</h4>
+                  <button
+                    id="btnCheckPen"
+                    type="button"
+                    class="btn btn-warning mr-4"
+                    @click="checkingPenalties()"
+                  >
+                    <Icon icon="iconamoon:flag-fill" />
+                    Penalty Confirm
+                  </button>
+                  <button
+                    id="btnCheckPen"
+                    type="button"
+                    class="btn btn-danger"
+                    @click="resetRace()"
+                  >
+                    <Icon icon="iconamoon:flag-fill" />
+                    Reset Race
+                  </button>
+                  <b-row>
+                    <b-col>
+                      <table class="table">
+                        <thead>
+                          <tr>
+                            <th scope="col">No</th>
+                            <th scope="col">Team Name</th>
+                            <th scope="col">BIB Number</th>
+                            <th scope="col">Start Time</th>
+                            <th scope="col">Finish Time</th>
+                            <th scope="col">Race Time</th>
+                            <th scope="col">Penalties</th>
+                            <th scope="col">Penalty Time</th>
+                            <th scope="col">Result</th>
+                            <th scope="col">Ranked</th>
+                            <th scope="col">Score</th>
+                            <th scope="col" v-if="editResult">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(item, index) in participant" :key="index">
+                            <td>{{ index + 1 }}</td>
+                            <td>{{ item.nameTeam }}</td>
+                            <td>{{ item.bibTeam }}</td>
+                            <td>{{ item.result.startTime }}</td>
+                            <td>{{ item.result.finishTime }}</td>
+                            <td>{{ item.result.raceTime }}</td>
+                            <td>
+                              <b-select
+                                :disabled="item.result.raceTime"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
                               >
-                                {{ penalty.value }}
-                              </option>
-                            </b-select>
-                          </td>
-                          <td>{{ item.result.penaltyTime }}</td>
-                          <td>
-                            {{
-                              item.result.penaltyTime == ""
-                                ? item.result.raceTime
-                                : item.result.totalTime
-                            }}
-                          </td>
-                          <td>{{ item.result.ranked }}</td>
-                          <td>{{ getScoreByRanked(item.result.ranked) }}</td>
-                          <td>
-                            <button type="button" class="btn btn-warning">
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+                            <td>{{ item.result.penaltyTime }}</td>
+                            <td>
+                              {{
+                                item.result.penaltyTime == ""
+                                  ? item.result.raceTime
+                                  : item.result.totalTime
+                              }}
+                            </td>
+                            <td>{{ item.result.ranked }}</td>
+                            <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                            <td v-if="editResult">
+                              <button
+                                type="button"
+                                class="btn btn-warning"
+                                @click="openModal(item, 'R4men')"
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
 
-                    <!-- <ul>
-                      <li>{{ currentPort }}</li>
-                    </ul> -->
-                    <br />
-                  </b-col>
-                </b-row>
+                      <!-- <ul>
+                        <li>{{ currentPort }}</li>
+                      </ul> -->
+                      <br />
+                    </b-col>
+                  </b-row>
+                </div>
               </div>
-            </div>
-          </b-col>
-        </b-row>
+            </b-col>
+          </b-row>
+        </div>
       </div>
     </div>
     <br />
@@ -291,17 +342,67 @@
     <br />
     <br />
     <br />
+    <!-- // AREA MODAL  -->
+    <b-modal id="bv-modal-edit-team" hide-footer no-close-on-backdrop centered>
+      <template #modal-title>
+        Edit Result - {{ editForm.nameTeam }} Team
+      </template>
+      <div class="d-block text-left mx-4 my-3">
+        <!-- TEAM NAME  -->
+        <b-form-group label="Name Team">
+          <b-form-input v-model="editForm.nameTeam" disabled></b-form-input>
+        </b-form-group>
+
+        <!-- TEAM BIB  -->
+        <b-form-group label="BIB Number Team">
+          <b-form-input v-model="editForm.bibTeam" disabled></b-form-input>
+        </b-form-group>
+
+        <!-- START TIME  -->
+        <b-form-group label="Start Time">
+          <b-form-input v-model="editForm.result.startTime"></b-form-input>
+        </b-form-group>
+
+        <!-- FINISH TIME  -->
+        <b-form-group label="Finish Time">
+          <b-form-input v-model="editForm.result.finishTime"></b-form-input>
+        </b-form-group>
+
+        <!-- PENALTIES  -->
+        <b-form-group label="Penalties Team">
+          <b-form-input v-model="editForm.result.penalties"></b-form-input>
+        </b-form-group>
+      </div>
+      <div class="mt-5 p-4" style="display: flex; gap: 2vh">
+        <b-button
+          class="btn-md"
+          style="border-radius: 20px"
+          variant="primary"
+          block
+          @click="simpanNewTeam"
+          >Save Result by Team</b-button
+        >
+      </div>
+    </b-modal>
+    <!-- // AREA MODAL  -->
   </div>
 </template>
 
 <script>
+import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
+import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-
+  components: {
+    sprintResult,
+    VueHtml2pdf,
+  },
   data() {
     return {
+      editForm: "",
+      editResult: false,
       isScrolled: false,
       port: null,
       isPortConnected: false,
@@ -540,6 +641,7 @@ export default {
       currentPort: "",
       isRankedDescending: false,
       participant: {},
+      dataEvent: "",
     };
   },
   async mounted() {
@@ -550,11 +652,24 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    openModal(datas, division) {
+      console.log(datas);
+      this.editForm = datas;
+      this.$bvModal.show("bv-modal-edit-team");
+    },
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("participantByCategories");
-      const datas = JSON.parse(dataStorage);
+      const events = localStorage.getItem("eventDetails");
+      this.dataEvent = JSON.parse(events);
+
+      let datas = JSON.parse(dataStorage);
       if (datas) {
+        datas = datas.sort(function (a, b) {
+          return a.praStart.localeCompare(b.praStart);
+        });
+
         this.participant = datas;
+        console.log(JSON.stringify(this.participant));
       }
     },
     async assignRanks(items) {
@@ -617,10 +732,12 @@ export default {
         item.result.penaltyTime = selectedPenaltyData.timePen;
       }
     },
+    async resetRace() {
+      this.editResult = false;
+    },
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
         const item = this.participant[i];
-        console.log(item, "<<< cek BOR");
         // item.result.penalty = this.dataPenalties[2].value;
         // item.result.penaltyTime = this.dataPenalties[2].timePen;
 
@@ -632,6 +749,7 @@ export default {
           item.result.totalTime = newTimeResult;
         }
       }
+      this.editResult = true;
       await this.assignRanks(this.participant);
     },
     getScoreByRanked(ranked) {
@@ -875,6 +993,17 @@ export default {
       } else {
         this.isScrolled = false;
       }
+    },
+    onProgress(event) {
+      console.log(`Processed: ${event} / 100`);
+    },
+    hasGenerated() {
+      alert("PDF generated successfully!");
+    },
+    generatePDF() {
+      // this.updateDataforPDF = updatedData
+
+      this.$refs.html2Pdf.generatePdf();
     },
   },
 };

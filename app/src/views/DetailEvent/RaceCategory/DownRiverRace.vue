@@ -82,7 +82,6 @@
     <br />
 
     <!-- SPRINT OPERATION TIME  -->
-
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
         <b-row>

@@ -18,29 +18,42 @@
         </div>
       </template>
 
-      <template v-for="team in teams">
-        <b-table hover striped hover :items="[team]" :fields="fields">
+      <template v-for="(team, index) in teams">
+        <b-table
+        fixed
+          hover
+          striped
+          :items="[team]"
+          :fields="fields"
+          :key="index"
+        >
           <template v-slot:cell(No)="row">
-            {{ row.index + 1 }}
+            <div>
+              {{ index + 1 }}
+            </div>
           </template>
           <template v-slot:cell(startingTime)="row">
-            <b-form-input
-              v-model="team.praStart"
-              type="time"
-              step="0.001"
-              pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}"
-              placeholder="Input Start Time"
-            ></b-form-input>
+            <div style="display: flex;">
+              <b-form-input
+                v-model="team.praStart"
+                type="time"
+                step="0.001"
+                pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}"
+                placeholder="Input Start Time"
+              ></b-form-input>
+            </div>
           </template>
           <template v-slot:cell(interval)="row">
-            <b-form-input
-              v-model="team.intervalRace"
-              type="time"
-              placeholder="Input Interval"
-            ></b-form-input>
+            <div style="display: flex;">
+              <b-form-input
+                v-model="team.intervalRace"
+                type="time"
+                placeholder="Input Interval"
+              ></b-form-input>
+            </div>
           </template>
           <template #cell(Action)="row">
-            <div style="display: flex; gap: 1vh">
+            <div style="display: flex; justify-content: flex-end; gap: 1vh;">
               <b-button
                 style="border-radius: 20px"
                 variant="warning"
@@ -105,12 +118,13 @@ export default {
             ? "slalom-race"
             : val == "DRR"
             ? "drr-race"
-            : val == "H2H"
-            ? "h2h-race"
+            : val == "HEAD2HEAD"
+            ? "head2head-race"
             : val;
 
-        console.log(JSON.stringify(this.teams))
-            
+        console.log(JSON.stringify(this.teams));
+        console.log(val, "<< cek val");
+
         const obj = JSON.stringify(this.teams);
         localStorage.setItem("participantByCategories", obj);
         this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
@@ -126,3 +140,10 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.name-team-width {
+  width: 800px !important;
+}
+</style>
+

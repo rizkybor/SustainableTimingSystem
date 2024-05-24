@@ -7,6 +7,7 @@
       >
     </h3>
     <!-- <p>{{ data }}</p> -->
+    <!-- <p>{{ dataParticipant }}</p> -->
     <p style="text-align: center">&nbsp;</p>
     <p style="text-align: center">
       <strong
@@ -38,11 +39,11 @@
         ><span style="color: #99cc00"
           >Kp/Ds.{{ data.addressVillage }}, Kel.{{ data.addressDistrict }},
           Kec.{{ data.addressSubDistrict }}, Kota {{ data.addressCity }},
-          {{ data.addressProvince }} - {{ data.addressState }} ( {{ data.addressZipCode }} ) - {{ data.riverName }}</span
+          {{ data.addressProvince }} - {{ data.addressState }} (
+          {{ data.addressZipCode }} ) - {{ data.riverName }}</span
         ></strong
       >
     </p>
-   
 
     <b-table
       striped
@@ -66,7 +67,7 @@
         {{ data.item.result.startTime }}
       </template>
       <template v-slot:cell(finishTime)="data">
-        {{ data.item.result.startFinish }}
+        {{ data.item.result.finishTime }}
       </template>
       <template v-slot:cell(raceTime)="data">
         {{ data.item.result.raceTime }}
@@ -126,7 +127,7 @@ export default {
         { key: "finishTime", label: "FINISH TIME" },
         { key: "raceTime", label: "RACE TIME" },
         { key: "penalties", label: "PENALTIES" },
-        { key: "teamPenalties", label: "TIM PENALTIES" },
+        { key: "teamPenalties", label: "TIME PENALTIES" },
         { key: "result", label: "RESULT" },
         { key: "rank", label: "RANK" },
         { key: "score", label: "SCORE" },
@@ -184,6 +185,136 @@ export default {
           },
         },
       ],
+      dataScore: [
+        {
+          ranking: 1,
+          score: 100,
+        },
+        {
+          ranking: 2,
+          score: 92,
+        },
+        {
+          ranking: 3,
+          score: 86,
+        },
+        {
+          ranking: 4,
+          score: 82,
+        },
+        {
+          ranking: 5,
+          score: 79,
+        },
+        {
+          ranking: 6,
+          score: 76,
+        },
+        {
+          ranking: 7,
+          score: 73,
+        },
+        {
+          ranking: 8,
+          score: 70,
+        },
+        {
+          ranking: 9,
+          score: 67,
+        },
+        {
+          ranking: 10,
+          score: 64,
+        },
+        {
+          ranking: 11,
+          score: 61,
+        },
+        {
+          ranking: 12,
+          score: 58,
+        },
+        {
+          ranking: 13,
+          score: 55,
+        },
+        {
+          ranking: 14,
+          score: 52,
+        },
+        {
+          ranking: 15,
+          score: 49,
+        },
+        {
+          ranking: 16,
+          score: 46,
+        },
+        {
+          ranking: 17,
+          score: 43,
+        },
+        {
+          ranking: 18,
+          score: 40,
+        },
+        {
+          ranking: 19,
+          score: 38,
+        },
+        {
+          ranking: 20,
+          score: 36,
+        },
+        {
+          ranking: 21,
+          score: 34,
+        },
+        {
+          ranking: 22,
+          score: 32,
+        },
+        {
+          ranking: 23,
+          score: 30,
+        },
+        {
+          ranking: 24,
+          score: 28,
+        },
+        {
+          ranking: 25,
+          score: 26,
+        },
+        {
+          ranking: 26,
+          score: 24,
+        },
+        {
+          ranking: 27,
+          score: 22,
+        },
+        {
+          ranking: 28,
+          score: 20,
+        },
+        {
+          ranking: 29,
+          score: 18,
+        },
+        {
+          ranking: 30,
+          score: 16,
+        },
+        {
+          ranking: 31,
+          score: 14,
+        },
+        {
+          ranking: 32,
+          score: 12,
+        },
+      ],
     };
   },
 };
@@ -191,7 +322,7 @@ export default {
 
 <style scoped>
 /* Add your custom CSS styles here */
-p{
+p {
   font-size: 12px;
 }
 </style>

@@ -6,7 +6,7 @@
       :enable-download="false"
       :preview-modal="true"
       :paginate-elements-by-height="500000"
-      :filename="tes"
+      filename="tes"
       :manual-pagination="false"
       :pdf-margin="1"
       :pdf-quality="2"
@@ -18,7 +18,7 @@
     >
       <section slot="pdf-content">
         <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult :data="dataEvent" :dataParticipant="participant" />
+        <sprintResult :data="dataEvent" :dataParticipant="participant.length == 0 ? [] : participant" />
       </section>
     </vue-html2pdf>
 
@@ -240,6 +240,7 @@
               <div class="card">
                 <div class="card-body">
                   <h4>List Result</h4>
+                  <p>{{ this.participant[0].result }}</p>
                   <button
                     id="btnCheckPen"
                     type="button"
@@ -249,7 +250,7 @@
                     <Icon icon="iconamoon:flag-fill" />
                     Penalty Confirm
                   </button>
-                  <button
+                  <!-- <button
                     id="btnCheckPen"
                     type="button"
                     class="btn btn-danger"
@@ -257,7 +258,7 @@
                   >
                     <Icon icon="iconamoon:flag-fill" />
                     Reset Race
-                  </button>
+                  </button> -->
                   <b-row>
                     <b-col>
                       <table class="table">
@@ -287,7 +288,7 @@
                             <td>{{ item.result.raceTime }}</td>
                             <td>
                               <b-select
-                                :disabled="item.result.raceTime"
+                                v-if="item.result.startTime != ''"
                                 v-model="item.result.penalty"
                                 @change="updateTimePen($event, item)"
                               >
@@ -343,32 +344,28 @@
     <br />
     <br />
     <!-- // AREA MODAL  -->
-    <b-modal id="bv-modal-edit-team" hide-footer no-close-on-backdrop centered>
+    <!-- <b-modal id="bv-modal-edit-team" hide-footer no-close-on-backdrop centered>
       <template #modal-title>
         Edit Result - {{ editForm.nameTeam }} Team
       </template>
       <div class="d-block text-left mx-4 my-3">
-        <!-- TEAM NAME  -->
+
         <b-form-group label="Name Team">
           <b-form-input v-model="editForm.nameTeam" disabled></b-form-input>
         </b-form-group>
 
-        <!-- TEAM BIB  -->
         <b-form-group label="BIB Number Team">
           <b-form-input v-model="editForm.bibTeam" disabled></b-form-input>
         </b-form-group>
 
-        <!-- START TIME  -->
         <b-form-group label="Start Time">
           <b-form-input v-model="editForm.result.startTime"></b-form-input>
         </b-form-group>
 
-        <!-- FINISH TIME  -->
         <b-form-group label="Finish Time">
           <b-form-input v-model="editForm.result.finishTime"></b-form-input>
         </b-form-group>
 
-        <!-- PENALTIES  -->
         <b-form-group label="Penalties Team">
           <b-form-input v-model="editForm.result.penalties"></b-form-input>
         </b-form-group>
@@ -383,7 +380,7 @@
           >Save Result by Team</b-button
         >
       </div>
-    </b-modal>
+    </b-modal> -->
     <!-- // AREA MODAL  -->
   </div>
 </template>
@@ -408,86 +405,6 @@ export default {
       isPortConnected: false,
       digitId: [],
       digitTime: [],
-      items: [
-        {
-          id: 0,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "JAWA TENGAH",
-          bibNumber: "01",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-        {
-          id: 1,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "JAWA BARAT",
-          bibNumber: "02",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-        {
-          id: 2,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "BANTEN",
-          bibNumber: "03",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-        {
-          id: 3,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "DKI JAKARTA",
-          bibNumber: "04",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-        {
-          id: 4,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "SULAWESI SELATAN",
-          bibNumber: "05",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-        {
-          id: 5,
-          timeStart: "",
-          timeFinish: "",
-          nameTeam: "SUMATERA SELATAN",
-          bibNumber: "06",
-          raceTime: "",
-          penalties: "0",
-          penaltiesTime: "00:00:00.000",
-          timeResult: "",
-          ranked: null,
-          score: null,
-        },
-      ],
       penTeam: "",
       dataPenalties: [
         {
@@ -644,6 +561,12 @@ export default {
       dataEvent: "",
     };
   },
+  computed:{
+    showButtonApproval(){
+      
+      console.log(this.participant,'COMPUTED')
+    }
+  },
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
     await this.checkValueStorage();
@@ -673,14 +596,9 @@ export default {
       }
     },
     async assignRanks(items) {
-      console.log(items, "<< CEK ITEMS YA");
       const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
-      console.log(itemsWithTimeResult, "<< CEK ITEMS RESULT");
 
       itemsWithTimeResult.sort((a, b) => {
-        console.log(a, "<< AAAAA");
-        console.log(b, "<< BBBBB");
-
         const timeA = this.parsesTime(a.result.totalTime);
         const timeB = this.parsesTime(b.result.totalTime);
         return timeA - timeB;
@@ -688,7 +606,6 @@ export default {
 
       itemsWithTimeResult.forEach((item, index) => {
         item.result.ranked = index + 1;
-        console.log("item", item.id);
       });
     },
     parsesTime(timeStr) {
@@ -699,21 +616,15 @@ export default {
 
     // Fungsi untuk menghitung skor berdasarkan peringkat
     async calculateScore(ranked) {
-      // Mencari data score berdasarkan ranking
       const scoreData = this.dataScore.find((data) => data.ranking === ranked);
-
-      // Jika data ditemukan, maka kembalikan skor dari data tersebut
       if (scoreData) {
         return scoreData.score;
       } else {
-        // Jika data tidak ditemukan, kembalikan 0 atau nilai default yang Anda inginkan
         return 0;
       }
     },
 
     //BATAS TERAKHIR
-
-    // Fungsi untuk mengonversi format waktu "HH:mm:ss.SSS" ke milidetik
     async parseTimeResult(timeResult) {
       const parts = timeResult.split(":");
       const hours = parseInt(parts[0]);
@@ -724,13 +635,24 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    updateTimePen(selectedValue, item) {
+    async updateTimePen(selectedValue, item) {
       const selectedPenaltyData = this.dataPenalties.find(
         (penalty) => penalty.value === selectedValue
       );
       if (selectedPenaltyData) {
         item.result.penaltyTime = selectedPenaltyData.timePen;
+        console.log(item.result.penaltyTime,'<<< CEK DATA PENALTY')
       }
+
+      if (item.result.raceTime && item.result.penaltyTime) {
+          const newTimeResult = await this.tambahWaktu(
+            item.result.raceTime,
+            item.result.penaltyTime
+          );
+          item.result.totalTime = newTimeResult;
+        }
+        this.editResult = true;
+      await this.assignRanks(this.participant);
     },
     async resetRace() {
       this.editResult = false;
@@ -1001,8 +923,10 @@ export default {
       alert("PDF generated successfully!");
     },
     generatePDF() {
-      // this.updateDataforPDF = updatedData
-
+      this.participant.forEach((e) => {
+        console.log(e.result)
+        e.result.score = this.getScoreByRanked(e.result.ranked)
+      })
       this.$refs.html2Pdf.generatePdf();
     },
   },

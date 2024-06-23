@@ -161,6 +161,47 @@
           </div>
         </div>
 
+        <div class="my-4">
+          <div class="text-left" style="display: flex; gap: 1vh">
+            <b-button
+              v-for="category in events.categoriesInitial"
+              :key="category.name"
+              style="border-radius: 20px"
+              :style="{
+                background:
+                  isActivated === category.name ? '#027BFE' : '#C4C4C4',
+              }"
+              @click="loadTeams(category)"
+            >
+              <img
+                v-if="category.name == 'DRR'"
+                src="../../../assets/icons/drr.png"
+                alt="DRR"
+                style="height: 50px; margin-right: 5px"
+              />
+              <img
+                v-if="category.name == 'SPRINT'"
+                src="../../../assets/icons/sprint.png"
+                alt="SPRINT"
+                style="height: 50px; margin-right: 5px"
+              />
+              <img
+                v-if="category.name == 'HEAD2HEAD'"
+                src="../../../assets/icons/h2h.png"
+                alt="HEAD2HEAD"
+                style="height: 50px; margin-right: 5px"
+              />
+              <img
+                v-if="category.name == 'SLALOM'"
+                src="../../../assets/icons/slalom.png"
+                alt="SLALOM"
+                style="height: 50px; margin-right: 5px"
+              />
+              {{ category.name }}
+            </b-button>
+          </div>
+        </div>
+
         <div>
           <teamParticipantVue
             v-if="!nothingR4men"

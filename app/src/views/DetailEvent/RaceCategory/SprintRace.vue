@@ -18,7 +18,11 @@
     >
       <section slot="pdf-content">
         <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult :data="dataEvent" :dataParticipant="participant.length == 0 ? [] : participant" />
+        <sprintResult
+          :data="dataEvent"
+          :dataParticipant="participant.length == 0 ? [] : participant"
+          :categories="titleCategories"
+        />
       </section>
     </vue-html2pdf>
 
@@ -44,6 +48,9 @@
             <h6 style="font-weight: 800; font-style: italic">
               Nomor Lomba : Sprint
             </h6>
+            <h6 style="font-weight: 800; font-style: italic">
+              Categories : {{ titleCategories }}
+            </h6>
             <p style="font-style: italic">
               <span>{{ dataEvent.addressCity }}, </span>
               <span
@@ -68,11 +75,6 @@
                 <Icon icon="icon-park-outline:ranking" />
                 Sort Ranked
               </button>
-
-              <!-- <button type="button" class="btn btn-secondary">
-                <Icon icon="ic:outline-delete-sweep" />
-                Reset
-              </button> -->
 
               <button
                 type="button"
@@ -240,8 +242,7 @@
               <div class="card">
                 <div class="card-body">
                   <h4>List Result</h4>
-                  <p>{{ this.participant[0].result }}</p>
-                  <button
+                  <!-- <button
                     id="btnCheckPen"
                     type="button"
                     class="btn btn-warning mr-4"
@@ -249,7 +250,7 @@
                   >
                     <Icon icon="iconamoon:flag-fill" />
                     Penalty Confirm
-                  </button>
+                  </button> -->
                   <!-- <button
                     id="btnCheckPen"
                     type="button"
@@ -559,13 +560,13 @@ export default {
       isRankedDescending: false,
       participant: {},
       dataEvent: "",
+      titleCategories: "",
     };
   },
-  computed:{
-    showButtonApproval(){
-      
-      console.log(this.participant,'COMPUTED')
-    }
+  computed: {
+    showButtonApproval() {
+      // console.log(this.participant, "COMPUTED");
+    },
   },
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
@@ -576,7 +577,7 @@ export default {
   },
   methods: {
     openModal(datas, division) {
-      console.log(datas);
+      // console.log(datas);
       this.editForm = datas;
       this.$bvModal.show("bv-modal-edit-team");
     },
@@ -584,6 +585,7 @@ export default {
       const dataStorage = localStorage.getItem("participantByCategories");
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = JSON.parse(events);
+      this.titleCategories = localStorage.getItem("currentCategories");
 
       let datas = JSON.parse(dataStorage);
       if (datas) {
@@ -592,7 +594,7 @@ export default {
         });
 
         this.participant = datas;
-        console.log(JSON.stringify(this.participant));
+        // console.log(JSON.stringify(this.participant));
       }
     },
     async assignRanks(items) {
@@ -609,7 +611,7 @@ export default {
       });
     },
     parsesTime(timeStr) {
-      console.log("hkhhkhk", timeStr);
+      // console.log("hkhhkhk", timeStr);
       const [hours, minutes, seconds] = timeStr.split(":").map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
     },
@@ -641,17 +643,17 @@ export default {
       );
       if (selectedPenaltyData) {
         item.result.penaltyTime = selectedPenaltyData.timePen;
-        console.log(item.result.penaltyTime,'<<< CEK DATA PENALTY')
+        // console.log(item.result.penaltyTime, "<<< CEK DATA PENALTY");
       }
 
       if (item.result.raceTime && item.result.penaltyTime) {
-          const newTimeResult = await this.tambahWaktu(
-            item.result.raceTime,
-            item.result.penaltyTime
-          );
-          item.result.totalTime = newTimeResult;
-        }
-        this.editResult = true;
+        const newTimeResult = await this.tambahWaktu(
+          item.result.raceTime,
+          item.result.penaltyTime
+        );
+        item.result.totalTime = newTimeResult;
+      }
+      this.editResult = true;
       await this.assignRanks(this.participant);
     },
     async resetRace() {
@@ -695,7 +697,7 @@ export default {
     async connectPort() {
       if (!this.isPortConnected) {
         let connectCheck = await this.setupSerialListener();
-        console.log(connectCheck, "<< check");
+        // console.log(connectCheck, "<< check");
         this.isPortConnected = true;
         alert("Connected");
       } else {
@@ -723,7 +725,7 @@ export default {
               this.currentPort = ports;
               const selectedPort = ports[5];
 
-              console.log(selectedPort, "<<< SELECT");
+              // console.log(selectedPort, "<<< SELECT");
 
               if (selectedPort && selectedPort.path) {
                 // Open the selected serial port
@@ -774,9 +776,9 @@ export default {
                     );
                   } else {
                     // Kondisi jika digit ke-13 bukan 0 dan juga bukan lebih besar dari 0
-                    console.log(
-                      "Digit ke-13 bukan 0 dan juga bukan lebih besar dari 0."
-                    );
+                    // console.log(
+                    //   "Digit ke-13 bukan 0 dan juga bukan lebih besar dari 0."
+                    // );
                   }
                   return true;
                 });
@@ -795,7 +797,7 @@ export default {
       }
     },
     formatTime(inputTime) {
-      console.log(inputTime, "<< cek");
+      // console.log(inputTime, "<< cek");
       const hours = inputTime.substr(0, 2);
       const minutes = inputTime.substr(2, 2);
       const seconds = inputTime.substr(4, 2);
@@ -807,7 +809,7 @@ export default {
       return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
     },
     async updateTime(val, id, title) {
-      console.log(val, id);
+      // console.log(val, id);
       if (title == "start") {
         this.participant[id].result.startTime = val;
       }
@@ -917,16 +919,16 @@ export default {
       }
     },
     onProgress(event) {
-      console.log(`Processed: ${event} / 100`);
+      // console.log(`Processed: ${event} / 100`);
     },
     hasGenerated() {
       alert("PDF generated successfully!");
     },
     generatePDF() {
       this.participant.forEach((e) => {
-        console.log(e.result)
-        e.result.score = this.getScoreByRanked(e.result.ranked)
-      })
+        // console.log(e.result);
+        e.result.score = this.getScoreByRanked(e.result.ranked);
+      });
       this.$refs.html2Pdf.generatePdf();
     },
   },

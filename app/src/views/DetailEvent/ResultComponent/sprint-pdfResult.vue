@@ -14,8 +14,7 @@
         ><span style="background-color: #99cc00; color: #ffffff"
           >SCORE BOARD&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
           &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;OPEN
-          WOMEN</span
+          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{{ categories }}</span
         ></strong
       >
     </p>
@@ -116,6 +115,7 @@ export default {
   props: {
     data: Object,
     dataParticipant: Object,
+    categories: String
   },
   data() {
     return {

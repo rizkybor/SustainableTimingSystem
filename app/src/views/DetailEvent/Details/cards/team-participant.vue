@@ -7,7 +7,7 @@
             <p class="h5 font-weight-bold">{{ teamTitle }}</p>
           </div>
           <b-button
-            @click="goTo(categories, teams)"
+            @click="goTo(categories, teams, teamTitle)"
             style="border-radius: 20px"
             class="btn-md"
             variant="primary"
@@ -108,7 +108,7 @@ export default {
         return e.praStart && e.intervalRace;
       });
     },
-    goTo(val, payload) {
+    goTo(val, payload, teamTitle) {
       let formValid = this.validateForm();
       if (formValid) {
         val =
@@ -122,11 +122,9 @@ export default {
             ? "head2head-race"
             : val;
 
-        console.log(JSON.stringify(this.teams));
-        console.log(val, "<< cek val");
-
         const obj = JSON.stringify(this.teams);
         localStorage.setItem("participantByCategories", obj);
+        localStorage.setItem("currentCategories", teamTitle);
         this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
       } else {
         ipcRenderer.send("get-alert", {

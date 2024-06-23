@@ -46,7 +46,7 @@
                   </div>
                 </div>
               </div>
-              <p>{{ team }}</p>
+              <!-- <p>{{ team }}</p> -->
 
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
@@ -58,7 +58,7 @@
                       background:
                         isActivated === category.name ? '#027BFE' : '#C4C4C4',
                     }"
-                    @click="loadTeams(category)"
+                    @click="getEvent(category)"
                   >
                     <img
                       v-if="category.name == 'DRR'"
@@ -88,47 +88,79 @@
                   </b-button>
                 </div>
               </div>
-              <!-- {{ formEvent }} -->
+
+              <div class="my-4" v-if="eventActive.show">
+                <div class="text-left" style="display: flex; gap: 1vh">
+                  <b-button
+                    v-for="category in formEvent.categoriesInitial"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedInitial === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getInitial(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
+
+              <div class="my-4" v-if="eventActive.show && initialActive.show">
+                <div class="text-left" style="display: flex; gap: 1vh">
+                  <b-button
+                    v-for="category in formEvent.categoriesRace"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedRace === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getRace(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
+
+              <div
+                class="my-4"
+                v-if="eventActive.show && initialActive.show && raceActive.show"
+              >
+                <div class="text-left" style="display: flex; gap: 1vh">
+                  <b-button
+                    v-for="category in formEvent.categoriesDivision"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedDivision === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getDivision(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
               <div v-if="showEmptyCards">
                 <cardEmptyVue />
               </div>
               <div v-else>
-                <cardTeamVue
-                  v-if="team.R4men"
-                  :teamTitle="'R4 - MEN'"
-                  :teams="teamsR4men"
+                <table-team-vue
+                  :teamTitle="titleTeams"
+                  :data="dataTeams"
+                  :filterEvent="eventActive.selected"
+                  :filterInitial="initialActive.selected"
+                  :filterRace="raceActive.selected"
+                  :filterDivision="divisionActive.selected"
                   :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant, 'R4men')"
-                />
-
-                <br />
-
-                <cardTeamVue
-                  v-if="team.R4women"
-                  :teamTitle="'R4 - WOMEN'"
-                  :teams="teamsR4women"
-                  :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant, 'R4women')"
-                />
-
-                <br />
-
-                <cardTeamVue
-                  v-if="team.R6men"
-                  :teamTitle="'R6 - MEN'"
-                  :teams="teamsR6men"
-                  :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant, 'R6men')"
-                />
-
-                <br />
-
-                <cardTeamVue
-                  v-if="team.R6women"
-                  :teamTitle="'R6 - WOMEN'"
-                  :teams="teamsR6women"
-                  :fields="headersTable"
-                  @open-modal="openModal(formEvent.participant, 'R6women')"
+                  @open-modal="openModal(formEvent.participant)"
                 />
               </div>
             </b-col>
@@ -200,6 +232,7 @@
 import Multiselect from "vue-multiselect";
 import cardEmptyVue from "../../../components/cards/card-empty.vue";
 import cardTeamVue from "../../../components/cards/card-team.vue";
+import tableTeamVue from "../../../components/cards/table-team.vue";
 import { ipcRenderer } from "electron";
 
 export default {
@@ -211,59 +244,51 @@ export default {
     Multiselect,
     cardTeamVue,
     cardEmptyVue,
+    tableTeamVue,
   },
   data() {
     return {
-      modalRaceCategories: "",
-      modalDivision: "",
-      modalDatas: [],
       showEmptyCards: true,
-      headersTable: ["No", "nameTeam", "bibTeam", "Action"],
-      optionCategories: [],
+      headersTable: [
+        { key: "no", label: "No" },
+        { key: "nameTeam", label: "Team Name" },
+        { key: "bibTeam", label: "Bib Number" },
+        { key: "Action" },
+      ],
       formModal: {
         nameTeam: "",
         bibTeam: "",
       },
-      team: {
-        R4men: false,
-        R4women: false,
-        R6men: false,
-        R6women: false,
-      },
       isActivated: "",
-      indexCategories: 0,
       formEvent: {},
       showCategoriesSprint: false,
       showCategoriesHead2Head: false,
       showCategoriesSlalom: false,
       showCategoriesDRR: false,
+      eventActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      initialActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      raceActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      divisionActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      dataTeams: [],
+      titleTeams: "",
+      filteredIndex: "",
     };
-  },
-  computed: {
-    teamsR4men() {
-      return this.formEvent.participant.find(
-        (item) =>
-          item.divisiType === "R4men" && item.categories === this.isActivated
-      ).teams;
-    },
-    teamsR4women() {
-      return this.formEvent.participant.find(
-        (item) =>
-          item.divisiType === "R4women" && item.categories === this.isActivated
-      ).teams;
-    },
-    teamsR6men() {
-      return this.formEvent.participant.find(
-        (item) =>
-          item.divisiType === "R6men" && item.categories === this.isActivated
-      ).teams;
-    },
-    teamsR6women() {
-      return this.formEvent.participant.find(
-        (item) =>
-          item.divisiType === "R6women" && item.categories === this.isActivated
-      ).teams;
-    },
   },
   async mounted() {
     if (this.open) {
@@ -272,105 +297,74 @@ export default {
     this.isActivated == "" ? "DRR" : "";
   },
   methods: {
-    generateDivisiTypes(cat, gen) {
-      const divisiTypes = [];
-      cat.forEach((category) => {
-        gen.forEach((gender) => {
-          const divisiType = category.name + gender.name.toLowerCase();
-          divisiTypes.push(divisiType);
-        });
-      });
-      return divisiTypes;
-    },
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("formNewEvent");
       const datas = JSON.parse(dataStorage);
       if (datas) {
         this.formEvent = datas;
       }
-
-      // Definisikan kategori baru
-      const newCategories = ["SPRINT", "SLALOM", "HEAD2HEAD", "DRR"];
-      const divisiTypes = await this.generateDivisiTypes(
-        this.formEvent.categoriesDivision,
-        this.formEvent.categoriesRace
-      );
-
-      newCategories.forEach((category) => {
-        // Periksa apakah kategori baru tersebut ada dalam data
-        const categoryData = datas.categoriesEvent.find(
-          (e) => e.name === category
-        );
-        if (categoryData) {
-          // Jika ada, tampilkan kategori tersebut
-          if (category === "SPRINT") {
-            this.showCategoriesSprint = true;
-          } else if (category === "DRR") {
-            this.showCategoriesDRR = true;
-          } else if (category === "HEAD2HEAD") {
-            this.showCategoriesHead2Head = true;
-          } else if (category === "SLALOM") {
-            this.showCategoriesSlalom = true;
-          }
-          // Buat array baru untuk setiap divisi dengan kategori baru
-          divisiTypes.forEach((e) => {
-            if (e == "R4men") {
-              this.team.R4men = true;
-            }
-            if (e == "R4women") {
-              this.team.R4women = true;
-            }
-            if (e == "R6men") {
-              this.team.R6men = true;
-            }
-            if (e == "R6women") {
-              this.team.R6women = true;
-            }
-          });
-          const result = divisiTypes.map((divisiType) => ({
-            categories: category,
-            divisiType: divisiType,
-            statusRaceId: 0,
-            teams: [],
-          }));
-
-          // Tambahkan array hasil ke formEvent.participant
-          this.formEvent.participant.push(...result);
-        }
-      });
     },
-    loadTeams(payload) {
-      this.showEmptyCards = false;
-      let ev = this.formEvent.participant;
+    getEvent(payload) {
+      this.isActivatedInitial = "";
+      this.showEmptyCards = true;
+      this.raceActive.show = false;
+      this.initialActive.show = false;
 
-      this.isActivated = payload.name; //get current name categories
-
-      for (const obj of ev) {
-        for (const [key, value] of Object.entries(obj)) {
-          if (key === payload.name.toLowerCase()) {
-            // R4 Men
-            value[0].details[0].teams;
-
-            // R4 Women
-            value[0].details[1].teams;
-
-            // R6 Men
-            value[1].details[0].teams;
-
-            // R6 Women
-            value[1].details[1].teams;
-          }
-        }
+      this.eventActive.show = !this.eventActive.show;
+      if (this.eventActive.show) {
+        this.eventActive.selected = payload;
+        this.isActivated = payload.name;
+      } else {
+        this.eventActive.selected = {};
+        this.isActivated = "";
       }
+    },
+    getInitial(payload) {
+      this.isActivatedRace = "";
+      this.showEmptyCards = true;
+      this.raceActive.show = false;
+
+      this.initialActive.show = !this.initialActive.show;
+      if (this.initialActive.show) {
+        this.initialActive.selected = payload;
+        this.isActivatedInitial = payload.name;
+      } else {
+        this.initialActive.selected = {};
+        this.isActivatedInitial = "";
+      }
+    },
+    getRace(payload) {
+      this.isActivatedDivision = "";
+      this.showEmptyCards = true;
+      this.divisionActive.show = false;
+
+      this.raceActive.show = !this.raceActive.show;
+      if (this.raceActive.show) {
+        this.raceActive.selected = payload;
+        this.isActivatedRace = payload.name;
+      } else {
+        this.raceActive.selected = {};
+        this.isActivatedRace = "";
+      }
+    },
+    getDivision(payload) {
+      this.divisionActive.show = !this.divisionActive.show;
+      if (this.divisionActive.show) {
+        this.divisionActive.selected = payload;
+        this.isActivatedDivision = payload.name;
+        this.titleTeams = this.divisionActive.selected.name;
+      } else {
+        this.divisionActive.selected = {};
+        this.isActivatedDivision = "";
+      }
+      this.showEmptyCards = !this.showEmptyCards;
     },
     goTo() {
       this.$emit("backForm");
     },
-    openModal(datas, division) {
+    openModal() {
       this.formModal.nameTeam = "";
       this.formModal.bibTeam = "";
-      this.modalDivision = division;
-      this.modalDatas = datas;
       this.$bvModal.show("bv-modal-add-team");
     },
     validateForm() {
@@ -450,29 +444,62 @@ export default {
               totalTime: "",
               ranked: "",
               score: "",
-              bracket: 16
-            }
+              bracket: 16,
+            },
           ],
         };
 
-        // Mencari objek yang memiliki divisiType yang sama dengan this.modalDivision
-        const matchingData = this.modalDatas.find(
-          (data) =>
-            data.divisiType === this.modalDivision &&
-            data.categories == this.isActivated
-        );
+        const existingTeam = this.dataTeams.find((team) => {
+          return (
+            team.eventId === this.eventActive.selected.value &&
+            team.initialId === this.initialActive.selected.value &&
+            team.raceId === this.raceActive.selected.value &&
+            team.divisionId === this.divisionActive.selected.value
+          );
+        });
 
-        // Jika ditemukan objek yang sesuai, tambahkan tim baru ke dalam array teams
-        if (matchingData) {
-          if (matchingData.categories == "SLALOM") {
-            matchingData.teams.push(slalomTeams);
-          } else if(matchingData.categories == "HEAD2HEAD"){
-            matchingData.teams.push(head2headTeams);
+        if (existingTeam) {
+          // Add new team to existing object
+          this.filteredIndex = this.dataTeams.findIndex((item) => {
+            return (
+              item.eventId === this.eventActive.selected.value &&
+              item.initialId === this.initialActive.selected.value &&
+              item.raceId === this.raceActive.selected.value &&
+              item.divisionId === this.divisionActive.selected.value
+            );
+          });
+
+          if (this.eventActive.selected.value == "3") {
+            this.dataTeams[this.filteredIndex].teams.push(slalomTeams);
+          } else if (this.eventActive.selected.value == "2") {
+            this.dataTeams[this.filteredIndex].teams.push(head2headTeams);
           } else {
-            matchingData.teams.push(defaultTeams);
+            this.dataTeams[this.filteredIndex].teams.push(defaultTeams);
           }
+        } else {
+          let payload = {
+            eventId: this.eventActive.selected.value,
+            initialId: this.initialActive.selected.value,
+            raceId: this.raceActive.selected.value,
+            divisionId: this.divisionActive.selected.value,
+            eventName: this.eventActive.selected.name,
+            initialName: this.initialActive.selected.name,
+            raceName: this.raceActive.selected.name,
+            divisionName: this.divisionActive.selected.name,
+            teams: [],
+          };
+
+          if (this.eventActive.selected.value == "3") {
+            payload.teams.push(slalomTeams);
+          } else if (this.eventActive.selected.value == "2") {
+            payload.teams.push(head2headTeams);
+          } else {
+            payload.teams.push(defaultTeams);
+          }
+          this.dataTeams.push(payload);
         }
-        this.$bvModal.hide("bv-modal-add-team");
+
+          this.$bvModal.hide("bv-modal-add-team");
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",
@@ -488,6 +515,7 @@ export default {
       const saveValid = this.validateSave();
       if (saveValid) {
         let payload = this.formEvent;
+        payload.participant = this.dataTeams
         ipcRenderer.send("insert-new-event", payload);
         ipcRenderer.on("insert-new-event-reply", (event, data) => {
           ipcRenderer.send("get-alert-saved", {

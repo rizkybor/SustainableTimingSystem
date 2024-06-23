@@ -171,7 +171,8 @@ export default {
     },
     clickRow(item) {
       //get id hexadecimal
-      const idHex = Array.from(item._id.id).map((b) => b.toString(16).padStart(2, "0")).join("");;
+      console.log(item,'<<< cek')
+      const idHex = Array.from(item._id.id).map((b) => b.toString(16).padStart(2, "0")).join("");
       this.$router.push(`/event-detail/${idHex}`);
     },
   },

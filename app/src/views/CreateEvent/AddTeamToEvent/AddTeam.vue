@@ -46,7 +46,6 @@
                   </div>
                 </div>
               </div>
-              <!-- <p>{{ team }}</p> -->
 
               <div class="my-4">
                 <div class="text-left" style="display: flex; gap: 1vh">
@@ -148,6 +147,7 @@
                   </b-button>
                 </div>
               </div>
+
               <div v-if="showEmptyCards">
                 <cardEmptyVue />
               </div>
@@ -231,7 +231,6 @@
 <script>
 import Multiselect from "vue-multiselect";
 import cardEmptyVue from "../../../components/cards/card-empty.vue";
-import cardTeamVue from "../../../components/cards/card-team.vue";
 import tableTeamVue from "../../../components/cards/table-team.vue";
 import { ipcRenderer } from "electron";
 
@@ -242,7 +241,6 @@ export default {
   },
   components: {
     Multiselect,
-    cardTeamVue,
     cardEmptyVue,
     tableTeamVue,
   },

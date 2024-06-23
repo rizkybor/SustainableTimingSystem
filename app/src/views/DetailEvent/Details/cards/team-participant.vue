@@ -7,7 +7,7 @@
             <p class="h5 font-weight-bold">{{ teamTitle }}</p>
           </div>
           <b-button
-            @click="goTo(categories, teams, teamTitle)"
+            @click="goTo(categories, data, teamTitle)"
             style="border-radius: 20px"
             class="btn-md"
             variant="primary"
@@ -18,7 +18,7 @@
         </div>
       </template>
 
-      <template v-for="(team, index) in teams">
+      <template v-for="(team, index) in dataTable">
         <b-table
         fixed
           hover
@@ -92,19 +92,38 @@ export default {
   name: "SustainableTimingSystemRaftingSprintGameTable",
   props: {
     teamTitle: String,
-    teams: Array,
+    data: Array,
     fields: Array,
-    categories: String,
+    filterEvent: Object,
+    filterInitial: Object,
+    filterRace: Object,
+    filterDivision: Object,
   },
   data() {
-    return {};
+    return {
+      dataTable: []
+    };
   },
 
-  mounted() {},
+  mounted() {
+    this.comparison()
+  },
 
   methods: {
+    comparison() {
+      const teams = this.data.find((item) => {
+        return (
+          item.eventId === this.filterEvent.value &&
+          item.initialId === this.filterInitial.value &&
+          item.raceId === this.filterRace.value &&
+          item.divisionId === this.filterDivision.value
+        );
+      }).teams;
+      console.log(teams,'<< cek')
+      this.dataTable = teams;
+    },
     validateForm() {
-      return this.teams.every((e) => {
+      return this.data.every((e) => {
         return e.praStart && e.intervalRace;
       });
     },
@@ -122,7 +141,7 @@ export default {
             ? "head2head-race"
             : val;
 
-        const obj = JSON.stringify(this.teams);
+        const obj = JSON.stringify(this.data);
         localStorage.setItem("participantByCategories", obj);
         localStorage.setItem("currentCategories", teamTitle);
         this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);

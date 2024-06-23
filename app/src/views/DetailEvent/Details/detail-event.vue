@@ -1,31 +1,4 @@
 <template>
-  <!-- <div class="mt-10">
-    <p>Event Details {{ this.$route.path }}</p>
-    <b-button @click="back('/')" variant="primary">
-      <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
-    >
-
-    <b-row>
-      <b-col>
-        <b-button @click="goTo('sprint-race')" variant="primary">
-          <Icon icon="ic:baseline-add-circle" />
-          BY PASS SPRINT RACE</b-button
-        >
-
-        <br />
-
-        <br />
-        <br />
-
-        <b-button @click="goTo('slalom-race')" variant="warning">
-          <Icon icon="ic:baseline-add-circle" />
-          BY PASS Slalom RACE</b-button
-        >
-        <br />
-        <br />
-      </b-col>
-    </b-row>
-  </div> -->
   <div class="m-4">
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
@@ -130,7 +103,7 @@
                 background:
                   isActivated === category.name ? '#027BFE' : '#C4C4C4',
               }"
-              @click="loadTeams(category)"
+              @click="getEvent(category)"
             >
               <img
                 v-if="category.name == 'DRR'"
@@ -161,7 +134,7 @@
           </div>
         </div>
 
-        <div class="my-4">
+        <div class="my-4" v-if="eventActive.show">
           <div class="text-left" style="display: flex; gap: 1vh">
             <b-button
               v-for="category in events.categoriesInitial"
@@ -169,56 +142,85 @@
               style="border-radius: 20px"
               :style="{
                 background:
-                  isActivated === category.name ? '#027BFE' : '#C4C4C4',
+                  isActivatedInitial === category.name ? '#027BFE' : '#C4C4C4',
               }"
-              @click="loadTeams(category)"
+              @click="getInitial(category)"
             >
-              <img
-                v-if="category.name == 'DRR'"
-                src="../../../assets/icons/drr.png"
-                alt="DRR"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'SPRINT'"
-                src="../../../assets/icons/sprint.png"
-                alt="SPRINT"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'HEAD2HEAD'"
-                src="../../../assets/icons/h2h.png"
-                alt="HEAD2HEAD"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'SLALOM'"
-                src="../../../assets/icons/slalom.png"
-                alt="SLALOM"
-                style="height: 50px; margin-right: 5px"
-              />
               {{ category.name }}
             </b-button>
           </div>
         </div>
 
-        <div>
+        <div class="my-4" v-if="eventActive.show && initialActive.show">
+          <div class="text-left" style="display: flex; gap: 1vh">
+            <b-button
+              v-for="category in events.categoriesRace"
+              :key="category.name"
+              style="border-radius: 20px"
+              :style="{
+                background:
+                  isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
+              }"
+              @click="getRace(category)"
+            >
+              {{ category.name }}
+            </b-button>
+          </div>
+        </div>
+
+        <div
+          class="my-4"
+          v-if="eventActive.show && initialActive.show && raceActive.show"
+        >
+          <div class="text-left" style="display: flex; gap: 1vh">
+            <b-button
+              v-for="category in events.categoriesDivision"
+              :key="category.name"
+              style="border-radius: 20px"
+              :style="{
+                background:
+                  isActivatedDivision === category.name ? '#027BFE' : '#C4C4C4',
+              }"
+              @click="getDivision(category)"
+            >
+              {{ category.name }}
+            </b-button>
+          </div>
+        </div>
+
+        <div v-if="showEmptyCards">
+          <cardEmptyVue />
+        </div>
+        <div v-else>
+          <teamParticipantVue
+            :teamTitle="titleTeams"
+            :data="dataTeams"
+            :filterEvent="eventActive.selected"
+            :filterInitial="initialActive.selected"
+            :filterRace="raceActive.selected"
+            :filterDivision="divisionActive.selected"
+            :fields="headersTable"
+            @open-modal="openModal(formEvent.participant)"
+          />
+        </div>
+
+        <!-- <div>
           <teamParticipantVue
             v-if="!nothingR4men"
             :teamTitle="'R4 - MEN'"
             :teams="teamsR4men"
             :categories="isActivated"
             :fields="headersTable"
-            @open-modal="openModal(formEvent.participant, 'R4men')"
+            @open-modal="openModal(events.participant, 'R4men')"
           />
-          <br />
-          <teamParticipantVue
+          <br /> -->
+        <!-- <teamParticipantVue
             v-if="!nothingR4women"
             :teamTitle="'R4 - WOMEN'"
             :teams="teamsR4women"
             :categories="isActivated"
             :fields="headersTable"
-            @open-modal="openModal(formEvent.participant, 'R4women')"
+            @open-modal="openModal(events.participant, 'R4women')"
           />
           <br />
           <teamParticipantVue
@@ -227,7 +229,7 @@
             :teams="teamsR6men"
             :categories="isActivated"
             :fields="headersTable"
-            @open-modal="openModal(formEvent.participant, 'R6men')"
+            @open-modal="openModal(events.participant, 'R6men')"
           />
           <br />
           <teamParticipantVue
@@ -236,10 +238,10 @@
             :teams="teamsR6women"
             :categories="isActivated"
             :fields="headersTable"
-            @open-modal="openModal(formEvent.participant, 'R6women')"
-          />
-          <!-- TABLE  -->
-        </div>
+            @open-modal="openModal(events.participant, 'R6women')"
+          /> -->
+        <!-- TABLE  -->
+        <!-- </div> -->
       </b-col>
     </b-row>
     <br />
@@ -250,116 +252,203 @@
 <script>
 import { ipcRenderer } from "electron";
 import teamParticipantVue from "./cards/team-participant.vue";
+import cardEmptyVue from "@/components/cards/card-empty.vue";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
   components: {
     teamParticipantVue,
+    cardEmptyVue,
   },
   data() {
     return {
+      showEmptyCards: true,
       loading: false,
       events: {},
       headersTable: [
-      { key: 'No', label: 'NO' },
-      { key: 'nameTeam', label: 'TEAM NAME' },
-      { key: 'bibTeam', label: 'BIB' },
-      { key: 'startingTime', label: 'STARTING TIME' },
-      { key: 'interval', label: 'INTERVAL' },
-      { key: 'Action', label: 'ACTION', class: 'text-right' }
-    ],
+        { key: "No", label: "NO" },
+        { key: "nameTeam", label: "TEAM NAME" },
+        { key: "bibTeam", label: "BIB" },
+        { key: "startingTime", label: "STARTING TIME" },
+        { key: "interval", label: "INTERVAL" },
+        { key: "Action", label: "ACTION", class: "text-right" },
+      ],
       team: {
         R4men: false,
         R4women: false,
         R6men: false,
         R6women: false,
       },
-      isActivated: "SPRINT",
+      isActivated: "",
+      events: {},
       nothingR4men: false,
       nothingR4women: false,
       nothingR6men: false,
       nothingR6women: false,
+      showCategoriesSprint: false,
+      showCategoriesHead2Head: false,
+      showCategoriesSlalom: false,
+      showCategoriesDRR: false,
+      eventActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      initialActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      raceActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      divisionActive: {
+        selected: {},
+        show: false,
+        actived: false,
+      },
+      dataTeams: [],
+      titleTeams: "",
+      filteredIndex: "",
     };
   },
-  computed: {
-    teamsR4men() {
-      const division = this.events.participant.find(
-        (item) => item.divisiType === "R4men"
-      );
-      if (division) {
-        this.nothingR4men = false;
-        return this.events.participant.find(
-          (item) =>
-            item.divisiType === "R4men" && item.categories === this.isActivated
-        ).teams;
-      } else {
-        this.nothingR4men = true;
-        return [];
-      }
-    },
-    teamsR4women() {
-      const division = this.events.participant.find(
-        (item) => item.divisiType === "R4women"
-      );
-      if (division) {
-        this.nothingR4women = false;
-        return this.events.participant.find(
-          (item) =>
-            item.divisiType === "R4women" &&
-            item.categories === this.isActivated
-        ).teams;
-      } else {
-        this.nothingR4women = true;
-        return [];
-      }
-    },
-    teamsR6men() {
-      const division = this.events.participant.find(
-        (item) => item.divisiType === "R6men"
-      );
-      if (division) {
-        this.nothingR6men = false;
-        return this.events.participant.find(
-          (item) =>
-            item.divisiType === "R6men" && item.categories === this.isActivated
-        ).teams;
-      } else {
-        this.nothingR6men = true;
-        return [];
-      }
-    },
-    teamsR6women() {
-      const division = this.events.participant.find(
-        (item) => item.divisiType === "R6women"
-      );
-      if (division) {
-        this.nothingR6women = false;
+  // computed: {
+  //   teamsR4men() {
+  //     const division = this.events.participant.find(
+  //       (item) => item.divisiType === "R4men"
+  //     );
+  //     if (division) {
+  //       this.nothingR4men = false;
+  //       return this.events.participant.find(
+  //         (item) =>
+  //           item.divisiType === "R4men" && item.categories === this.isActivated
+  //       ).teams;
+  //     } else {
+  //       this.nothingR4men = true;
+  //       return [];
+  //     }
+  //   },
+  //   teamsR4women() {
+  //     const division = this.events.participant.find(
+  //       (item) => item.divisiType === "R4women"
+  //     );
+  //     if (division) {
+  //       this.nothingR4women = false;
+  //       return this.events.participant.find(
+  //         (item) =>
+  //           item.divisiType === "R4women" &&
+  //           item.categories === this.isActivated
+  //       ).teams;
+  //     } else {
+  //       this.nothingR4women = true;
+  //       return [];
+  //     }
+  //   },
+  //   teamsR6men() {
+  //     const division = this.events.participant.find(
+  //       (item) => item.divisiType === "R6men"
+  //     );
+  //     if (division) {
+  //       this.nothingR6men = false;
+  //       return this.events.participant.find(
+  //         (item) =>
+  //           item.divisiType === "R6men" && item.categories === this.isActivated
+  //       ).teams;
+  //     } else {
+  //       this.nothingR6men = true;
+  //       return [];
+  //     }
+  //   },
+  //   teamsR6women() {
+  //     const division = this.events.participant.find(
+  //       (item) => item.divisiType === "R6women"
+  //     );
+  //     if (division) {
+  //       this.nothingR6women = false;
 
-        return this.events.participant.find(
-          (item) =>
-            item.divisiType === "R6women" &&
-            item.categories === this.isActivated
-        ).teams;
-      } else {
-        this.nothingR6women = true;
-        return [];
-      }
-    },
-  },
+  //       return this.events.participant.find(
+  //         (item) =>
+  //           item.divisiType === "R6women" &&
+  //           item.categories === this.isActivated
+  //       ).teams;
+  //     } else {
+  //       this.nothingR6women = true;
+  //       return [];
+  //     }
+  //   },
+  // },
 
   async created() {
     const eventId = this.$route.params.id;
     await this.loadData(eventId);
   },
   methods: {
+    getEvent(payload) {
+      this.isActivatedInitial = "";
+      this.showEmptyCards = true;
+      this.raceActive.show = false;
+      this.initialActive.show = false;
+
+      this.eventActive.show = !this.eventActive.show;
+      if (this.eventActive.show) {
+        this.eventActive.selected = payload;
+        this.isActivated = payload.name;
+      } else {
+        this.eventActive.selected = {};
+        this.isActivated = "";
+      }
+    },
+    getInitial(payload) {
+      this.isActivatedRace = "";
+      this.showEmptyCards = true;
+      this.raceActive.show = false;
+
+      this.initialActive.show = !this.initialActive.show;
+      if (this.initialActive.show) {
+        this.initialActive.selected = payload;
+        this.isActivatedInitial = payload.name;
+      } else {
+        this.initialActive.selected = {};
+        this.isActivatedInitial = "";
+      }
+    },
+    getRace(payload) {
+      this.isActivatedDivision = "";
+      this.showEmptyCards = true;
+      this.divisionActive.show = false;
+
+      this.raceActive.show = !this.raceActive.show;
+      if (this.raceActive.show) {
+        this.raceActive.selected = payload;
+        this.isActivatedRace = payload.name;
+      } else {
+        this.raceActive.selected = {};
+        this.isActivatedRace = "";
+      }
+    },
+    getDivision(payload) {
+      this.divisionActive.show = !this.divisionActive.show;
+      if (this.divisionActive.show) {
+        this.divisionActive.selected = payload;
+        this.isActivatedDivision = payload.name;
+        this.titleTeams = this.divisionActive.selected.name;
+      } else {
+        this.divisionActive.selected = {};
+        this.isActivatedDivision = "";
+      }
+      this.showEmptyCards = !this.showEmptyCards;
+    },
     async loadData(payload) {
       this.loading = true;
-
       await setTimeout(() => {
         ipcRenderer.send("get-events-byid", payload);
         ipcRenderer.on("get-events-byid-reply", (event, data) => {
           if (data) {
             this.events = data;
+            console.log(this.events)
+            this.dataTeams = this.events.participant
             localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");
@@ -367,29 +456,6 @@ export default {
           this.loading = false;
         });
       }, 1000);
-    },
-    loadTeams(payload) {
-      this.showEmptyCards = false;
-      let ev = this.events.participant;
-      this.isActivated = payload.name; //get current name categories
-
-      for (const obj of ev) {
-        for (const [key, value] of Object.entries(obj)) {
-          if (key === payload.name.toLowerCase()) {
-            // R4 Men
-            value[0].details[0].teams;
-
-            // R4 Women
-            value[0].details[1].teams;
-
-            // R6 Men
-            value[1].details[0].teams;
-
-            // R6 Women
-            value[1].details[1].teams;
-          }
-        }
-      }
     },
     goTo(val) {
       this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);

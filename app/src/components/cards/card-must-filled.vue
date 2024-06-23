@@ -4,7 +4,7 @@
         <template #header>
           <div style="display: flex; justify-content: space-between">
             <div class="mx-2 mt-3">
-              <p class="h5 font-weight-bold">{{ teamTitle }}</p>
+              <p class="h5 font-weight-bold">Information</p>
             </div>
           </div>
         </template>

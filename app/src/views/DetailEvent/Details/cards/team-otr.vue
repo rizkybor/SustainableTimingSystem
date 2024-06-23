@@ -17,13 +17,12 @@
               {{ categories }}
             </b-button> -->
             <b-button
-              @click="goTo(categories, data, teamTitle)"
+              @click="goTo('OTR', data, teamTitle)"
               style="border-radius: 20px"
               class="btn-md"
-              variant="primary"
+              variant="warning"
             >
               <Icon icon="game-icons:checkered-flag" /> Start Timing
-              {{ categories }}
             </b-button>
           </div>
           </div>
@@ -105,7 +104,6 @@
       teamTitle: String,
       data: Array,
       fields: Array,
-      filterEvent: Object,
       filterInitial: Object,
       filterRace: Object,
       filterDivision: Object,
@@ -124,13 +122,11 @@
       comparison() {
         const teams = this.data.find((item) => {
           return (
-            item.eventId === this.filterEvent.value &&
             item.initialId === this.filterInitial.value &&
             item.raceId === this.filterRace.value &&
             item.divisionId === this.filterDivision.value
           );
         }).teams;
-        console.log(teams,'<< cek')
         this.dataTable = teams;
       },
       validateForm() {

@@ -73,7 +73,14 @@
                     <label class="mr-3">Start Date Event </label>
                   </b-col>
                   <b-col>
-                    <p>: {{ formatDate(events.startDateEvent) }}</p>
+                    <p>
+                      :
+                      {{
+                        events.startDateEvent
+                          ? formatDate(events.startDateEvent)
+                          : "-"
+                      }}
+                    </p>
                   </b-col>
                 </div>
               </b-col>
@@ -83,7 +90,14 @@
                     <label class="mr-3">End Date Event </label>
                   </b-col>
                   <b-col>
-                    <p>: {{ formatDate(events.endDateEvent) }}</p>
+                    <p>
+                      :
+                      {{
+                        events.endDateEvent
+                          ? formatDate(events.endDateEvent)
+                          : "-"
+                      }}
+                    </p>
                   </b-col>
                 </div>
               </b-col>
@@ -93,39 +107,38 @@
         <br />
         <br />
         <div class="my-4">
-          <div class="text-left" style="display: flex; gap: 1vh">
-            <!-- <b-button
-              @click="
-                () => {
-                  this.otr = true;
-                }
-              "
+          <div
+            class="text-left"
+            style="display: flex; gap: 1vh; justify-content: center"
+          >
+            <b-button
+              @click="changeRaceGame()"
               style="border-radius: 20px"
               class="btn-md mr-2"
               variant="warning"
             >
               <Icon icon="game-icons:checkered-flag" /> Official Training Run
-              {{ categories }}
-            </b-button> -->
+            </b-button>
             <b-button
-              @click="
-                () => {
-                  this.otr = false;
-                }
-              "
+              @click="changeRaceGame()"
               style="border-radius: 20px"
               class="btn-md mr-2"
               variant="primary"
             >
               <Icon icon="game-icons:checkered-flag" /> Race Game
-              {{ categories }}
             </b-button>
           </div>
         </div>
 
         <div v-if="!otr">
           <div class="my-4">
-            <div class="text-left" style="display: flex; gap: 1vh">
+            <div style="display: flex; gap: 1vh; justify-content: center">
+              <label>Event Model :</label>
+            </div>
+            <div
+              class="text-left"
+              style="display: flex; gap: 1vh; justify-content: center"
+            >
               <b-button
                 v-for="category in events.categoriesEvent"
                 :key="category.name"
@@ -165,61 +178,87 @@
             </div>
           </div>
 
-          <div class="my-4" v-if="eventActive.show">
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesInitial"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedInitial === category.name
-                      ? '#027BFE'
-                      : '#C4C4C4',
-                }"
-                @click="getInitial(category)"
-              >
-                {{ category.name }}
-              </b-button>
+          <div class="row justify-content-md-center">
+            <div class="col-md-auto">
+              <div class="my-4" v-if="eventActive.show">
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Event Initial :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesInitial"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedInitial === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getInitial(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="my-4" v-if="eventActive.show && initialActive.show">
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesRace"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
-                }"
-                @click="getRace(category)"
-              >
-                {{ category.name }}
-              </b-button>
+            <div class="col-md-auto">
+              <div class="my-4" v-if="eventActive.show && initialActive.show">
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Race Categories :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesRace"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedRace === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getRace(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div
-            class="my-4"
-            v-if="eventActive.show && initialActive.show && raceActive.show"
-          >
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesDivision"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedDivision === category.name
-                      ? '#027BFE'
-                      : '#C4C4C4',
-                }"
-                @click="getDivision(category)"
+            <div class="col-md-auto">
+              <div
+                class="my-4"
+                v-if="eventActive.show && initialActive.show && raceActive.show"
               >
-                {{ category.name }}
-              </b-button>
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Type Race :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesDivision"
+                    :key="category.name"
+                    style="border-radius: 20px"
+                    :style="{
+                      background:
+                        isActivatedDivision === category.name
+                          ? '#027BFE'
+                          : '#C4C4C4',
+                    }"
+                    @click="getDivision(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -240,78 +279,110 @@
           </div>
         </div>
 
-        <!-- <div v-if="otr"> -->
-          <!-- <div class="my-4">
-            <div class="text-left" style="display: flex; gap: 1vh">
+        <div v-if="otr">
+          <div class="my-4">
+            <div style="display: flex; gap: 1vh; justify-content: center">
+              <label>Event Model :</label>
+            </div>
+            <div
+              class="text-left"
+              style="display: flex; gap: 1vh; justify-content: center"
+            >
               <b-button
-                style="border-radius: 20px;  background:#027BFE"
-                @click="getEvent()"
+                style="border-radius: 20px; background: #ffc107; color: black"
+                @click="getEvent({name: 'OTR', value: 0})"
               >
                 <img
                   src="../../../assets/icons/drr.png"
                   alt="DRR"
                   style="height: 50px; margin-right: 5px"
                 />
-                DRR
+                Official Training Run
               </b-button>
             </div>
           </div>
 
-          <div class="my-4" v-if="eventActive.show">
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesInitial"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedInitial === category.name
-                      ? '#027BFE'
-                      : '#C4C4C4',
-                }"
-                @click="getInitial(category)"
-              >
-                {{ category.name }}
-              </b-button>
+          <div class="row justify-content-md-center">
+            <div class="col-md-auto">
+              <div class="my-4" v-if="eventActive.show">
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Event Initial :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesInitial"
+                    :key="category.name"
+                    style="border-radius: 20px; color: black"
+                    :style="{
+                      background:
+                        isActivatedInitial === category.name
+                          ? '#ffc107'
+                          : '#C4C4C4',
+                    }"
+                    @click="getInitial(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="my-4" v-if="eventActive.show && initialActive.show">
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesRace"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
-                }"
-                @click="getRace(category)"
-              >
-                {{ category.name }}
-              </b-button>
+            <div class="col-md-auto">
+              <div class="my-4" v-if="eventActive.show && initialActive.show">
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Race Categories :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesRace"
+                    :key="category.name"
+                    style="border-radius: 20px; color: black"
+                    :style="{
+                      background:
+                        isActivatedRace === category.name
+                          ? '#ffc107'
+                          : '#C4C4C4',
+                    }"
+                    @click="getRace(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div
-            class="my-4"
-            v-if="eventActive.show && initialActive.show && raceActive.show"
-          >
-            <div class="text-left" style="display: flex; gap: 1vh">
-              <b-button
-                v-for="category in events.categoriesDivision"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivatedDivision === category.name
-                      ? '#027BFE'
-                      : '#C4C4C4',
-                }"
-                @click="getDivision(category)"
+            <div class="col-md-auto">
+              <div
+                class="my-4"
+                v-if="eventActive.show && initialActive.show && raceActive.show"
               >
-                {{ category.name }}
-              </b-button>
+                <div style="display: flex; gap: 1vh; justify-content: center">
+                  <label>Type Race :</label>
+                </div>
+                <div
+                  class="text-left"
+                  style="display: flex; gap: 1vh; justify-content: center"
+                >
+                  <b-button
+                    v-for="category in events.categoriesDivision"
+                    :key="category.name"
+                    style="border-radius: 20px; color: black"
+                    :style="{
+                      background:
+                        isActivatedDivision === category.name
+                          ? '#ffc107'
+                          : '#C4C4C4',
+                    }"
+                    @click="getDivision(category)"
+                  >
+                    {{ category.name }}
+                  </b-button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -322,16 +393,14 @@
             <teamOTR
               :teamTitle="titleTeams"
               :data="otrTeams"
-              :filterEvent="eventActive.selected"
               :filterInitial="initialActive.selected"
               :filterRace="raceActive.selected"
               :filterDivision="divisionActive.selected"
               :fields="headersTable"
               @open-modal="openModal(formEvent.participant)"
             />
-          </div> -->
-
-        <!-- </div> -->
+          </div>
+        </div>
       </b-col>
     </b-row>
     <br />
@@ -351,7 +420,7 @@ export default {
   components: {
     teamParticipantVue,
     cardEmptyVue,
-    teamOTR
+    teamOTR,
   },
   data() {
     return {
@@ -405,8 +474,8 @@ export default {
       dataTeams: [],
       otrTeams: [],
       titleTeams: "",
-      filteredIndex: "",
       otr: false,
+      filteredIndex: "",
     };
   },
   async created() {
@@ -414,6 +483,25 @@ export default {
     await this.loadData(eventId);
   },
   methods: {
+    async changeRaceGame() {
+      this.otr = !this.otr
+      this.titleTeams = "";
+      this.eventActive.selected = {};
+      this.eventActive.show = false;
+      this.eventActive.actived = false;
+      this.initialActive.selected = {};
+      this.initialActive.show = false;
+      this.initialActive.actived = false;
+      this.raceActive.selected = {};
+      this.raceActive.show = false;
+      this.raceActive.actived = false;
+      this.divisionActive.selected = {};
+      this.divisionActive.show = false;
+      this.divisionActive.actived = false;
+
+      // const eventId = this.$route.params.id;
+      // await this.loadData(eventId)
+    },
     getEvent(payload) {
       this.isActivatedInitial = "";
       this.showEmptyCards = true;
@@ -458,7 +546,6 @@ export default {
       }
     },
     getDivision(payload) {
-      console.log
       this.divisionActive.show = !this.divisionActive.show;
       if (this.divisionActive.show) {
         this.divisionActive.selected = payload;
@@ -479,7 +566,6 @@ export default {
             this.events = data;
             this.dataTeams = this.events.participant;
             this.otrTeams = this.events.participant;
-            console.log(this.dataTeams,'<< cek')
             localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");

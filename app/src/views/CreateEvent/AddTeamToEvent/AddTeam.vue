@@ -392,6 +392,16 @@ export default {
             ranked: "",
             score: "",
           },
+          otr: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
         };
 
         const slalomTeams = {
@@ -497,7 +507,7 @@ export default {
           this.dataTeams.push(payload);
         }
 
-          this.$bvModal.hide("bv-modal-add-team");
+        this.$bvModal.hide("bv-modal-add-team");
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",
@@ -513,7 +523,7 @@ export default {
       const saveValid = this.validateSave();
       if (saveValid) {
         let payload = this.formEvent;
-        payload.participant = this.dataTeams
+        payload.participant = this.dataTeams;
         ipcRenderer.send("insert-new-event", payload);
         ipcRenderer.on("insert-new-event-reply", (event, data) => {
           ipcRenderer.send("get-alert-saved", {

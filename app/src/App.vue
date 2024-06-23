@@ -33,8 +33,6 @@ export default {
       return !(currentPath.includes("sprint-race") || currentPath.includes("slalom"));
     }
   }
-
-
 };
 
 </script>

@@ -92,156 +92,246 @@
         </div>
         <br />
         <br />
-
         <div class="my-4">
           <div class="text-left" style="display: flex; gap: 1vh">
             <b-button
-              v-for="category in events.categoriesEvent"
-              :key="category.name"
+              @click="
+                () => {
+                  this.otr = true;
+                }
+              "
               style="border-radius: 20px"
-              :style="{
-                background:
-                  isActivated === category.name ? '#027BFE' : '#C4C4C4',
-              }"
-              @click="getEvent(category)"
+              class="btn-md mr-2"
+              variant="warning"
             >
-              <img
-                v-if="category.name == 'DRR'"
-                src="../../../assets/icons/drr.png"
-                alt="DRR"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'SPRINT'"
-                src="../../../assets/icons/sprint.png"
-                alt="SPRINT"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'HEAD2HEAD'"
-                src="../../../assets/icons/h2h.png"
-                alt="HEAD2HEAD"
-                style="height: 50px; margin-right: 5px"
-              />
-              <img
-                v-if="category.name == 'SLALOM'"
-                src="../../../assets/icons/slalom.png"
-                alt="SLALOM"
-                style="height: 50px; margin-right: 5px"
-              />
-              {{ category.name }}
+              <Icon icon="game-icons:checkered-flag" /> Official Training Run
+              {{ categories }}
             </b-button>
-          </div>
-        </div>
-
-        <div class="my-4" v-if="eventActive.show">
-          <div class="text-left" style="display: flex; gap: 1vh">
             <b-button
-              v-for="category in events.categoriesInitial"
-              :key="category.name"
+              @click="
+                () => {
+                  this.otr = false;
+                }
+              "
               style="border-radius: 20px"
-              :style="{
-                background:
-                  isActivatedInitial === category.name ? '#027BFE' : '#C4C4C4',
-              }"
-              @click="getInitial(category)"
+              class="btn-md mr-2"
+              variant="primary"
             >
-              {{ category.name }}
+              <Icon icon="game-icons:checkered-flag" /> Race Game
+              {{ categories }}
             </b-button>
           </div>
         </div>
 
-        <div class="my-4" v-if="eventActive.show && initialActive.show">
-          <div class="text-left" style="display: flex; gap: 1vh">
-            <b-button
-              v-for="category in events.categoriesRace"
-              :key="category.name"
-              style="border-radius: 20px"
-              :style="{
-                background:
-                  isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
-              }"
-              @click="getRace(category)"
-            >
-              {{ category.name }}
-            </b-button>
+        <div v-if="!otr">
+          <div class="my-4">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesEvent"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivated === category.name ? '#027BFE' : '#C4C4C4',
+                }"
+                @click="getEvent(category)"
+              >
+                <img
+                  v-if="category.name == 'DRR'"
+                  src="../../../assets/icons/drr.png"
+                  alt="DRR"
+                  style="height: 50px; margin-right: 5px"
+                />
+                <img
+                  v-if="category.name == 'SPRINT'"
+                  src="../../../assets/icons/sprint.png"
+                  alt="SPRINT"
+                  style="height: 50px; margin-right: 5px"
+                />
+                <img
+                  v-if="category.name == 'HEAD2HEAD'"
+                  src="../../../assets/icons/h2h.png"
+                  alt="HEAD2HEAD"
+                  style="height: 50px; margin-right: 5px"
+                />
+                <img
+                  v-if="category.name == 'SLALOM'"
+                  src="../../../assets/icons/slalom.png"
+                  alt="SLALOM"
+                  style="height: 50px; margin-right: 5px"
+                />
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div class="my-4" v-if="eventActive.show">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesInitial"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedInitial === category.name
+                      ? '#027BFE'
+                      : '#C4C4C4',
+                }"
+                @click="getInitial(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div class="my-4" v-if="eventActive.show && initialActive.show">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesRace"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
+                }"
+                @click="getRace(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div
+            class="my-4"
+            v-if="eventActive.show && initialActive.show && raceActive.show"
+          >
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesDivision"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedDivision === category.name
+                      ? '#027BFE'
+                      : '#C4C4C4',
+                }"
+                @click="getDivision(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div v-if="showEmptyCards">
+            <cardEmptyVue />
+          </div>
+          <div v-else>
+            <teamParticipantVue
+              :teamTitle="titleTeams"
+              :data="dataTeams"
+              :filterEvent="eventActive.selected"
+              :filterInitial="initialActive.selected"
+              :filterRace="raceActive.selected"
+              :filterDivision="divisionActive.selected"
+              :fields="headersTable"
+              @open-modal="openModal(formEvent.participant)"
+            />
           </div>
         </div>
 
-        <div
-          class="my-4"
-          v-if="eventActive.show && initialActive.show && raceActive.show"
-        >
-          <div class="text-left" style="display: flex; gap: 1vh">
-            <b-button
-              v-for="category in events.categoriesDivision"
-              :key="category.name"
-              style="border-radius: 20px"
-              :style="{
-                background:
-                  isActivatedDivision === category.name ? '#027BFE' : '#C4C4C4',
-              }"
-              @click="getDivision(category)"
-            >
-              {{ category.name }}
-            </b-button>
+        <div v-if="otr">
+          <div class="my-4">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                style="border-radius: 20px;  background:#027BFE"
+                @click="getEvent()"
+              >
+                <img
+                  src="../../../assets/icons/drr.png"
+                  alt="DRR"
+                  style="height: 50px; margin-right: 5px"
+                />
+                DRR
+              </b-button>
+            </div>
           </div>
-        </div>
 
-        <div v-if="showEmptyCards">
-          <cardEmptyVue />
-        </div>
-        <div v-else>
-          <teamParticipantVue
-            :teamTitle="titleTeams"
-            :data="dataTeams"
-            :filterEvent="eventActive.selected"
-            :filterInitial="initialActive.selected"
-            :filterRace="raceActive.selected"
-            :filterDivision="divisionActive.selected"
-            :fields="headersTable"
-            @open-modal="openModal(formEvent.participant)"
-          />
-        </div>
+          <div class="my-4" v-if="eventActive.show">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesInitial"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedInitial === category.name
+                      ? '#027BFE'
+                      : '#C4C4C4',
+                }"
+                @click="getInitial(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
 
-        <!-- <div>
-          <teamParticipantVue
-            v-if="!nothingR4men"
-            :teamTitle="'R4 - MEN'"
-            :teams="teamsR4men"
-            :categories="isActivated"
-            :fields="headersTable"
-            @open-modal="openModal(events.participant, 'R4men')"
-          />
-          <br /> -->
-        <!-- <teamParticipantVue
-            v-if="!nothingR4women"
-            :teamTitle="'R4 - WOMEN'"
-            :teams="teamsR4women"
-            :categories="isActivated"
-            :fields="headersTable"
-            @open-modal="openModal(events.participant, 'R4women')"
-          />
-          <br />
-          <teamParticipantVue
-            v-if="!nothingR6men"
-            :teamTitle="'R6 - MEN'"
-            :teams="teamsR6men"
-            :categories="isActivated"
-            :fields="headersTable"
-            @open-modal="openModal(events.participant, 'R6men')"
-          />
-          <br />
-          <teamParticipantVue
-            v-if="!nothingR6women"
-            :teamTitle="'R6 - WOMEN'"
-            :teams="teamsR6women"
-            :categories="isActivated"
-            :fields="headersTable"
-            @open-modal="openModal(events.participant, 'R6women')"
-          /> -->
-        <!-- TABLE  -->
-        <!-- </div> -->
+          <div class="my-4" v-if="eventActive.show && initialActive.show">
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesRace"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedRace === category.name ? '#027BFE' : '#C4C4C4',
+                }"
+                @click="getRace(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div
+            class="my-4"
+            v-if="eventActive.show && initialActive.show && raceActive.show"
+          >
+            <div class="text-left" style="display: flex; gap: 1vh">
+              <b-button
+                v-for="category in events.categoriesDivision"
+                :key="category.name"
+                style="border-radius: 20px"
+                :style="{
+                  background:
+                    isActivatedDivision === category.name
+                      ? '#027BFE'
+                      : '#C4C4C4',
+                }"
+                @click="getDivision(category)"
+              >
+                {{ category.name }}
+              </b-button>
+            </div>
+          </div>
+
+          <div v-if="showEmptyCards">
+            <cardEmptyVue />
+          </div>
+          <div v-else>
+            <teamOTR
+              :teamTitle="titleTeams"
+              :data="otrTeams"
+              :filterEvent="eventActive.selected"
+              :filterInitial="initialActive.selected"
+              :filterRace="raceActive.selected"
+              :filterDivision="divisionActive.selected"
+              :fields="headersTable"
+              @open-modal="openModal(formEvent.participant)"
+            />
+          </div>
+
+        </div>
       </b-col>
     </b-row>
     <br />
@@ -252,13 +342,16 @@
 <script>
 import { ipcRenderer } from "electron";
 import teamParticipantVue from "./cards/team-participant.vue";
-import cardEmptyVue from "@/components/cards/card-empty.vue";
+import teamOTR from "./cards/team-otr.vue";
+
+import cardEmptyVue from "@/components/cards/card-must-filled.vue";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
   components: {
     teamParticipantVue,
     cardEmptyVue,
+    teamOTR
   },
   data() {
     return {
@@ -310,76 +403,12 @@ export default {
         actived: false,
       },
       dataTeams: [],
+      otrTeams: [],
       titleTeams: "",
       filteredIndex: "",
+      otr: false,
     };
   },
-  // computed: {
-  //   teamsR4men() {
-  //     const division = this.events.participant.find(
-  //       (item) => item.divisiType === "R4men"
-  //     );
-  //     if (division) {
-  //       this.nothingR4men = false;
-  //       return this.events.participant.find(
-  //         (item) =>
-  //           item.divisiType === "R4men" && item.categories === this.isActivated
-  //       ).teams;
-  //     } else {
-  //       this.nothingR4men = true;
-  //       return [];
-  //     }
-  //   },
-  //   teamsR4women() {
-  //     const division = this.events.participant.find(
-  //       (item) => item.divisiType === "R4women"
-  //     );
-  //     if (division) {
-  //       this.nothingR4women = false;
-  //       return this.events.participant.find(
-  //         (item) =>
-  //           item.divisiType === "R4women" &&
-  //           item.categories === this.isActivated
-  //       ).teams;
-  //     } else {
-  //       this.nothingR4women = true;
-  //       return [];
-  //     }
-  //   },
-  //   teamsR6men() {
-  //     const division = this.events.participant.find(
-  //       (item) => item.divisiType === "R6men"
-  //     );
-  //     if (division) {
-  //       this.nothingR6men = false;
-  //       return this.events.participant.find(
-  //         (item) =>
-  //           item.divisiType === "R6men" && item.categories === this.isActivated
-  //       ).teams;
-  //     } else {
-  //       this.nothingR6men = true;
-  //       return [];
-  //     }
-  //   },
-  //   teamsR6women() {
-  //     const division = this.events.participant.find(
-  //       (item) => item.divisiType === "R6women"
-  //     );
-  //     if (division) {
-  //       this.nothingR6women = false;
-
-  //       return this.events.participant.find(
-  //         (item) =>
-  //           item.divisiType === "R6women" &&
-  //           item.categories === this.isActivated
-  //       ).teams;
-  //     } else {
-  //       this.nothingR6women = true;
-  //       return [];
-  //     }
-  //   },
-  // },
-
   async created() {
     const eventId = this.$route.params.id;
     await this.loadData(eventId);
@@ -447,8 +476,8 @@ export default {
         ipcRenderer.on("get-events-byid-reply", (event, data) => {
           if (data) {
             this.events = data;
-            console.log(this.events)
-            this.dataTeams = this.events.participant
+            this.dataTeams = this.events.participant;
+            this.otrTeams = this.events.participant;
             localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");

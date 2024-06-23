@@ -6,6 +6,16 @@
           <div class="mx-2 mt-3">
             <p class="h5 font-weight-bold">{{ teamTitle }}</p>
           </div>
+          <div>
+          <!-- <b-button
+            @click="goTo(categories, data, teamTitle)"
+            style="border-radius: 20px"
+            class="btn-md mr-2"
+            variant="warning"
+          >
+            <Icon icon="game-icons:checkered-flag" /> Official Training Run
+            {{ categories }}
+          </b-button> -->
           <b-button
             @click="goTo(categories, data, teamTitle)"
             style="border-radius: 20px"
@@ -15,6 +25,7 @@
             <Icon icon="game-icons:checkered-flag" /> Start Timing
             {{ categories }}
           </b-button>
+        </div>
         </div>
       </template>
 

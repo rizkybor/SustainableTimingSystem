@@ -94,7 +94,7 @@
         <br />
         <div class="my-4">
           <div class="text-left" style="display: flex; gap: 1vh">
-            <b-button
+            <!-- <b-button
               @click="
                 () => {
                   this.otr = true;
@@ -106,7 +106,7 @@
             >
               <Icon icon="game-icons:checkered-flag" /> Official Training Run
               {{ categories }}
-            </b-button>
+            </b-button> -->
             <b-button
               @click="
                 () => {
@@ -240,8 +240,8 @@
           </div>
         </div>
 
-        <div v-if="otr">
-          <div class="my-4">
+        <!-- <div v-if="otr"> -->
+          <!-- <div class="my-4">
             <div class="text-left" style="display: flex; gap: 1vh">
               <b-button
                 style="border-radius: 20px;  background:#027BFE"
@@ -329,9 +329,9 @@
               :fields="headersTable"
               @open-modal="openModal(formEvent.participant)"
             />
-          </div>
+          </div> -->
 
-        </div>
+        <!-- </div> -->
       </b-col>
     </b-row>
     <br />
@@ -458,6 +458,7 @@ export default {
       }
     },
     getDivision(payload) {
+      console.log
       this.divisionActive.show = !this.divisionActive.show;
       if (this.divisionActive.show) {
         this.divisionActive.selected = payload;
@@ -478,6 +479,7 @@ export default {
             this.events = data;
             this.dataTeams = this.events.participant;
             this.otrTeams = this.events.participant;
+            console.log(this.dataTeams,'<< cek')
             localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");

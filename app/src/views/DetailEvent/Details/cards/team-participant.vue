@@ -17,13 +17,13 @@
             {{ categories }}
           </b-button> -->
           <b-button
-            @click="goTo(categories, data, teamTitle)"
+            @click="goTo(filterEvent.name, dataTable, teamTitle)"
             style="border-radius: 20px"
             class="btn-md"
             variant="primary"
           >
             <Icon icon="game-icons:checkered-flag" /> Start Timing
-            {{ categories }}
+            {{ filterEvent.name }}
           </b-button>
         </div>
         </div>
@@ -130,11 +130,10 @@ export default {
           item.divisionId === this.filterDivision.value
         );
       }).teams;
-      console.log(teams,'<< cek')
       this.dataTable = teams;
     },
     validateForm() {
-      return this.data.every((e) => {
+      return this.dataTable.every((e) => {
         return e.praStart && e.intervalRace;
       });
     },
@@ -152,7 +151,7 @@ export default {
             ? "head2head-race"
             : val;
 
-        const obj = JSON.stringify(this.data);
+        const obj = JSON.stringify(payload);
         localStorage.setItem("participantByCategories", obj);
         localStorage.setItem("currentCategories", teamTitle);
         this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);

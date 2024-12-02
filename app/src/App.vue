@@ -15,6 +15,7 @@
   </div>
 </template>
 
+
 <script>
 import FooterVue from "./components/Footer.vue";
 import Navbar from "./components/Navbar.vue";

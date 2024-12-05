@@ -17,7 +17,6 @@
       ref="html2Pdf"
     >
       <section slot="pdf-content">
-        <!-- <ContentToPrint :data="updateDataforPDF" /> -->
         <sprintResult
           :data="dataEvent"
           :dataParticipant="participant.length == 0 ? [] : participant"
@@ -723,9 +722,9 @@ export default {
             // Check if at least one port is available
             if (ports && ports.length > 0) {
               this.currentPort = ports;
-              const selectedPort = ports[5];
+              const selectedPort = ports[6];
 
-              // console.log(selectedPort, "<<< SELECT");
+              console.log(selectedPort, "<<< SELECT");
 
               if (selectedPort && selectedPort.path) {
                 // Open the selected serial port

@@ -545,11 +545,34 @@ export default {
         this.isActivatedRace = "";
       }
     },
-    getDivision(payload) {
+    async getDivision(payload) {
+      let parameter = {
+        eventId: this.events.id,
+        categoryInitialValue: this.initialActive.selected.value,
+        categoryRaceValue: this.raceActive.selected.value,
+        categoryDivisionValue: payload.value,
+      }
+      this.loading = true;
       this.divisionActive.show = !this.divisionActive.show;
       if (this.divisionActive.show) {
         this.divisionActive.selected = payload;
         this.isActivatedDivision = payload.name;
+        setTimeout(() => {
+        ipcRenderer.send("get-participant", parameter);
+        ipcRenderer.on("get-participant-reply", (event, data) => {
+          console.log("Data received from backend:", data);
+          if (data) {
+            this.otrTeams = data
+            // this.events = data;
+            // this.dataTeams = this.events.participant;
+            // this.otrTeams = this.events.participant;
+            // localStorage.setItem("eventDetails", JSON.stringify(data));
+          } else {
+            console.error("Failed to retrieve data from events table");
+          }
+          this.loading = false;
+        });
+      }, 1000);
         this.titleTeams = this.divisionActive.selected.name;
       } else {
         this.divisionActive.selected = {};
@@ -564,8 +587,8 @@ export default {
         ipcRenderer.on("get-events-byid-reply", (event, data) => {
           if (data) {
             this.events = data;
-            this.dataTeams = this.events.participant;
-            this.otrTeams = this.events.participant;
+            // this.dataTeams = this.events.participant;
+            // this.otrTeams = this.events.participant;
             localStorage.setItem("eventDetails", JSON.stringify(data));
           } else {
             console.error("Failed to retrieve data from events table");

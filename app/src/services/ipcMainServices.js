@@ -1,5 +1,6 @@
 const { ipcMain, dialog } = require("electron");
 const { getAllEvents, getEventById } = require("../controllers/GET/getEvent.js");
+const { getParticipant } = require("../controllers/GET/getParticipant.js");
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
@@ -64,6 +65,15 @@ function setupIPCMainHandlers() {
       event.reply("get-events-byid-reply", data);
     } catch (error) {
       event.reply("get-events-byid-reply", []);
+    }
+  });
+
+  ipcMain.on("get-participant", async (event, datas) => {
+    try {
+      const data = await getParticipant(datas);
+      event.reply("get-participant-reply", data);
+    } catch (error) {
+      event.reply("get-participant-reply", []);
     }
   });
 

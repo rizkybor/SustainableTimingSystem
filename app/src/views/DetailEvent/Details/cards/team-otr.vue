@@ -120,14 +120,15 @@
   
     methods: {
       comparison() {
-        const teams = this.data.find((item) => {
-          return (
-            item.initialId === this.filterInitial.value &&
-            item.raceId === this.filterRace.value &&
-            item.divisionId === this.filterDivision.value
-          );
-        }).teams;
-        this.dataTable = teams;
+        console.log(this.data,'<< cek')
+        // const teams = this.data.find((item) => {
+        //   return (
+        //     item.initialId === this.filterInitial.value &&
+        //     item.raceId === this.filterRace.value &&
+        //     item.divisionId === this.filterDivision.value
+        //   );
+        // }).teams;
+        this.dataTable = this.data;
       },
       validateForm() {
         return this.data.every((e) => {
@@ -135,31 +136,32 @@
         });
       },
       goTo(val, payload, teamTitle) {
-        let formValid = this.validateForm();
-        if (formValid) {
-          val =
-            val === "SPRINT"
-              ? "sprint-race"
-              : val == "SLALOM"
-              ? "slalom-race"
-              : val == "DRR"
-              ? "drr-race"
-              : val == "HEAD2HEAD"
-              ? "head2head-race"
-              : val;
+        console.log(val, payload, teamTitle)
+        // let formValid = this.validateForm();
+        // if (formValid) {
+        //   val =
+        //     val === "SPRINT"
+        //       ? "sprint-race"
+        //       : val == "SLALOM"
+        //       ? "slalom-race"
+        //       : val == "DRR"
+        //       ? "drr-race"
+        //       : val == "HEAD2HEAD"
+        //       ? "head2head-race"
+        //       : val;
   
-          const obj = JSON.stringify(this.data);
-          localStorage.setItem("participantByCategories", obj);
-          localStorage.setItem("currentCategories", teamTitle);
-          this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
-        } else {
-          ipcRenderer.send("get-alert", {
-            type: "warning",
-            detail:
-              "Fill in the pre-Start and interval first, before starting the race",
-            message: "Ups Sorry",
-          });
-        }
+        //   const obj = JSON.stringify(this.data);
+        //   localStorage.setItem("participantByCategories", obj);
+        //   localStorage.setItem("currentCategories", teamTitle);
+        //   this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
+        // } else {
+        //   ipcRenderer.send("get-alert", {
+        //     type: "warning",
+        //     detail:
+        //       "Fill in the pre-Start and interval first, before starting the race",
+        //     message: "Ups Sorry",
+        //   });
+        // }
       },
     },
   };

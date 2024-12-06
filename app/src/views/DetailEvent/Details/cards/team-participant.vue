@@ -122,6 +122,10 @@ export default {
 
   methods: {
     comparison() {
+      console.log(this.filterEvent.value,'<< cek')
+      console.log(this.filterInitial.value,'<< cek')
+      console.log(this.filterRace.value,'<< cek')
+      console.log(this.filterDivision.value,'<< cek')
       const teams = this.data.find((item) => {
         return (
           item.eventId === this.filterEvent.value &&
@@ -130,6 +134,8 @@ export default {
           item.divisionId === this.filterDivision.value
         );
       }).teams;
+      console.log(teams,'<< cek')
+
       this.dataTable = teams;
     },
     validateForm() {

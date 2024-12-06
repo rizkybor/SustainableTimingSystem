@@ -267,12 +267,14 @@
                           <tr>
                             <th scope="col">No</th>
                             <th scope="col">Team Name</th>
-                            <th scope="col">BIB Number</th>
+                            <th scope="col">BIBO Number</th>
                             <th scope="col">Start Time</th>
                             <th scope="col">Finish Time</th>
                             <th scope="col">Race Time</th>
                             <th scope="col">Penalties</th>
-                            <th scope="col">Penalty Time</th>
+                            <th scope="col">Penalty Time Start</th>
+                            <th scope="col">Penalty Time Finish</th>
+
                             <th scope="col">Result</th>
                             <th scope="col">Ranked</th>
                             <th scope="col">Score</th>

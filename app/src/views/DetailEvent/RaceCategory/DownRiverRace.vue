@@ -46,7 +46,7 @@
             </h5>
 
             <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : Sprint
+              Nomor Lomba : DRR
             </h6>
             <h6 style="font-weight: 800; font-style: italic">
               Categories : {{ titleCategories }}
@@ -271,10 +271,14 @@
                             <th scope="col">Start Time</th>
                             <th scope="col">Finish Time</th>
                             <th scope="col">Race Time</th>
-                            <th scope="col">Penalties</th>
-                            <th scope="col">Penalty Time Start</th>
-                            <th scope="col">Penalty Time Finish</th>
-
+                            <th scope="col">Pen Start</th>
+                            <th scope="col">PS 1</th>
+                            <th scope="col">PS 2</th>
+                            <th scope="col">PS 3</th>
+                            <th scope="col">PS 4</th>
+                            <th scope="col">PS 5</th>
+                            <th scope="col">Pen Finish</th>
+                            <th scope="col">Pen Total</th>
                             <th scope="col">Result</th>
                             <th scope="col">Ranked</th>
                             <th scope="col">Score</th>
@@ -289,6 +293,8 @@
                             <td>{{ item.result.startTime }}</td>
                             <td>{{ item.result.finishTime }}</td>
                             <td>{{ item.result.raceTime }}</td>
+
+                            <!-- PEN START -->
                             <td>
                               <b-select
                                 v-if="item.result.startTime != ''"
@@ -304,6 +310,108 @@
                                 </option>
                               </b-select>
                             </td>
+                            <!-- PEN 1 -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+
+                            <!-- PS 2 -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+                            
+                            <!-- PS 2 -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+
+                            <!-- PS 3 -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+                            
+                            <!-- PS 4 -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+
+                            <!-- PEN FINISH -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penalty"
+                                @change="updateTimePen($event, item)"
+                              >
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.value"
+                                >
+                                  {{ penalty.value }}
+                                </option>
+                              </b-select>
+                            </td>
+
                             <td>{{ item.result.penaltyTime }}</td>
                             <td>
                               {{
@@ -417,8 +525,8 @@ export default {
         },
         {
           label: "pen 1",
-          value: 5,
-          timePen: "00:00:05.000",
+          value: 10,
+          timePen: "00:00:10.000",
         },
         {
           label: "pen 2",
@@ -586,10 +694,10 @@ export default {
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("participantByCategories");
       const events = localStorage.getItem("eventDetails");
-      console.log(dataStorage,'<< cek storage')
-      console.log('<<<<<<>>>>>>>>>>>>>>>>')
+      console.log(dataStorage, "<< cek storage");
+      console.log("<<<<<<>>>>>>>>>>>>>>>>");
 
-      console.log(events,'<< cek events')
+      console.log(events, "<< cek events");
       this.dataEvent = JSON.parse(events);
       this.titleCategories = localStorage.getItem("currentCategories");
 

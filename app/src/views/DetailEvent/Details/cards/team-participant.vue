@@ -122,10 +122,10 @@ export default {
 
   methods: {
     comparison() {
-      console.log(this.filterEvent.value,'<< cek')
-      console.log(this.filterInitial.value,'<< cek')
-      console.log(this.filterRace.value,'<< cek')
-      console.log(this.filterDivision.value,'<< cek')
+      console.log(this.filterEvent.value,'<< cek event value')
+      console.log(this.filterInitial.value,'<< cek initial value')
+      console.log(this.filterRace.value,'<< cek race value')
+      console.log(this.filterDivision.value,'<< cek division value')
       const teams = this.data.find((item) => {
         return (
           item.eventId === this.filterEvent.value &&

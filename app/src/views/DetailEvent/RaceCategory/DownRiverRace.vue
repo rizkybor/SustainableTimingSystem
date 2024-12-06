@@ -487,12 +487,17 @@ export default {
           timePen: "00:00:00.000",
         },
         {
-          label: "pen 1",
+          label: "+ 10",
           value: 10,
           timePen: "00:00:10.000",
         },
         {
-          label: "pen 2",
+          label: "- 10",
+          value: 999,
+          timePen: "-00:00:10.000",
+        },
+        {
+          label: "+ 50",
           value: 50,
           timePen: "00:00:50.000",
         },
@@ -714,51 +719,55 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(
-      selectedTimePen,
-      item,
-      penaltyType,
-      sectionIndex = null
-    ) {
-      // Update penalti sesuai dengan jenisnya
-      if (penaltyType === "penaltySection" && sectionIndex !== null) {
-        item.result.penaltySection[sectionIndex] = selectedTimePen;
-      } else {
-        item.result[penaltyType] = selectedTimePen;
-      }
+    async updateTimePen(selectedTimePen, item, penaltyType, sectionIndex = null) {
+  console.log("Selected Penalty:", selectedTimePen);
 
-      // Akumulasi semua waktu penalti
-      const penaltyFields = [
-        item.result.penaltyStartTime || "00:00:00.000",
-        item.result.penaltyFinishTime || "00:00:00.000",
-        ...item.result.penaltySection.map((time) => time || "00:00:00.000"),
-      ];
+  // Perbarui penalti sesuai jenisnya
+  if (penaltyType === "penaltySection" && sectionIndex !== null) {
+    item.result.penaltySection[sectionIndex] = selectedTimePen;
+  } else {
+    item.result[penaltyType] = selectedTimePen;
+  }
 
-      // Hitung total waktu penalti
-      const totalPenaltyTime = await penaltyFields.reduce(
-        async (acc, currentTime) => {
-          const accumulatedTime = await acc;
-          return this.tambahWaktu(accumulatedTime, currentTime);
-        },
-        "00:00:00.000"
+  // Awal waktu penalti total
+  let totalPenaltyTime = "00:00:00.000";
+
+  // Iterasi semua penalti yang diterapkan
+  const penaltyFields = [
+    item.result.penaltyStartTime || "00:00:00.000",
+    item.result.penaltyFinishTime || "00:00:00.000",
+    ...item.result.penaltySection.map((time) => time || "00:00:00.000"),
+  ];
+
+  for (const penalty of penaltyFields) {
+    if (penalty === "-00:00:10.000") {
+      // Jika penalti adalah pengurangan waktu
+      totalPenaltyTime = await this.kurangiWaktu(
+        totalPenaltyTime,
+        "00:00:10.000"
       );
+    } else {
+      // Penalti lainnya dianggap penambahan waktu
+      totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, penalty);
+    }
+  }
 
-      // Set total penalti
-      item.result.penaltyTime = totalPenaltyTime;
+  // Perbarui total penalti
+  item.result.penaltyTime = totalPenaltyTime;
 
-      // Jika ada raceTime, hitung totalTime
-      if (item.result.raceTime) {
-        item.result.totalTime = await this.tambahWaktu(
-          item.result.raceTime,
-          totalPenaltyTime
-        );
-      }
+  // Jika ada raceTime, hitung waktu total
+  if (item.result.raceTime) {
+    item.result.totalTime = await this.tambahWaktu(
+      item.result.raceTime,
+      totalPenaltyTime
+    );
+  }
 
-      this.editResult = true;
+  this.editResult = true;
 
-      // Update peringkat setelah penalti dihitung
-      await this.assignRanks(this.participant);
-    },
+  // Perbarui peringkat setelah penalti dihitung
+  await this.assignRanks(this.participant);
+},
 
     async resetRace() {
       this.editResult = false;

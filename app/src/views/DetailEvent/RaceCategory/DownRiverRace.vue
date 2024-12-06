@@ -996,6 +996,39 @@ export default {
 
       return hasilFormat;
     },
+
+    async kurangiWaktu(waktuA, waktuB) {
+      const partsA = waktuA.split(":");
+      const partsB = waktuB.split(":");
+
+      const milidetikA =
+        parseInt(partsA[0]) * 3600000 +
+        parseInt(partsA[1]) * 60000 +
+        parseFloat(partsA[2]) * 1000;
+      const milidetikB =
+        parseInt(partsB[0]) * 3600000 +
+        parseInt(partsB[1]) * 60000 +
+        parseFloat(partsB[2]) * 1000;
+
+      let totalMilidetik = milidetikA - milidetikB;
+      if (totalMilidetik < 0) totalMilidetik = 0;
+
+      const jam = Math.floor(totalMilidetik / 3600000);
+      const menit = Math.floor((totalMilidetik % 3600000) / 60000);
+      const detik = Math.floor((totalMilidetik % 60000) / 1000);
+      const milidetik = totalMilidetik % 1000;
+
+      const hasilFormat = `${String(jam).padStart(2, "0")}:${String(menit).padStart(
+        2,
+        "0"
+      )}:${String(detik).padStart(2, "0")}.${String(milidetik).padStart(
+        3,
+        "0"
+      )}`;
+
+      return hasilFormat;
+    },
+
     goTo() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },

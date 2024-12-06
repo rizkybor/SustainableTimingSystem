@@ -18,7 +18,7 @@
     >
       <section slot="pdf-content">
         <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult
+        <drrResult
           :data="dataEvent"
           :dataParticipant="participant.length == 0 ? [] : participant"
           :categories="titleCategories"
@@ -67,6 +67,15 @@
                 justify-content: flex-end !important;
               "
             >
+             <button
+                type="button"
+                class="btn btn-outline-success"
+                @click="toggleSortRanked"
+              >
+                <Icon icon="icon-park-outline:ranking" />
+                Simpan Event
+              </button>
+
               <button
                 type="button"
                 class="btn btn-info"
@@ -112,7 +121,7 @@
 
     <br />
 
-    <!-- SPRINT OPERATION TIME  -->
+    <!-- DRR OPERATION TIME  -->
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
         <div v-if="!editResult">
@@ -243,16 +252,7 @@
                 <div class="card-body">
                   <h4>List Result</h4>
                   <!-- <button
-                    id="btnCheckPen"
-                    type="button"
-                    class="btn btn-warning mr-4"
-                    @click="checkingPenalties()"
-                  >
-                    <Icon icon="iconamoon:flag-fill" />
-                    Penalty Confirm
-                  </button> -->
-                  <!-- <button
-                    id="btnCheckPen"
+                    id="btnReset"
                     type="button"
                     class="btn btn-danger"
                     @click="resetRace()"
@@ -463,12 +463,12 @@
 <script>
 import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
-import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
+import drrResult from "../ResultComponent/drr-pdfResult.vue";
 
 export default {
-  name: "SustainableTimingSystemSprintRace",
+  name: "SustainableTimingSystemDRRRace",
   components: {
-    sprintResult,
+    drrResult,
     VueHtml2pdf,
   },
   data() {
@@ -764,23 +764,7 @@ export default {
     async resetRace() {
       this.editResult = false;
     },
-    // async checkingPenalties() {
-    //   for (let i = 0; i < this.participant.length; i++) {
-    //     const item = this.participant[i];
-    //     // item.result.penalty = this.dataPenalties[2].value;
-    //     // item.result.penaltyTime = this.dataPenalties[2].timePen;
-
-    //     if (item.result.raceTime && item.result.penaltyTime) {
-    //       const newTimeResult = await this.tambahWaktu(
-    //         item.result.raceTime,
-    //         item.result.penaltyTime
-    //       );
-    //       item.result.totalTime = newTimeResult;
-    //     }
-    //   }
-    //   this.editResult = true;
-    //   await this.assignRanks(this.participant);
-    // },
+    
     getScoreByRanked(ranked) {
       const matchingRank = this.dataScore.find(
         (data) => data.ranking === ranked

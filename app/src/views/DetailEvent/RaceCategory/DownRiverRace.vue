@@ -267,16 +267,12 @@
                           <tr>
                             <th scope="col">No</th>
                             <th scope="col">Team Name</th>
-                            <th scope="col">BIBO Number</th>
+                            <th scope="col">BIB</th>
                             <th scope="col">Start Time</th>
                             <th scope="col">Finish Time</th>
                             <th scope="col">Race Time</th>
                             <th scope="col">Pen Start</th>
-                            <th scope="col">PS 1</th>
-                            <th scope="col">PS 2</th>
-                            <th scope="col">PS 3</th>
-                            <th scope="col">PS 4</th>
-                            <th scope="col">PS 5</th>
+                            <th scope="col">Pen Section</th>
                             <th scope="col">Pen Finish</th>
                             <th scope="col">Pen Total</th>
                             <th scope="col">Result</th>
@@ -298,97 +294,55 @@
                             <td>
                               <b-select
                                 v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
+                                v-model="item.result.penaltyStartTime"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltyStartTime'
+                                  )
+                                "
+                                :placeholder="'Penalty Start'"
                               >
-                                <option
-                                  v-for="penalty in dataPenalties"
-                                  :key="penalty.value"
-                                  :value="penalty.value"
-                                >
-                                  {{ penalty.value }}
+                              <option disabled value="">
+                                  Select Penalty Start Time
                                 </option>
-                              </b-select>
-                            </td>
-                            <!-- PEN 1 -->
-                            <td>
-                              <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
-                              >
                                 <option
                                   v-for="penalty in dataPenalties"
                                   :key="penalty.value"
-                                  :value="penalty.value"
+                                  :value="penalty.timePen"
                                 >
                                   {{ penalty.value }}
                                 </option>
                               </b-select>
                             </td>
 
-                            <!-- PS 2 -->
+                            <!-- PEN Section -->
                             <td>
                               <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
-                              >
-                                <option
-                                  v-for="penalty in dataPenalties"
-                                  :key="penalty.value"
-                                  :value="penalty.value"
-                                >
-                                  {{ penalty.value }}
-                                </option>
-                              </b-select>
-                            </td>
-                            
-                            <!-- PS 2 -->
-                            <td>
-                              <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
-                              >
-                                <option
-                                  v-for="penalty in dataPenalties"
-                                  :key="penalty.value"
-                                  :value="penalty.value"
-                                >
-                                  {{ penalty.value }}
-                                </option>
-                              </b-select>
-                            </td>
+                              class="small-select"
 
-                            <!-- PS 3 -->
-                            <td>
-                              <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
+                                v-for="(section, index) in item.result
+                                  .penaltySection"
+                                :key="index"
+                                v-model="item.result.penaltySection[index]"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltySection',
+                                    index
+                                  )
+                                "
                               >
-                                <option
-                                  v-for="penalty in dataPenalties"
-                                  :key="penalty.value"
-                                  :value="penalty.value"
-                                >
-                                  {{ penalty.value }}
+                                <!-- Placeholder option -->
+                                <option disabled value="">
+                                  Section {{ index + 1 }}
                                 </option>
-                              </b-select>
-                            </td>
-                            
-                            <!-- PS 4 -->
-                            <td>
-                              <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
-                              >
                                 <option
                                   v-for="penalty in dataPenalties"
                                   :key="penalty.value"
-                                  :value="penalty.value"
+                                  :value="penalty.timePen"
                                 >
                                   {{ penalty.value }}
                                 </option>
@@ -399,13 +353,23 @@
                             <td>
                               <b-select
                                 v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
+                                v-model="item.result.penaltyFinishTime"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltyFinishTime'
+                                  )
+                                "
+                                :placeholder="'Penalty Finish'"
                               >
+                                <option disabled value="">
+                                  Select Penalty Finish Time
+                                </option>
                                 <option
                                   v-for="penalty in dataPenalties"
                                   :key="penalty.value"
-                                  :value="penalty.value"
+                                  :value="penalty.timePen"
                                 >
                                   {{ penalty.value }}
                                 </option>
@@ -751,45 +715,72 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(selectedValue, item) {
-      const selectedPenaltyData = this.dataPenalties.find(
-        (penalty) => penalty.value === selectedValue
-      );
-      if (selectedPenaltyData) {
-        item.result.penaltyTime = selectedPenaltyData.timePen;
-        // console.log(item.result.penaltyTime, "<<< CEK DATA PENALTY");
+    async updateTimePen(
+      selectedTimePen,
+      item,
+      penaltyType,
+      sectionIndex = null
+    ) {
+      // Update penalti sesuai dengan jenisnya
+      if (penaltyType === "penaltySection" && sectionIndex !== null) {
+        item.result.penaltySection[sectionIndex] = selectedTimePen;
+      } else {
+        item.result[penaltyType] = selectedTimePen;
       }
 
-      if (item.result.raceTime && item.result.penaltyTime) {
-        const newTimeResult = await this.tambahWaktu(
+      // Akumulasi semua waktu penalti
+      const penaltyFields = [
+        item.result.penaltyStartTime || "00:00:00.000",
+        item.result.penaltyFinishTime || "00:00:00.000",
+        ...item.result.penaltySection.map((time) => time || "00:00:00.000"),
+      ];
+
+      // Hitung total waktu penalti
+      const totalPenaltyTime = await penaltyFields.reduce(
+        async (acc, currentTime) => {
+          const accumulatedTime = await acc;
+          return this.tambahWaktu(accumulatedTime, currentTime);
+        },
+        "00:00:00.000"
+      );
+
+      // Set total penalti
+      item.result.penaltyTime = totalPenaltyTime;
+
+      // Jika ada raceTime, hitung totalTime
+      if (item.result.raceTime) {
+        item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
-          item.result.penaltyTime
+          totalPenaltyTime
         );
-        item.result.totalTime = newTimeResult;
       }
+
       this.editResult = true;
+
+      // Update peringkat setelah penalti dihitung
       await this.assignRanks(this.participant);
     },
+
     async resetRace() {
       this.editResult = false;
     },
-    async checkingPenalties() {
-      for (let i = 0; i < this.participant.length; i++) {
-        const item = this.participant[i];
-        // item.result.penalty = this.dataPenalties[2].value;
-        // item.result.penaltyTime = this.dataPenalties[2].timePen;
+    // async checkingPenalties() {
+    //   for (let i = 0; i < this.participant.length; i++) {
+    //     const item = this.participant[i];
+    //     // item.result.penalty = this.dataPenalties[2].value;
+    //     // item.result.penaltyTime = this.dataPenalties[2].timePen;
 
-        if (item.result.raceTime && item.result.penaltyTime) {
-          const newTimeResult = await this.tambahWaktu(
-            item.result.raceTime,
-            item.result.penaltyTime
-          );
-          item.result.totalTime = newTimeResult;
-        }
-      }
-      this.editResult = true;
-      await this.assignRanks(this.participant);
-    },
+    //     if (item.result.raceTime && item.result.penaltyTime) {
+    //       const newTimeResult = await this.tambahWaktu(
+    //         item.result.raceTime,
+    //         item.result.penaltyTime
+    //       );
+    //       item.result.totalTime = newTimeResult;
+    //     }
+    //   }
+    //   this.editResult = true;
+    //   await this.assignRanks(this.participant);
+    // },
     getScoreByRanked(ranked) {
       const matchingRank = this.dataScore.find(
         (data) => data.ranking === ranked
@@ -1164,5 +1155,10 @@ td.time {
 /* Warna saat tidak terhubung (misalnya, merah) */
 .disconnected {
   background-color: red;
+}
+
+.small-select {
+  width: 140px; /* Atur lebar sesuai kebutuhan */
+  display: flex; /* Untuk menghindari elemen mengambil ruang penuh */
 }
 </style>

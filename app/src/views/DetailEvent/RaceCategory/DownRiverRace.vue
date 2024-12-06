@@ -284,11 +284,11 @@
                         <tbody>
                           <tr v-for="(item, index) in participant" :key="index">
                             <td>{{ index + 1 }}</td>
-                            <td>{{ item.nameTeam }}</td>
-                            <td>{{ item.bibTeam }}</td>
+                            <td class="large-bold text-strong max-char">{{ item.nameTeam }}</td>
+                            <td class="large-bold">{{ item.bibTeam }}</td>
                             <td>{{ item.result.startTime }}</td>
                             <td>{{ item.result.finishTime }}</td>
-                            <td>{{ item.result.raceTime }}</td>
+                            <td class="large-bold">{{ item.result.raceTime }}</td>
 
                             <!-- PEN START -->
                             <td>
@@ -320,8 +320,7 @@
                             <!-- PEN Section -->
                             <td>
                               <b-select
-                              class="small-select"
-
+                                class="small-select"
                                 v-for="(section, index) in item.result
                                   .penaltySection"
                                 :key="index"
@@ -376,16 +375,16 @@
                               </b-select>
                             </td>
 
-                            <td>{{ item.result.penaltyTime }}</td>
-                            <td>
+                            <td class="large-bold penalty-char">{{ item.result.penaltyTime }}</td>
+                            <td class="large-bold result-char">
                               {{
                                 item.result.penaltyTime == ""
                                   ? item.result.raceTime
                                   : item.result.totalTime
                               }}
                             </td>
-                            <td>{{ item.result.ranked }}</td>
-                            <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                            <td class="large-bold">{{ item.result.ranked }}</td>
+                            <td class="large-bold">{{ getScoreByRanked(item.result.ranked) }}</td>
                             <td v-if="editResult">
                               <button
                                 type="button"
@@ -1055,6 +1054,10 @@ table {
   border-collapse: collapse;
 }
 
+.table tbody td {
+  vertical-align: middle; /* Menengahkan konten secara vertikal */
+}
+
 /* Style untuk header kolom */
 th {
   background-color: #007bff;
@@ -1142,7 +1145,33 @@ td.time {
 }
 
 .small-select {
+  margin-bottom: 5px;
   width: 140px; /* Atur lebar sesuai kebutuhan */
   display: flex; /* Untuk menghindari elemen mengambil ruang penuh */
+}
+
+.large-bold {
+  font-size: 1.2rem; /* Ubah ukuran teks sesuai kebutuhan, contoh: 1.5rem */
+  font-weight: bold; /* Membuat teks tebal */
+}
+
+.text-strong {
+  color: #000; /* Tambahkan warna hitam untuk penegasan */
+}
+
+.max-char {
+  max-width: 250px; /* Atur lebar maksimal sesuai kebutuhan */
+  word-wrap: break-word; /* Membagi teks ke baris berikutnya jika terlalu panjang */
+  white-space: normal; /* Memastikan teks bisa membungkus */
+  overflow: hidden; /* Menghindari teks keluar */
+  text-overflow: ellipsis;
+}
+
+.penalty-char {
+  color: red;
+}
+
+.result-char {
+  color: green;
 }
 </style>

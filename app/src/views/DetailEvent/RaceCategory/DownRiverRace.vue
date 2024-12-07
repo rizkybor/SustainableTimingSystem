@@ -312,7 +312,7 @@
                                   :key="penalty.value"
                                   :value="penalty.timePen"
                                 >
-                                  {{ penalty.value }}
+                                  {{ penalty.label }}
                                 </option>
                               </b-select>
                             </td>
@@ -343,7 +343,7 @@
                                   :key="penalty.value"
                                   :value="penalty.timePen"
                                 >
-                                  {{ penalty.value }}
+                                  {{ penalty.label }}
                                 </option>
                               </b-select>
                             </td>
@@ -370,7 +370,7 @@
                                   :key="penalty.value"
                                   :value="penalty.timePen"
                                 >
-                                  {{ penalty.value }}
+                                  {{ penalty.label }}
                                 </option>
                               </b-select>
                             </td>
@@ -482,7 +482,7 @@ export default {
       penTeam: "",
       dataPenalties: [
         {
-          label: "clear",
+          label: "0",
           value: 0,
           timePen: "00:00:00.000",
         },
@@ -505,131 +505,131 @@ export default {
       dataScore: [
         {
           ranking: 1,
-          score: 100,
+          score: 350,
         },
         {
           ranking: 2,
-          score: 92,
+          score: 322,
         },
         {
           ranking: 3,
-          score: 86,
+          score: 301,
         },
         {
           ranking: 4,
-          score: 82,
+          score: 287,
         },
         {
           ranking: 5,
-          score: 79,
+          score: 277,
         },
         {
           ranking: 6,
-          score: 76,
+          score: 266,
         },
         {
           ranking: 7,
-          score: 73,
+          score: 256,
         },
         {
           ranking: 8,
-          score: 70,
+          score: 245,
         },
         {
           ranking: 9,
-          score: 67,
+          score: 235,
         },
         {
           ranking: 10,
-          score: 64,
+          score: 224,
         },
         {
           ranking: 11,
-          score: 61,
+          score: 214,
         },
         {
           ranking: 12,
-          score: 58,
+          score: 203,
         },
         {
           ranking: 13,
-          score: 55,
+          score: 193,
         },
         {
           ranking: 14,
-          score: 52,
+          score: 182,
         },
         {
           ranking: 15,
-          score: 49,
+          score: 172,
         },
         {
           ranking: 16,
-          score: 46,
+          score: 161,
         },
         {
           ranking: 17,
-          score: 43,
+          score: 151,
         },
         {
           ranking: 18,
-          score: 40,
+          score: 140,
         },
         {
           ranking: 19,
-          score: 38,
+          score: 133,
         },
         {
           ranking: 20,
-          score: 36,
+          score: 126,
         },
         {
           ranking: 21,
-          score: 34,
+          score: 119,
         },
         {
           ranking: 22,
-          score: 32,
+          score: 112,
         },
         {
           ranking: 23,
-          score: 30,
+          score: 105,
         },
         {
           ranking: 24,
-          score: 28,
+          score: 98,
         },
         {
           ranking: 25,
-          score: 26,
+          score: 91,
         },
         {
           ranking: 26,
-          score: 24,
+          score: 84,
         },
         {
           ranking: 27,
-          score: 22,
+          score: 77,
         },
         {
           ranking: 28,
-          score: 20,
+          score: 70,
         },
         {
           ranking: 29,
-          score: 18,
+          score: 63,
         },
         {
           ranking: 30,
-          score: 16,
+          score: 56,
         },
         {
           ranking: 31,
-          score: 14,
+          score: 49,
         },
         {
           ranking: 32,
-          score: 12,
+          score: 42,
         },
       ],
       digitTimeStart: null,
@@ -1056,9 +1056,10 @@ export default {
     },
     generatePDF() {
       this.participant.forEach((e) => {
-        // console.log(e.result);
         e.result.score = this.getScoreByRanked(e.result.ranked);
       });
+      
+      console.log(typeof(this.participant))
       this.$refs.html2Pdf.generatePdf();
     },
   },

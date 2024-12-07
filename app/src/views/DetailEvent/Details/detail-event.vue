@@ -279,7 +279,7 @@
           </div>
         </div>
 
-        <div v-if="otr">
+        <!-- <div v-if="otr">
           <div class="my-4">
             <div style="display: flex; gap: 1vh; justify-content: center">
               <label>Event Model :</label>
@@ -400,7 +400,7 @@
               @open-modal="openModal(formEvent.participant)"
             />
           </div>
-        </div>
+        </div> -->
       </b-col>
     </b-row>
     <br />

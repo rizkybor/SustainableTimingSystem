@@ -18,7 +18,7 @@
     >
       <section slot="pdf-content">
         <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult
+        <drrResult
           :data="dataEvent"
           :dataParticipant="participant.length == 0 ? [] : participant"
           :categories="titleCategories"
@@ -46,7 +46,7 @@
             </h5>
 
             <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : Sprint
+              Nomor Lomba : DRR
             </h6>
             <h6 style="font-weight: 800; font-style: italic">
               Categories : {{ titleCategories }}
@@ -67,6 +67,15 @@
                 justify-content: flex-end !important;
               "
             >
+             <button
+                type="button"
+                class="btn btn-outline-success"
+                @click="toggleSortRanked"
+              >
+                <Icon icon="icon-park-outline:ranking" />
+                Simpan Event
+              </button>
+
               <button
                 type="button"
                 class="btn btn-info"
@@ -112,7 +121,7 @@
 
     <br />
 
-    <!-- SPRINT OPERATION TIME  -->
+    <!-- DRR OPERATION TIME  -->
     <div class="card" style="background-color: dodgerblue">
       <div class="card-body">
         <div v-if="!editResult">
@@ -243,16 +252,7 @@
                 <div class="card-body">
                   <h4>List Result</h4>
                   <!-- <button
-                    id="btnCheckPen"
-                    type="button"
-                    class="btn btn-warning mr-4"
-                    @click="checkingPenalties()"
-                  >
-                    <Icon icon="iconamoon:flag-fill" />
-                    Penalty Confirm
-                  </button> -->
-                  <!-- <button
-                    id="btnCheckPen"
+                    id="btnReset"
                     type="button"
                     class="btn btn-danger"
                     @click="resetRace()"
@@ -267,12 +267,14 @@
                           <tr>
                             <th scope="col">No</th>
                             <th scope="col">Team Name</th>
-                            <th scope="col">BIB Number</th>
+                            <th scope="col">BIB</th>
                             <th scope="col">Start Time</th>
                             <th scope="col">Finish Time</th>
                             <th scope="col">Race Time</th>
-                            <th scope="col">Penalties</th>
-                            <th scope="col">Penalty Time</th>
+                            <th scope="col">Pen Start</th>
+                            <th scope="col">Pen Section</th>
+                            <th scope="col">Pen Finish</th>
+                            <th scope="col">Pen Total</th>
                             <th scope="col">Result</th>
                             <th scope="col">Ranked</th>
                             <th scope="col">Score</th>
@@ -282,36 +284,107 @@
                         <tbody>
                           <tr v-for="(item, index) in participant" :key="index">
                             <td>{{ index + 1 }}</td>
-                            <td>{{ item.nameTeam }}</td>
-                            <td>{{ item.bibTeam }}</td>
+                            <td class="large-bold text-strong max-char">{{ item.nameTeam }}</td>
+                            <td class="large-bold">{{ item.bibTeam }}</td>
                             <td>{{ item.result.startTime }}</td>
                             <td>{{ item.result.finishTime }}</td>
-                            <td>{{ item.result.raceTime }}</td>
+                            <td class="large-bold">{{ item.result.raceTime }}</td>
+
+                            <!-- PEN START -->
                             <td>
                               <b-select
                                 v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
+                                v-model="item.result.penaltyStartTime"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltyStartTime'
+                                  )
+                                "
+                                :placeholder="'Penalty Start'"
                               >
+                              <option disabled value="">
+                                  Select Penalty Start Time
+                                </option>
                                 <option
                                   v-for="penalty in dataPenalties"
                                   :key="penalty.value"
-                                  :value="penalty.value"
+                                  :value="penalty.timePen"
                                 >
-                                  {{ penalty.value }}
+                                  {{ penalty.label }}
                                 </option>
                               </b-select>
                             </td>
-                            <td>{{ item.result.penaltyTime }}</td>
+
+                            <!-- PEN Section -->
                             <td>
+                              <b-select
+                                class="small-select"
+                                v-for="(section, index) in item.result
+                                  .penaltySection"
+                                :key="index"
+                                v-model="item.result.penaltySection[index]"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltySection',
+                                    index
+                                  )
+                                "
+                              >
+                                <!-- Placeholder option -->
+                                <option disabled value="">
+                                  Section {{ index + 1 }}
+                                </option>
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.timePen"
+                                >
+                                  {{ penalty.label }}
+                                </option>
+                              </b-select>
+                            </td>
+
+                            <!-- PEN FINISH -->
+                            <td>
+                              <b-select
+                                v-if="item.result.startTime != ''"
+                                v-model="item.result.penaltyFinishTime"
+                                @change="
+                                  updateTimePen(
+                                    $event,
+                                    item,
+                                    'penaltyFinishTime'
+                                  )
+                                "
+                                :placeholder="'Penalty Finish'"
+                              >
+                                <option disabled value="">
+                                  Select Penalty Finish Time
+                                </option>
+                                <option
+                                  v-for="penalty in dataPenalties"
+                                  :key="penalty.value"
+                                  :value="penalty.timePen"
+                                >
+                                  {{ penalty.label }}
+                                </option>
+                              </b-select>
+                            </td>
+
+                            <td class="large-bold penalty-char">{{ item.result.penaltyTime }}</td>
+                            <td class="large-bold result-char">
                               {{
                                 item.result.penaltyTime == ""
                                   ? item.result.raceTime
                                   : item.result.totalTime
                               }}
                             </td>
-                            <td>{{ item.result.ranked }}</td>
-                            <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                            <td class="large-bold">{{ item.result.ranked }}</td>
+                            <td class="large-bold">{{ getScoreByRanked(item.result.ranked) }}</td>
                             <td v-if="editResult">
                               <button
                                 type="button"
@@ -389,12 +462,12 @@
 <script>
 import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
-import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
+import drrResult from "../ResultComponent/drr-pdfResult.vue";
 
 export default {
-  name: "SustainableTimingSystemSprintRace",
+  name: "SustainableTimingSystemDRRRace",
   components: {
-    sprintResult,
+    drrResult,
     VueHtml2pdf,
   },
   data() {
@@ -409,17 +482,22 @@ export default {
       penTeam: "",
       dataPenalties: [
         {
-          label: "clear",
+          label: "0",
           value: 0,
           timePen: "00:00:00.000",
         },
         {
-          label: "pen 1",
-          value: 5,
-          timePen: "00:00:05.000",
+          label: "+ 10",
+          value: 10,
+          timePen: "00:00:10.000",
         },
         {
-          label: "pen 2",
+          label: "- 10",
+          value: 999,
+          timePen: "-00:00:10.000",
+        },
+        {
+          label: "+ 50",
           value: 50,
           timePen: "00:00:50.000",
         },
@@ -427,131 +505,131 @@ export default {
       dataScore: [
         {
           ranking: 1,
-          score: 100,
+          score: 350,
         },
         {
           ranking: 2,
-          score: 92,
+          score: 322,
         },
         {
           ranking: 3,
-          score: 86,
+          score: 301,
         },
         {
           ranking: 4,
-          score: 82,
+          score: 287,
         },
         {
           ranking: 5,
-          score: 79,
+          score: 277,
         },
         {
           ranking: 6,
-          score: 76,
+          score: 266,
         },
         {
           ranking: 7,
-          score: 73,
+          score: 256,
         },
         {
           ranking: 8,
-          score: 70,
+          score: 245,
         },
         {
           ranking: 9,
-          score: 67,
+          score: 235,
         },
         {
           ranking: 10,
-          score: 64,
+          score: 224,
         },
         {
           ranking: 11,
-          score: 61,
+          score: 214,
         },
         {
           ranking: 12,
-          score: 58,
+          score: 203,
         },
         {
           ranking: 13,
-          score: 55,
+          score: 193,
         },
         {
           ranking: 14,
-          score: 52,
+          score: 182,
         },
         {
           ranking: 15,
-          score: 49,
+          score: 172,
         },
         {
           ranking: 16,
-          score: 46,
+          score: 161,
         },
         {
           ranking: 17,
-          score: 43,
+          score: 151,
         },
         {
           ranking: 18,
-          score: 40,
+          score: 140,
         },
         {
           ranking: 19,
-          score: 38,
+          score: 133,
         },
         {
           ranking: 20,
-          score: 36,
+          score: 126,
         },
         {
           ranking: 21,
-          score: 34,
+          score: 119,
         },
         {
           ranking: 22,
-          score: 32,
+          score: 112,
         },
         {
           ranking: 23,
-          score: 30,
+          score: 105,
         },
         {
           ranking: 24,
-          score: 28,
+          score: 98,
         },
         {
           ranking: 25,
-          score: 26,
+          score: 91,
         },
         {
           ranking: 26,
-          score: 24,
+          score: 84,
         },
         {
           ranking: 27,
-          score: 22,
+          score: 77,
         },
         {
           ranking: 28,
-          score: 20,
+          score: 70,
         },
         {
           ranking: 29,
-          score: 18,
+          score: 63,
         },
         {
           ranking: 30,
-          score: 16,
+          score: 56,
         },
         {
           ranking: 31,
-          score: 14,
+          score: 49,
         },
         {
           ranking: 32,
-          score: 12,
+          score: 42,
         },
       ],
       digitTimeStart: null,
@@ -584,10 +662,10 @@ export default {
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("participantByCategories");
       const events = localStorage.getItem("eventDetails");
-      console.log(dataStorage,'<< cek storage')
-      console.log('<<<<<<>>>>>>>>>>>>>>>>')
+      console.log(dataStorage, "<< cek storage");
+      console.log("<<<<<<>>>>>>>>>>>>>>>>");
 
-      console.log(events,'<< cek events')
+      console.log(events, "<< cek events");
       this.dataEvent = JSON.parse(events);
       this.titleCategories = localStorage.getItem("currentCategories");
 
@@ -641,45 +719,60 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(selectedValue, item) {
-      const selectedPenaltyData = this.dataPenalties.find(
-        (penalty) => penalty.value === selectedValue
-      );
-      if (selectedPenaltyData) {
-        item.result.penaltyTime = selectedPenaltyData.timePen;
-        // console.log(item.result.penaltyTime, "<<< CEK DATA PENALTY");
-      }
+    async updateTimePen(selectedTimePen, item, penaltyType, sectionIndex = null) {
+  console.log("Selected Penalty:", selectedTimePen);
 
-      if (item.result.raceTime && item.result.penaltyTime) {
-        const newTimeResult = await this.tambahWaktu(
-          item.result.raceTime,
-          item.result.penaltyTime
-        );
-        item.result.totalTime = newTimeResult;
-      }
-      this.editResult = true;
-      await this.assignRanks(this.participant);
-    },
+  // Perbarui penalti sesuai jenisnya
+  if (penaltyType === "penaltySection" && sectionIndex !== null) {
+    item.result.penaltySection[sectionIndex] = selectedTimePen;
+  } else {
+    item.result[penaltyType] = selectedTimePen;
+  }
+
+  // Awal waktu penalti total
+  let totalPenaltyTime = "00:00:00.000";
+
+  // Iterasi semua penalti yang diterapkan
+  const penaltyFields = [
+    item.result.penaltyStartTime || "00:00:00.000",
+    item.result.penaltyFinishTime || "00:00:00.000",
+    ...item.result.penaltySection.map((time) => time || "00:00:00.000"),
+  ];
+
+  for (const penalty of penaltyFields) {
+    if (penalty === "-00:00:10.000") {
+      // Jika penalti adalah pengurangan waktu
+      totalPenaltyTime = await this.kurangiWaktu(
+        totalPenaltyTime,
+        "00:00:10.000"
+      );
+    } else {
+      // Penalti lainnya dianggap penambahan waktu
+      totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, penalty);
+    }
+  }
+
+  // Perbarui total penalti
+  item.result.penaltyTime = totalPenaltyTime;
+
+  // Jika ada raceTime, hitung waktu total
+  if (item.result.raceTime) {
+    item.result.totalTime = await this.tambahWaktu(
+      item.result.raceTime,
+      totalPenaltyTime
+    );
+  }
+
+  this.editResult = true;
+
+  // Perbarui peringkat setelah penalti dihitung
+  await this.assignRanks(this.participant);
+},
+
     async resetRace() {
       this.editResult = false;
     },
-    async checkingPenalties() {
-      for (let i = 0; i < this.participant.length; i++) {
-        const item = this.participant[i];
-        // item.result.penalty = this.dataPenalties[2].value;
-        // item.result.penaltyTime = this.dataPenalties[2].timePen;
-
-        if (item.result.raceTime && item.result.penaltyTime) {
-          const newTimeResult = await this.tambahWaktu(
-            item.result.raceTime,
-            item.result.penaltyTime
-          );
-          item.result.totalTime = newTimeResult;
-        }
-      }
-      this.editResult = true;
-      await this.assignRanks(this.participant);
-    },
+    
     getScoreByRanked(ranked) {
       const matchingRank = this.dataScore.find(
         (data) => data.ranking === ranked
@@ -912,6 +1005,39 @@ export default {
 
       return hasilFormat;
     },
+
+    async kurangiWaktu(waktuA, waktuB) {
+      const partsA = waktuA.split(":");
+      const partsB = waktuB.split(":");
+
+      const milidetikA =
+        parseInt(partsA[0]) * 3600000 +
+        parseInt(partsA[1]) * 60000 +
+        parseFloat(partsA[2]) * 1000;
+      const milidetikB =
+        parseInt(partsB[0]) * 3600000 +
+        parseInt(partsB[1]) * 60000 +
+        parseFloat(partsB[2]) * 1000;
+
+      let totalMilidetik = milidetikA - milidetikB;
+      if (totalMilidetik < 0) totalMilidetik = 0;
+
+      const jam = Math.floor(totalMilidetik / 3600000);
+      const menit = Math.floor((totalMilidetik % 3600000) / 60000);
+      const detik = Math.floor((totalMilidetik % 60000) / 1000);
+      const milidetik = totalMilidetik % 1000;
+
+      const hasilFormat = `${String(jam).padStart(2, "0")}:${String(menit).padStart(
+        2,
+        "0"
+      )}:${String(detik).padStart(2, "0")}.${String(milidetik).padStart(
+        3,
+        "0"
+      )}`;
+
+      return hasilFormat;
+    },
+
     goTo() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
@@ -930,9 +1056,10 @@ export default {
     },
     generatePDF() {
       this.participant.forEach((e) => {
-        // console.log(e.result);
         e.result.score = this.getScoreByRanked(e.result.ranked);
       });
+      
+      console.log(typeof(this.participant))
       this.$refs.html2Pdf.generatePdf();
     },
   },
@@ -968,6 +1095,10 @@ export default {
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.table tbody td {
+  vertical-align: middle; /* Menengahkan konten secara vertikal */
 }
 
 /* Style untuk header kolom */
@@ -1054,5 +1185,36 @@ td.time {
 /* Warna saat tidak terhubung (misalnya, merah) */
 .disconnected {
   background-color: red;
+}
+
+.small-select {
+  margin-bottom: 5px;
+  width: 140px; /* Atur lebar sesuai kebutuhan */
+  display: flex; /* Untuk menghindari elemen mengambil ruang penuh */
+}
+
+.large-bold {
+  font-size: 1.2rem; /* Ubah ukuran teks sesuai kebutuhan, contoh: 1.5rem */
+  font-weight: bold; /* Membuat teks tebal */
+}
+
+.text-strong {
+  color: #000; /* Tambahkan warna hitam untuk penegasan */
+}
+
+.max-char {
+  max-width: 250px; /* Atur lebar maksimal sesuai kebutuhan */
+  word-wrap: break-word; /* Membagi teks ke baris berikutnya jika terlalu panjang */
+  white-space: normal; /* Memastikan teks bisa membungkus */
+  overflow: hidden; /* Menghindari teks keluar */
+  text-overflow: ellipsis;
+}
+
+.penalty-char {
+  color: red;
+}
+
+.result-char {
+  color: green;
 }
 </style>

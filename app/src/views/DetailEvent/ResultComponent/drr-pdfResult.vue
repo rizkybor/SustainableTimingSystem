@@ -71,9 +71,19 @@
       <template v-slot:cell(raceTime)="data">
         {{ data.item.result.raceTime }}
       </template>
-      <template v-slot:cell(penalties)="data">
-        {{ data.item.result.penalty }}
+      
+      <template v-slot:cell(penaltiesStart)="data">
+        {{ data.item.result.penaltyStartTime }}
       </template>
+      
+      <template v-slot:cell(penaltiesSection)="data">
+        {{ data.item.result.penaltySection }}
+      </template>
+
+      <template v-slot:cell(penaltiesFinish)="data">
+        {{ data.item.result.penaltyFinishTime }}
+      </template>
+
       <template v-slot:cell(teamPenalties)="data">
         {{ data.item.result.penaltyTime }}
       </template>
@@ -126,7 +136,9 @@ export default {
         { key: "startTime", label: "START TIME" },
         { key: "finishTime", label: "FINISH TIME" },
         { key: "raceTime", label: "RACE TIME" },
-        { key: "penalties", label: "PENALTIES" },
+        { key: "penaltiesStart", label: "PEN START" },
+        { key: "penaltiesSection", label: "PEN SECTION" },
+        { key: "penaltiesFinish", label: "PENALTIES FINISH" },
         { key: "teamPenalties", label: "TIME PENALTIES" },
         { key: "result", label: "RESULT" },
         { key: "rank", label: "RANK" },

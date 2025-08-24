@@ -1,5 +1,8 @@
 const { ipcMain, dialog } = require("electron");
-const { getAllEvents, getEventById } = require("../controllers/GET/getEvent.js");
+const {
+  getAllEvents,
+  getEventById,
+} = require("../controllers/GET/getEvent.js");
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
@@ -7,7 +10,13 @@ const {
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
 } = require("../controllers/GET/getOptionEvent.js");
-const { insertNewEvent } = require("../controllers/INSERT/insertNewEvent.js");
+const {
+  insertNewEvent,
+  insertSprintResult,
+} = require("../controllers/INSERT/insertNewEvent.js");
+const {
+  getSprintResult,
+} = require("../controllers/GET/getResult.js");
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -122,6 +131,26 @@ function setupIPCMainHandlers() {
       event.reply("insert-new-event-reply", []);
     }
   });
+
+  // SAVE SPRINT RESULT
+  ipcMain.on("insert-sprint-result", async (event, datas) => {
+    try {
+      const data = await insertSprintResult(datas);
+      event.reply("insert-sprint-result-reply", data);
+    } catch (error) {
+      event.reply("insert-sprint-result-reply", null);
+    }
+  });
+
+  // LOAD SPRINT RESULT
+  ipcMain.on("get-sprint-result", async (event, query) => {
+  try {
+    const data = await getSprintResult(query);   // <- lihat controller di bawah
+    event.reply("get-sprint-result-reply", { ok: true, items: data });
+  } catch (error) {
+    event.reply("get-sprint-result-reply", { ok: false, items: [], error: error.message });
+  }
+});
 }
 
 module.exports = {

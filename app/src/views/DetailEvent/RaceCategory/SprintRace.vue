@@ -69,6 +69,15 @@
             >
               <button
                 type="button"
+                class="btn btn-secondary"
+                @click="saveResult"
+              >
+                <Icon icon="icon-park-outline:save" />
+                Save Result
+              </button>
+
+              <button
+                type="button"
                 class="btn btn-info"
                 @click="toggleSortRanked"
               >
@@ -387,6 +396,7 @@
 </template>
 
 <script>
+import { ipcRenderer } from "electron";
 import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
 import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
@@ -725,7 +735,7 @@ export default {
               this.currentPort = ports;
               const selectedPort = ports[6];
 
-              console.log(this.currentPort, "<<< CEK PORT");
+              console.log(this.currentPort[6].path, "<<< CEK PORT");
 
               if (selectedPort && selectedPort.path) {
                 // Open the selected serial port
@@ -930,6 +940,33 @@ export default {
         e.result.score = this.getScoreByRanked(e.result.ranked);
       });
       this.$refs.html2Pdf.generatePdf();
+    },
+    saveResult() {
+      // Normalisasi ke array selalu
+      let arr = Array.isArray(this.participant)
+        ? this.participant
+        : Object.values(this.participant || {});
+
+      // Sanitasi minimal: buang field non-serializable/fungsi
+      const clean = JSON.parse(JSON.stringify(arr));
+
+      if (!Array.isArray(clean) || clean.length === 0) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Belum ada data yang bisa disimpan.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+
+      ipcRenderer.send("insert-sprint-result", clean);
+      ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+        ipcRenderer.send("get-alert-saved", {
+          type: "question",
+          detail: `Result data has been successfully saved`,
+          message: "Successfully",
+        });
+      });
     },
   },
 };

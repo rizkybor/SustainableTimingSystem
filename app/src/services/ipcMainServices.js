@@ -14,9 +14,7 @@ const {
   insertNewEvent,
   insertSprintResult,
 } = require("../controllers/INSERT/insertNewEvent.js");
-const {
-  getSprintResult,
-} = require("../controllers/GET/getResult.js");
+const { getSprintResult } = require("../controllers/GET/getResult.js");
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -143,12 +141,16 @@ function setupIPCMainHandlers() {
   });
 
   // LOAD SPRINT RESULT
-  ipcMain.on("get-sprint-result", async (event, query) => {
+  ipcMain.on("get-sprint-result", async (event, query = {}) => {
   try {
-    const data = await getSprintResult(query);   // <- lihat controller di bawah
+    const data = await getSprintResult(query.eventId); 
     event.reply("get-sprint-result-reply", { ok: true, items: data });
   } catch (error) {
-    event.reply("get-sprint-result-reply", { ok: false, items: [], error: error.message });
+    event.reply("get-sprint-result-reply", {
+      ok: false,
+      items: [],
+      error: error.message,
+    });
   }
 });
 }

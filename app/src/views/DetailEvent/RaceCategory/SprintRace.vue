@@ -959,13 +959,33 @@ export default {
         return;
       }
 
-      ipcRenderer.send("insert-sprint-result", clean);
+      // Ambil eventId dari dataEvent
+      const eventId =
+        this.dataEvent && this.dataEvent._id
+          ? this.dataEvent._id.toString()
+          : null;
+
+      // Tambahkan eventId ke setiap item
+      const payload = clean.map((it) => ({
+        ...it,
+        eventId,
+      }));
+
+      ipcRenderer.send("insert-sprint-result", payload);
       ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
-        ipcRenderer.send("get-alert-saved", {
-          type: "question",
-          detail: `Result data has been successfully saved`,
-          message: "Successfully",
-        });
+        if (res && res.ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "question",
+            detail: `Result data has been successfully saved`,
+            message: "Successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: (res && res.error) || "Save failed",
+            message: "Failed",
+          });
+        }
       });
     },
   },

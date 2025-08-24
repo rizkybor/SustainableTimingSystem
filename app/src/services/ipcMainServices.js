@@ -142,17 +142,41 @@ function setupIPCMainHandlers() {
 
   // LOAD SPRINT RESULT
   ipcMain.on("get-sprint-result", async (event, query = {}) => {
-  try {
-    const data = await getSprintResult(query.eventId); 
-    event.reply("get-sprint-result-reply", { ok: true, items: data });
-  } catch (error) {
-    event.reply("get-sprint-result-reply", {
-      ok: false,
-      items: [],
-      error: error.message,
-    });
-  }
-});
+    try {
+      const data = await getSprintResult(query.eventId);
+      event.reply("get-sprint-result-reply", { ok: true, items: data });
+    } catch (error) {
+      event.reply("get-sprint-result-reply", {
+        ok: false,
+        items: [],
+        error: error.message,
+      });
+    }
+  });
+
+  // SAVE DRR RESULT
+  ipcMain.on("insert-drr-result", async (event, datas) => {
+    try {
+      const data = await insertDrrResult(datas);
+      event.reply("insert-drr-result-reply", data);
+    } catch (error) {
+      event.reply("insert-drr-result-reply", null);
+    }
+  });
+
+  // LOAD DRR RESULT
+  ipcMain.on("get-drr-result", async (event, query = {}) => {
+    try {
+      const data = await getDrrResult(query.eventId);
+      event.reply("get-drr-result-reply", { ok: true, items: data });
+    } catch (error) {
+      event.reply("get-drr-result-reply", {
+        ok: false,
+        items: [],
+        error: error.message,
+      });
+    }
+  });
 }
 
 module.exports = {

@@ -61,22 +61,22 @@
             class="d-flex justify-content-center mt-5"
             style="align-items: center; gap: 5vh; z-index: 1"
           >
-            <img
+            <!-- <img
               src="@/assets/images/ic_makopala.png"
               alt="Logo"
               style="height: 110px"
-            />
+            /> -->
             <img
               src="@/assets/images/kikiaka-square.jpg"
               alt="Logo"
               style="height: 340px"
             />
 
-            <img
+            <!-- <img
               src="@/assets/images/faji.jpg"
               alt="Logo"
               style="height: 140px"
-            />
+            /> -->
           </div>
         </b-col>
       </div>

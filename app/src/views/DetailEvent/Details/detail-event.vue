@@ -30,14 +30,41 @@
                     <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
                   </b-button>
                   <b-button
-                    style="border-radius: 20px"
+                    style="border-radius: 8px"
                     @click="showResultCategories()"
                     type="input"
-                    variant="success"
-                    class="btn-md"
+                    variant="secondary"
+                    class="btn-md mx-1"
                   >
                     <Icon icon="system-uicons:document" />
                     Sprint Result
+                  </b-button>
+                  <b-button
+                    style="border-radius: 8px"
+                    type="input"
+                    variant="secondary"
+                    class="btn-md mx-1"
+                  >
+                    <Icon icon="system-uicons:document" />
+                    H2H Result
+                  </b-button>
+                  <b-button
+                    style="border-radius: 8px"
+                    type="input"
+                    variant="secondary"
+                    class="btn-md mx-1"
+                  >
+                    <Icon icon="system-uicons:document" />
+                    Slalom Result
+                  </b-button>
+                  <b-button
+                    style="border-radius: 8px"
+                    type="input"
+                    variant="secondary"
+                    class="btn-md mx-1"
+                  >
+                    <Icon icon="system-uicons:document" />
+                    DRR Result
                   </b-button>
                 </div>
               </div>

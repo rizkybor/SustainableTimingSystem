@@ -1,3 +1,5 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
 window.addEventListener('DOMContentLoaded', () => {
     const replaceText = (selector, text) => {
       const element = document.getElementById(selector)
@@ -7,3 +9,28 @@ window.addEventListener('DOMContentLoaded', () => {
       replaceText(`${type}-version`, process.versions[type])
     }
   })
+
+function expose(key, api) {
+  // aman untuk dua mode:
+  // - contextIsolation: true  -> lewat contextBridge
+  // - contextIsolation: false -> assign langsung ke window
+  if (process.contextIsolated) {
+    try { contextBridge.exposeInMainWorld(key, api) } catch (e) {}
+  } else {
+    // fallback jika contextIsolation dimatikan
+    window[key] = api
+  }
+}
+
+// file picker (dipanggil renderer: window.fileAPI.pickImage())
+expose('fileAPI', {
+  pickImage: () => ipcRenderer.invoke('file:pick-image'),
+})
+
+// Cloudinary bridge (renderer: window.cloud.uploadImage(), deleteImage())
+expose('cloud', {
+  uploadImage: (absPath, options = {}) =>
+    ipcRenderer.invoke('cloud:upload-image', absPath, options),
+  deleteImage: (publicId) =>
+    ipcRenderer.invoke('cloud:delete-image', publicId),
+})

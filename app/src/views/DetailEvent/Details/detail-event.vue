@@ -1,330 +1,134 @@
 <template>
-  <div class="m-4">
-    <b-row>
-      <b-col cols="10" offset="1" class="mb-5">
-        <div class="mx-2 mt-3">
-          <p class="h6 text-muted">Home / On Game</p>
-        </div>
+  <div class="sts-detail">
+    <!-- NAV BAR halamanmu tetap dari layout global -->
 
-        <div>
-          <b-card
-            header="Event Detail"
-            class="shadow"
-            style="border-radius: 20px"
-          >
-            <template #header>
-              <div
-                class="d-flex"
-                style="justify-content: space-between; gap: 1vh"
-              >
-                <div class="mx-2 mt-3">
-                  <p class="h6 text-muted">Event Detail</p>
-                </div>
-                <div>
-                  <b-button
-                    style="border-radius: 20px"
-                    @click="back('/')"
-                    variant="secondary"
-                    class="btn-md mr-2"
-                  >
-                    <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-                  </b-button>
-                  <b-button
-                    style="border-radius: 8px"
-                    @click="showResultCategories()"
-                    type="input"
-                    variant="secondary"
-                    class="btn-md mx-1"
-                  >
-                    <Icon icon="system-uicons:document" />
-                    Sprint Result
-                  </b-button>
-                  <b-button
-                    style="border-radius: 8px"
-                    type="input"
-                    variant="secondary"
-                    class="btn-md mx-1"
-                  >
-                    <Icon icon="system-uicons:document" />
-                    H2H Result
-                  </b-button>
-                  <b-button
-                    style="border-radius: 8px"
-                    type="input"
-                    variant="secondary"
-                    class="btn-md mx-1"
-                  >
-                    <Icon icon="system-uicons:document" />
-                    Slalom Result
-                  </b-button>
-                  <b-button
-                    style="border-radius: 8px"
-                    type="input"
-                    variant="secondary"
-                    class="btn-md mx-1"
-                  >
-                    <Icon icon="system-uicons:document" />
-                    DRR Result
-                  </b-button>
-                </div>
-              </div>
-            </template>
+    <!-- Breadcrumb -->
+    <b-container class="mt-3">
+      <div class="text-muted small mb-2">
+        Events / <span class="text-body">{{ events.eventName || 'Event' }}</span>
+      </div>
+    </b-container>
 
-            <b-row>
-              <b-col cols="6">
-                <div style="display: flex; flex-direction: row">
-                  <b-col cols="3">
-                    <label class="mr-3">Event Name </label>
-                  </b-col>
-                  <b-col>
-                    <p>: {{ events.eventName }}</p>
-                  </b-col>
-                </div>
-              </b-col>
-              <b-col cols="6">
-                <div style="display: flex; flex-direction: row">
-                  <b-col cols="3">
-                    <label class="mr-3">River Name </label>
-                  </b-col>
-                  <b-col>
-                    <p>: {{ events.riverName }}</p>
-                  </b-col>
-                </div>
-              </b-col>
-            </b-row>
+    <!-- 1) JUMBOTRON DETAIL -->
+    <section class="detail-hero">
+      <b-container>
+        <b-row>
+          <b-col cols="12" md="8" class="py-4">
+            <h2 class="h1 font-weight-bold mb-2 text-white">
+              {{ events.eventName || 'World Rafting Championship 2028' }}
+            </h2>
 
-            <b-row>
-              <b-col cols="6">
-                <div style="display: flex; flex-direction: row">
-                  <b-col cols="3">
-                    <label class="mr-3">Start Date Event </label>
-                  </b-col>
-                  <b-col>
-                    <p>
-                      :
-                      {{
-                        events.startDateEvent
-                          ? formatDate(events.startDateEvent)
-                          : "-"
-                      }}
-                    </p>
-                  </b-col>
-                </div>
-              </b-col>
-              <b-col cols="6">
-                <div style="display: flex; flex-direction: row">
-                  <b-col cols="3">
-                    <label class="mr-3">End Date Event </label>
-                  </b-col>
-                  <b-col>
-                    <p>
-                      :
-                      {{
-                        events.endDateEvent
-                          ? formatDate(events.endDateEvent)
-                          : "-"
-                      }}
-                    </p>
-                  </b-col>
-                </div>
-              </b-col>
-            </b-row>
-          </b-card>
-        </div>
-        <br />
-        <br />
-        <div class="my-4">
+            <div class="meta text-white-50">
+              <span class="mr-3"><strong class="text-white">Location</strong> :
+                {{ events.location || 'Colorado, USA' }}</span>
+              <span class="mr-3"><strong class="text-white">River</strong> :
+                {{ events.riverName || 'Dirty Devil River' }}</span>
+              <span class="mr-3"><strong class="text-white">Level</strong> :
+                {{ events.levelName || 'Classification - A' }}</span>
+            </div>
+          </b-col>
+
+          <b-col cols="12" md="4" class="d-flex align-items-center justify-content-center">
+            <div class="hero-image placeholder d-flex align-items-center justify-content-center">
+              <Icon icon="mdi:image" width="64" height="64" />
+            </div>
+          </b-col>
+        </b-row>
+      </b-container>
+    </section>
+
+    <b-container class="mt-4 mb-5">
+      <!-- 2) RACE CATEGORIES -->
+      <h5 class="font-weight-bold mb-3">Race Categories</h5>
+      <b-row>
+        <b-col cols="12" md="3" v-for="c in raceCategories" :key="c.key" class="mb-3">
           <div
-            class="text-left"
-            style="display: flex; gap: 1vh; justify-content: center"
+            class="race-card"
+            :class="{ active: isActivated === c.key }"
+            @click="selectCategory(c)"
           >
+            <div class="race-icon">
+              <Icon :icon="c.icon" width="28" height="28" />
+            </div>
+            <div class="h6 font-weight-bold mb-1 text-center">{{ c.title }}</div>
+            <small class="text-muted d-block text-center">{{ c.desc }}</small>
+
             <b-button
-              @click="changeRaceGame()"
-              style="border-radius: 20px"
-              class="btn-md mr-2"
-              variant="warning"
+              size="sm"
+              variant="secondary"
+              class="rounded-pill w-100 mt-3"
             >
-              <Icon icon="game-icons:checkered-flag" /> Official Training Run
-            </b-button>
-            <b-button
-              @click="changeRaceGame()"
-              style="border-radius: 20px"
-              class="btn-md mr-2"
-              variant="primary"
-            >
-              <Icon icon="game-icons:checkered-flag" /> Race Game
+              Select
             </b-button>
           </div>
+        </b-col>
+      </b-row>
+
+      <!-- 3) REGISTERED TEAMS – SPRINT -->
+      <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+        <h5 class="font-weight-bold mb-0">Registered Teams – Sprint Category</h5>
+      </div>
+
+      <!-- Panel MEN -->
+      <section class="panel-box">
+        <div class="panel-head">
+          <div class="font-weight-bold">Team R4 Men's – Sprint</div>
+          <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
         </div>
 
-        <div v-if="!otr">
-          <div class="my-4">
-            <div style="display: flex; gap: 1vh; justify-content: center">
-              <label>Event Model :</label>
-            </div>
-            <div
-              class="text-left"
-              style="display: flex; gap: 1vh; justify-content: center"
-            >
-              <b-button
-                v-for="category in events.categoriesEvent"
-                :key="category.name"
-                style="border-radius: 20px"
-                :style="{
-                  background:
-                    isActivated === category.name ? '#027BFE' : '#C4C4C4',
-                }"
-                @click="getEvent(category)"
-              >
-                <img
-                  v-if="category.name == 'DRR'"
-                  src="../../../assets/icons/drr.png"
-                  alt="DRR"
-                  style="height: 50px; margin-right: 5px"
-                />
-                <img
-                  v-if="category.name == 'SPRINT'"
-                  src="../../../assets/icons/sprint.png"
-                  alt="SPRINT"
-                  style="height: 50px; margin-right: 5px"
-                />
-                <img
-                  v-if="category.name == 'HEAD2HEAD'"
-                  src="../../../assets/icons/h2h.png"
-                  alt="HEAD2HEAD"
-                  style="height: 50px; margin-right: 5px"
-                />
-                <img
-                  v-if="category.name == 'SLALOM'"
-                  src="../../../assets/icons/slalom.png"
-                  alt="SLALOM"
-                  style="height: 50px; margin-right: 5px"
-                />
-                {{ category.name }}
-              </b-button>
-            </div>
-          </div>
+        <!-- gunakan komponen tabel tim milikmu -->
+        <teamParticipantVue
+          :teamTitle="'R4 Men – Sprint'"
+          :data="dataTeams"
+          :filterEvent="eventActive.selected"
+          :filterInitial="initialActive.selected"
+          :filterRace="raceActive.selected"
+          :filterDivision="{ name: 'R4 MEN' }"
+          :fields="headersTable"
+          @open-modal="openModal(formEvent && formEvent.participant)"
+        />
+      </section>
 
-          <div class="row justify-content-md-center">
-            <div class="col-md-auto">
-              <div class="my-4" v-if="eventActive.show">
-                <div style="display: flex; gap: 1vh; justify-content: center">
-                  <label>Event Initial :</label>
-                </div>
-                <div
-                  class="text-left"
-                  style="display: flex; gap: 1vh; justify-content: center"
-                >
-                  <b-button
-                    v-for="category in events.categoriesInitial"
-                    :key="category.name"
-                    style="border-radius: 20px"
-                    :style="{
-                      background:
-                        isActivatedInitial === category.name
-                          ? '#027BFE'
-                          : '#C4C4C4',
-                    }"
-                    @click="getInitial(category)"
-                  >
-                    {{ category.name }}
-                  </b-button>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-auto">
-              <div class="my-4" v-if="eventActive.show && initialActive.show">
-                <div style="display: flex; gap: 1vh; justify-content: center">
-                  <label>Race Categories :</label>
-                </div>
-                <div
-                  class="text-left"
-                  style="display: flex; gap: 1vh; justify-content: center"
-                >
-                  <b-button
-                    v-for="category in events.categoriesRace"
-                    :key="category.name"
-                    style="border-radius: 20px"
-                    :style="{
-                      background:
-                        isActivatedRace === category.name
-                          ? '#027BFE'
-                          : '#C4C4C4',
-                    }"
-                    @click="getRace(category)"
-                  >
-                    {{ category.name }}
-                  </b-button>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-auto">
-              <div
-                class="my-4"
-                v-if="eventActive.show && initialActive.show && raceActive.show"
-              >
-                <div style="display: flex; gap: 1vh; justify-content: center">
-                  <label>Type Race :</label>
-                </div>
-                <div
-                  class="text-left"
-                  style="display: flex; gap: 1vh; justify-content: center"
-                >
-                  <b-button
-                    v-for="category in events.categoriesDivision"
-                    :key="category.name"
-                    style="border-radius: 20px"
-                    :style="{
-                      background:
-                        isActivatedDivision === category.name
-                          ? '#027BFE'
-                          : '#C4C4C4',
-                    }"
-                    @click="getDivision(category)"
-                  >
-                    {{ category.name }}
-                  </b-button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="showEmptyCards">
-            <cardEmptyVue />
-          </div>
-          <div v-else>
-            <teamParticipantVue
-              :teamTitle="titleTeams"
-              :data="dataTeams"
-              :filterEvent="eventActive.selected"
-              :filterInitial="initialActive.selected"
-              :filterRace="raceActive.selected"
-              :filterDivision="divisionActive.selected"
-              :fields="headersTable"
-              @open-modal="openModal(formEvent.participant)"
-            />
-          </div>
+      <!-- Panel WOMEN -->
+      <section class="panel-box mt-4">
+        <div class="panel-head">
+          <div class="font-weight-bold">Team R4 Women’s – Sprint</div>
+          <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
         </div>
-      </b-col>
-    </b-row>
-    <br />
-    <br />
 
+        <teamParticipantVue
+          :teamTitle="'R4 Women – Sprint'"
+          :data="dataTeams"
+          :filterEvent="eventActive.selected"
+          :filterInitial="initialActive.selected"
+          :filterRace="raceActive.selected"
+          :filterDivision="{ name: 'R4 WOMEN' }"
+          :fields="headersTable"
+          @open-modal="openModal(formEvent && formEvent.participant)"
+        />
+      </section>
+    </b-container>
+
+    <!-- FOOTER ringan -->
+    <footer class="sts-footer text-center text-muted py-3">
+      © {{ new Date().getFullYear() }} Sustainable Timing System. All rights reserved.
+    </footer>
+
+    <!-- MODAL RESULT (existing) -->
     <b-modal id="bv-modal-result" title="Sprint Results" size="xl" hide-footer>
       <div v-if="resultsLoading" class="text-center py-4">Loading...</div>
-
       <div v-else>
         <table class="table table-striped table-sm mb-0">
           <thead>
             <tr>
-              <th style="width: 50px">#</th>
+              <th style="width:50px">#</th>
               <th>Team</th>
-              <th style="width: 90px">BIB</th>
-              <th style="width: 90px">Rank</th>
-              <th style="width: 140px">Race</th>
-              <th style="width: 140px">Penalty</th>
-              <th style="width: 140px">Total</th>
-              <th style="width: 190px">Saved At</th>
+              <th style="width:90px">BIB</th>
+              <th style="width:90px">Rank</th>
+              <th style="width:140px">Race</th>
+              <th style="width:140px">Penalty</th>
+              <th style="width:140px">Total</th>
+              <th style="width:190px">Saved At</th>
             </tr>
           </thead>
           <tbody>
@@ -333,21 +137,13 @@
               <td>{{ r.nameTeam }}</td>
               <td>{{ r.bibTeam }}</td>
               <td>{{ r.result && r.result.ranked }}</td>
-              <td>{{ r.result ? cleanTime(r.result.raceTime) : "" }}</td>
-              <td>{{ r.result ? cleanTime(r.result.penaltyTime) : "" }}</td>
-              <td>
-                {{
-                  r.result
-                    ? cleanTime(r.result.totalTime || r.result.raceTime)
-                    : ""
-                }}
-              </td>
+              <td>{{ r.result ? cleanTime(r.result.raceTime) : '' }}</td>
+              <td>{{ r.result ? cleanTime(r.result.penaltyTime) : '' }}</td>
+              <td>{{ r.result ? cleanTime(r.result.totalTime || r.result.raceTime) : '' }}</td>
               <td>{{ fmtDate(r.createdAt) }}</td>
             </tr>
             <tr v-if="!sprintResultsSorted.length">
-              <td colspan="8" class="text-center text-muted py-4">
-                Belum ada data tersimpan.
-              </td>
+              <td colspan="8" class="text-center text-muted py-4">Belum ada data tersimpan.</td>
             </tr>
           </tbody>
         </table>
@@ -358,23 +154,17 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { Icon } from "@iconify/vue2";
 import teamParticipantVue from "./cards/team-participant.vue";
-import teamOTR from "./cards/team-otr.vue";
-
 import cardEmptyVue from "@/components/cards/card-must-filled.vue";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: {
-    teamParticipantVue,
-    cardEmptyVue,
-    teamOTR,
-  },
+  components: { Icon, teamParticipantVue, cardEmptyVue },
   data() {
     return {
       resultsLoading: false,
       sprintResults: [],
-      showEmptyCards: true,
       loading: false,
       events: {},
       headersTable: [
@@ -385,61 +175,50 @@ export default {
         { key: "interval", label: "INTERVAL" },
         { key: "Action", label: "ACTION", class: "text-right" },
       ],
-      team: {
-        R4men: false,
-        R4women: false,
-        R6men: false,
-        R6women: false,
-      },
-      isActivated: "",
-      events: {},
-      nothingR4men: false,
-      nothingR4women: false,
-      nothingR6men: false,
-      nothingR6women: false,
-      showCategoriesSprint: false,
-      showCategoriesHead2Head: false,
-      showCategoriesSlalom: false,
-      showCategoriesDRR: false,
-      eventActive: {
-        selected: {},
-        show: false,
-        actived: false,
-      },
-      initialActive: {
-        selected: {},
-        show: false,
-        actived: false,
-      },
-      raceActive: {
-        selected: {},
-        show: false,
-        actived: false,
-      },
-      divisionActive: {
-        selected: {},
-        show: false,
-        actived: false,
-      },
       dataTeams: [],
-      otrTeams: [],
-      titleTeams: "",
-      otr: false,
-      filteredIndex: "",
+      // state filter yg sudah ada di kodenya
+      isActivated: "",
+      eventActive: { selected: {}, show: false, actived: false },
+      initialActive: { selected: {}, show: false, actived: false },
+      raceActive: { selected: { name: "SPRINT" }, show: true, actived: true }, // default SPRINT agar sesuai mockup
+      divisionActive: { selected: {}, show: false, actived: false },
+
+      // kartu kategori (ikon + deskripsi)
+      raceCategories: [
+        {
+          key: "SPRINT",
+          title: "Sprint",
+          icon: "mdi:flash",
+          desc: "Short-distance race against the clock on grade II-III rapids",
+        },
+        {
+          key: "HEAD2HEAD",
+          title: "Head to Head",
+          icon: "mdi:swap-horizontal",
+          desc: "Direct competition between two teams on parallel courses",
+        },
+        {
+          key: "SLALOM",
+          title: "Slalom",
+          icon: "mdi:gate",
+          desc: "Technical navigation through gates on whitewater",
+        },
+        {
+          key: "DRR",
+          title: "Down River Race",
+          icon: "mdi:waves",
+          desc: "Long-distance endurance race with varied river conditions",
+        },
+      ],
     };
   },
   computed: {
     sprintResultsSorted() {
-      // copy dulu biar gak mutate state asli
-      const list = Array.isArray(this.sprintResults)
-        ? this.sprintResults.slice()
-        : [];
-
-      // helper local untuk konversi "HH:MM:SS.mmm" ke ms
-      const toMs = (t) => {
+      const list = Array.isArray(this.sprintResults) ? this.sprintResults.slice() : [];
+      const toMs = function (t) {
         if (!t) return Number.POSITIVE_INFINITY;
         const s = String(t).trim().replace("\r", "");
-        const parts = s.split(":"); // HH:MM:SS.mmm
+        const parts = s.split(":");
         if (parts.length < 3) return Number.POSITIVE_INFINITY;
         const hh = parseInt(parts[0], 10) || 0;
         const mm = parseInt(parts[1], 10) || 0;
@@ -448,17 +227,12 @@ export default {
         const ms = parseInt(secMs[1], 10) || 0;
         return ((hh * 60 + mm) * 60 + ss) * 1000 + ms;
       };
-
-      return list.sort((a, b) => {
+      return list.sort(function (a, b) {
         const ra = a && a.result ? a.result.ranked : undefined;
         const rb = b && b.result ? b.result.ranked : undefined;
-
-        // jika ada ranked, pakai ranked
         if (typeof ra === "number" && typeof rb === "number") return ra - rb;
         if (typeof ra === "number") return -1;
         if (typeof rb === "number") return 1;
-
-        // fallback pakai totalTime/raceTime
         const ta = a && a.result ? a.result.totalTime || a.result.raceTime : "";
         const tb = b && b.result ? b.result.totalTime || b.result.raceTime : "";
         return toMs(ta) - toMs(tb);
@@ -470,203 +244,136 @@ export default {
     await this.loadData(eventId);
   },
   methods: {
-    // 👉 FITUR BUTTON RESULT
-    cleanTime(t) {
-      return t ? String(t).trim().replace("\r", "") : "";
-    },
-    fmtDate(d) {
-      try {
-        // Mongo sudah Date; kalau string juga aman
-        return new Date(d).toLocaleString();
-      } catch (e) {
-        return "-";
-      }
+    // === UI handlers ===
+    selectCategory(c) {
+      this.isActivated = c.key;
+      this.raceActive = { selected: { name: c.key }, show: true, actived: true };
     },
 
-    // tombol Result
+    // === time helpers ===
+    cleanTime(t) { return t ? String(t).trim().replace("\r", "") : ""; },
+    fmtDate(d) { try { return new Date(d).toLocaleString(); } catch (e) { return "-"; } },
+
+    // === IPC ===
+    async loadData(id) {
+      this.loading = true;
+      const self = this;
+      setTimeout(function () {
+        ipcRenderer.send("get-events-byid", id);
+        ipcRenderer.once("get-events-byid-reply", function (_e, data) {
+          if (data) {
+            self.events = data;
+            self.dataTeams = data && data.participant ? data.participant : [];
+            localStorage.setItem("eventDetails", JSON.stringify(data));
+          } else {
+            console.error("Failed to retrieve data from events table");
+          }
+          self.loading = false;
+        });
+      }, 300);
+    },
+
+    // === Navigation ===
+    goTo(val) { this.$router.push("/event-detail/" + this.$route.params.id + "/" + val); },
+    back(val) { this.$router.push(val); },
+
+    // === formatting ===
+    formatDate(inputDate) {
+      if (!inputDate) return "-";
+      const parts = inputDate.split("-");
+      const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+      const date = new Date(y, m, d);
+      const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
+    },
+
+    // === Result modal ===
     showResultCategories() {
       this.resultsLoading = true;
       this.sprintResults = [];
-
-      // const q = {
-      //   eventId: this.$route.params.id,
-      //   model:
-      //     this.eventActive &&
-      //     this.eventActive.selected &&
-      //     this.eventActive.selected.name,
-      //   initial:
-      //     this.initialActive &&
-      //     this.initialActive.selected &&
-      //     this.initialActive.selected.name,
-      //   race:
-      //     this.raceActive &&
-      //     this.raceActive.selected &&
-      //     this.raceActive.selected.name,
-      //   division:
-      //     this.divisionActive &&
-      //     this.divisionActive.selected &&
-      //     this.divisionActive.selected.name,
-      // };
-
-       const q = {
-    eventId: this.$route.params.id,  // cukup kirim eventId
-  };
-
-      console.log(q,'<<< cek q')
+      const q = { eventId: this.$route.params.id };
       ipcRenderer.send("get-sprint-result", q);
-
-      // pakai once biar gak numpuk
-      ipcRenderer.once("get-sprint-result-reply", (e, res) => {
-        this.resultsLoading = false;
-        console.log(res,'<<< response');
+      const self = this;
+      ipcRenderer.once("get-sprint-result-reply", function (_e, res) {
+        self.resultsLoading = false;
         if (!(res && res.ok)) {
           ipcRenderer.send("get-alert", {
             type: "warning",
             detail: res && res.error ? res.error : "Cannot load results",
             message: "Failed",
           });
-          this.$bvModal.show("bv-modal-result");
+          self.$bvModal.show("bv-modal-result");
           return;
         }
-        this.sprintResults = Array.isArray(res.items) ? res.items : [];
-        this.$bvModal.show("bv-modal-result");
+        self.sprintResults = Array.isArray(res.items) ? res.items : [];
+        self.$bvModal.show("bv-modal-result");
       });
-    },
-    async changeRaceGame() {
-      this.otr = !this.otr;
-      this.titleTeams = "";
-      this.eventActive.selected = {};
-      this.eventActive.show = false;
-      this.eventActive.actived = false;
-      this.initialActive.selected = {};
-      this.initialActive.show = false;
-      this.initialActive.actived = false;
-      this.raceActive.selected = {};
-      this.raceActive.show = false;
-      this.raceActive.actived = false;
-      this.divisionActive.selected = {};
-      this.divisionActive.show = false;
-      this.divisionActive.actived = false;
-
-      // const eventId = this.$route.params.id;
-      // await this.loadData(eventId)
-    },
-    getEvent(payload) {
-      this.isActivatedInitial = "";
-      this.showEmptyCards = true;
-      this.raceActive.show = false;
-      this.initialActive.show = false;
-
-      this.eventActive.show = !this.eventActive.show;
-      if (this.eventActive.show) {
-        this.eventActive.selected = payload;
-        this.isActivated = payload.name;
-      } else {
-        this.eventActive.selected = {};
-        this.isActivated = "";
-      }
-    },
-    getInitial(payload) {
-      this.isActivatedRace = "";
-      this.showEmptyCards = true;
-      this.raceActive.show = false;
-
-      this.initialActive.show = !this.initialActive.show;
-      if (this.initialActive.show) {
-        this.initialActive.selected = payload;
-        this.isActivatedInitial = payload.name;
-      } else {
-        this.initialActive.selected = {};
-        this.isActivatedInitial = "";
-      }
-    },
-    getRace(payload) {
-      this.isActivatedDivision = "";
-      this.showEmptyCards = true;
-      this.divisionActive.show = false;
-
-      this.raceActive.show = !this.raceActive.show;
-      if (this.raceActive.show) {
-        this.raceActive.selected = payload;
-        this.isActivatedRace = payload.name;
-      } else {
-        this.raceActive.selected = {};
-        this.isActivatedRace = "";
-      }
-    },
-    getDivision(payload) {
-      this.divisionActive.show = !this.divisionActive.show;
-      if (this.divisionActive.show) {
-        this.divisionActive.selected = payload;
-        this.isActivatedDivision = payload.name;
-        this.titleTeams = this.divisionActive.selected.name;
-      } else {
-        this.divisionActive.selected = {};
-        this.isActivatedDivision = "";
-      }
-      this.showEmptyCards = !this.showEmptyCards;
-    },
-    async loadData(payload) {
-      this.loading = true;
-      await setTimeout(() => {
-        ipcRenderer.send("get-events-byid", payload);
-        ipcRenderer.on("get-events-byid-reply", (event, data) => {
-          if (data) {
-            this.events = data;
-            this.dataTeams = this.events.participant;
-            this.otrTeams = this.events.participant;
-            localStorage.setItem("eventDetails", JSON.stringify(data));
-          } else {
-            console.error("Failed to retrieve data from events table");
-          }
-          this.loading = false;
-        });
-      }, 1000);
-    },
-    goTo(val) {
-      this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
-    },
-    back(val) {
-      this.$router.push(`${val}`);
-    },
-    formatDate(inputDate) {
-      // Pisahkan tanggal, bulan, dan tahun dari inputDate
-      const parts = inputDate.split("-");
-      const year = parseInt(parts[0]);
-      const month = parseInt(parts[1]);
-      const day = parseInt(parts[2]);
-
-      // Buat objek Date dari tanggal yang diberikan
-      const date = new Date(year, month - 1, day); // Perhatikan bahwa bulan dimulai dari 0, jadi kurangi 1 dari nilai bulan
-
-      // Buat daftar nama bulan dalam Bahasa Indonesia
-      const monthNames = [
-        "Januari",
-        "Februari",
-        "Maret",
-        "April",
-        "Mei",
-        "Juni",
-        "Juli",
-        "Agustus",
-        "September",
-        "Oktober",
-        "November",
-        "Desember",
-      ];
-
-      // Format tanggal dengan menggunakan nilai tanggal, nama bulan, dan tahun
-      const formattedDate =
-        day + " " + monthNames[date.getMonth()] + " " + year;
-
-      return formattedDate;
     },
   },
 };
 </script>
 
 <style scoped>
-.name-team-width {
-  width: 800px !important;
+:root{ --sts-blue:#2c5cff; --sts-muted:#8793b5; }
+
+/* HERO */
+.detail-hero{
+  background: linear-gradient(180deg,#b8c6e6 0%, #92a3d1 60%, #8ea1d1 100%);
+  border-bottom:1px solid rgba(255,255,255,.25);
 }
+.detail-hero .h1{ text-shadow: 0 2px 12px rgba(0,0,0,.12); }
+.detail-hero .hero-image{
+  width:320px; max-width:100%; height:180px; border-radius:16px;
+  background: rgba(255,255,255,.25);
+  box-shadow:0 8px 24px rgba(0,0,0,.12);
+}
+
+/* RACE CATEGORY CARDS */
+.race-card{
+  border:1px solid #dfe5f2; border-radius:12px; background:#fff;
+  padding:16px; height:100%;
+  box-shadow:0 6px 18px rgba(44,92,255,.06);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  cursor:pointer;
+}
+.race-card:hover{ transform: translateY(-2px); box-shadow:0 10px 22px rgba(44,92,255,.10); }
+.race-card.active{ border-color: #2c5cff; }
+.race-icon{
+  width:56px; height:56px; border-radius:12px; margin: 0 auto 6px auto;
+  background:#eff3ff; color:#2c5cff;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* PANEL REGISTERED TEAMS */
+.panel-box{
+  border:1px solid #dfe5f2; border-radius:12px; background:#fff;
+  box-shadow:0 6px 18px rgba(44,92,255,.06);
+  padding:0; overflow:hidden;
+}
+.panel-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px;
+  background: #f6f8fc; border-bottom:1px solid #e7ecf6;
+}
+
+/* tabel dalam panel agar mirip mockup */
+.panel-box .table{
+  margin-bottom:0;
+  border-collapse:separate; border-spacing:0 8px;
+}
+.panel-box .table thead th{
+  border:0; background:transparent; color:#2c3e50; font-weight:700;
+}
+.panel-box .table tbody tr{
+  background:#fff; border:1px solid #eef0f6;
+}
+.panel-box .btn.btn-sm.rounded-pill{ border-radius:999px; }
+
+/* FOOTER */
+.sts-footer{
+  border-top:1px solid #e6eaf2; background:#eef3f7;
+}
+
+/* Utility */
+.placeholder{ color:#e5ebff; }
 </style>

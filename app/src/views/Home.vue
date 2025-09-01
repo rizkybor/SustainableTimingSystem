@@ -1,7 +1,7 @@
 <template>
   <div class="sts-page">
     <!-- 1) NAVBAR -->
-    <b-navbar toggleable="lg" type="light" variant="white" class="sts-navbar shadow-sm">
+    <!-- <b-navbar toggleable="lg" type="light" variant="white" class="sts-navbar shadow-sm">
       <b-container>
         <b-navbar-brand class="d-flex align-items-center">
           <div class="brand-box mr-2 d-flex align-items-center justify-content-center">
@@ -24,7 +24,7 @@
           </b-navbar-nav>
         </b-collapse>
       </b-container>
-    </b-navbar>
+    </b-navbar> -->
 
     <!-- 2) JUMBOTRON -->
     <section class="sts-jumbotron">
@@ -166,9 +166,10 @@
     </b-container>
 
     <!-- 6) FOOTER -->
-    <footer class="sts-footer text-center text-muted py-4">
+    <!-- <footer class="sts-footer text-center text-muted py-4">
       © {{ new Date().getFullYear() }} Sustainable Timing System. All rights reserved.
-    </footer>
+    </footer> -->
+    
   </div>
 </template>
 
@@ -301,7 +302,7 @@ export default {
 .team-avatar{ height:40px; width:40px; border-radius:999px; background:#eff3ff; color:#2c5cff; }
 
 /* FOOTER */
-.sts-footer{ border-top:1px solid #e6eaf2; background:#eef3f7; }
+/* .sts-footer{ border-top:1px solid #e6eaf2; background:#eef3f7; } */
 
 /* MISC */
 .placeholder{ color:#8793b5; }

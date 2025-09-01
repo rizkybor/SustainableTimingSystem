@@ -1,13 +1,7 @@
 <template>
   <div>
-    <footer class="footer mt-auto py-4">
-      <div class="container">
-        <div style="display: flex; justify-content: space-between;"> 
-          <span >Copyright © 2024 kikiaka.id - All Rights Reserved</span>
-
-          <span style="font-weight: bold;">SUSTAINABLE TIMING SYSTEM</span>
-        </div>
-      </div>
+     <footer class="sts-footer text-center py-4" style="color: white;">
+      © {{ new Date().getFullYear() }} Sustainable Timing System. All rights reserved.
     </footer>
   </div>
 </template>
@@ -33,12 +27,5 @@ export default {
 </script>
 
 <style scoped>
-.footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background-color: var(--blue);
-    text-align: center;
-    color: white !important;
-  }
+.sts-footer{ border-top:1px solid #e6eaf2; background:#2c5cff; }
 </style>

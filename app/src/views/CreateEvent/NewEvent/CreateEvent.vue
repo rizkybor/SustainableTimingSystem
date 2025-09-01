@@ -276,7 +276,7 @@
                 >
               </div>
               <div>
-                <b-button
+                <!-- <b-button
                   class="btn-md"
                   style="border-radius: 20px"
                   @click="save()"
@@ -284,7 +284,16 @@
                   variant="primary"
                 >
                   Next <Icon icon="ic:baseline-keyboard-double-arrow-right"
-                /></b-button>
+                /></b-button> -->
+                <b-button
+                  class="btn-md"
+                  style="border-radius: 20px"
+                  @click="save()"
+                  type="input"
+                  variant="primary"
+                >
+                  Create Event <Icon icon="ic:baseline-check-circle" />
+                </b-button>
               </div>
             </div>
           </b-card>
@@ -478,16 +487,45 @@ export default {
       }
       return true;
     },
+    // save() {
+    //   const formValid = this.validateForm();
+    //   if (formValid) {
+    //     const obj = JSON.stringify(this.formEvent);
+    //     localStorage.setItem("formNewEvent", obj);
+    //     this.$emit("enterForm");
+    //   } else {
+    //     ipcRenderer.send("get-alert", {
+    //       type: "warning",
+    //       detail: "To go to the next page, all fields must be filled in",
+    //       message: "Ups Sorry",
+    //     });
+    //   }
+    // },
     save() {
       const formValid = this.validateForm();
       if (formValid) {
-        const obj = JSON.stringify(this.formEvent);
-        localStorage.setItem("formNewEvent", obj);
-        this.$emit("enterForm");
+        let payload = { ...this.formEvent };
+        // selalu kosongin participant
+        payload.participant = [];
+
+        ipcRenderer.send("insert-new-event", payload);
+
+        ipcRenderer.once("insert-new-event-reply", (event, data) => {
+          ipcRenderer.send("get-alert-saved", {
+            type: "question",
+            detail: `Event data has been successfully saved`,
+            message: "Successfully",
+          });
+        });
+
+        setTimeout(() => {
+          localStorage.removeItem("formNewEvent");
+          this.$router.push("/");
+        }, 1500);
       } else {
         ipcRenderer.send("get-alert", {
           type: "warning",
-          detail: "To go to the next page, all fields must be filled in",
+          detail: "To create an event, all fields must be filled in",
           message: "Ups Sorry",
         });
       }

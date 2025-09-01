@@ -17,11 +17,11 @@
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"><strong class="text-white">Location</strong> :
-                {{ events.location || "Colorado, USA" }}</span>
+                {{ events.location || events.addressCity || "–" }}</span>
               <span class="mr-3"><strong class="text-white">River</strong> :
-                {{ events.riverName || "Dirty Devil River" }}</span>
+                {{ events.riverName || "–" }}</span>
               <span class="mr-3"><strong class="text-white">Level</strong> :
-                {{ events.levelName || "Classification - A" }}</span>
+                {{ events.levelName || "–" }}</span>
             </div>
           </b-col>
           <b-col cols="12" md="4" class="d-flex align-items-center justify-content-center">
@@ -47,17 +47,37 @@
         </b-col>
       </b-row>
 
+      <!-- INITIAL CHIPS (pilih usia/kelas) -->
+<h5 class="font-weight-bold mb-3 mt-4">Initial Categories</h5>
+<b-row v-if="(events.categoriesInitial||[]).length">
+  <b-col
+    cols="12"
+    md="3"
+    v-for="i in events.categoriesInitial"
+    :key="i.name"
+    class="mb-3"
+  >
+    <div
+      class="race-card"
+      :class="{ active: initialActive.selected && initialActive.selected.name===i.name }"
+      @click="selectInitial(i)"
+    >
+      <div class="h6 font-weight-bold mb-1 text-center">{{ i.name }}</div>
+    </div>
+  </b-col>
+</b-row>
+
       <!-- 3) REGISTERED TEAMS – sesuai race aktif -->
       <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
         <h5 class="font-weight-bold mb-0">
-          Registered Teams – {{ (raceActive.selected && raceActive.selected.name) || "Sprint" }} Category
+          Registered Teams – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }} Category
         </h5>
       </div>
 
       <!-- R4 MEN -->
       <section class="panel-box" v-if="showPanel('R4','MEN')">
         <div class="panel-head">
-          <div class="font-weight-bold">Team R4 Men's – {{ (raceActive.selected && raceActive.selected.name) || "Sprint" }}</div>
+          <div class="font-weight-bold">Team R4 Men's – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
             <multiselect
               v-model="selectedToAdd.R4_MEN"
@@ -76,7 +96,7 @@
           </div>
         </div>
         <teamParticipantVue
-          :teamTitle="'R4 Men – ' + ((raceActive.selected && raceActive.selected.name) || 'Sprint')"
+          :teamTitle="'R4 Men – ' + ((raceActive.selected && raceActive.selected.name) || 'SPRINT')"
           :data="teamsMenR4"
           :fields="headersTable"
           @open-modal="openModal && openModal(formEvent ? formEvent.participant : null)"
@@ -86,7 +106,7 @@
       <!-- R4 WOMEN -->
       <section class="panel-box mt-4" v-if="showPanel('R4','WOMEN')">
         <div class="panel-head">
-          <div class="font-weight-bold">Team R4 Women’s – {{ (raceActive.selected && raceActive.selected.name) || "Sprint" }}</div>
+          <div class="font-weight-bold">Team R4 Women’s – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
             <multiselect
               v-model="selectedToAdd.R4_WOMEN"
@@ -105,7 +125,7 @@
           </div>
         </div>
         <teamParticipantVue
-          :teamTitle="'R4 Women – ' + ((raceActive.selected && raceActive.selected.name) || 'Sprint')"
+          :teamTitle="'R4 Women – ' + ((raceActive.selected && raceActive.selected.name) || 'SPRINT')"
           :data="teamsWomenR4"
           :fields="headersTable"
           @open-modal="openModal && openModal(formEvent ? formEvent.participant : null)"
@@ -115,7 +135,7 @@
       <!-- R6 MEN -->
       <section class="panel-box mt-4" v-if="showPanel('R6','MEN')">
         <div class="panel-head">
-          <div class="font-weight-bold">Team R6 Men's – {{ (raceActive.selected && raceActive.selected.name) || "Sprint" }}</div>
+          <div class="font-weight-bold">Team R6 Men's – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
             <multiselect
               v-model="selectedToAdd.R6_MEN"
@@ -134,7 +154,7 @@
           </div>
         </div>
         <teamParticipantVue
-          :teamTitle="'R6 Men – ' + ((raceActive.selected && raceActive.selected.name) || 'Sprint')"
+          :teamTitle="'R6 Men – ' + ((raceActive.selected && raceActive.selected.name) || 'SPRINT')"
           :data="teamsMenR6"
           :fields="headersTable"
           @open-modal="openModal && openModal(formEvent ? formEvent.participant : null)"
@@ -144,7 +164,7 @@
       <!-- R6 WOMEN -->
       <section class="panel-box mt-4" v-if="showPanel('R6','WOMEN')">
         <div class="panel-head">
-          <div class="font-weight-bold">Team R6 Women’s – {{ (raceActive.selected && raceActive.selected.name) || "Sprint" }}</div>
+          <div class="font-weight-bold">Team R6 Women’s – {{ (raceActive.selected && raceActive.selected.name) || 'SPRINT' }}</div>
           <div class="d-flex align-items-center">
             <multiselect
               v-model="selectedToAdd.R6_WOMEN"
@@ -163,7 +183,7 @@
           </div>
         </div>
         <teamParticipantVue
-          :teamTitle="'R6 Women – ' + ((raceActive.selected && raceActive.selected.name) || 'Sprint')"
+          :teamTitle="'R6 Women – ' + ((raceActive.selected && raceActive.selected.name) || 'SPRINT')"
           :data="teamsWomenR6"
           :fields="headersTable"
           @open-modal="openModal && openModal(formEvent ? formEvent.participant : null)"
@@ -228,18 +248,27 @@ export default {
   components: { Icon, teamParticipantVue, cardEmptyVue, Multiselect },
   data() {
     return {
-      // registry tim global untuk event ini (dropdown)
+      useDummyTeams: true, // set true untuk pakai dummy
+dummyTeams: [
+  { id: "t101", nameTeam: "FAJI Jakarta Pusat",  bibTeam: "001" },
+  { id: "t102", nameTeam: "FAJI Jakarta Utara",  bibTeam: "002" },
+  { id: "t103", nameTeam: "FAJI Jakarta Barat",  bibTeam: "003" },
+  { id: "t104", nameTeam: "FAJI Jakarta Timur",  bibTeam: "004" },
+  { id: "t105", nameTeam: "FAJI Jakarta Selatan",bibTeam: "005" },
+  { id: "t106", nameTeam: "FAJI Bekasi",          bibTeam: "006" },
+  { id: "t107", nameTeam: "FAJI Depok",           bibTeam: "007" },
+  { id: "t108", nameTeam: "FAJI Bogor",           bibTeam: "008" },
+  { id: "t109", nameTeam: "FAJI Tangerang",       bibTeam: "009" },
+  { id: "t110", nameTeam: "FAJI Bandung",         bibTeam: "010" },
+  { id: "t111", nameTeam: "FAJI Cirebon",         bibTeam: "011" },
+  { id: "t112", nameTeam: "FAJI Serang",          bibTeam: "012" }
+],
       availableTeams: [],
       selectedToAdd: { R4_MEN: null, R4_WOMEN: null, R6_MEN: null, R6_WOMEN: null },
 
-      // template tim ketika dimasukkan ke participant
-      teamTemplate: {
-        nameTeam: "", bibTeam: "", startOrder: "", praStart: "", intervalRace: "", statusId: 0,
-        result: { startTime: "", finishTime: "", raceTime: "", penaltyTime: "", penalty: "", totalTime: "", ranked: "", score: "" },
-        otr:    { startTime: "", finishTime: "", raceTime: "", penaltyTime: "", penalty: "", totalTime: "", ranked: "", score: "" }
-      },
-
       raceActive: { selected: { name: "SPRINT" }, show: true, actived: true },
+      initialActive: { selected: {}, show: false, actived: false },
+
       resultsLoading: false,
       sprintResults: [],
       loading: false,
@@ -254,35 +283,30 @@ export default {
       ],
       dataTeams: [],
 
-      // UI state
       isActivated: "",
-      eventActive: { selected: {}, show: false, actived: false },
-      initialActive: { selected: {}, show: false, actived: false },
-      divisionActive: { selected: {}, show: false, actived: false },
 
-      // kartu kategori (ikon + deskripsi)
       raceCategories: [
-        { key: "SPRINT",    title: "Sprint",      icon: "mdi:flash",            desc: "Short-distance race against the clock on grade II-III rapids" },
-        { key: "HEAD2HEAD", title: "Head to Head",icon: "mdi:swap-horizontal",  desc: "Direct competition between two teams on parallel courses" },
-        { key: "SLALOM",    title: "Slalom",      icon: "mdi:gate",             desc: "Technical navigation through gates on whitewater" },
-        { key: "DRR",       title: "Down River",  icon: "mdi:waves",            desc: "Long-distance endurance race with varied river conditions" },
+        { key: "SPRINT",    title: "Sprint",      icon: "mdi:flash",           desc: "Short-distance race against the clock on grade II-III rapids" },
+        { key: "HEAD2HEAD", title: "Head to Head",icon: "mdi:swap-horizontal", desc: "Direct competition between two teams on parallel courses" },
+        { key: "SLALOM",    title: "Slalom",      icon: "mdi:gate",            desc: "Technical navigation through gates on whitewater" },
+        { key: "DRR",       title: "Down River",  icon: "mdi:waves",           desc: "Long-distance endurance race with varied river conditions" },
       ],
     };
   },
   computed: {
-    // panel data
+    // data per panel
     teamsMenR4()   { return this.getTeamsBy("R4","MEN",   this.raceActive.selected && this.raceActive.selected.name); },
     teamsWomenR4() { return this.getTeamsBy("R4","WOMEN", this.raceActive.selected && this.raceActive.selected.name); },
     teamsMenR6()   { return this.getTeamsBy("R6","MEN",   this.raceActive.selected && this.raceActive.selected.name); },
     teamsWomenR6() { return this.getTeamsBy("R6","WOMEN", this.raceActive.selected && this.raceActive.selected.name); },
 
-    // penentu ada panel yang tampil sama sekali
+    // apakah ada panel yang tampil
     anyPanelShown() {
       return this.showPanel("R4","MEN") || this.showPanel("R4","WOMEN") ||
              this.showPanel("R6","MEN") || this.showPanel("R6","WOMEN");
     },
 
-    // existing
+    // existing (result modal)
     sprintResultsSorted() {
       const list = Array.isArray(this.sprintResults) ? this.sprintResults.slice() : [];
       const toMs = function (t) {
@@ -313,167 +337,205 @@ export default {
     const eventId = this.$route.params.id;
     await this.loadData(eventId);
     await this.loadAvailableTeams(eventId);
+    // set initial default = item pertama jika ada
+    if ((this.events.categoriesInitial||[]).length && !this.initialActive.selected.name){
+      this.initialActive = { selected: this.events.categoriesInitial[0], show: true, actived: true };
+    }
   },
   methods: {
-    // ====== PANELS VISIBILITY based on event config (NOT participant) ======
-    hasDivision(divName) {
-      const divs = this.events && this.events.categoriesDivision ? this.events.categoriesDivision : [];
-      for (let i=0;i<divs.length;i++){
-        if (String(divs[i].name).toUpperCase() === String(divName).toUpperCase()) return true;
-      }
-      return false;
-    },
-    hasRace(name) {
-      const races = this.events && this.events.categoriesRace ? this.events.categoriesRace : [];
-      for (let i=0;i<races.length;i++){
-        if (String(races[i].name).toUpperCase() === String(name).toUpperCase()) return true;
-      }
-      return false;
-    },
-    showPanel(divName, raceName) {
-      // panel terlihat jika diset di konfigurasi event (agar bisa tambah tim meski participant kosong)
-      return this.hasDivision(divName) && this.hasRace(raceName);
-    },
+   /* ===== UI ===== */
+  selectCategory(c) {
+    this.isActivated = c.key;
+    this.raceActive = { selected: { name: c.key }, show: true, actived: true };
+  },
+  selectInitial(init) {
+    this.initialActive = { selected: init, show: true, actived: true };
+  },
 
-    // ====== DROPDOWN REGISTRY ======
-    loadAvailableTeams(eventId) {
-      try {
-        ipcRenderer.send("get-teams-available", { eventId });
-        ipcRenderer.once("get-teams-available-reply", (_e, res) => {
-          if (Array.isArray(res) && res.length) {
-            this.availableTeams = res;
-          } else {
-            // fallback contoh
-            this.availableTeams = [
-              { id: "t1", nameTeam: "FAJI DKI Jakarta", bibTeam: "001" },
-              { id: "t2", nameTeam: "FAJI Banten",       bibTeam: "002" },
-              { id: "t3", nameTeam: "FAJI DIY",          bibTeam: "003" },
-              { id: "t4", nameTeam: "FAJI Jawa Barat",   bibTeam: "004" }
-            ];
-          }
-        });
-      } catch (e) {
-        this.availableTeams = [
+  /* ===== Panel visibility by config ===== */
+  hasDivision(divName) {
+    const divs = (this.events && this.events.categoriesDivision) ? this.events.categoriesDivision : [];
+    return divs.some(function (d) {
+      return String(d.name).toUpperCase() === String(divName).toUpperCase();
+    });
+  },
+  hasRace(name) {
+    const races = (this.events && this.events.categoriesRace) ? this.events.categoriesRace : [];
+    return races.some(function (r) {
+      return String(r.name).toUpperCase() === String(name).toUpperCase();
+    });
+  },
+  showPanel(divName, raceName) {
+    return this.hasDivision(divName) && this.hasRace(raceName);
+  },
+
+  /* ===== Dropdown registry ===== */
+  loadAvailableTeams(eventId) {
+      // Jika ingin pakai dummy (dev/demo), skip IPC dan isi langsung
+  if (this.useDummyTeams) {
+    this.availableTeams = this.dummyTeams.slice();
+    return;
+  }
+    try {
+      ipcRenderer.send("get-teams-available", { eventId });
+      ipcRenderer.once("get-teams-available-reply", (_e, res) => {
+        this.availableTeams = (Array.isArray(res) && res.length) ? res : [
           { id: "t1", nameTeam: "FAJI DKI Jakarta", bibTeam: "001" },
           { id: "t2", nameTeam: "FAJI Banten",       bibTeam: "002" },
           { id: "t3", nameTeam: "FAJI DIY",          bibTeam: "003" },
           { id: "t4", nameTeam: "FAJI Jawa Barat",   bibTeam: "004" }
         ];
+      });
+    } catch (e) {
+      this.availableTeams = [
+        { id: "t1", nameTeam: "FAJI DKI Jakarta", bibTeam: "001" },
+        { id: "t2", nameTeam: "FAJI Banten",       bibTeam: "002" },
+        { id: "t3", nameTeam: "FAJI DIY",          bibTeam: "003" },
+        { id: "t4", nameTeam: "FAJI Jawa Barat",   bibTeam: "004" }
+      ];
+    }
+  },
+  availableFor(divisionName, raceName) {
+    const ev = (this.raceActive.selected && this.raceActive.selected.name)
+      ? String(this.raceActive.selected.name).toUpperCase() : "SPRINT";
+    const initName = (this.initialActive.selected && this.initialActive.selected.name)
+      ? this.initialActive.selected.name : "";
+    const bucket = this._getBucket(ev, divisionName, raceName, initName);
+    const used = new Set(((bucket && bucket.teams) ? bucket.teams : []).map(t => String(t.bibTeam).trim()));
+    const list = this.availableTeams || [];
+    return list.filter(t => !used.has(String(t.bibTeam).trim()));
+  },
+
+  /* ===== Add team via dropdown ===== */
+  onPickTeam(divisionName, raceName, teamObj) {
+    if (!teamObj) return;
+
+    const evName = (this.raceActive.selected && this.raceActive.selected.name) ? this.raceActive.selected.name : "SPRINT";
+    const initSel = (this.initialActive.selected && this.initialActive.selected.name) ? this.initialActive.selected.name : "";
+    if (!initSel) {
+      ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert", { type:"warning", message:"Pilih Initial", detail:"Silakan pilih initial terlebih dahulu." });
+      return;
+    }
+
+    const bucket = this._ensureBucket(evName, divisionName, raceName, initSel);
+
+    if (bucket.teams.some(t => String(t.bibTeam).trim() === String(teamObj.bibTeam).trim())) {
+      ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert", { type:"warning", message:"Duplicate BIB", detail:`BIB ${teamObj.bibTeam} sudah ada pada kombinasi ini.` });
+      return;
+    }
+
+    const record = this._buildTeamRecord(evName, teamObj);
+    bucket.teams.push(record);
+    this.dataTeams = this.dataTeams.slice();
+
+    const k = (String(divisionName).toUpperCase() + "_" + String(raceName).toUpperCase());
+    if (this.selectedToAdd[k] !== undefined) this.selectedToAdd[k] = null;
+
+    this._persistParticipants();
+  },
+
+  _buildTeamRecord(eventName, teamObj) {
+    const ev = String(eventName||"").toUpperCase();
+    const base = {
+      nameTeam: teamObj.nameTeam,
+      bibTeam: teamObj.bibTeam,
+      startOrder: "", praStart: "", intervalRace: "", statusId: 0,
+    };
+    if (ev === "HEAD2HEAD") {
+      return { ...base, result: [{ startTime:"", finishTime:"", raceTime:"", penaltyTime:"", penalty:"", totalTime:"", ranked:"", score:"", bracket:16 }] };
+    }
+    if (ev === "SLALOM") {
+      return { ...base, result: [
+        { startTime:"", finishTime:"", raceTime:"", penaltyTime:"", penalty:"", totalTime:"", ranked:"", score:"" },
+        { startTime:"", finishTime:"", raceTime:"", penaltyTime:"", penalty:"", totalTime:"", ranked:"", score:"" },
+      ]};
+    }
+    return {
+      ...base,
+      result: { startTime:"", finishTime:"", raceTime:"", penaltyTime:"", penalty:"", totalTime:"", ranked:"", score:"" },
+      otr:    { startTime:"", finishTime:"", raceTime:"", penaltyTime:"", penalty:"", totalTime:"", ranked:"", score:"" }
+    };
+  },
+
+  /* ===== Buckets ===== */
+  _getBucket(eventName, divisionName, raceName, initialName) {
+    const ev = String(eventName||"").toUpperCase();
+    const div= String(divisionName||"").toUpperCase();
+    const rac= String(raceName||"").toUpperCase();
+    const ini= String(initialName||"").toUpperCase();
+    const arr = this.dataTeams || [];
+    for (let i=0;i<arr.length;i++){
+      const p = arr[i];
+      if (String(p.eventName).toUpperCase()===ev &&
+          String(p.divisionName).toUpperCase()===div &&
+          String(p.raceName).toUpperCase()===rac &&
+          String(p.initialName).toUpperCase()===ini) {
+        if (!Array.isArray(p.teams)) p.teams = [];
+        return p;
       }
-    },
-    availableFor(divisionName, raceName) {
-      const ev = (this.raceActive && this.raceActive.selected && this.raceActive.selected.name)
-                 ? String(this.raceActive.selected.name).toUpperCase() : "SPRINT";
-      const bucket = this._getBucket(ev, divisionName, raceName);
-      const used = {};
-      if (bucket && Array.isArray(bucket.teams)) {
-        for (let i=0;i<bucket.teams.length;i++) used[String(bucket.teams[i].bibTeam).trim()] = true;
-      }
-      const list = this.availableTeams || [];
-      return list.filter(function(t){ return !used[String(t.bibTeam).trim()]; });
-    },
-    onPickTeam(divisionName, raceName, teamObj) {
-      if (!teamObj) return;
-      const ev = (this.raceActive && this.raceActive.selected && this.raceActive.selected.name)
-                 ? String(this.raceActive.selected.name).toUpperCase() : "SPRINT";
-      const bucket = this._ensureBucket(ev, divisionName, raceName);
+    }
+    return null;
+  },
+  _ensureBucket(eventName, divisionName, raceName, initialName) {
+    const exist = this._getBucket(eventName, divisionName, raceName, initialName);
+    if (exist) return exist;
 
-      // cek duplikat BIB
-      const exists = bucket.teams.some(function(t){ return String(t.bibTeam).trim() === String(teamObj.bibTeam).trim(); });
-      if (exists) {
-        ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert", {
-          type: "warning", message: "Duplicate BIB", detail: "BIB sudah dipakai pada panel ini."
-        });
-        return;
-      }
+    const ev  = String(eventName).toUpperCase();
+    const div = String(divisionName).toUpperCase();
+    const rac = String(raceName).toUpperCase();
+    const ini = String(initialName).toUpperCase();
 
-      // map ke template
-      const newTeam = JSON.parse(JSON.stringify(this.teamTemplate));
-      newTeam.nameTeam = teamObj.nameTeam;
-      newTeam.bibTeam  = teamObj.bibTeam;
+    const evCfg  = (this.events && this.events.categoriesEvent)   ? this.events.categoriesEvent.find(x => String(x.name).toUpperCase() === ev)  : null;
+    const iniCfg = (this.events && this.events.categoriesInitial) ? this.events.categoriesInitial.find(x => String(x.name).toUpperCase() === ini): null;
+    const racCfg = (this.events && this.events.categoriesRace)    ? this.events.categoriesRace.find(x => String(x.name).toUpperCase() === rac) : null;
+    const divCfg = (this.events && this.events.categoriesDivision)? this.events.categoriesDivision.find(x => String(x.name).toUpperCase() === div): null;
 
-      bucket.teams.push(newTeam);
-      this.dataTeams = this.dataTeams.slice(); // trigger reactivity
+    const bucket = {
+      eventId:    evCfg  ? String(evCfg.value)  : "",
+      initialId:  iniCfg ? String(iniCfg.value) : "",
+      raceId:     racCfg ? String(racCfg.value) : "",
+      divisionId: divCfg ? String(divCfg.value) : "",
+      eventName:   ev,
+      initialName: ini,
+      raceName:    rac,
+      divisionName:div,
+      teams: []
+    };
+    if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
+    this.dataTeams.push(bucket);
+    return bucket;
+  },
+  _persistParticipants() {
+    try {
+      const payload = { eventId: this.$route.params.id, participant: this.dataTeams };
+      ipcRenderer && ipcRenderer.send && ipcRenderer.send("events-update-participant", payload);
+    } catch(e) {}
+  },
 
-      // reset dropdown
-      const key = (String(divisionName).toUpperCase() + "_" + String(raceName).toUpperCase());
-      if (this.selectedToAdd[key] !== undefined) this.selectedToAdd[key] = null;
-
-      // persist
-      this._persistParticipants();
-    },
-    _getBucket(eventName, divisionName, raceName) {
-      const ev = String(eventName).toUpperCase();
-      const div = String(divisionName).toUpperCase();
-      const race = String(raceName).toUpperCase();
-      const arr = this.dataTeams || [];
-      for (let i=0;i<arr.length;i++){
-        const p = arr[i];
-        if (String(p.eventName).toUpperCase()===ev &&
-            String(p.divisionName).toUpperCase()===div &&
-            String(p.raceName).toUpperCase()===race) {
-          if (!Array.isArray(p.teams)) p.teams = [];
-          return p;
-        }
-      }
-      return null;
-    },
-    _ensureBucket(eventName, divisionName, raceName) {
-      const existing = this._getBucket(eventName, divisionName, raceName);
-      if (existing) return existing;
-
-      const ev = String(eventName).toUpperCase();
-      const div = String(divisionName).toUpperCase();
-      const race = String(raceName).toUpperCase();
-
-      const bucket = {
-        eventId:   this.events && this.events._id ? this.events._id : null,
-        initialId: (this.initialActive && this.initialActive.selected && this.initialActive.selected.value) || "1",
-        raceId:    null,
-        divisionId:null,
-        eventName: ev,
-        initialName: (this.initialActive && this.initialActive.selected && this.initialActive.selected.name) || "YOUTH",
-        raceName: race,
-        divisionName: div,
-        teams: []
-      };
-      if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
-      this.dataTeams.push(bucket);
-      return bucket;
-    },
-    _persistParticipants() {
-      try {
-        if (!ipcRenderer || !ipcRenderer.send) return;
-        const payload = { eventId: this.$route.params.id, participant: this.dataTeams };
-        ipcRenderer.send('events-update-participant', payload);
-        // optional feedback:
-        // ipcRenderer.once('events-update-participant-reply', (_e,res)=>{});
-      } catch(e) { /* ignore */ }
-    },
-
-    // ====== FILTER TIM & NORMALISASI RESULT ======
+    /* ===== Filter & result normalize ===== */
     getTeamsBy(divisionName, raceName, eventName) {
       if (!Array.isArray(this.dataTeams)) return [];
       const evName = String(eventName || "").toUpperCase();
       const div = String(divisionName || "").toUpperCase();
       const race = String(raceName || "").toUpperCase();
+      const ini = (this.initialActive.selected && this.initialActive.selected.name)
+                  ? String(this.initialActive.selected.name).toUpperCase() : "";
 
-      const buckets = this.dataTeams.filter(function (p) {
-        return String(p.eventName).toUpperCase() === evName &&
-               String(p.divisionName).toUpperCase() === div &&
-               String(p.raceName).toUpperCase() === race;
-      });
+      const buckets = this.dataTeams.filter(p =>
+        String(p.eventName).toUpperCase() === evName &&
+        String(p.divisionName).toUpperCase() === div &&
+        String(p.raceName).toUpperCase() === race &&
+        (!ini || String(p.initialName).toUpperCase() === ini)
+      );
 
       const out = [];
-      for (let i=0;i<buckets.length;i++){
-        const tms = buckets[i] && buckets[i].teams ? buckets[i].teams : [];
-        for (let j=0;j<tms.length;j++){
-          const t = Object.assign({}, tms[j]);
-          t._eventName = evName; t._divisionName = div; t._raceName = race;
-          t.resultDisplay = this.pickBestResult(t, evName);
-          out.push(t);
-        }
-      }
+      buckets.forEach(b => {
+        (b.teams || []).forEach(t => {
+          const row = { ...t, _eventName: evName, _divisionName: div, _raceName: race };
+          row.resultDisplay = this.pickBestResult(row, evName);
+          out.push(row);
+        });
+      });
       return out;
     },
     pickBestResult(team, evName) {
@@ -482,7 +544,7 @@ export default {
       if (name === "HEAD2HEAD") {
         const arr = (team && team.result && Array.isArray(team.result)) ? team.result.slice() : [];
         if (!arr.length) return {};
-        arr.sort(function(a,b){
+        arr.sort((a,b)=>{
           const ba = typeof a.bracket === "number" ? a.bracket : -1;
           const bb = typeof b.bracket === "number" ? b.bracket : -1;
           if (bb !== ba) return bb - ba;
@@ -493,86 +555,61 @@ export default {
       if (name === "SLALOM") {
         let runs = (team && team.result && Array.isArray(team.result)) ? team.result : [];
         if (!runs.length) return {};
-        const self = this;
-        runs = runs.filter(function(r){ return r && (r.totalTime || r.raceTime); });
+        runs = runs.filter(r => r && (r.totalTime || r.raceTime));
         if (!runs.length) return {};
-        runs.sort(function(a,b){
-          return self._toMs(a.totalTime || a.raceTime) - self._toMs(b.totalTime || b.raceTime);
-        });
+        const toMs = (t) => {
+          if (!t) return Number.POSITIVE_INFINITY;
+          const s = String(t).trim().replace("\r", "");
+          const parts = s.split(":");
+          if (parts.length < 3) return Number.POSITIVE_INFINITY;
+          const hh = parseInt(parts[0], 10) || 0, mm = parseInt(parts[1], 10) || 0;
+          const secMs = parts[2].split(".");
+          const ss = parseInt(secMs[0], 10) || 0, ms = parseInt(secMs[1], 10) || 0;
+          return ((hh * 60 + mm) * 60 + ss) * 1000 + ms;
+        };
+        runs.sort((a,b)=> toMs(a.totalTime || a.raceTime) - toMs(b.totalTime || b.raceTime));
         return runs[0] || {};
       }
       return {};
     },
-    _toMs(t) {
-      if (!t) return Number.POSITIVE_INFINITY;
-      const s = String(t).trim().replace("\r", "");
-      const parts = s.split(":");
-      if (parts.length < 3) return Number.POSITIVE_INFINITY;
-      const hh = parseInt(parts[0], 10) || 0, mm = parseInt(parts[1], 10) || 0;
-      const secMs = parts[2].split(".");
-      const ss = parseInt(secMs[0], 10) || 0, ms = parseInt(secMs[1], 10) || 0;
-      return ((hh * 60 + mm) * 60 + ss) * 1000 + ms;
-    },
 
-    // ====== UI ======
-    selectCategory(c) {
-      this.isActivated = c.key;
-      this.raceActive = { selected: { name: c.key }, show: true, actived: true };
-    },
-    cleanTime(t) { return t ? String(t).trim().replace("\r", "") : ""; },
-    fmtDate(d) { try { return new Date(d).toLocaleString(); } catch (e) { return "-"; } },
-
-    // ====== IPC EVENT DATA ======
+    /* ===== IPC: load event & results ===== */
     async loadData(id) {
       this.loading = true;
-      const self = this;
-      setTimeout(function () {
+      setTimeout(() => {
         ipcRenderer.send("get-events-byid", id);
-        ipcRenderer.once("get-events-byid-reply", function (_e, data) {
+        ipcRenderer.once("get-events-byid-reply", (_e, data) => {
           if (data) {
-            self.events = data;
-            self.dataTeams = (data && data.participant) ? data.participant : [];
+            this.events = data;
+            this.dataTeams = Array.isArray(data.participant) ? data.participant : [];
             localStorage.setItem("eventDetails", JSON.stringify(data));
-          } else {
-            console.error("Failed to retrieve data from events table");
           }
-          self.loading = false;
+          this.loading = false;
         });
       }, 300);
     },
 
-    // Navigation (opsional)
-    goTo(val) { this.$router.push("/event-detail/" + this.$route.params.id + "/" + val); },
-    back(val) { this.$router.push(val); },
-    formatDate(inputDate) {
-      if (!inputDate) return "-";
-      const parts = inputDate.split("-");
-      const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
-      const date = new Date(y, m, d);
-      const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-      return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
-    },
-
-    // Modal Result (existing)
+    // existing
+    cleanTime(t) { return t ? String(t).trim().replace("\r", "") : ""; },
+    fmtDate(d)   { try { return new Date(d).toLocaleString(); } catch (e) { return "-"; } },
     showResultCategories() {
       this.resultsLoading = true;
       this.sprintResults = [];
       const q = { eventId: this.$route.params.id };
       ipcRenderer.send("get-sprint-result", q);
-      const self = this;
-      ipcRenderer.once("get-sprint-result-reply", function (_e, res) {
-        self.resultsLoading = false;
+      ipcRenderer.once("get-sprint-result-reply", (_e, res) => {
+        this.resultsLoading = false;
         if (!(res && res.ok)) {
           ipcRenderer.send("get-alert", {
             type: "warning",
-            detail: (res && res.error) ? res.error : "Cannot load results",
+            detail: res && res.error ? res.error : "Cannot load results",
             message: "Failed",
           });
-          self.$bvModal.show("bv-modal-result");
+          this.$bvModal.show("bv-modal-result");
           return;
         }
-        self.sprintResults = Array.isArray(res.items) ? res.items : [];
-        self.$bvModal.show("bv-modal-result");
+        this.sprintResults = Array.isArray(res.items) ? res.items : [];
+        this.$bvModal.show("bv-modal-result");
       });
     },
   },
@@ -610,11 +647,15 @@ export default {
   display:flex; align-items:center; justify-content:center;
 }
 
+
 /* PANEL REGISTERED TEAMS */
 .panel-box{
   border:1px solid #dfe5f2; border-radius:12px; background:#fff;
   box-shadow:0 6px 18px rgba(44,92,255,.06);
-  padding:0; overflow:hidden;
+  padding:0;
+  /* overflow:hidden;  <-- HAPUS baris ini */
+  overflow: visible;     /* tambahkan ini */
+  position: relative;    /* biar z-index bekerja */
 }
 .panel-head{
   display:flex; align-items:center; justify-content:space-between;

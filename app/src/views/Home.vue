@@ -46,7 +46,7 @@
       </b-container>
     </section>
 
-    <b-container class="mb-5">
+    <b-container class="mt-4 mb-5">
       <!-- 3) ACTION CARDS -->
       <b-row>
         <b-col cols="12" md="6" class="mb-4">
@@ -57,7 +57,7 @@
               </div>
               <h5 class="mb-1 font-weight-bold">Create a new Event</h5>
               <small class="text-muted d-block mb-3">
-                Define event details and set up everything you need for a successful competition.
+                Define event details and set up everything competition.
               </small>
               <b-button variant="secondary" class="w-100 rounded-pill" @click="goTo('create-new')">
                 Create Event

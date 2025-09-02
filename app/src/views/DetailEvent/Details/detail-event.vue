@@ -8,30 +8,31 @@
     </b-container>
 
     <!-- 1) JUMBOTRON DETAIL -->
-    <section class="detail-hero">
-      <b-container>
-        <b-row>
-          <b-col cols="12" md="8" class="py-4">
-            <h2 class="h1 font-weight-bold mb-2 text-white">
-              {{ events.eventName || "World Rafting Championship 2028" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3"><strong class="text-white">Location</strong> :
-                {{ events.location || events.addressCity || "–" }}</span>
-              <span class="mr-3"><strong class="text-white">River</strong> :
-                {{ events.riverName || "–" }}</span>
-              <span class="mr-3"><strong class="text-white">Level</strong> :
-                {{ events.levelName || "–" }}</span>
-            </div>
-          </b-col>
-          <b-col cols="12" md="4" class="d-flex align-items-center justify-content-center">
-            <div class="hero-image placeholder d-flex align-items-center justify-content-center">
-              <Icon icon="mdi:image" width="64" height="64" />
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+   <section class="detail-hero">
+  <div class="hero-bg"></div> <!-- dummy background -->
+  <b-container class="hero-inner">
+    <b-row>
+      <b-col cols="12" md="8" class="py-4 text-shadow">
+        <h2 class="h1 font-weight-bold mb-2 text-white">
+          {{ events.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025" }}
+        </h2>
+        <div class="meta text-white-50">
+          <span class="mr-3"><strong class="text-white">Location</strong> :
+            {{ events.location || events.addressCity || "Sungai Ciliwung, Jagakarsa, Jakarta Selatan." }}</span>
+          <span class="mr-3"><strong class="text-white">River</strong> :
+            {{ events.riverName || "Ciliwung" }}</span>
+          <span class="mr-3"><strong class="text-white">Level</strong> :
+            {{ events.levelName || "II–III" }}</span>
+        </div>
+      </b-col>
+      <b-col cols="12" md="4" class="d-flex align-items-center justify-content-center">
+        <div class="hero-logo placeholder d-flex align-items-center justify-content-center">
+          <Icon icon="mdi:shield-crown" width="56" height="56" />
+        </div>
+      </b-col>
+    </b-row>
+  </b-container>
+</section>
 
     <b-container class="mt-4 mb-5">
       <!-- 2) RACE CATEGORIES -->
@@ -42,30 +43,25 @@
             <div class="race-icon"><Icon :icon="c.icon" width="28" height="28" /></div>
             <div class="h6 font-weight-bold mb-1 text-center">{{ c.title }}</div>
             <small class="text-muted d-block text-center">{{ c.desc }}</small>
-            <b-button size="sm" variant="secondary" class="rounded-pill w-100 mt-3">Select</b-button>
+            <!-- <b-button size="sm" variant="secondary" class="rounded-pill w-100 mt-3">Select</b-button> -->
           </div>
         </b-col>
       </b-row>
 
       <!-- INITIAL CHIPS (pilih usia/kelas) -->
-<h5 class="font-weight-bold mb-3 mt-4">Initial Categories</h5>
-<b-row v-if="(events.categoriesInitial||[]).length">
-  <b-col
-    cols="12"
-    md="3"
-    v-for="i in events.categoriesInitial"
+<h5 class="font-weight-bold mb-3 mt-4">Initials Category</h5>
+<div class="init-tabs">
+  <button
+    v-for="i in (events.categoriesInitial || [])"
     :key="i.name"
-    class="mb-3"
+    type="button"
+    class="init-tab"
+    :class="{ active: initialActive.selected && initialActive.selected.name === i.name }"
+    @click="selectInitial(i)"
   >
-    <div
-      class="race-card"
-      :class="{ active: initialActive.selected && initialActive.selected.name===i.name }"
-      @click="selectInitial(i)"
-    >
-      <div class="h6 font-weight-bold mb-1 text-center">{{ i.name }}</div>
-    </div>
-  </b-col>
-</b-row>
+    {{ i.name }}
+  </button>
+</div>
 
       <!-- 3) REGISTERED TEAMS – sesuai race aktif -->
       <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
@@ -79,19 +75,6 @@
         <div class="panel-head">
           <div class="font-weight-bold">Team R4 Men's – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
-            <multiselect
-              v-model="selectedToAdd.R4_MEN"
-              :options="availableFor('R4','MEN')"
-              :searchable="true"
-              :close-on-select="true"
-              :clear-on-select="true"
-              :show-labels="false"
-              track-by="id"
-              label="nameTeam"
-              placeholder="Select team"
-              class="mr-2 minw-220"
-              @input="onPickTeam('R4','MEN', $event)"
-            />
             <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
           </div>
         </div>
@@ -108,19 +91,6 @@
         <div class="panel-head">
           <div class="font-weight-bold">Team R4 Women’s – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
-            <multiselect
-              v-model="selectedToAdd.R4_WOMEN"
-              :options="availableFor('R4','WOMEN')"
-              :searchable="true"
-              :close-on-select="true"
-              :clear-on-select="true"
-              :show-labels="false"
-              track-by="id"
-              label="nameTeam"
-              placeholder="Select team"
-              class="mr-2 minw-220"
-              @input="onPickTeam('R4','WOMEN', $event)"
-            />
             <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
           </div>
         </div>
@@ -137,19 +107,6 @@
         <div class="panel-head">
           <div class="font-weight-bold">Team R6 Men's – {{ (raceActive.selected && raceActive.selected.name) || "SPRINT" }}</div>
           <div class="d-flex align-items-center">
-            <multiselect
-              v-model="selectedToAdd.R6_MEN"
-              :options="availableFor('R6','MEN')"
-              :searchable="true"
-              :close-on-select="true"
-              :clear-on-select="true"
-              :show-labels="false"
-              track-by="id"
-              label="nameTeam"
-              placeholder="Select team"
-              class="mr-2 minw-220"
-              @input="onPickTeam('R6','MEN', $event)"
-            />
             <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
           </div>
         </div>
@@ -166,19 +123,6 @@
         <div class="panel-head">
           <div class="font-weight-bold">Team R6 Women’s – {{ (raceActive.selected && raceActive.selected.name) || 'SPRINT' }}</div>
           <div class="d-flex align-items-center">
-            <multiselect
-              v-model="selectedToAdd.R6_WOMEN"
-              :options="availableFor('R6','WOMEN')"
-              :searchable="true"
-              :close-on-select="true"
-              :clear-on-select="true"
-              :show-labels="false"
-              track-by="id"
-              label="nameTeam"
-              placeholder="Select team"
-              class="mr-2 minw-220"
-              @input="onPickTeam('R6','WOMEN', $event)"
-            />
             <b-button size="sm" variant="secondary" class="rounded-pill">Start Race</b-button>
           </div>
         </div>
@@ -343,6 +287,45 @@ dummyTeams: [
     }
   },
   methods: {
+    startRace(divisionName, raceName) {
+  const evName = (this.raceActive.selected && this.raceActive.selected.name) ? this.raceActive.selected.name : "";
+  const initSel = (this.initialActive.selected && this.initialActive.selected.name) ? this.initialActive.selected.name : "";
+  if (!evName || !initSel) {
+    ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert", {
+      type: "warning",
+      message: "Incomplete",
+      detail: "Pilih Race Category dan Initial terlebih dahulu."
+    });
+    return;
+  }
+  const bucket = this._getBucket(evName, divisionName, raceName, initSel);
+  const count = bucket && Array.isArray(bucket.teams) ? bucket.teams.length : 0;
+
+  ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert-saved", {
+    type: "info",
+    message: "Start Race",
+    detail: `Kategori ${divisionName} ${raceName} – ${evName} (${initSel}). Peserta: ${count}.`
+  });
+
+  // TODO: taruh logika real start (penjadwalan, nomor start, dsb) di sini
+},
+
+/* util hapus & konfirmasi baris bila komponen child butuh callback */
+removeTeamByBib(bib) {
+  if (!bib) return;
+  (this.dataTeams || []).forEach(b => {
+    b.teams = (b.teams || []).filter(t => String(t.bibTeam).trim() !== String(bib).trim());
+  });
+  this.dataTeams = this.dataTeams.slice();
+  this._persistParticipants();
+},
+confirmRow(bib) {
+  ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert-saved", {
+    type: "success",
+    message: "Saved",
+    detail: `Team dengan BIB ${bib} disimpan.`
+  });
+},
    /* ===== UI ===== */
   selectCategory(c) {
     this.isActivated = c.key;
@@ -617,60 +600,100 @@ dummyTeams: [
 </script>
 
 <style scoped>
-:root { --sts-blue:#2c5cff; --sts-muted:#8793b5; }
+:root { --blue:#1f6fa3; --blue-2:#0f5d8f; --chip:#e9eef5; --card:#ffffff; --line:#e8edf6; }
 
-/* HERO */
-.detail-hero{
-  background: linear-gradient(180deg,#b8c6e6 0%, #92a3d1 60%, #8ea1d1 100%);
-  border-bottom:1px solid rgba(255,255,255,.25);
+/* ================= HERO ================= */
+.detail-hero{ position: relative; min-height: 220px; }
+.detail-hero .hero-bg{
+  position:absolute; inset:0;
+  background-image: url('https://images.unsplash.com/photo-1520981825232-ece5fae45120?q=80&w=1600&auto=format&fit=crop'); /* dummy */
+  background-size: cover; background-position: center;
+  filter: brightness(0.55);
 }
-.detail-hero .h1{ text-shadow: 0 2px 12px rgba(0,0,0,.12); }
-.detail-hero .hero-image{
-  width:320px; max-width:100%; height:180px; border-radius:16px;
-  background: rgba(255,255,255,.25);
-  box-shadow:0 8px 24px rgba(0,0,0,.12);
+.detail-hero .hero-inner{ position:relative; z-index:1; }
+.text-shadow{ text-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.hero-logo{
+  width:80px; height:80px; border-radius:18px; background: rgba(255,255,255,.2);
+  color:#fff; backdrop-filter: blur(2px); border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 8px 22px rgba(0,0,0,.25);
 }
 
-/* RACE CATEGORY CARDS */
+/* ============ RACE CATEGORY CARDS ============ */
 .race-card{
-  border:1px solid #dfe5f2; border-radius:12px; background:#fff;
+  border:1px solid #e6ebf4; border-radius:16px; background:#fff;
   padding:16px; height:100%;
-  box-shadow:0 6px 18px rgba(44,92,255,.06);
+  box-shadow:0 12px 26px rgba(31,56,104,.08);
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
   cursor:pointer;
 }
-.race-card:hover{ transform: translateY(-2px); box-shadow:0 10px 22px rgba(44,92,255,.10); }
-.race-card.active{ border-color: #2c5cff; }
+.race-card:hover{ transform: translateY(-2px); box-shadow:0 16px 28px rgba(31,56,104,.12); }
+.race-card.active{ border-color: var(--blue); box-shadow:0 14px 30px rgba(31,111,163,.16); }
 .race-icon{
-  width:56px; height:56px; border-radius:12px; margin: 0 auto 6px auto;
-  background:#eff3ff; color:#2c5cff;
+  width:56px; height:56px; border-radius:12px; margin: 0 auto 8px auto;
+  background:#eef6ff; color:var(--blue);
   display:flex; align-items:center; justify-content:center;
 }
 
+/* ================ INITIAL TABS (pill) ================ */
+.init-tabs{ display:flex; gap:12px; background:#f1f3f7; padding:6px; border-radius:10px; }
+.init-tab{
+  appearance:none; border:0; background:transparent; color:#2b3445;
+  font-weight:700; padding:10px 18px; border-radius:8px; line-height:1;
+}
+.init-tab.active{ background:var(--blue); color:#fff; box-shadow:0 6px 16px rgba(31,111,163,.24); }
 
-/* PANEL REGISTERED TEAMS */
+/* ================ PANEL REGISTERED TEAMS ================= */
 .panel-box{
-  border:1px solid #dfe5f2; border-radius:12px; background:#fff;
-  box-shadow:0 6px 18px rgba(44,92,255,.06);
-  padding:0;
-  /* overflow:hidden;  <-- HAPUS baris ini */
-  overflow: visible;     /* tambahkan ini */
-  position: relative;    /* biar z-index bekerja */
+  border:1px solid #e6ebf4; border-radius:16px; background:#fff;
+  box-shadow:0 12px 26px rgba(31,56,104,.08);
+  padding:0; overflow:visible; position:relative;
 }
 .panel-head{
   display:flex; align-items:center; justify-content:space-between;
-  padding:12px 16px;
-  background: #f6f8fc; border-bottom:1px solid #e7ecf6;
+  padding:14px 16px; border-bottom:1px solid #edf2f7; background:#f9fbff; border-top-left-radius:16px; border-top-right-radius:16px;
 }
+.btn-start{
+  border:1px solid #d0d9e8 !important; background:#f4f7fb !important; color:#56627a !important;
+  border-radius:10px; padding:6px 12px; font-weight:700;
+}
+
+/* ======= Multiselect (bar di header) ======= */
 .minw-220{ min-width:220px; }
 .panel-head .multiselect{ width:240px; }
-.panel-head .multiselect__tags{ border-radius:999px; padding:2px 8px; }
+.panel-head .multiselect__tags{
+  min-height:36px; border-radius:10px; padding:6px 10px; border:1px solid #e6ebf4;
+}
+.panel-head .multiselect__option--highlight{ background:#eef6ff; color:#1a2a3f; }
 
-/* tabel */
-.panel-box .table{ margin-bottom:0; border-collapse:separate; border-spacing:0 8px; }
-.panel-box .table thead th{ border:0; background:transparent; color:#2c3e50; font-weight:700; }
-.panel-box .table tbody tr{ background:#fff; border:1px solid #eef0f6; }
+/* ================ TABLE (isi panel) ================= */
+.panel-box .table{ margin-bottom:0; border-collapse:separate; border-spacing:0 10px; }
+.panel-box .table thead th{
+  border:0; background:transparent; color:#16324f; font-weight:800; font-size:12px; letter-spacing:.3px;
+}
+.panel-box .table tbody tr{
+  background:#fff; border:1px solid #e7ecf6;
+  box-shadow:0 6px 18px rgba(31,56,104,.06);
+}
+.panel-box .table tbody td{
+  vertical-align:middle; border-top:0 !important; padding:10px 12px;
+}
 
-/* Utility */
-.placeholder{ color:#e5ebff; }
+/* Input gaya lembut di baris tabel */
+.table .form-control{
+  height:38px; border-radius:10px; border:1px solid #e6ebf4; background:#f7f9fc;
+  padding:6px 10px;
+}
+.table .form-control:focus{
+  background:#fff; border-color:#9ec5ff; box-shadow:0 0 0 4px rgba(42,104,196,.15);
+}
+
+/* Icon action (cek & hapus) */
+.btn-ghost{
+  border:1px solid #d5deec; background:#eef3fb; color:#325a8f; border-radius:10px; height:34px; width:34px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.btn-ghost.danger{ background:#fef2f2; color:#a11d1d; border-color:#f1d1d1; }
+
+/* Misc */
+.placeholder{ color:#8793b5; }
 </style>

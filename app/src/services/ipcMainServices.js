@@ -1,4 +1,6 @@
 const { ipcMain, dialog } = require("electron");
+const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
 const {
   getAllEvents,
   getEventById,
@@ -15,6 +17,13 @@ const {
   insertSprintResult,
 } = require("../controllers/INSERT/insertNewEvent.js");
 const { getSprintResult } = require("../controllers/GET/getResult.js");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
+  api_key:    process.env.CLOUDINARY_API_KEY || "",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "",
+  secure:     true,
+});
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -175,6 +184,68 @@ function setupIPCMainHandlers() {
         items: [],
         error: error.message,
       });
+    }
+  });
+
+// ========================================================================
+  // File picker & Cloudinary (TIDAK ADA optional chaining)
+  // ========================================================================
+  ipcMain.handle("file:pick-image", async () => {
+    const dlg = await dialog.showOpenDialog({
+      title: "Select image",
+      properties: ["openFile"],
+      filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] }],
+    });
+
+    const canceled = !!dlg.canceled;
+    const filePaths = dlg.filePaths || [];
+
+    if (canceled || !filePaths.length) {
+      return { ok: false, canceled: true };
+    }
+    return { ok: true, path: filePaths[0] };
+  });
+
+  ipcMain.handle("cloud:upload-image", async (_e, absPath, options) => {
+    const opts = options || {};
+    try {
+      if (!absPath) throw new Error("Missing file path");
+      if (!fs.existsSync(absPath)) throw new Error("File not found");
+
+      const res = await cloudinary.uploader.upload(absPath, {
+        folder: opts.folder || "sts-rafter/events",
+        resource_type: "image",
+        overwrite: true,
+        public_id: opts.publicId ? String(opts.publicId) : undefined,
+      });
+
+      return {
+        ok: true,
+        result: {
+          public_id: res.public_id,
+          secure_url: res.secure_url,
+          url: res.url,
+          folder: res.folder,
+          width: res.width,
+          height: res.height,
+          bytes: res.bytes,
+          format: res.format,
+          version: res.version,
+          created_at: res.created_at,
+        },
+      };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle("cloud:delete-image", async (_e, publicId) => {
+    try {
+      if (!publicId) throw new Error("Missing public_id");
+      const r = await cloudinary.uploader.destroy(String(publicId), { resource_type: "image" });
+      return { ok: true, result: r };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
     }
   });
 }

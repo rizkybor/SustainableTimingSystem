@@ -8,12 +8,15 @@ import SprintRace from "../views/DetailEvent/RaceCategory/SprintRace.vue";
 import SlalomRace from "../views/DetailEvent/RaceCategory/SlalomRace.vue";
 import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
 import Head2Head from "../views/DetailEvent/RaceCategory/HeadToHead.vue";
+import CreateTeam from "@/views/CreateTeam/index.vue";
+
 
 Vue.use(VueRouter);
 
 const routes = [
   { path: "/", name: "home", component: Home },
   { path: "/create-new", component: CreateEvent },
+    { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/slalom-race", component: SlalomRace },
   {
     path: "/event-detail/:id",

@@ -16,36 +16,103 @@
             <form ref="form-newEvent">
               <br />
               <div>
+                <!-- ===== Event Information ===== -->
                 <p class="h5 my-2">Event Information</p>
 
-                <!-- EVENT LEVEL  -->
-                <b-form-group label="Event Level">
-                  <b-form-select
-                    size="sm"
-                    v-model="formEvent.levelName"
-                    :options="optionLevels"
-                    value-field="name"
-                    text-field="name"
-                  />
-                </b-form-group>
+                <b-row>
+                  <!-- KIRI: field level, event name, river name -->
+                  <b-col md="8">
+                    <!-- EVENT LEVEL  -->
+                    <b-form-group label="Event Level">
+                      <b-form-select
+                        size="sm"
+                        v-model="formEvent.levelName"
+                        :options="optionLevels"
+                        value-field="name"
+                        text-field="name"
+                      />
+                    </b-form-group>
 
-                <!-- EVENT NAME  -->
-                <b-form-group label="Event Name">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.eventName"
-                    placeholder="Enter your event name"
-                  />
-                </b-form-group>
+                    <!-- EVENT NAME  -->
+                    <b-form-group label="Event Name">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.eventName"
+                        placeholder="Enter your event name"
+                      />
+                    </b-form-group>
 
-                <!-- RIVER NAME  -->
-                <b-form-group label="River Name">
-                  <b-form-input
-                    size="sm"
-                    v-model="formEvent.riverName"
-                    placeholder="Enter river name"
-                  />
-                </b-form-group>
+                    <!-- RIVER NAME  -->
+                    <b-form-group label="River Name">
+                      <b-form-input
+                        size="sm"
+                        v-model="formEvent.riverName"
+                        placeholder="Enter river name"
+                      />
+                    </b-form-group>
+                  </b-col>
+
+                  <!-- KANAN: upload (Event Logo) -->
+                  <b-col md="4">
+                    <b-form-group label="Event Logo">
+                      <div class="d-flex flex-column align-items-stretch">
+                        <div class="mb-2">
+                          <img
+                            v-if="posterPreview"
+                            :src="posterPreview"
+                            alt="Poster preview"
+                            style="
+                              width: 100%;
+                              height: 180px;
+                              object-fit: cover;
+                              border-radius: 12px;
+                              border: 1px solid #e5e7eb;
+                            "
+                          />
+                          <div
+                            v-else
+                            class="d-flex align-items-center justify-content-center"
+                            style="
+                              width: 100%;
+                              height: 180px;
+                              border: 1px dashed #cbd5e1;
+                              border-radius: 12px;
+                              color: #94a3b8;
+                              background: #fafafa;
+                            "
+                          >
+                            Drag & Drop or Choose file to upload
+                          </div>
+                        </div>
+
+                        <b-button
+                          size="sm"
+                          variant="primary"
+                          :disabled="isUploadingPoster"
+                          @click="pickAndUploadPoster"
+                        >
+                          {{
+                            isUploadingPoster ? "Uploading…" : "Upload Image"
+                          }}
+                        </b-button>
+
+                        <b-button
+                          v-if="formEvent.poster"
+                          size="sm"
+                          variant="outline-danger"
+                          class="mt-2"
+                          @click="clearPoster"
+                        >
+                          Remove
+                        </b-button>
+
+                        <small class="text-muted mt-2">
+                          PNG/JPG, maksimum 10MB
+                        </small>
+                      </div>
+                    </b-form-group>
+                  </b-col>
+                </b-row>
 
                 <br />
                 <p class="h5 my-2">Date & Location</p>
@@ -210,58 +277,6 @@
                   />
                 </b-form-group>
 
-                <!-- POSTER (OPTIONAL) -->
-                <p class="h5 my-3">Poster (Optional)</p>
-                <b-form-group label="Event Poster">
-                  <div class="d-flex align-items-start">
-                    <div class="mr-3">
-                      <img
-                        v-if="posterPreview"
-                        :src="posterPreview"
-                        alt="Poster preview"
-                        style="width: 220px; max-height: 140px; object-fit: cover; border-radius: 12px; border:1px solid #eee;"
-                      />
-                      <div
-                        v-else
-                        class="d-flex align-items-center justify-content-center"
-                        style="width:220px;height:140px;border:1px dashed #cbd5e1;border-radius:12px;color:#94a3b8;"
-                      >
-                        No image
-                      </div>
-                    </div>
-
-                    <div>
-                      <b-button
-                        size="sm"
-                        variant="primary"
-                        class="mb-2"
-                        :disabled="isUploadingPoster"
-                        @click="pickAndUploadPoster"
-                      >
-                        {{ isUploadingPoster ? "Uploading…" : "Upload to Cloudinary" }}
-                      </b-button>
-
-                      <div class="text-muted small" v-if="formEvent.poster && formEvent.poster.secure_url">
-                        Saved URL: <code>{{ formEvent.poster.secure_url }}</code>
-                      </div>
-                      <div class="text-muted small" v-if="formEvent.poster && formEvent.poster.public_id">
-                        Public ID: <code>{{ formEvent.poster.public_id }}</code>
-                      </div>
-
-                      <div>
-                        <b-button
-                          v-if="formEvent.poster"
-                          size="sm"
-                          variant="outline-danger"
-                          @click="clearPoster"
-                        >
-                          Remove Poster
-                        </b-button>
-                      </div>
-                    </div>
-                  </div>
-                </b-form-group>
-
                 <br />
 
                 <b-row>
@@ -314,7 +329,7 @@
               <div>
                 <b-button
                   class="btn-md"
-                  style="border-radius: 20px"
+                  style="border-radius: 10px"
                   @click="goTo()"
                   variant="secondary"
                 >
@@ -325,12 +340,12 @@
               <div>
                 <b-button
                   class="btn-md"
-                  style="border-radius: 20px"
+                  style="border-radius: 10px"
                   @click="save()"
                   type="input"
                   variant="primary"
                 >
-                  Create Event
+                  Submit
                   <Icon icon="ic:baseline-check-circle" />
                 </b-button>
               </div>
@@ -566,7 +581,11 @@ export default {
             ? this.formEvent.poster.public_id
             : null;
 
-        if (pub && window.cloud && typeof window.cloud.deleteImage === "function") {
+        if (
+          pub &&
+          window.cloud &&
+          typeof window.cloud.deleteImage === "function"
+        ) {
           await window.cloud.deleteImage(pub);
         }
       } catch (e) {

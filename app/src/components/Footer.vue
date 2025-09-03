@@ -27,5 +27,5 @@ export default {
 </script>
 
 <style scoped>
-.sts-footer{ border-top:1px solid #e6eaf2; background:#2c5cff; }
+.sts-footer{ border-top:1px solid #e6eaf2; background:#1874A5; }
 </style>

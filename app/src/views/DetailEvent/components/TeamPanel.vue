@@ -170,22 +170,56 @@ export default {
       });
     },
     startRace() {
-        console.log(this.teamsAvailable,'<<<< CEK TIM')
-      // Periksa apakah draft dan teamId tersedia
-      if (this.draft && this.draft.teamId) {
-        const selectedTeam = this.teamsAvailable.find(
-          (team) => team.id === this.draft.teamId
-        );
+        this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
 
-        if (selectedTeam) {
-          console.log("Tim yang dipilih:", selectedTeam.nameTeam);
-          // Kirim pesan atau logika lain jika diperlukan
-          // ipcRenderer.send("get-alert-saved", { ... });
-        } else {
-          console.error("Tim tidak ditemukan!");
-        }
+      // Periksa apakah draft dan teamId tersedia
+    //   if (this.draft && this.draft.teamId) {
+    //     const selectedTeam = this.teamsAvailable.find(
+    //       (team) => team.id === this.draft.teamId
+    //     );
+
+    //     if (selectedTeam) {
+    //       console.log("Tim yang dipilih:", selectedTeam.nameTeam);
+    //       // Kirim pesan atau logika lain jika diperlukan
+    //       // ipcRenderer.send("get-alert-saved", { ... });
+    //     } else {
+    //       console.error("Tim tidak ditemukan!");
+    //     }
+    //   } else {
+    //     console.error("Team ID belum dipilih!");
+    //   }
+    },
+    goTo(val, payload, teamTitle) {
+      // Validasi form
+      let formValid = this.validateForm();
+      if (formValid) {
+        // Menentukan jenis kategori berdasarkan event
+        val =
+          val === "SPRINT"
+            ? "sprint-race"
+            : val == "SLALOM"
+            ? "slalom-race"
+            : val == "DRR"
+            ? "drr-race"
+            : val == "HEAD2HEAD"
+            ? "head2head-race"
+            : val;
+
+        // Menyimpan data ke localStorage
+        const obj = JSON.stringify(payload);
+        localStorage.setItem("participantByCategories", obj);
+        localStorage.setItem("currentCategories", teamTitle);
+
+        // Navigasi ke halaman berdasarkan kategori
+        this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
       } else {
-        console.error("Team ID belum dipilih!");
+        // Jika form tidak valid, kirim notifikasi
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail:
+            "Fill in the pre-Start and interval first, before starting the race",
+          message: "Ups Sorry",
+        });
       }
     },
     //   ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert-saved", {

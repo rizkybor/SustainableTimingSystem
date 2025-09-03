@@ -1,5 +1,5 @@
 <template>
-  <div class="px-3">
+  <div>
     <vue-html2pdf
       :show-layout="false"
       :float-layout="true"
@@ -26,18 +26,44 @@
       </section>
     </vue-html2pdf>
 
-    <div style="display: flex; justify-content: space-between">
-      <b-button @click="goTo()" variant="primary">
-        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
-      >
-      <!-- <b-button @click="goTo()" variant="primary">
-        New Category
-        <Icon icon="ic:baseline-add-circle-outline" />
-      </b-button> -->
-    </div>
-    <br />
+    <section class="detail-hero">
+      <div class="hero-bg"></div>
+      <b-container class="hero-inner">
+        <b-row class="align-items-center">
+          <!-- logo -->
+          <b-col cols="auto" class="pr-0">
+            <div
+              class="hero-logo d-flex align-items-center justify-content-center"
+            >
+              <Icon icon="mdi:shield-crown" width="56" height="56" />
+            </div>
+          </b-col>
 
-    <div class="card new" :class="{ 'v-shadow-on-scroll': isScrolled }">
+          <!-- judul + meta -->
+          <b-col>
+            <h2 class="h1 font-weight-bold mb-1 text-white">
+              {{
+                dataEvent.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025"
+              }}
+            </h2>
+            <div class="meta text-white-50">
+              <span class="mr-3"
+                ><strong class="text-white">Location</strong> :
+                {{ dataEvent.addressCity || "-" }}</span
+              >
+              <span class="mr-3"
+                ><strong class="text-white">River</strong> : {{ "-" }}</span
+              >
+              <span class="mr-3"
+                ><strong class="text-white">Level</strong> : {{ "-" }}</span
+              >
+            </div>
+          </b-col>
+        </b-row>
+      </b-container>
+    </section>
+
+    <div class="px-5">
       <div class="card-body">
         <b-row>
           <b-col>
@@ -52,7 +78,6 @@
               Categories : {{ titleCategories }}
             </h6>
             <p style="font-style: italic">
-              <span>{{ dataEvent.addressCity }}, </span>
               <span
                 >{{ dataEvent.startDateEvent }} -
                 {{ dataEvent.endDateEvent }}</span
@@ -85,14 +110,14 @@
                 Sort Ranked
               </button>
 
-              <button
+              <!-- <button
                 type="button"
                 class="btn btn-warning"
                 @click="generatePDF()"
               >
                 <Icon icon="ic:outline-local-printshop" />
                 Print Result
-              </button>
+              </button> -->
 
               <button
                 type="button"
@@ -118,22 +143,23 @@
         </b-row>
       </div>
     </div>
-
-    <br />
-
     <!-- SPRINT OPERATION TIME  -->
-    <div class="card" style="background-color: dodgerblue">
-      <div class="card-body">
+
+    <div class="px-5 mb-4">
+      <div
+        class="card p-4"
+        style="background-color: rgb(32, 32, 32); border-radius: 20px"
+      >
         <div v-if="!editResult">
           <b-row>
             <b-col class="col-3">
               <div
-                class="card"
+                class="card-time"
                 style="
                   padding: 10px;
                   height: auto;
                   min-height: 500px;
-                  background-color: rgb(32, 32, 32);
+                  border: 1px solid #e6ebf4;
                 "
               >
                 <table class="table table-dark table-sm">
@@ -154,11 +180,13 @@
             </b-col>
 
             <b-col class="col">
-              <div class="card">
+              <div class="card" style="border-radius: 15px">
                 <div class="card-body">
                   <b-row>
                     <b-col class="col">
-                      <h5 class="card-title">Buffer-Timer-Start</h5>
+                      <h5 class="card-title" style="font-weight: 800">
+                        Buffer-Timer-Start
+                      </h5>
                       <b-row>
                         <b-col class="col">
                           <p>Get Time Start</p>
@@ -197,11 +225,13 @@
 
               <br />
 
-              <div class="card">
+              <div class="card" style="border-radius: 15px">
                 <div class="card-body">
                   <b-row>
                     <b-col class="col">
-                      <h5 class="card-title">Buffer-Timer-Finish</h5>
+                      <h5 class="card-title" style="font-weight: 800">
+                        Buffer-Timer-Finish
+                      </h5>
                       <b-row>
                         <b-col class="col">
                           <p>Get Time Finish</p>
@@ -244,154 +274,90 @@
           <br />
           <br />
         </div>
+      </div>
+    </div>
 
-        <div>
-          <b-row>
-            <b-col class="col">
-              <div class="card">
-                <div class="card-body">
-                  <h4>List Result</h4>
-                  <!-- <button
-                    id="btnCheckPen"
-                    type="button"
-                    class="btn btn-warning mr-4"
-                    @click="checkingPenalties()"
-                  >
-                    <Icon icon="iconamoon:flag-fill" />
-                    Penalty Confirm
-                  </button> -->
-                  <!-- <button
-                    id="btnCheckPen"
-                    type="button"
-                    class="btn btn-danger"
-                    @click="resetRace()"
-                  >
-                    <Icon icon="iconamoon:flag-fill" />
-                    Reset Race
-                  </button> -->
-                  <b-row>
-                    <b-col>
-                      <table class="table">
-                        <thead>
-                          <tr>
-                            <th scope="col">No</th>
-                            <th scope="col">Team Name</th>
-                            <th scope="col">BIB Number</th>
-                            <th scope="col">Start Time</th>
-                            <th scope="col">Finish Time</th>
-                            <th scope="col">Race Time</th>
-                            <th scope="col">Penalties</th>
-                            <th scope="col">Penalty Time</th>
-                            <th scope="col">Result</th>
-                            <th scope="col">Ranked</th>
-                            <th scope="col">Score</th>
-                            <th scope="col" v-if="editResult">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="(item, index) in participant" :key="index">
-                            <td>{{ index + 1 }}</td>
-                            <td>{{ item.nameTeam }}</td>
-                            <td>{{ item.bibTeam }}</td>
-                            <td>{{ item.result.startTime }}</td>
-                            <td>{{ item.result.finishTime }}</td>
-                            <td>{{ item.result.raceTime }}</td>
-                            <td>
-                              <b-select
-                                v-if="item.result.startTime != ''"
-                                v-model="item.result.penalty"
-                                @change="updateTimePen($event, item)"
-                              >
-                                <option
-                                  v-for="penalty in dataPenalties"
-                                  :key="penalty.value"
-                                  :value="penalty.value"
-                                >
-                                  {{ penalty.value }}
-                                </option>
-                              </b-select>
-                            </td>
-                            <td>{{ item.result.penaltyTime }}</td>
-                            <td>
-                              {{
-                                item.result.penaltyTime == ""
-                                  ? item.result.raceTime
-                                  : item.result.totalTime
-                              }}
-                            </td>
-                            <td>{{ item.result.ranked }}</td>
-                            <td>{{ getScoreByRanked(item.result.ranked) }}</td>
-                            <td v-if="editResult">
-                              <button
-                                type="button"
-                                class="btn btn-warning"
-                                @click="openModal(item, 'R4men')"
-                              >
-                                Edit
-                              </button>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+    <div class="px-4 mt-4">
+      <div class="card-body">
+        <h4>List Result</h4>
+        <b-row>
+          <b-col>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">No</th>
+                  <th scope="col">Team Name</th>
+                  <th scope="col">BIB Number</th>
+                  <th scope="col">Start Time</th>
+                  <th scope="col">Finish Time</th>
+                  <th scope="col">Race Time</th>
+                  <th scope="col">Penalties</th>
+                  <th scope="col">Penalty Time</th>
+                  <th scope="col">Result</th>
+                  <th scope="col">Ranked</th>
+                  <th scope="col">Score</th>
+                  <th scope="col" v-if="editResult">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, index) in participant" :key="index">
+                  <td>{{ index + 1 }}</td>
+                  <td>{{ item.nameTeam }}</td>
+                  <td>{{ item.bibTeam }}</td>
+                  <td>{{ item.result.startTime }}</td>
+                  <td>{{ item.result.finishTime }}</td>
+                  <td>{{ item.result.raceTime }}</td>
+                  <td>
+                    <b-select
+                      v-if="item.result.startTime != ''"
+                      v-model="item.result.penalty"
+                      @change="updateTimePen($event, item)"
+                    >
+                      <option
+                        v-for="penalty in dataPenalties"
+                        :key="penalty.value"
+                        :value="penalty.value"
+                      >
+                        {{ penalty.value }}
+                      </option>
+                    </b-select>
+                  </td>
+                  <td>{{ item.result.penaltyTime }}</td>
+                  <td>
+                    {{
+                      item.result.penaltyTime == ""
+                        ? item.result.raceTime
+                        : item.result.totalTime
+                    }}
+                  </td>
+                  <td>{{ item.result.ranked }}</td>
+                  <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                  <td v-if="editResult">
+                    <button
+                      type="button"
+                      class="btn btn-warning"
+                      @click="openModal(item, 'R4men')"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-                      <!-- <ul>
+            <!-- <ul>
                         <li>{{ currentPort }}</li>
                       </ul> -->
-                      <br />
-                    </b-col>
-                  </b-row>
-                </div>
-              </div>
-            </b-col>
-          </b-row>
-        </div>
+            <br />
+          </b-col>
+        </b-row>
       </div>
+      <b-button @click="goTo()" variant="outline-info" class="custom-button">
+        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
+      </b-button>
     </div>
     <br />
     <br />
-    <br />
-    <br />
-    <br />
-    <br />
-    <!-- // AREA MODAL  -->
-    <!-- <b-modal id="bv-modal-edit-team" hide-footer no-close-on-backdrop centered>
-      <template #modal-title>
-        Edit Result - {{ editForm.nameTeam }} Team
-      </template>
-      <div class="d-block text-left mx-4 my-3">
-
-        <b-form-group label="Name Team">
-          <b-form-input v-model="editForm.nameTeam" disabled></b-form-input>
-        </b-form-group>
-
-        <b-form-group label="BIB Number Team">
-          <b-form-input v-model="editForm.bibTeam" disabled></b-form-input>
-        </b-form-group>
-
-        <b-form-group label="Start Time">
-          <b-form-input v-model="editForm.result.startTime"></b-form-input>
-        </b-form-group>
-
-        <b-form-group label="Finish Time">
-          <b-form-input v-model="editForm.result.finishTime"></b-form-input>
-        </b-form-group>
-
-        <b-form-group label="Penalties Team">
-          <b-form-input v-model="editForm.result.penalties"></b-form-input>
-        </b-form-group>
-      </div>
-      <div class="mt-5 p-4" style="display: flex; gap: 2vh">
-        <b-button
-          class="btn-md"
-          style="border-radius: 20px"
-          variant="primary"
-          block
-          @click="simpanNewTeam"
-          >Save Result by Team</b-button
-        >
-      </div>
-    </b-modal> -->
-    <!-- // AREA MODAL  -->
   </div>
 </template>
 
@@ -993,6 +959,77 @@ export default {
 </script>
 
 <style scoped>
+.card-time {
+  border-radius: 20px;
+}
+
+/* ===== HERO / BANNER ===== */
+.detail-hero {
+  position: relative;
+  overflow: hidden; /* biar radius rapi */
+}
+
+/* Foto background */
+.detail-hero .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://images.unsplash.com/photo-1520981825232-ece5fae45120?q=80&w=1600&auto=format&fit=crop");
+  background-size: cover;
+  background-position: center;
+}
+/* Overlay gelap halus (ganti brightness filter) */
+.detail-hero .hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
+}
+
+/* Konten di atas background */
+.detail-hero .hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 22px 22px; /* beri ruang kiri-kanan */
+}
+
+/* Judul besar putih + shadow kuat */
+.detail-hero h2 {
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(26px, 4.2vw, 46px);
+  line-height: 1.05;
+  margin-bottom: 6px !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.2px;
+}
+
+/* Sub-info (lokasi, sungai, level) */
+.detail-hero .meta {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(12px, 1.6vw, 16px);
+}
+
+/* Kotak logo putih membulat dengan bayangan */
+.hero-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit; /* ikon ikut warna default */
+}
+
+.hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .card-table {
   max-width: 100%;
   overflow-x: auto; /* Untuk mengaktifkan horizontal scroll jika tabel terlalu lebar */
@@ -1009,37 +1046,63 @@ export default {
   top: 0;
   z-index: 1;
   transition: box-shadow 0.3s ease;
-  background-color: dodgerblue;
+  background-color: #343a40;
 }
 
 .v-shadow-on-scroll {
   box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 1.5);
-  background-color: rgb(2, 102, 203);
+  background-color: rgb(195, 195, 195);
 }
 
-/* Style untuk tabel */
+/* Styling for Table */
 table {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 12px; /* Rounded corners for the entire table */
+  overflow: hidden;
 }
 
-/* Style untuk header kolom */
-th {
-  background-color: #007bff;
-  color: white;
-  text-align: center;
+thead {
+  background-color: #343a40; /* Dark background */
+  color: #ffffff; /* White text */
+  font-weight: 600; /* Bold text */
 }
 
-/* Style untuk baris ganjil */
-tr:nth-child(odd) {
-  background-color: #f2f2f2;
+thead th {
+  padding: 12px 15px; /* Spacing inside header cells */
+  text-align: left; /* Align text to the left */
+  font-size: 14px; /* Font size */
+  border-bottom: 2px solid #f1f1f1; /* Light border at the bottom */
 }
 
-/* Style untuk baris genap */
-tr:nth-child(even) {
-  background-color: #e0e0e0;
+tbody tr:nth-child(odd) {
+  background-color: #f9f9f9; /* Light background for odd rows */
 }
 
+tbody tr:nth-child(even) {
+  background-color: #f2f2f2; /* Slightly darker background for even rows */
+}
+
+th,
+td {
+  border: none; /* Remove borders */
+}
+
+thead th:first-child {
+  border-top-left-radius: 12px; /* Rounded left corner */
+}
+
+thead th:last-child {
+  border-top-right-radius: 12px; /* Rounded right corner */
+}
+
+table,
+th,
+td {
+  border: none;
+}
+
+/* Styling List Result  */
 /* Style untuk sel data */
 td {
   text-align: center;
@@ -1107,5 +1170,18 @@ td.time {
 /* Warna saat tidak terhubung (misalnya, merah) */
 .disconnected {
   background-color: red;
+}
+
+/* Custom button styling */
+.custom-button {
+  border-color: #1874a5; /* Set the border color to #1874A5 */
+  color: #1874a5; /* Set the text color to #1874A5 */
+  transition: all 0.3s ease; /* Smooth transition for color changes */
+}
+
+.custom-button:hover {
+  background-color: #1874a5; /* Background color when hovered */
+  color: white; /* Text color when hovered */
+  border-color: #1874a5; /* Border color when hovered */
 }
 </style>

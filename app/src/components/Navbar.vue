@@ -3,9 +3,8 @@
     <b-navbar
       toggleable="lg"
       type="dark"
-      variant="primary"
       class="navbar navbar-expand-lg navbar-dark fixed-top shadow-s"
-      style="background-color: var(--blue)"
+      style="background-color: #1874A5"
     >
       <div class="container">
         <a class="navbar-brand" @click="goTo()">

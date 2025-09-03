@@ -214,7 +214,7 @@ export default {
 
       // state
       raceActive: { selected: { name: "SPRINT" } },
-      initialActive: { selected: { name: "YOUTH" } },
+      initialActive: { selected: { name: "Silakan Pilih Initial" } },
 
       // data
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
@@ -373,6 +373,7 @@ export default {
       return null;
     },
     _ensureBucket(eventName, divisionName, raceName, initialName) {
+      console.log(initialName,'<< cek initial name')
       const exist = this._getBucket(
         eventName,
         divisionName,

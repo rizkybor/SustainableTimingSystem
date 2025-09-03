@@ -142,7 +142,7 @@
     <div class="px-5 mb-4">
       <div
         class="card p-4"
-        style="background-color: rgb(32, 32, 32); border-radius: 20px"
+        style="background-color: #4A4A4A; border-radius: 20px"
       >
         <div v-if="!editResult">
           <b-row>
@@ -157,7 +157,7 @@
                 "
               >
                 <table class="table table-dark table-sm">
-                  <thead>
+                  <thead style="background-color: white; color: #4A4A4A;">
                     <tr>
                       <th scope="col">Id Registrasi</th>
                       <th scope="col">Racetime</th>
@@ -1040,7 +1040,7 @@ export default {
   top: 0;
   z-index: 1;
   transition: box-shadow 0.3s ease;
-  background-color: #343a40;
+  background-color: #4A4A4A;
 }
 
 .v-shadow-on-scroll {
@@ -1057,7 +1057,7 @@ table {
 }
 
 thead {
-  background-color: #343a40; /* Dark background */
+    background-color: #4A4A4A;
   color: #ffffff; /* White text */
   font-weight: 600; /* Bold text */
 }
@@ -1111,7 +1111,7 @@ td.penalty {
 
 /* Style untuk sel data dalam field "Penalty" */
 td.penalty span {
-  background-color: #007bff;
+  background-color: #4A4A4A;
   color: white;
   padding: 4px 8px;
   border-radius: 5px;
@@ -1119,7 +1119,7 @@ td.penalty span {
 
 /* Style untuk sel data dalam field "Penalty" (Teks hitam) */
 td.penalty span.black {
-  background-color: black;
+  background-color: #4A4A4A;
 }
 
 /* Style untuk sel data dalam field "Penalty" (Teks merah) */
@@ -1129,7 +1129,7 @@ td.penalty span.red {
 
 /* Style untuk sel data dalam field "Penalty" (Teks biru) */
 td.penalty span.blue {
-  background-color: blue;
+  background-color: #4A4A4A;
 }
 
 /* Style untuk sel data dalam field "Penalty" (Teks hijau) */

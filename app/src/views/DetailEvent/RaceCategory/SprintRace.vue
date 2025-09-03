@@ -67,22 +67,16 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h5 style="font-weight: 800; font-style: italic">
-              {{ dataEvent.eventName }}
-            </h5>
-
             <h6 style="font-weight: 800; font-style: italic">
               Nomor Lomba : Sprint
             </h6>
             <h6 style="font-weight: 800; font-style: italic">
               Categories : {{ titleCategories }}
             </h6>
-            <p style="font-style: italic">
-              <span
-                >{{ dataEvent.startDateEvent }} -
-                {{ dataEvent.endDateEvent }}</span
-              >
-            </p>
+              <h6 style="font-weight: 800; font-style: italic">
+              Tanggal : {{ dataEvent.startDateEvent }} -
+                {{ dataEvent.endDateEvent }}
+            </h6>
           </b-col>
           <b-col>
             <div

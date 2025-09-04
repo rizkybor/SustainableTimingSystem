@@ -34,7 +34,7 @@ const {
   getOptionTeamTypes
 } = require("../controllers/INSERT/insertTeams");
 
-const { getSprintResult } = require("../controllers/GET/getResult.js");
+const { getSprintResult, existsSprintResult } = require("../controllers/GET/getResult.js");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
@@ -183,6 +183,15 @@ function setupIPCMainHandlers() {
       });
     }
   });
+
+  ipcMain.on("sprint-result:exists", async (event, identity) => {
+  try {
+    const exists = await existsSprintResult(identity);
+    event.reply("sprint-result:exists-reply", { ok: true, exists });
+  } catch (err) {
+    event.reply("sprint-result:exists-reply", { ok: false, error: err.message });
+  }
+});
 
   // SAVE DRR RESULT
   ipcMain.on("insert-drr-result", async (event, datas) => {

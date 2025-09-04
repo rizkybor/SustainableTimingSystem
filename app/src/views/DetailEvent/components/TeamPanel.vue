@@ -20,11 +20,20 @@
             <Icon icon="mdi:printer-outline" class="mr-2" />
             Print Result
           </b-button> -->
+          <!-- 👇 BARU: tampil hanya jika ada result -->
+          <b-button
+            v-if="resultAvailable"
+            class="btn-add"
+            @click="$emit('show-result')"
+            title="Show saved results for this category"
+          >
+            <Icon icon="mdi:podium" class="mr-1" /> Show Result
+          </b-button>
 
           <b-button
             size="sm"
-            variant="primary rounded-pill"
-            class="d-flex align-items-center"
+            variant="primary"
+class="btn-add"
             @click="startRace(rows)"
           >
             <Icon icon="mdi:flag-variant" class="mr-2" />
@@ -150,6 +159,7 @@ export default {
     rows: { type: Array, default: () => [] },
     teamsAvailable: { type: Array, default: () => [] },
     draft: { type: Object, default: null },
+    resultAvailable: { type: Boolean, default: false },
   },
   computed: {
     teamsAvailableAll() {
@@ -221,15 +231,15 @@ export default {
     //   //   }
     // },
     startRace() {
-    // kirim identity + rows milik panel ini
-    this.$emit('start-race', {
-      division: this.division,
-      race: this.race,
-      eventName: this.eventName,
-      initialName: this.initialName,
-      rows: Array.isArray(this.rows) ? this.rows : []
-    });
-  },
+      // kirim identity + rows milik panel ini
+      this.$emit("start-race", {
+        division: this.division,
+        race: this.race,
+        eventName: this.eventName,
+        initialName: this.initialName,
+        rows: Array.isArray(this.rows) ? this.rows : [],
+      });
+    },
     goTo(val, payload, teamTitle) {
       // Validasi form
       let formValid = this.validateForm();

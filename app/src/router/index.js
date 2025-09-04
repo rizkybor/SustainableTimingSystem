@@ -9,7 +9,7 @@ import SlalomRace from "../views/DetailEvent/RaceCategory/SlalomRace.vue";
 import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
 import Head2Head from "../views/DetailEvent/RaceCategory/HeadToHead.vue";
 import CreateTeam from "@/views/CreateTeam/index.vue";
-
+import SprintResult from "@/views/Result/SprintResult.vue";
 
 Vue.use(VueRouter);
 
@@ -47,6 +47,11 @@ const routes = [
         path: "head2head-race",
         name: "head2head-race",
         component: Head2Head,
+      },
+       {
+        path: "sprint-result",
+       name: 'SprintResult',
+        component: SprintResult,
       },
     ],
   },

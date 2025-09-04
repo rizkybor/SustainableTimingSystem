@@ -112,6 +112,8 @@
         @draft-cancel="cancelDraft('R4', 'MEN')"
         @delete-row="deleteRow('R4', 'MEN', $event)"
         @start-race="handleStartRace"
+        :result-available="isResultAvailable('R4', 'MEN')"
+        @show-result="showResult('R4', 'MEN')"
       />
 
       <team-panel
@@ -188,6 +190,12 @@ export default {
   components: { Icon, TeamPanel },
   data() {
     return {
+      resultAvailMap: {
+        R4_MEN: false,
+        R4_WOMEN: false,
+        R6_MEN: false,
+        R6_WOMEN: false,
+      },
       _lastToken: "",
       // kategori UI
       raceCategories: [
@@ -282,6 +290,43 @@ export default {
   },
 
   methods: {
+    isResultAvailable(div, race) {
+      return !!this.resultAvailMap[this.keyOf(div, race)];
+    },
+    setResultAvailable(div, race, val) {
+      this.$set(this.resultAvailMap, this.keyOf(div, race), !!val);
+    },
+
+    async checkSprintResultExists(div, race) {
+      const idt = this._buildIdentity(div, race);
+      if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
+        this.setResultAvailable(div, race, false);
+        return;
+      }
+      await new Promise((resolve) => {
+        const cb = (_e, res) => {
+          const ok = res && res.ok && !!res.exists;
+          this.setResultAvailable(div, race, ok);
+          resolve();
+        };
+        ipcRenderer.send("sprint-result:exists", idt);
+        ipcRenderer.once("sprint-result:exists-reply", cb);
+        setTimeout(() => {
+          try {
+            ipcRenderer.removeListener("sprint-result:exists-reply", cb);
+          } catch {}
+          resolve();
+        }, 3000);
+      });
+    },
+
+    showResult(div, race) {
+      const idt = this._buildIdentity(div, race);
+      try {
+        localStorage.setItem("resultViewIdentity", JSON.stringify(idt));
+      } catch {}
+      this.$router.push(`/event-detail/${this.$route.params.id}/sprint-result`);
+    },
     _clearBucketInState(identity) {
       const ev = String(identity.eventName).toUpperCase();
       const ini = String(identity.initialName).toUpperCase();
@@ -420,14 +465,22 @@ export default {
     async refreshVisibleBuckets() {
       await this.$nextTick();
       const jobs = [];
-      if (this.showPanel("R4", "MEN"))
+      if (this.showPanel("R4", "MEN")) {
         jobs.push(this.loadTeamsRegistered("R4", "MEN"));
-      if (this.showPanel("R4", "WOMEN"))
+        jobs.push(this.checkSprintResultExists("R4", "MEN"));
+      }
+      if (this.showPanel("R4", "WOMEN")) {
         jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
-      if (this.showPanel("R6", "MEN"))
+        jobs.push(this.checkSprintResultExists("R4", "WOMEN"));
+      }
+      if (this.showPanel("R6", "MEN")) {
         jobs.push(this.loadTeamsRegistered("R6", "MEN"));
-      if (this.showPanel("R6", "WOMEN"))
+        jobs.push(this.checkSprintResultExists("R6", "MEN"));
+      }
+      if (this.showPanel("R6", "WOMEN")) {
         jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
+        jobs.push(this.checkSprintResultExists("R6", "WOMEN"));
+      }
       await Promise.all(jobs);
     },
 
@@ -859,33 +912,34 @@ export default {
         });
       } catch {}
     },
-    _toUpperSafe(v) { return String(v || '').toUpperCase(); },
+    _toUpperSafe(v) {
+      return String(v || "").toUpperCase();
+    },
 
-  _mapRaceToPath(evName) {
-    const e = this._toUpperSafe(evName);
-    if (e === 'SPRINT') return 'sprint-race';
-    if (e === 'SLALOM') return 'slalom-race';
-    if (e === 'DRR') return 'drr-race';
-    if (e === 'HEAD2HEAD') return 'head2head-race';
-    return e.toLowerCase(); // fallback
-  },
+    _mapRaceToPath(evName) {
+      const e = this._toUpperSafe(evName);
+      if (e === "SPRINT") return "sprint-race";
+      if (e === "SLALOM") return "slalom-race";
+      if (e === "DRR") return "drr-race";
+      if (e === "HEAD2HEAD") return "head2head-race";
+      return e.toLowerCase(); // fallback
+    },
 
-  handleStartRace(payload) {
-    // payload dari TeamPanel
-    const { division, race, eventName, initialName } = payload;
+    handleStartRace(payload) {
+      // payload dari TeamPanel
+      const { division, race, eventName, initialName } = payload;
 
-    // Ambil bucket AKTUAL (supaya tersinkron dgn state & DB)
-    const bucket =
-      this._getBucket(
+      // Ambil bucket AKTUAL (supaya tersinkron dgn state & DB)
+      const bucket = this._getBucket(
         this._toUpperSafe(eventName),
         this._toUpperSafe(division),
         this._toUpperSafe(race),
         this._toUpperSafe(initialName)
       ) || {
-        eventId: '',
-        initialId: '',
-        raceId: '',
-        divisionId: '',
+        eventId: "",
+        initialId: "",
+        raceId: "",
+        divisionId: "",
         eventName: this._toUpperSafe(eventName),
         initialName: this._toUpperSafe(initialName),
         raceName: this._toUpperSafe(race),
@@ -893,39 +947,41 @@ export default {
         teams: [],
       };
 
-    // Siapkan payload lengkap untuk halaman race
-    const startData = {
-      // metadata event penuh (butuh categories untuk render berikutnya)
-      event: this.events || {},
-      // konteks kategori yang dipilih user
-      context: {
-        eventName: bucket.eventName,      // SPRINT/SLALOM/DRR/HEAD2HEAD (UPPER)
-        initialName: bucket.initialName,
-        divisionName: bucket.divisionName,
-        raceName: bucket.raceName,
-      },
-      // bucket aktif (teams kombinasi tsb)
-      bucket,
-      // seluruh dataTeams untuk referensi (mis. cross-panel)
-      allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
-    };
+      // Siapkan payload lengkap untuk halaman race
+      const startData = {
+        // metadata event penuh (butuh categories untuk render berikutnya)
+        event: this.events || {},
+        // konteks kategori yang dipilih user
+        context: {
+          eventName: bucket.eventName, // SPRINT/SLALOM/DRR/HEAD2HEAD (UPPER)
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
+        },
+        // bucket aktif (teams kombinasi tsb)
+        bucket,
+        // seluruh dataTeams untuk referensi (mis. cross-panel)
+        allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+      };
 
-    // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
-    try {
-      localStorage.setItem('raceStartPayload', JSON.stringify(startData));
-    } catch {}
+      // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
+      try {
+        localStorage.setItem("raceStartPayload", JSON.stringify(startData));
+      } catch {}
 
-    // Opsional: notifikasi
-    ipcRenderer && ipcRenderer.send && ipcRenderer.send('get-alert-saved', {
-      type: 'info',
-      message: 'Start Race',
-      detail: `${bucket.eventName} – ${bucket.divisionName}/${bucket.raceName} (${bucket.initialName})`,
-    });
+      // Opsional: notifikasi
+      ipcRenderer &&
+        ipcRenderer.send &&
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Start Race",
+          detail: `${bucket.eventName} – ${bucket.divisionName}/${bucket.raceName} (${bucket.initialName})`,
+        });
 
-    // Arahkan ke halaman race yang sesuai
-    const path = this._mapRaceToPath(eventName);
-    this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
-  },
+      // Arahkan ke halaman race yang sesuai
+      const path = this._mapRaceToPath(eventName);
+      this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+    },
   },
 };
 </script>

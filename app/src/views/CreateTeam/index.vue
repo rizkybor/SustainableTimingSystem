@@ -2,13 +2,6 @@
   <div style="height: 86vh">
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
-        <div class="mx-5 mt-5">
-          <p class="h6 text-muted mb-0">
-            <Icon icon="ic:round-arrow-back" class="mr-1" />
-            Back
-          </p>
-        </div>
-
         <b-card
           title="Create New Team"
           sub-title="Create your main team and add sub-teams to represent different categories"
@@ -75,13 +68,30 @@
 
         <!-- ✅ LIST TEAM -->
         <b-card title="Teams List" class="team-card m-3 px-4 py-4 mt-4">
+          <div class="d-flex align-items-center mb-3">
+            <label class="mb-0 mr-2 font-weight-bold">Filter:</label>
+            <b-form-select
+              v-model="filterType"
+              :options="filterTypeOptions"
+              class="input-soft w-auto"
+              size="sm"
+            />
+            <b-button
+              size="sm"
+              class="ml-2 btn-outline-pill"
+              variant="outline-secondary"
+              @click="filterType = 'ALL'"
+            >
+              Reset
+            </b-button>
+          </div>
           <b-table
             striped
             hover
             small
             bordered
             head-variant="light"
-            :items="teams"
+            :items="filteredTeams"
             :fields="fields"
             responsive="md"
             class="teams-table"
@@ -213,6 +223,7 @@ export default {
         statusTeam: "Active",
       },
       teams: [], // ✅ list teams
+      filterType: "ALL",
       fields: [
         {
           key: "index",
@@ -253,6 +264,24 @@ export default {
         statusId: 0,
       },
     };
+  },
+  computed: {
+    // Opsi dropdown filter (All + dari optionTeamTypes)
+    filterTypeOptions() {
+      const base = [{ value: "ALL", text: "All Types" }];
+      const mapped = (this.optionTeamTypes || []).map((o) => ({
+        value: String(o.value),
+        text: o.name,
+      }));
+      return base.concat(mapped);
+    },
+    // Hasil filter untuk tabel
+    filteredTeams() {
+      const list = Array.isArray(this.teams) ? this.teams : [];
+      if (this.filterType === "ALL") return list;
+      const sel = String(this.filterType).toLowerCase();
+      return list.filter((t) => String(t.typeTeam || "").toLowerCase() === sel);
+    },
   },
   async mounted() {
     try {

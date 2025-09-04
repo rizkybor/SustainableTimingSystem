@@ -198,28 +198,38 @@ export default {
       }
       if (ok) this.$emit("delete-row", row); // ⬅️ emit objek row lengkap
     },
-    startRace(params) {
-      console.log(params, "<<< checked teams");
-      // INSERT ICP to TABLE TEAMS
-      // this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
+    // startRace(params) {
+    //   console.log(params, "<<< checked teams");
+    //   // INSERT ICP to TABLE TEAMS
+    //   // this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
 
-      // Periksa apakah draft dan teamId tersedia
-      //   if (this.draft && this.draft.teamId) {
-      //     const selectedTeam = this.teamsAvailable.find(
-      //       (team) => team.id === this.draft.teamId
-      //     );
+    //   // Periksa apakah draft dan teamId tersedia
+    //   //   if (this.draft && this.draft.teamId) {
+    //   //     const selectedTeam = this.teamsAvailable.find(
+    //   //       (team) => team.id === this.draft.teamId
+    //   //     );
 
-      //     if (selectedTeam) {
-      //       console.log("Tim yang dipilih:", selectedTeam.nameTeam);
-      //       // Kirim pesan atau logika lain jika diperlukan
-      //       // ipcRenderer.send("get-alert-saved", { ... });
-      //     } else {
-      //       console.error("Tim tidak ditemukan!");
-      //     }
-      //   } else {
-      //     console.error("Team ID belum dipilih!");
-      //   }
-    },
+    //   //     if (selectedTeam) {
+    //   //       console.log("Tim yang dipilih:", selectedTeam.nameTeam);
+    //   //       // Kirim pesan atau logika lain jika diperlukan
+    //   //       // ipcRenderer.send("get-alert-saved", { ... });
+    //   //     } else {
+    //   //       console.error("Tim tidak ditemukan!");
+    //   //     }
+    //   //   } else {
+    //   //     console.error("Team ID belum dipilih!");
+    //   //   }
+    // },
+    startRace() {
+    // kirim identity + rows milik panel ini
+    this.$emit('start-race', {
+      division: this.division,
+      race: this.race,
+      eventName: this.eventName,
+      initialName: this.initialName,
+      rows: Array.isArray(this.rows) ? this.rows : []
+    });
+  },
     goTo(val, payload, teamTitle) {
       // Validasi form
       let formValid = this.validateForm();

@@ -111,6 +111,7 @@
         @draft-save="saveDraft('R4', 'MEN')"
         @draft-cancel="cancelDraft('R4', 'MEN')"
         @delete-row="deleteRow('R4', 'MEN', $event)"
+        @start-race="handleStartRace"
       />
 
       <team-panel
@@ -129,6 +130,7 @@
         @draft-save="saveDraft('R4', 'WOMEN')"
         @draft-cancel="cancelDraft('R4', 'WOMEN')"
         @delete-row="deleteRow('R4', 'WOMEN', $event)"
+        @start-race="handleStartRace"
       />
 
       <team-panel
@@ -147,6 +149,7 @@
         @draft-save="saveDraft('R6', 'MEN')"
         @draft-cancel="cancelDraft('R6', 'MEN')"
         @delete-row="deleteRow('R6', 'MEN', $event)"
+        @start-race="handleStartRace"
       />
 
       <team-panel
@@ -165,6 +168,7 @@
         @draft-save="saveDraft('R6', 'WOMEN')"
         @draft-cancel="cancelDraft('R6', 'WOMEN')"
         @delete-row="deleteRow('R6', 'WOMEN', $event)"
+        @start-race="handleStartRace"
       />
 
       <div v-if="!anyPanelShown" class="text-center text-muted py-5">
@@ -855,6 +859,73 @@ export default {
         });
       } catch {}
     },
+    _toUpperSafe(v) { return String(v || '').toUpperCase(); },
+
+  _mapRaceToPath(evName) {
+    const e = this._toUpperSafe(evName);
+    if (e === 'SPRINT') return 'sprint-race';
+    if (e === 'SLALOM') return 'slalom-race';
+    if (e === 'DRR') return 'drr-race';
+    if (e === 'HEAD2HEAD') return 'head2head-race';
+    return e.toLowerCase(); // fallback
+  },
+
+  handleStartRace(payload) {
+    // payload dari TeamPanel
+    const { division, race, eventName, initialName } = payload;
+
+    // Ambil bucket AKTUAL (supaya tersinkron dgn state & DB)
+    const bucket =
+      this._getBucket(
+        this._toUpperSafe(eventName),
+        this._toUpperSafe(division),
+        this._toUpperSafe(race),
+        this._toUpperSafe(initialName)
+      ) || {
+        eventId: '',
+        initialId: '',
+        raceId: '',
+        divisionId: '',
+        eventName: this._toUpperSafe(eventName),
+        initialName: this._toUpperSafe(initialName),
+        raceName: this._toUpperSafe(race),
+        divisionName: this._toUpperSafe(division),
+        teams: [],
+      };
+
+    // Siapkan payload lengkap untuk halaman race
+    const startData = {
+      // metadata event penuh (butuh categories untuk render berikutnya)
+      event: this.events || {},
+      // konteks kategori yang dipilih user
+      context: {
+        eventName: bucket.eventName,      // SPRINT/SLALOM/DRR/HEAD2HEAD (UPPER)
+        initialName: bucket.initialName,
+        divisionName: bucket.divisionName,
+        raceName: bucket.raceName,
+      },
+      // bucket aktif (teams kombinasi tsb)
+      bucket,
+      // seluruh dataTeams untuk referensi (mis. cross-panel)
+      allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+    };
+
+    // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
+    try {
+      localStorage.setItem('raceStartPayload', JSON.stringify(startData));
+    } catch {}
+
+    // Opsional: notifikasi
+    ipcRenderer && ipcRenderer.send && ipcRenderer.send('get-alert-saved', {
+      type: 'info',
+      message: 'Start Race',
+      detail: `${bucket.eventName} – ${bucket.divisionName}/${bucket.raceName} (${bucket.initialName})`,
+    });
+
+    // Arahkan ke halaman race yang sesuai
+    const path = this._mapRaceToPath(eventName);
+    this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+  },
   },
 };
 </script>

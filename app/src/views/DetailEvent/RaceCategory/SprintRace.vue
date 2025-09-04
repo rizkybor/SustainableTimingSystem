@@ -244,6 +244,74 @@ import { SerialPort } from "serialport";
 import OperationTimePanel from "../components/OperationTeamPanel.vue";
 import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
 
+// --- helper untuk baca & normalisasi payload baru (bucket) ---
+const RACE_PAYLOAD_KEY = "raceStartPayload";
+
+function normalizeTeamForSprint(t = {}) {
+  const base = {
+    nameTeam: String(t.nameTeam || ""),
+    bibTeam: String(t.bibTeam || ""),
+    startOrder: String(t.startOrder || ""),
+    praStart: String(t.praStart || ""),
+    intervalRace: String(t.intervalRace || ""),
+    statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+  };
+
+  const emptyRes = {
+    startTime: "",
+    finishTime: "",
+    raceTime: "",
+    penaltyTime: "",
+    penalty: "",
+    totalTime: "",
+    ranked: "",
+    score: "",
+  };
+
+  // kalau format lama (array untuk result: H2H/Slalom), ambil elemen pertama
+  let result = t.result;
+  if (Array.isArray(result)) result = result[0] || {};
+  if (!result || typeof result !== "object" || Array.isArray(result))
+    result = {};
+  result = { ...emptyRes, ...result };
+
+  // otr pastikan object juga
+  let otr = t.otr;
+  if (!otr || typeof otr !== "object" || Array.isArray(otr)) otr = {};
+  otr = { ...emptyRes, ...otr };
+
+  return { ...base, result, otr };
+}
+
+function loadRaceStartPayloadForSprint() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(RACE_PAYLOAD_KEY);
+  } catch {}
+  let obj = {};
+  try {
+    obj = JSON.parse(raw || "{}");
+  } catch {}
+
+  const b = obj.bucket || {};
+  const bucket = {
+    eventId: String(b.eventId || ""),
+    initialId: String(b.initialId || ""),
+    raceId: String(b.raceId || ""),
+    divisionId: String(b.divisionId || ""),
+    eventName: String(b.eventName || "").toUpperCase(),
+    initialName: String(b.initialName || "").toUpperCase(),
+    raceName: String(b.raceName || "").toUpperCase(),
+    divisionName: String(b.divisionName || "").toUpperCase(),
+    teams: Array.isArray(b.teams) ? b.teams.map(normalizeTeamForSprint) : [],
+  };
+
+  return {
+    bucket,
+    allBuckets: Array.isArray(obj.allBuckets) ? obj.allBuckets : [],
+  };
+}
+
 export default {
   name: "SustainableTimingSystemSprintRace",
   components: {
@@ -424,12 +492,36 @@ export default {
   },
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
-    await this.checkValueStorage();
+    // 1) coba baca format baru (raceStartPayload)
+    const ok = this.loadFromRaceStartPayload();
+
+    // 2) fallback ke format lama jika belum ada
+    if (!ok) {
+      await this.checkValueStorage();
+    }
   },
   destroyed() {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    loadFromRaceStartPayload() {
+      const { bucket } = loadRaceStartPayloadForSprint();
+      if (!bucket || !bucket.teams || !bucket.teams.length) return false;
+
+      // isi tabel peserta sprint
+      this.participant = bucket.teams.slice(); // array of teams (sudah dinormalisasi)
+
+      // isi judul kategori dari bucket
+      this.titleCategories = `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`;
+
+      // event detail (kalau kamu simpan di localStorage seperti sebelumnya, tetap ambil)
+      try {
+        const events = localStorage.getItem("eventDetails");
+        if (events) this.dataEvent = JSON.parse(events);
+      } catch {}
+
+      return true;
+    },
     openModal(datas, division) {
       // console.log(datas);
       this.editForm = datas;
@@ -763,6 +855,17 @@ export default {
       return hasilFormat;
     },
     goTo() {
+      try {
+        localStorage.removeItem("raceStartPayload");
+        localStorage.removeItem("participantByCategories");
+        localStorage.removeItem("currentCategories");
+      } catch (e) {
+        console.warn("Gagal menghapus raceStartPayload:", e);
+      }
+
+      // reset state lokal (opsional biar UI langsung bersih)
+      this.participant = [];
+      this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
     handleScroll() {
@@ -831,6 +934,14 @@ export default {
           });
         }
       });
+    },
+    beforeRouteLeave(to, from, next) {
+      try {
+        localStorage.removeItem("raceStartPayload");
+        localStorage.removeItem("participantByCategories");
+        localStorage.removeItem("currentCategories");
+      } catch {}
+      next();
     },
   },
 };

@@ -105,16 +105,16 @@
             <td class="muted">{{ idx + 1 }}</td>
             <td>{{ r.nameTeam }}</td>
             <td>{{ r.bibTeam }}</td>
-            <td class="text-right">
-              <button
-                type="button"
-                class="btn-ghost danger"
-                @click="$emit('delete-row', r.bibTeam)"
-                title="Delete"
-              >
-                <Icon icon="mdi:trash-can-outline" width="18" height="18" />
-              </button>
-            </td>
+           <td class="text-right">
+  <button
+    type="button"
+    class="btn-ghost danger"
+    @click="onDelete(r)"
+    title="Delete"
+  >
+    <Icon icon="mdi:trash-can-outline" width="18" height="18" />
+  </button>
+</td>
           </tr>
 
           <tr v-if="!draft && !rows.length">
@@ -169,6 +169,31 @@ export default {
         bib: e.target.value,
       });
     },
+     async onDelete(row) {
+    // pakai modal BV kalau ada; fallback ke confirm biasa
+    let ok = true;
+    if (this.$bvModal && this.$bvModal.msgBoxConfirm) {
+      ok = await this.$bvModal
+        .msgBoxConfirm(
+          `Hapus tim "${row.nameTeam}" (BIB: ${row.bibTeam || "-"}) dari tabel ini?`,
+          {
+            title: "Confirm Delete",
+            okTitle: "Delete",
+            okVariant: "danger",
+            cancelTitle: "Cancel",
+            centered: true,
+            noCloseOnEsc: true,
+            noCloseOnBackdrop: true,
+          }
+        )
+        .catch(() => false);
+    } else {
+      ok = window.confirm(
+        `Hapus tim "${row.nameTeam}" (BIB: ${row.bibTeam || "-"}) dari tabel ini?`
+      );
+    }
+    if (ok) this.$emit("delete-row", row); // ⬅️ emit objek row lengkap
+  },
     startRace(params) {
       console.log(params,'<<< checked teams')
       // INSERT ICP to TABLE TEAMS 

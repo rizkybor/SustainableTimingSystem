@@ -159,13 +159,16 @@ function setupIPCMainHandlers() {
 
   // SAVE SPRINT RESULT
   ipcMain.on("insert-sprint-result", async (event, datas) => {
-    try {
-      const data = await insertSprintResult(datas);
-      event.reply("insert-sprint-result-reply", data);
-    } catch (error) {
-      event.reply("insert-sprint-result-reply", null);
-    }
-  });
+  try {
+    const result = await insertSprintResult(datas);
+    event.reply("insert-sprint-result-reply", result);
+  } catch (err) {
+    event.reply("insert-sprint-result-reply", {
+      ok: false,
+      error: err.message || String(err),
+    });
+  }
+});
 
   // LOAD SPRINT RESULT
   ipcMain.on("get-sprint-result", async (event, query = {}) => {

@@ -196,6 +196,94 @@ import { Icon } from "@iconify/vue2";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
+function getBucket() {
+  try {
+    const raw = localStorage.getItem(RACE_PAYLOAD_KEY);
+    const obj = JSON.parse(raw || "{}");
+    const b = obj.bucket || {};
+    return {
+      eventId: String(b.eventId || ""),
+      initialId: String(b.initialId || ""),
+      raceId: String(b.raceId || ""),
+      divisionId: String(b.divisionId || ""),
+      eventName: String(b.eventName || "").toUpperCase(),
+      initialName: String(b.initialName || "").toUpperCase(),
+      raceName: String(b.raceName || "").toUpperCase(),
+      divisionName: String(b.divisionName || "").toUpperCase(),
+    };
+  } catch {
+    return {
+      eventId: "",
+      initialId: "",
+      raceId: "",
+      divisionId: "",
+      eventName: "",
+      initialName: "",
+      raceName: "",
+      divisionName: "",
+    };
+  }
+}
+
+/** builder dokumen yang akan disimpan */
+function buildResultDocs(participantArr, bucket) {
+  const now = new Date();
+  return participantArr.map((t) => {
+    const team = {
+      nameTeam: String(t.nameTeam || ""),
+      bibTeam: String(t.bibTeam || ""),
+      startOrder: String(t.startOrder || ""),
+      praStart: String(t.praStart || ""),
+      intervalRace: String(t.intervalRace || ""),
+      statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+    };
+    const result = { ...(t.result || {}) };
+    const otr = { ...(t.otr || {}) };
+
+    // pastikan string/angka aman
+    result.startTime = String(result.startTime || "");
+    result.finishTime = String(result.finishTime || "");
+    result.raceTime = String(result.raceTime || "");
+    result.penalty = Number.isFinite(result.penalty)
+      ? result.penalty
+      : result.penalty
+      ? Number(result.penalty)
+      : 0;
+    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
+    result.totalTime = String(result.totalTime || result.raceTime || "");
+    result.ranked = Number.isFinite(result.ranked)
+      ? result.ranked
+      : result.ranked
+      ? Number(result.ranked)
+      : 0;
+    result.score = Number.isFinite(result.score)
+      ? result.score
+      : result.score
+      ? Number(result.score)
+      : 0;
+
+    return {
+      // === KUNCI RELASI (HARUS SAMA DGN TEAMS REGISTERED) ===
+      eventId: bucket.eventId,
+      initialId: bucket.initialId,
+      raceId: bucket.raceId,
+      divisionId: bucket.divisionId,
+      eventName: bucket.eventName,
+      initialName: bucket.initialName,
+      raceName: bucket.raceName,
+      divisionName: bucket.divisionName,
+
+      // === DATA TIM + HASIL ===
+      ...team,
+      result,
+      otr,
+
+      // meta optional
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+}
 
 function normalizeTeamForSprint(t = {}) {
   const base = {
@@ -652,38 +740,51 @@ export default {
     },
 
     saveResult() {
-      const clean = JSON.parse(JSON.stringify(this.participantArr));
-      if (!Array.isArray(clean) || clean.length === 0) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data yang bisa disimpan.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-      const eventId =
-        this.dataEvent && this.dataEvent._id
-          ? this.dataEvent._id.toString()
-          : null;
-      const payload = clean.map((it) => ({ ...it, eventId }));
+  const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+  if (!Array.isArray(clean) || clean.length === 0) {
+    ipcRenderer.send("get-alert", {
+      type: "warning",
+      detail: "Belum ada data yang bisa disimpan.",
+      message: "Ups Sorry",
+    });
+    return;
+  }
 
-      ipcRenderer.send("insert-sprint-result", payload);
-      ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
-        if (res && res.ok) {
-          ipcRenderer.send("get-alert-saved", {
-            type: "question",
-            detail: "Result data has been successfully saved",
-            message: "Successfully",
-          });
-        } else {
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            detail: (res && res.error) || "Save failed",
-            message: "Failed",
-          });
-        }
+  // Gunakan bucket dari raceStartPayload agar identik dengan Team Registered
+  const bucket = getBucket();
+  const must = ["eventId", "initialId", "raceId", "divisionId"];
+  const missing = must.filter((k) => !bucket[k]);
+  if (missing.length) {
+    ipcRenderer.send("get-alert", {
+      type: "error",
+      detail: `Bucket fields missing: ${missing.join(", ")}`,
+      message: "Failed",
+    });
+    return;
+  }
+
+  // Bangun dokumen yang siap disimpan
+  const docs = buildResultDocs(clean, bucket);
+
+  // KIRIM ARRAY LANGSUNG (bukan objek)
+  ipcRenderer.send("insert-sprint-result", docs);
+
+  ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+    if (res && res.ok) {
+      ipcRenderer.send("get-alert-saved", {
+        type: "question",
+        detail: "Result data has been successfully saved",
+        message: "Successfully",
       });
-    },
+    } else {
+      ipcRenderer.send("get-alert", {
+        type: "error",
+        detail: (res && res.error) || "Save failed",
+        message: "Failed",
+      });
+    }
+  });
+},
   },
 };
 </script>

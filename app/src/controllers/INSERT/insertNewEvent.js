@@ -124,6 +124,8 @@ async function insertDrrResult(payload) {
   }
 }
 
+
+
 module.exports = {
   insertNewEvent,
   insertSprintResult,

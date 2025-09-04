@@ -1,10 +1,12 @@
 const { ipcMain, dialog } = require("electron");
 const fs = require("fs");
 const cloudinary = require("cloudinary").v2;
+
 const {
   getAllEvents,
   getEventById,
 } = require("../controllers/GET/getEvent.js");
+
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
@@ -12,17 +14,33 @@ const {
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
 } = require("../controllers/GET/getOptionEvent.js");
+
 const {
   insertNewEvent,
   insertSprintResult,
 } = require("../controllers/INSERT/insertNewEvent.js");
+
+const {
+  getTeamsRegistered,
+  deleteTeamInBucket,
+  upsertTeamsRegistered,
+} = require("../controllers/INSERT/insertTeamsRegistered.js");
+
+const {
+  insertNewTeam,
+  getAllTeams,
+  deleteTeamById,
+  updateTeamById,
+  getOptionTeamTypes
+} = require("../controllers/INSERT/insertTeams");
+
 const { getSprintResult } = require("../controllers/GET/getResult.js");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
-  api_key:    process.env.CLOUDINARY_API_KEY || "",
+  api_key: process.env.CLOUDINARY_API_KEY || "",
   api_secret: process.env.CLOUDINARY_API_SECRET || "",
-  secure:     true,
+  secure: true,
 });
 
 // communication with database
@@ -187,14 +205,16 @@ function setupIPCMainHandlers() {
     }
   });
 
-// ========================================================================
+  // ========================================================================
   // File picker & Cloudinary (TIDAK ADA optional chaining)
   // ========================================================================
   ipcMain.handle("file:pick-image", async () => {
     const dlg = await dialog.showOpenDialog({
       title: "Select image",
       properties: ["openFile"],
-      filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] }],
+      filters: [
+        { name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] },
+      ],
     });
 
     const canceled = !!dlg.canceled;
@@ -235,17 +255,139 @@ function setupIPCMainHandlers() {
         },
       };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+      };
     }
   });
 
   ipcMain.handle("cloud:delete-image", async (_e, publicId) => {
     try {
       if (!publicId) throw new Error("Missing public_id");
-      const r = await cloudinary.uploader.destroy(String(publicId), { resource_type: "image" });
+      const r = await cloudinary.uploader.destroy(String(publicId), {
+        resource_type: "image",
+      });
       return { ok: true, result: r };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+  });
+
+  // ========================================================================
+  // Teams Collection Function
+  // ========================================================================
+  // Opsi team types
+ipcMain.on("option-team-types", async (event) => {
+  try {
+    const items = await getOptionTeamTypes(); // optional; atau return hardcoded
+    event.reply("option-team-types-reply", items);
+  } catch (e) {
+    event.reply("option-team-types-reply", [
+      { value: "club", name: "Club" },
+      { value: "pengcab", name: "Pengcab" },
+      { value: "pengprov", name: "Pengprov" },
+      { value: "country", name: "Country" },
+    ]);
+  }
+});
+
+// Insert
+ipcMain.on("insert-new-team", async (event, doc) => {
+  try {
+    const result = await insertNewTeam(doc);
+    event.reply("insert-new-team-reply", { ok: true, ...result });
+  } catch (e) {
+    event.reply("insert-new-team-reply", { ok: false, error: String(e && e.message || e) });
+  }
+});
+
+// List
+ipcMain.on("teams:get-all", async (event) => {
+  try {
+    const items = await getAllTeams();
+    // kirim _id sebagai string agar aman di renderer
+    const mapped = (items || []).map(it => ({ ...it, _id: String(it._id) }));
+    event.reply("teams:get-all-reply", { ok: true, items: mapped });
+  } catch (e) {
+    event.reply("teams:get-all-reply", { ok: false, items: [], error: String(e && e.message || e) });
+  }
+});
+
+// Update
+ipcMain.on("teams:update", async (event, payload) => {
+  try {
+    const ok = await updateTeamById(payload);
+    event.reply("teams:update-reply", { ok });
+  } catch (e) {
+    console.error("teams:update error:", e);
+    event.reply("teams:update-reply", { ok: false, error: String(e && e.message || e) });
+  }
+});
+
+// Delete
+ipcMain.on("teams:delete", async (event, { _id }) => {
+  try {
+    const ok = await deleteTeamById(_id);
+    event.reply("teams:delete-reply", { ok });
+  } catch (e) {
+    event.reply("teams:delete-reply", { ok: false, error: String(e && e.message || e) });
+  }
+});
+
+  // ========================================================================
+  // Teams Registered Function
+  // ========================================================================
+
+  // main process
+  // ipcMain.on("get-teams-registered", async (event, identity) => {
+  //     try {
+  //       const bucket = await getTeamsRegistered(identity);
+  //       console.log(bucket,'<< BUCKET')
+  //       event.reply("get-teams-registered-reply", bucket || null);
+  //     } catch (err) {
+  //       console.error("get-teams-registered error:", err);
+  //       event.reply("get-teams-registered-reply", null);
+  //     }
+  //   });
+
+  ipcMain.on("get-teams-registered", async (event, identity) => {
+    try {
+      const res = await getTeamsRegistered(identity); // -> null atau dokumen bucket
+      console.log(res, "<<< CEK RES");
+      event.reply("get-teams-registered-reply", res);
+    } catch (error) {
+      console.error("get-teams-registered error:", error);
+      event.reply("get-teams-registered-reply", null);
+    }
+  });
+
+  ipcMain.on("delete-team-in-bucket", async (event, payload) => {
+    try {
+      const data = await deleteTeamInBucket(payload);
+      event.reply("delete-team-in-bucket-reply", data);
+    } catch (error) {
+      console.error("delete-team-in-bucket error:", error);
+      event.reply("delete-team-in-bucket-reply", {
+        ok: false,
+        error: String(error),
+      });
+    }
+  });
+
+  ipcMain.on("upsert-teams-registered", async (event, bucket) => {
+    try {
+      const ok = await upsertTeamsRegistered(bucket);
+      event.reply("upsert-teams-registered-reply", { ok });
+    } catch (error) {
+      console.error("upsert-teams-registered error:", error);
+      event.reply("upsert-teams-registered-reply", {
+        ok: false,
+        error: String(error),
+      });
     }
   });
 }

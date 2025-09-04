@@ -184,6 +184,7 @@ export default {
   components: { Icon, TeamPanel },
   data() {
     return {
+      _lastToken: "",
       // kategori UI
       raceCategories: [
         {
@@ -270,15 +271,169 @@ export default {
     ) {
       this.initialActive.selected = this.events.categoriesInitial[0];
     }
+
+    await this.$nextTick();
+    this.refreshVisibleBuckets();
   },
 
   methods: {
-    /* ------------ UI ------------- */
+    _clearBucketInState(identity) {
+      const ev = String(identity.eventName).toUpperCase();
+      const ini = String(identity.initialName).toUpperCase();
+      const rac = String(identity.raceName).toUpperCase();
+      const div = String(identity.divisionName).toUpperCase();
+
+      this.dataTeams = (this.dataTeams || []).filter(
+        (b) =>
+          !(
+            String(b.eventName).toUpperCase() === ev &&
+            String(b.initialName).toUpperCase() === ini &&
+            String(b.raceName).toUpperCase() === rac &&
+            String(b.divisionName).toUpperCase() === div
+          )
+      );
+    },
+    // --- helpers aman (tanpa optional chaining) ---
+    _safeSelectedName(obj) {
+      return obj && obj.selected && obj.selected.name
+        ? String(obj.selected.name)
+        : "";
+    },
+    _matchId(list, name) {
+      const n = String(name || "").toUpperCase();
+      const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
+      return f ? String(f.value) : "";
+    },
+
+    // identity dinamis utk satu panel
+    _buildIdentity(div, race) {
+      const eventName = this._safeSelectedName(this.raceActive);
+      const initialName = this._safeSelectedName(this.initialActive);
+
+      // kalau placeholder, kosongkan id supaya guard memblok
+      const isPlaceholder = initialName === "Silakan Pilih Initial";
+
+      return {
+        eventId: this._matchId(this.events.categoriesEvent, eventName),
+        initialId: isPlaceholder
+          ? ""
+          : this._matchId(this.events.categoriesInitial, initialName),
+        raceId: this._matchId(this.events.categoriesRace, race),
+        divisionId: this._matchId(this.events.categoriesDivision, div),
+
+        eventName: String(eventName).toUpperCase(),
+        initialName: String(initialName).toUpperCase(),
+        raceName: String(race).toUpperCase(),
+        divisionName: String(div).toUpperCase(),
+      };
+    },
+
+    _mergeBucketIntoState(bucket) {
+      if (!bucket) return;
+      if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
+      const idx = this.dataTeams.findIndex(
+        (b) =>
+          String(b.eventName).toUpperCase() ===
+            String(bucket.eventName).toUpperCase() &&
+          String(b.initialName).toUpperCase() ===
+            String(bucket.initialName).toUpperCase() &&
+          String(b.raceName).toUpperCase() ===
+            String(bucket.raceName).toUpperCase() &&
+          String(b.divisionName).toUpperCase() ===
+            String(bucket.divisionName).toUpperCase()
+      );
+      if (idx >= 0) this.$set(this.dataTeams, idx, bucket);
+      else this.dataTeams.push(bucket);
+    },
+
+    _clearBucketInState(identity) {
+      this.dataTeams = (this.dataTeams || []).filter(
+        (b) =>
+          !(
+            String(b.eventName).toUpperCase() === identity.eventName &&
+            String(b.initialName).toUpperCase() === identity.initialName &&
+            String(b.raceName).toUpperCase() === identity.raceName &&
+            String(b.divisionName).toUpperCase() === identity.divisionName
+          )
+      );
+    },
+
+    // === READ satu bucket (panel) ===
+    async loadTeamsRegistered(div, race) {
+      const identity = this._buildIdentity(div, race);
+
+      // Jangan fetch kalau identity belum lengkap → kosongkan tabel kombinasi tsb
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        this._clearBucketInState(identity);
+        return;
+      }
+
+      // Token untuk menangkal balasan telat (race condition)
+      const token = [
+        identity.eventName,
+        identity.initialName,
+        identity.divisionName,
+        identity.raceName,
+        Date.now(),
+      ].join("|");
+      this._lastToken = token;
+
+      // Balut dalam Promise + timeout supaya handler pasti selesai
+      await new Promise((resolve) => {
+        const onReply = (_e, bucket) => {
+          // Jika sudah ada request baru, abaikan balasan ini
+          if (this._lastToken !== token) return resolve();
+
+          if (bucket && Array.isArray(bucket.teams)) {
+            this._mergeBucketIntoState(bucket);
+          } else {
+            this._clearBucketInState(identity);
+          }
+          resolve();
+        };
+
+        // kirim permintaan
+        ipcRenderer.send("get-teams-registered", identity);
+        ipcRenderer.once("get-teams-registered-reply", onReply);
+
+        // hard timeout (misal 3s) agar listener tidak “menggantung”
+        setTimeout(() => {
+          try {
+            ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          } catch {}
+          resolve();
+        }, 3000);
+      });
+    },
+
+    // === READ semua panel yang terlihat ===
+    async refreshVisibleBuckets() {
+      await this.$nextTick();
+      const jobs = [];
+      if (this.showPanel("R4", "MEN"))
+        jobs.push(this.loadTeamsRegistered("R4", "MEN"));
+      if (this.showPanel("R4", "WOMEN"))
+        jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
+      if (this.showPanel("R6", "MEN"))
+        jobs.push(this.loadTeamsRegistered("R6", "MEN"));
+      if (this.showPanel("R6", "WOMEN"))
+        jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
+      await Promise.all(jobs);
+    },
+
+    // === UI handlers (tetap panggil refresh) ===
     selectCategory(c) {
       this.raceActive.selected = { name: c.key };
+      this.refreshVisibleBuckets();
     },
     selectInitial(i) {
       this.initialActive.selected = i;
+      this.refreshVisibleBuckets();
     },
 
     /* ------------ visibility panel ------------ */
@@ -373,7 +528,6 @@ export default {
       return null;
     },
     _ensureBucket(eventName, divisionName, raceName, initialName) {
-      console.log(initialName,'<< cek initial name')
       const exist = this._getBucket(
         eventName,
         divisionName,
@@ -411,8 +565,21 @@ export default {
         divisionName: div,
         teams: [],
       };
+
+      // 🔴 VALIDASI: initialId wajib ada
+      if (!bucket.initialId) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail:
+            "Gagal Simpan, silakan pilih Initials Category terlebih dahulu.",
+          message: "Ups Sorry",
+        });
+        return null;
+      }
+
       if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
       this.dataTeams.push(bucket);
+
       return bucket;
     },
 
@@ -542,19 +709,75 @@ export default {
       this.dataTeams = this.dataTeams.slice(); // trigger reactive update
       this.$set(this.draftMap, k, null);
       this.persistParticipants();
+      // 🔁 sinkronkan perubahan ke DB
+      this.syncBucketToDB(bucket);
     },
 
-    deleteRow(div, race, bib) {
+    syncBucketToDB(bucket) {
+      console.log(bucket);
+      // kirim satu dokumen bucket untuk di-upsert
+      ipcRenderer.send("upsert-teams-registered", bucket);
+      ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail:
+              (res && res.error) ||
+              "Gagal menyimpan perubahan tim ke database.",
+            message: "Failed",
+          });
+        }
+        // kalau mau silent success, tidak perlu alert
+        // else { console.log("bucket tersinkron"); }
+      });
+    },
+
+    deleteRow(div, race, row) {
       const evName = this.raceActive.selected.name;
       const init =
         (this.initialActive.selected && this.initialActive.selected.name) || "";
+
+      // 1) Hapus dari state lokal
       const bucket = this._getBucket(evName, div, race, init);
       if (!bucket) return;
       bucket.teams = (bucket.teams || []).filter(
-        (t) => String(t.bibTeam).trim() !== String(bib).trim()
+        (t) =>
+          String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
+          String(t.nameTeam).trim().toUpperCase() !==
+            String(row.nameTeam).trim().toUpperCase()
       );
       this.dataTeams = this.dataTeams.slice();
       this.persistParticipants();
+
+      // 2) Hapus di DB
+      ipcRenderer.send("delete-team-in-bucket", {
+        identity: {
+          eventId: bucket.eventId,
+          initialId: bucket.initialId,
+          raceId: bucket.raceId,
+          divisionId: bucket.divisionId,
+          eventName: bucket.eventName,
+          initialName: bucket.initialName,
+          raceName: bucket.raceName,
+          divisionName: bucket.divisionName,
+        },
+        team: {
+          nameTeam: row.nameTeam,
+          bibTeam: row.bibTeam,
+        },
+      });
+
+      ipcRenderer.once("delete-team-in-bucket-reply", (_e, res) => {
+        if (res && res.ok) {
+          // optional toast
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: (res && res.error) || "Gagal menghapus team di database.",
+            message: "Failed",
+          });
+        }
+      });
     },
 
     /* ------------ load & persist ------------ */

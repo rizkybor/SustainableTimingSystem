@@ -11,7 +11,7 @@
 
         <!-- Right: Actions -->
         <b-col cols="12" md="6" class="d-flex justify-content-md-end gap-2">
-          <b-button
+          <!-- <b-button
             size="sm"
             variant="outline-secondary rounded-pill"
             class="d-flex align-items-center"
@@ -19,13 +19,13 @@
           >
             <Icon icon="mdi:printer-outline" class="mr-2" />
             Print Result
-          </b-button>
+          </b-button> -->
 
           <b-button
             size="sm"
             variant="primary rounded-pill"
             class="d-flex align-items-center"
-            @click="startRace"
+            @click="startRace(rows)"
           >
             <Icon icon="mdi:flag-variant" class="mr-2" />
             Start Race
@@ -169,8 +169,10 @@ export default {
         bib: e.target.value,
       });
     },
-    startRace() {
-        this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
+    startRace(params) {
+      console.log(params,'<<< checked teams')
+      // INSERT ICP to TABLE TEAMS 
+        // this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
 
       // Periksa apakah draft dan teamId tersedia
     //   if (this.draft && this.draft.teamId) {

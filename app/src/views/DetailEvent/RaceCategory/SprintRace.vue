@@ -1,36 +1,10 @@
 <template>
   <div>
-    <vue-html2pdf
-      :show-layout="false"
-      :float-layout="true"
-      :enable-download="false"
-      :preview-modal="true"
-      :paginate-elements-by-height="500000"
-      filename="tes"
-      :manual-pagination="false"
-      :pdf-margin="1"
-      :pdf-quality="2"
-      pdf-format="a4"
-      pdf-content-width="100%"
-      pdf-orientation="landscape"
-      @progress="onProgress($event)"
-      ref="html2Pdf"
-    >
-      <section slot="pdf-content">
-        <!-- <ContentToPrint :data="updateDataforPDF" /> -->
-        <sprintResult
-          :data="dataEvent"
-          :dataParticipant="participant.length == 0 ? [] : participant"
-          :categories="titleCategories"
-        />
-      </section>
-    </vue-html2pdf>
-
+    <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
       <b-container class="hero-inner">
         <b-row class="align-items-center">
-          <!-- logo -->
           <b-col cols="auto" class="pr-0">
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
@@ -39,23 +13,23 @@
             </div>
           </b-col>
 
-          <!-- judul + meta -->
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{
-                dataEvent.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025"
+                dataEventSafe.eventName ||
+                "Kejurnas Arung Jeram DKI Jakarta 2025"
               }}
             </h2>
             <div class="meta text-white-50">
+              <span class="mr-3">
+                <strong class="text-white">Location</strong> :
+                {{ dataEventSafe.addressCity || "-" }}
+              </span>
               <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ dataEvent.addressCity || "-" }}</span
+                ><strong class="text-white">River</strong> : -</span
               >
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : {{ "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> : {{ "-" }}</span
+                ><strong class="text-white">Level</strong> : -</span
               >
             </div>
           </b-col>
@@ -71,28 +45,22 @@
               Nomor Lomba : Sprint
             </h6>
             <h6 style="font-weight: 800; font-style: italic">
-              Categories : {{ titleCategories }}
+              Categories : {{ titleCategories || "-" }}
             </h6>
             <h6 style="font-weight: 800; font-style: italic">
-              Tanggal : {{ dataEvent.startDateEvent }} -
-              {{ dataEvent.endDateEvent }}
+              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
+              {{ dataEventSafe.endDateEvent || "-" }}
             </h6>
           </b-col>
+
           <b-col>
-            <div
-              style="
-                display: flex;
-                gap: 10px;
-                justify-content: flex-end !important;
-              "
-            >
+            <div style="display: flex; gap: 10px; justify-content: flex-end">
               <button
                 type="button"
                 class="btn btn-secondary"
                 @click="saveResult"
               >
-                <Icon icon="icon-park-outline:save" />
-                Save Result
+                <Icon icon="icon-park-outline:save" /> Save Result
               </button>
 
               <button
@@ -100,18 +68,8 @@
                 class="btn btn-info"
                 @click="toggleSortRanked"
               >
-                <Icon icon="icon-park-outline:ranking" />
-                Sort Ranked
+                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
               </button>
-
-              <!-- <button
-                type="button"
-                class="btn btn-warning"
-                @click="generatePDF()"
-              >
-                <Icon icon="ic:outline-local-printshop" />
-                Print Result
-              </button> -->
 
               <button
                 type="button"
@@ -138,21 +96,17 @@
       </div>
     </div>
 
-    <!-- KOMPONEN OPERATION TIME  -->
+    <!-- OPERATION TIME -->
     <OperationTimePanel
       :digit-id="digitId"
       :digit-time="digitTime"
-      :participant="
-        Array.isArray(participant)
-          ? participant
-          : Object.values(participant || {})
-      "
+      :participant="participantArr"
       :digit-time-start.sync="digitTimeStart"
       :digit-time-finish.sync="digitTimeFinish"
       @update-time="updateTime"
     />
-    <!-- END KOMPONEN OPERATION TIME  -->
 
+    <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
         <h4>List Result</h4>
@@ -161,22 +115,22 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th scope="col">No</th>
-                  <th scope="col">Team Name</th>
-                  <th scope="col">BIB Number</th>
-                  <th scope="col">Start Time</th>
-                  <th scope="col">Finish Time</th>
-                  <th scope="col">Race Time</th>
-                  <th scope="col">Penalties</th>
-                  <th scope="col">Penalty Time</th>
-                  <th scope="col">Result</th>
-                  <th scope="col">Ranked</th>
-                  <th scope="col">Score</th>
-                  <th scope="col" v-if="editResult">Action</th>
+                  <th>No</th>
+                  <th>Team Name</th>
+                  <th>BIB Number</th>
+                  <th>Start Time</th>
+                  <th>Finish Time</th>
+                  <th>Race Time</th>
+                  <th>Penalties</th>
+                  <th>Penalty Time</th>
+                  <th>Result</th>
+                  <th>Ranked</th>
+                  <th>Score</th>
+                  <th v-if="editResult">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in participant" :key="index">
+                <tr v-for="(item, index) in participantArr" :key="index">
                   <td>{{ index + 1 }}</td>
                   <td>{{ item.nameTeam }}</td>
                   <td>{{ item.bibTeam }}</td>
@@ -185,7 +139,7 @@
                   <td>{{ item.result.raceTime }}</td>
                   <td>
                     <b-select
-                      v-if="item.result.startTime != ''"
+                      v-if="item.result.startTime"
                       v-model="item.result.penalty"
                       @change="updateTimePen($event, item)"
                     >
@@ -201,9 +155,9 @@
                   <td>{{ item.result.penaltyTime }}</td>
                   <td>
                     {{
-                      item.result.penaltyTime == ""
-                        ? item.result.raceTime
-                        : item.result.totalTime
+                      item.result.penaltyTime
+                        ? item.result.totalTime
+                        : item.result.raceTime
                     }}
                   </td>
                   <td>{{ item.result.ranked }}</td>
@@ -220,31 +174,27 @@
                 </tr>
               </tbody>
             </table>
-
-            <!-- <ul>
-                        <li>{{ currentPort }}</li>
-                      </ul> -->
             <br />
           </b-col>
         </b-row>
       </div>
+
       <b-button @click="goTo()" variant="outline-info" class="custom-button">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
     </div>
-    <br />
-    <br />
+
+    <br /><br />
   </div>
 </template>
 
 <script>
 import { ipcRenderer } from "electron";
-import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
 import OperationTimePanel from "../components/OperationTeamPanel.vue";
-import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
+import { Icon } from "@iconify/vue2";
 
-// --- helper untuk baca & normalisasi payload baru (bucket) ---
+/** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
 function normalizeTeamForSprint(t = {}) {
@@ -268,31 +218,24 @@ function normalizeTeamForSprint(t = {}) {
     score: "",
   };
 
-  // kalau format lama (array untuk result: H2H/Slalom), ambil elemen pertama
+  // dukung format lama (array result)
   let result = t.result;
   if (Array.isArray(result)) result = result[0] || {};
-  if (!result || typeof result !== "object" || Array.isArray(result))
-    result = {};
+  if (!result || typeof result !== "object") result = {};
   result = { ...emptyRes, ...result };
 
-  // otr pastikan object juga
   let otr = t.otr;
-  if (!otr || typeof otr !== "object" || Array.isArray(otr)) otr = {};
+  if (!otr || typeof otr !== "object") otr = {};
   otr = { ...emptyRes, ...otr };
 
   return { ...base, result, otr };
 }
 
 function loadRaceStartPayloadForSprint() {
-  let raw = null;
-  try {
-    raw = localStorage.getItem(RACE_PAYLOAD_KEY);
-  } catch {}
   let obj = {};
   try {
-    obj = JSON.parse(raw || "{}");
+    obj = JSON.parse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}");
   } catch {}
-
   const b = obj.bucket || {};
   const bucket = {
     eventId: String(b.eventId || ""),
@@ -305,20 +248,13 @@ function loadRaceStartPayloadForSprint() {
     divisionName: String(b.divisionName || "").toUpperCase(),
     teams: Array.isArray(b.teams) ? b.teams.map(normalizeTeamForSprint) : [],
   };
-
-  return {
-    bucket,
-    allBuckets: Array.isArray(obj.allBuckets) ? obj.allBuckets : [],
-  };
+  return { bucket };
 }
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: {
-    OperationTimePanel,
-    sprintResult,
-    VueHtml2pdf,
-  },
+  components: { OperationTimePanel, Icon },
+
   data() {
     return {
       editForm: "",
@@ -330,386 +266,271 @@ export default {
       digitTime: [],
       penTeam: "",
       dataPenalties: [
-        {
-          label: "clear",
-          value: 0,
-          timePen: "00:00:00.000",
-        },
-        {
-          label: "pen 1",
-          value: 5,
-          timePen: "00:00:05.000",
-        },
-        {
-          label: "pen 2",
-          value: 50,
-          timePen: "00:00:50.000",
-        },
+        { label: "clear", value: 0, timePen: "00:00:00.000" },
+        { label: "pen 1", value: 5, timePen: "00:00:05.000" },
+        { label: "pen 2", value: 50, timePen: "00:00:50.000" },
       ],
       dataScore: [
-        {
-          ranking: 1,
-          score: 100,
-        },
-        {
-          ranking: 2,
-          score: 92,
-        },
-        {
-          ranking: 3,
-          score: 86,
-        },
-        {
-          ranking: 4,
-          score: 82,
-        },
-        {
-          ranking: 5,
-          score: 79,
-        },
-        {
-          ranking: 6,
-          score: 76,
-        },
-        {
-          ranking: 7,
-          score: 73,
-        },
-        {
-          ranking: 8,
-          score: 70,
-        },
-        {
-          ranking: 9,
-          score: 67,
-        },
-        {
-          ranking: 10,
-          score: 64,
-        },
-        {
-          ranking: 11,
-          score: 61,
-        },
-        {
-          ranking: 12,
-          score: 58,
-        },
-        {
-          ranking: 13,
-          score: 55,
-        },
-        {
-          ranking: 14,
-          score: 52,
-        },
-        {
-          ranking: 15,
-          score: 49,
-        },
-        {
-          ranking: 16,
-          score: 46,
-        },
-        {
-          ranking: 17,
-          score: 43,
-        },
-        {
-          ranking: 18,
-          score: 40,
-        },
-        {
-          ranking: 19,
-          score: 38,
-        },
-        {
-          ranking: 20,
-          score: 36,
-        },
-        {
-          ranking: 21,
-          score: 34,
-        },
-        {
-          ranking: 22,
-          score: 32,
-        },
-        {
-          ranking: 23,
-          score: 30,
-        },
-        {
-          ranking: 24,
-          score: 28,
-        },
-        {
-          ranking: 25,
-          score: 26,
-        },
-        {
-          ranking: 26,
-          score: 24,
-        },
-        {
-          ranking: 27,
-          score: 22,
-        },
-        {
-          ranking: 28,
-          score: 20,
-        },
-        {
-          ranking: 29,
-          score: 18,
-        },
-        {
-          ranking: 30,
-          score: 16,
-        },
-        {
-          ranking: 31,
-          score: 14,
-        },
-        {
-          ranking: 32,
-          score: 12,
-        },
+        { ranking: 1, score: 100 },
+        { ranking: 2, score: 92 },
+        { ranking: 3, score: 86 },
+        { ranking: 4, score: 82 },
+        { ranking: 5, score: 79 },
+        { ranking: 6, score: 76 },
+        { ranking: 7, score: 73 },
+        { ranking: 8, score: 70 },
+        { ranking: 9, score: 67 },
+        { ranking: 10, score: 64 },
+        { ranking: 11, score: 61 },
+        { ranking: 12, score: 58 },
+        { ranking: 13, score: 55 },
+        { ranking: 14, score: 52 },
+        { ranking: 15, score: 49 },
+        { ranking: 16, score: 46 },
+        { ranking: 17, score: 43 },
+        { ranking: 18, score: 40 },
+        { ranking: 19, score: 38 },
+        { ranking: 20, score: 36 },
+        { ranking: 21, score: 34 },
+        { ranking: 22, score: 32 },
+        { ranking: 23, score: 30 },
+        { ranking: 24, score: 28 },
+        { ranking: 25, score: 26 },
+        { ranking: 26, score: 24 },
+        { ranking: 27, score: 22 },
+        { ranking: 28, score: 20 },
+        { ranking: 29, score: 18 },
+        { ranking: 30, score: 16 },
+        { ranking: 31, score: 14 },
+        { ranking: 32, score: 12 },
       ],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
       isRankedDescending: false,
-      participant: {},
-      dataEvent: "",
+
+      /** penting: tipe konsisten */
+      participant: [],
+      dataEvent: {},
       titleCategories: "",
     };
   },
+
   computed: {
-    showButtonApproval() {
-      // console.log(this.participant, "COMPUTED");
+    participantArr() {
+      return Array.isArray(this.participant)
+        ? this.participant
+        : Object.values(this.participant || {});
+    },
+    dataEventSafe() {
+      return this.dataEvent && typeof this.dataEvent === "object"
+        ? this.dataEvent
+        : {};
     },
   },
+
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
-    // 1) coba baca format baru (raceStartPayload)
     const ok = this.loadFromRaceStartPayload();
-
-    // 2) fallback ke format lama jika belum ada
-    if (!ok) {
-      await this.checkValueStorage();
-    }
+    if (!ok) await this.checkValueStorage();
   },
-  destroyed() {
+
+  beforeDestroy() {
     window.removeEventListener("scroll", this.handleScroll);
   },
+
+  /** gunakan guard rute yang benar (bukan di methods) */
+  beforeRouteLeave(to, from, next) {
+    try {
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
+    } catch {}
+    next();
+  },
+
   methods: {
+    /** load dari payload baru */
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForSprint();
-      if (!bucket || !bucket.teams || !bucket.teams.length) return false;
+      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
+        return false;
 
-      // isi tabel peserta sprint
-      this.participant = bucket.teams.slice(); // array of teams (sudah dinormalisasi)
+      this.participant = bucket.teams.slice();
+      this.titleCategories =
+        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
 
-      // isi judul kategori dari bucket
-      this.titleCategories = `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`;
-
-      // event detail (kalau kamu simpan di localStorage seperti sebelumnya, tetap ambil)
       try {
         const events = localStorage.getItem("eventDetails");
-        if (events) this.dataEvent = JSON.parse(events);
-      } catch {}
-
+        this.dataEvent = events ? JSON.parse(events) : {};
+      } catch {
+        this.dataEvent = {};
+      }
       return true;
     },
-    openModal(datas, division) {
-      // console.log(datas);
-      this.editForm = datas;
-      this.$bvModal.show("bv-modal-edit-team");
-    },
+
+    /** fallback format lama */
     async checkValueStorage() {
-      const dataStorage = localStorage.getItem("participantByCategories");
-      const events = localStorage.getItem("eventDetails");
-      this.dataEvent = JSON.parse(events);
-      this.titleCategories = localStorage.getItem("currentCategories");
+      let dataStorage = null,
+        events = null;
+      try {
+        dataStorage = localStorage.getItem("participantByCategories");
+        events = localStorage.getItem("eventDetails");
+      } catch {}
 
-      let datas = JSON.parse(dataStorage);
-      if (datas) {
-        datas = datas.sort(function (a, b) {
-          return a.praStart.localeCompare(b.praStart);
-        });
+      this.dataEvent = events ? JSON.parse(events) : {};
 
-        this.participant = datas;
-        // console.log(JSON.stringify(this.participant));
-      }
+      const raw = dataStorage ? JSON.parse(dataStorage) : [];
+      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+      arr.sort((a, b) =>
+        String(a.praStart || "").localeCompare(String(b.praStart || ""))
+      );
+
+      this.participant = arr;
+      this.titleCategories = String(
+        localStorage.getItem("currentCategories") || ""
+      ).trim();
     },
+
+    openModal(datas) {
+      this.editForm = datas;
+      this.$bvModal &&
+        this.$bvModal.show &&
+        this.$bvModal.show("bv-modal-edit-team");
+    },
+
     async assignRanks(items) {
       const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
-
-      itemsWithTimeResult.sort((a, b) => {
-        const timeA = this.parsesTime(a.result.totalTime);
-        const timeB = this.parsesTime(b.result.totalTime);
-        return timeA - timeB;
-      });
-
+      itemsWithTimeResult.sort(
+        (a, b) =>
+          this.parsesTime(a.result.totalTime) -
+          this.parsesTime(b.result.totalTime)
+      );
       itemsWithTimeResult.forEach((item, index) => {
         item.result.ranked = index + 1;
       });
     },
+
     parsesTime(timeStr) {
-      // console.log("hkhhkhk", timeStr);
-      const [hours, minutes, seconds] = timeStr.split(":").map(parseFloat);
+      const [hours, minutes, seconds] = String(timeStr || "0:0:0")
+        .split(":")
+        .map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
     },
 
-    // Fungsi untuk menghitung skor berdasarkan peringkat
     async calculateScore(ranked) {
-      const scoreData = this.dataScore.find((data) => data.ranking === ranked);
-      if (scoreData) {
-        return scoreData.score;
-      } else {
-        return 0;
-      }
+      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
+      return scoreData ? scoreData.score : 0;
     },
 
-    //BATAS TERAKHIR
     async parseTimeResult(timeResult) {
-      const parts = timeResult.split(":");
-      const hours = parseInt(parts[0]);
-      const minutes = parseInt(parts[1]);
-      const seconds = parseInt(parts[2]);
-      const milliseconds = parseInt(parts[3]);
-
+      const parts = String(timeResult || "00:00:00:000").split(":");
+      const [hours, minutes, seconds, milliseconds] = parts.map(
+        (p) => parseInt(p, 10) || 0
+      );
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
     async updateTimePen(selectedValue, item) {
-      const selectedPenaltyData = this.dataPenalties.find(
-        (penalty) => penalty.value === selectedValue
-      );
-      if (selectedPenaltyData) {
-        item.result.penaltyTime = selectedPenaltyData.timePen;
-        // console.log(item.result.penaltyTime, "<<< CEK DATA PENALTY");
-      }
+      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
+      if (sel) item.result.penaltyTime = sel.timePen;
 
       if (item.result.raceTime && item.result.penaltyTime) {
-        const newTimeResult = await this.tambahWaktu(
+        item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
           item.result.penaltyTime
         );
-        item.result.totalTime = newTimeResult;
       }
       this.editResult = true;
       await this.assignRanks(this.participant);
     },
+
     async resetRace() {
       this.editResult = false;
     },
+
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
-        const item = this.participant[i];
-        // item.result.penalty = this.dataPenalties[2].value;
-        // item.result.penaltyTime = this.dataPenalties[2].timePen;
-
-        if (item.result.raceTime && item.result.penaltyTime) {
-          const newTimeResult = await this.tambahWaktu(
-            item.result.raceTime,
-            item.result.penaltyTime
+        const it = this.participant[i];
+        if (it.result.raceTime && it.result.penaltyTime) {
+          it.result.totalTime = await this.tambahWaktu(
+            it.result.raceTime,
+            it.result.penaltyTime
           );
-          item.result.totalTime = newTimeResult;
         }
       }
       this.editResult = true;
       await this.assignRanks(this.participant);
     },
+
     getScoreByRanked(ranked) {
-      const matchingRank = this.dataScore.find(
-        (data) => data.ranking === ranked
-      );
-      return matchingRank ? matchingRank.score : null;
+      const m = this.dataScore.find((d) => d.ranking === ranked);
+      return m ? m.score : null;
     },
+
     toggleSortRanked() {
-      // Ubah arah urutan setiap kali tombol diklik
       this.isRankedDescending = !this.isRankedDescending;
-      this.sortRanked();
+      const arr = this.participantArr.slice();
+      arr.sort((a, b) =>
+        this.isRankedDescending
+          ? b.result.ranked - a.result.ranked
+          : a.result.ranked - b.result.ranked
+      );
+      this.participant = arr;
     },
-    sortRanked() {
-      if (this.isRankedDescending) {
-        this.participant.sort((a, b) => b.result.ranked - a.result.ranked);
-      } else {
-        this.participant.sort((a, b) => a.result.ranked - b.result.ranked);
-      }
-    },
+
     async connectPort() {
       if (!this.isPortConnected) {
-        let connectCheck = await this.setupSerialListener();
-        // console.log(connectCheck, "<< check");
-        this.isPortConnected = true;
-        alert("Connected");
+        const ok = await this.setupSerialListener();
+        if (ok) {
+          this.isPortConnected = true;
+          alert("Connected");
+        } else {
+          // gagal konek: jangan ubah tombol jadi connected
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
       } else {
         await this.disconnected();
         this.isPortConnected = false;
         alert("Disconnected");
       }
     },
+
     async disconnected() {
-      if (this.port && this.port.isOpen) {
-        this.port.close();
-      }
+      if (this.port && this.port.isOpen) this.port.close();
       this.isPortConnected = false;
     },
+
     async setupSerialListener() {
       let receivedData = "";
-      let a = "";
-      let b = "";
+      let a = "",
+        b = "";
       try {
-        // Read the list of serial ports
         SerialPort.list()
           .then((ports) => {
-            // Check if at least one port is available
             if (ports && ports.length > 0) {
               this.currentPort = ports;
               const selectedPort = ports[6];
-
-              console.log(this.currentPort[6].path, "<<< CEK PORT");
-
               if (selectedPort && selectedPort.path) {
-                // Open the selected serial port
                 this.port = new SerialPort({
                   path: selectedPort.path,
                   baudRate: 9600,
                 });
-
                 this.port.on("data", (data) => {
                   const newData = data.toString();
                   receivedData += newData;
-
                   for (let i = 0; i < receivedData.length; i++) {
                     const char = receivedData[i];
-
-                    //  TIME BY RACETIME
-                    if (char === "M") {
+                    if (char === "M" || char === "R") {
                       a = receivedData.slice(0, i + 1);
                       b = receivedData.slice(i + 1);
-
-                      receivedData = "";
-                      break;
-                    }
-
-                    //  TIME BY SENSOR
-                    if (char === "R") {
-                      a = receivedData.slice(0, i + 1);
-                      b = receivedData.slice(i + 1);
-
                       receivedData = "";
                       break;
                     }
                   }
-
                   this.digitId.unshift(a);
                   this.digitTime.unshift(b);
-
-                  // Memeriksa waktu Start atau Finish
                   if (a[11] == "0") {
                     this.digitTimeStart = b.replace(
                       /(\d{2})(\d{2})(\d{2})(\d{3})/,
@@ -720,11 +541,6 @@ export default {
                       /(\d{2})(\d{2})(\d{2})(\d{3})/,
                       "$1:$2:$3.$4"
                     );
-                  } else {
-                    // Kondisi jika digit ke-13 bukan 0 dan juga bukan lebih besar dari 0
-                    // console.log(
-                    //   "Digit ke-13 bukan 0 dan juga bukan lebih besar dari 0."
-                    // );
                   }
                   return true;
                 });
@@ -735,31 +551,26 @@ export default {
               console.error("No serial ports available.");
             }
           })
-          .catch((err) => {
-            console.error("Error:", err.message);
-          });
+          .catch((err) => console.error("Error:", err.message));
       } catch (err) {
         console.error("Error:", err.message);
       }
     },
+
     formatTime(inputTime) {
-      // console.log(inputTime, "<< cek");
-      const hours = inputTime.substr(0, 2);
-      const minutes = inputTime.substr(2, 2);
-      const seconds = inputTime.substr(4, 2);
-      const milliseconds = inputTime.substr(6);
-
-      const correctedMinutes = Math.min(parseInt(minutes, 10), 59);
-      const correctedSeconds = Math.min(parseInt(seconds, 10), 59);
-
+      const hours = String(inputTime).substr(0, 2);
+      const minutes = String(inputTime).substr(2, 2);
+      const seconds = String(inputTime).substr(4, 2);
+      const milliseconds = String(inputTime).substr(6);
+      const correctedMinutes = Math.min(parseInt(minutes, 10) || 0, 59);
+      const correctedSeconds = Math.min(parseInt(seconds, 10) || 0, 59);
       return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
     },
+
     async updateTime(val, id, title) {
-      // console.log(val, id);
-      if (title == "start") {
-        this.participant[id].result.startTime = val;
-      }
-      if (title == "finish") {
+      if (!Array.isArray(this.participant) || !this.participant[id]) return;
+      if (title === "start") this.participant[id].result.startTime = val;
+      if (title === "finish") {
         this.participant[id].result.finishTime = val;
         if (
           this.participant[id].result.startTime &&
@@ -772,88 +583,57 @@ export default {
         }
       }
     },
+
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
-      // Parsing waktu awal dan waktu akhir menjadi objek Date
-      var waktuAwalParts = waktuAwal.split(":");
-      var waktuAkhirParts = waktuAkhir.split(":");
+      const [h1, m1, s1] = String(waktuAwal).split(":");
+      const [h2, m2, s2] = String(waktuAkhir).split(":");
 
-      var waktuAwalDate = new Date(0);
-      waktuAwalDate.setUTCHours(parseInt(waktuAwalParts[0]));
-      waktuAwalDate.setUTCMinutes(parseInt(waktuAwalParts[1]));
-      waktuAwalDate.setUTCSeconds(parseInt(waktuAwalParts[2].split(".")[0]));
-      waktuAwalDate.setUTCMilliseconds(
-        parseInt(waktuAwalParts[2].split(".")[1])
+      const d1 = new Date(0);
+      d1.setUTCHours(
+        +h1 || 0,
+        +m1 || 0,
+        parseInt((s1 || "0").split(".")[0]) || 0,
+        parseInt((s1 || "0").split(".")[1]) || 0
+      );
+      const d2 = new Date(0);
+      d2.setUTCHours(
+        +h2 || 0,
+        +m2 || 0,
+        parseInt((s2 || "0").split(".")[0]) || 0,
+        parseInt((s2 || "0").split(".")[1]) || 0
       );
 
-      var waktuAkhirDate = new Date(0);
-      waktuAkhirDate.setUTCHours(parseInt(waktuAkhirParts[0]));
-      waktuAkhirDate.setUTCMinutes(parseInt(waktuAkhirParts[1]));
-      waktuAkhirDate.setUTCSeconds(parseInt(waktuAkhirParts[2].split(".")[0]));
-      waktuAkhirDate.setUTCMilliseconds(
-        parseInt(waktuAkhirParts[2].split(".")[1])
-      );
-
-      // Menghitung selisih waktu dalam milidetik
-      var selisihMilidetik = waktuAkhirDate - waktuAwalDate;
-
-      // Mengonversi selisih milidetik menjadi jam, menit, detik, dan milidetik
-      var milidetik = selisihMilidetik % 1000;
-      var detik = Math.floor((selisihMilidetik / 1000) % 60);
-      var menit = Math.floor((selisihMilidetik / (1000 * 60)) % 60);
-      var jam = Math.floor(selisihMilidetik / (1000 * 60 * 60));
-
-      // Mengonversi hasil ke dalam format yang diinginkan
-      var hasilFormat =
-        (await this.pad(jam)) +
-        ":" +
-        (await this.pad(menit)) +
-        ":" +
-        (await this.pad(detik)) +
-        "." +
-        milidetik;
-
-      return hasilFormat;
-    },
-
-    async pad(angka) {
-      return angka < 10 ? "0" + angka : angka;
+      const diff = d2 - d1;
+      const ms = diff % 1000;
+      const sec = Math.floor((diff / 1000) % 60);
+      const min = Math.floor((diff / (1000 * 60)) % 60);
+      const hr = Math.floor(diff / (1000 * 60 * 60));
+      const pad = (n) => (n < 10 ? "0" + n : "" + n);
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${ms}`;
     },
 
     async tambahWaktu(waktuA, waktuB) {
-      // Parsing waktu dalam format "HH:mm:ss.SSS"
-      const partsA = waktuA.split(":");
-      const partsB = waktuB.split(":");
-
-      // Menghitung total milidetik
-      const milidetikA =
-        parseInt(partsA[0]) * 3600000 +
-        parseInt(partsA[1]) * 60000 +
-        parseFloat(partsA[2]) * 1000;
-      const milidetikB =
-        parseInt(partsB[0]) * 3600000 +
-        parseInt(partsB[1]) * 60000 +
-        parseFloat(partsB[2]) * 1000;
-
-      // Menambahkan waktu bersama-sama
-      const totalMilidetik = milidetikA + milidetikB;
-
-      // Mengonversi total milidetik menjadi format waktu
-      const jam = Math.floor(totalMilidetik / 3600000);
-      const sisaMilidetik = totalMilidetik % 3600000;
-      const menit = Math.floor(sisaMilidetik / 60000);
-      const sisaMilidetik2 = sisaMilidetik % 60000;
-      const detik = Math.floor(sisaMilidetik2 / 1000);
-      const milidetik = sisaMilidetik2 % 1000;
-
-      // Mengonversi hasil ke dalam format yang diinginkan
-      const hasilFormat = `${String(jam).padStart(2, "0")}:${String(
-        menit
-      ).padStart(2, "0")}:${String(detik).padStart(2, "0")}.${String(
-        milidetik
-      ).padStart(3, "0")}`;
-
-      return hasilFormat;
+      const psA = String(waktuA).split(":");
+      const psB = String(waktuB).split(":");
+      const msA =
+        (+psA[0] || 0) * 3600000 +
+        (+psA[1] || 0) * 60000 +
+        (parseFloat(psA[2]) || 0) * 1000;
+      const msB =
+        (+psB[0] || 0) * 3600000 +
+        (+psB[1] || 0) * 60000 +
+        (parseFloat(psB[2]) || 0) * 1000;
+      const total = msA + msB;
+      const hr = Math.floor(total / 3600000);
+      const rem = total % 3600000;
+      const min = Math.floor(rem / 60000);
+      const rem2 = rem % 60000;
+      const sec = Math.floor(rem2 / 1000);
+      const ms = rem2 % 1000;
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
+
     goTo() {
       try {
         localStorage.removeItem("raceStartPayload");
@@ -862,41 +642,17 @@ export default {
       } catch (e) {
         console.warn("Gagal menghapus raceStartPayload:", e);
       }
-
-      // reset state lokal (opsional biar UI langsung bersih)
       this.participant = [];
       this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
+
     handleScroll() {
-      if (window.scrollY > 0) {
-        this.isScrolled = true;
-      } else {
-        this.isScrolled = false;
-      }
+      this.isScrolled = window.scrollY > 0;
     },
-    onProgress(event) {
-      // console.log(`Processed: ${event} / 100`);
-    },
-    hasGenerated() {
-      alert("PDF generated successfully!");
-    },
-    generatePDF() {
-      this.participant.forEach((e) => {
-        // console.log(e.result);
-        e.result.score = this.getScoreByRanked(e.result.ranked);
-      });
-      this.$refs.html2Pdf.generatePdf();
-    },
+
     saveResult() {
-      // Normalisasi ke array selalu
-      let arr = Array.isArray(this.participant)
-        ? this.participant
-        : Object.values(this.participant || {});
-
-      // Sanitasi minimal: buang field non-serializable/fungsi
-      const clean = JSON.parse(JSON.stringify(arr));
-
+      const clean = JSON.parse(JSON.stringify(this.participantArr));
       if (!Array.isArray(clean) || clean.length === 0) {
         ipcRenderer.send("get-alert", {
           type: "warning",
@@ -905,25 +661,18 @@ export default {
         });
         return;
       }
-
-      // Ambil eventId dari dataEvent
       const eventId =
         this.dataEvent && this.dataEvent._id
           ? this.dataEvent._id.toString()
           : null;
-
-      // Tambahkan eventId ke setiap item
-      const payload = clean.map((it) => ({
-        ...it,
-        eventId,
-      }));
+      const payload = clean.map((it) => ({ ...it, eventId }));
 
       ipcRenderer.send("insert-sprint-result", payload);
       ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
         if (res && res.ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
-            detail: `Result data has been successfully saved`,
+            detail: "Result data has been successfully saved",
             message: "Successfully",
           });
         } else {
@@ -934,14 +683,6 @@ export default {
           });
         }
       });
-    },
-    beforeRouteLeave(to, from, next) {
-      try {
-        localStorage.removeItem("raceStartPayload");
-        localStorage.removeItem("participantByCategories");
-        localStorage.removeItem("currentCategories");
-      } catch {}
-      next();
     },
   },
 };
@@ -984,7 +725,6 @@ export default {
   color: rgba(255, 255, 255, 0.92);
   font-size: clamp(12px, 1.6vw, 16px);
 }
-/* Kotak logo */
 .hero-logo {
   width: 100px;
   height: 100px;
@@ -997,13 +737,8 @@ export default {
   align-items: center;
   justify-content: center;
 }
-.hero-logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
 
-/* ===== TABLE (List Result) ===== */
+/* ===== TABLE ===== */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1011,7 +746,7 @@ table {
   overflow: hidden;
 }
 thead {
-  background-color: #4a4a4a;
+  background: #4a4a4a;
   color: #fff;
   font-weight: 600;
 }
@@ -1022,23 +757,17 @@ thead th {
   border-bottom: 2px solid #f1f1f1;
 }
 tbody tr:nth-child(odd) {
-  background-color: #f9f9f9;
+  background: #f9f9f9;
 }
 tbody tr:nth-child(even) {
-  background-color: #f2f2f2;
+  background: #f2f2f2;
 }
 th,
 td {
   border: none;
 }
-thead th:first-child {
-  border-top-left-radius: 12px;
-}
-thead th:last-child {
-  border-top-right-radius: 12px;
-}
 
-/* ===== PORT CONNECTION INDICATOR ===== */
+/* ===== PORT ===== */
 .status-indicator {
   display: inline-block;
   width: 10px;
@@ -1048,10 +777,10 @@ thead th:last-child {
   transition: background-color 0.3s;
 }
 .connected {
-  background-color: rgb(0, 255, 0);
+  background: rgb(0, 255, 0);
 }
 .disconnected {
-  background-color: red;
+  background: red;
 }
 
 /* ===== Buttons ===== */
@@ -1061,7 +790,7 @@ thead th:last-child {
   transition: all 0.3s ease;
 }
 .custom-button:hover {
-  background-color: #1874a5;
+  background: #1874a5;
   color: #fff;
   border-color: #1874a5;
 }

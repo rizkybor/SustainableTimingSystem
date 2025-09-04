@@ -31,9 +31,10 @@
           </b-button>
 
           <b-button
+          :disabled="resultAvailable"
             size="sm"
             variant="primary"
-class="btn-add"
+            class="btn-add"
             @click="startRace(rows)"
           >
             <Icon icon="mdi:flag-variant" class="mr-2" />

@@ -73,9 +73,9 @@
             <h6 style="font-weight: 800; font-style: italic">
               Categories : {{ titleCategories }}
             </h6>
-              <h6 style="font-weight: 800; font-style: italic">
+            <h6 style="font-weight: 800; font-style: italic">
               Tanggal : {{ dataEvent.startDateEvent }} -
-                {{ dataEvent.endDateEvent }}
+              {{ dataEvent.endDateEvent }}
             </h6>
           </b-col>
           <b-col>
@@ -137,139 +137,21 @@
         </b-row>
       </div>
     </div>
-    <!-- SPRINT OPERATION TIME  -->
 
-    <div class="px-5 mb-4">
-      <div
-        class="card p-4"
-        style="background-color: #4A4A4A; border-radius: 20px"
-      >
-        <div v-if="!editResult">
-          <b-row>
-            <b-col class="col-3">
-              <div
-                class="card-time"
-                style="
-                  padding: 10px;
-                  height: auto;
-                  min-height: 500px;
-                  border: 1px solid #e6ebf4;
-                "
-              >
-                <table class="table table-dark table-sm">
-                  <thead style="background-color: white; color: #4A4A4A;">
-                    <tr>
-                      <th scope="col">Id Registrasi</th>
-                      <th scope="col">Racetime</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(id, index) in digitId" :key="index">
-                      <td style="color: black">{{ id }}</td>
-                      <td style="color: black">{{ digitTime[index] }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </b-col>
-
-            <b-col class="col">
-              <div class="card" style="border-radius: 15px">
-                <div class="card-body">
-                  <b-row>
-                    <b-col class="col">
-                      <h5 class="card-title" style="font-weight: 800">
-                        Buffer-Timer-Start
-                      </h5>
-                      <b-row>
-                        <b-col class="col">
-                          <p>Get Time Start</p>
-                          <div class="input-group mb-3">
-                            <input
-                              v-model="digitTimeStart"
-                              type="text"
-                              class="form-control"
-                              placeholder="Timer"
-                              aria-label="Timer"
-                              aria-describedby="basic-addon1"
-                            />
-                          </div>
-                        </b-col>
-                      </b-row>
-                    </b-col>
-                    <b-col class="col-4">
-                      <button
-                        v-for="(button, index) in participant"
-                        id="btnStart"
-                        :key="index"
-                        type="button"
-                        class="btn custom-btn"
-                        :disabled="button.result.startTime ? true : false"
-                        :class="
-                          button.result.startTime ? 'btn-secondary' : 'btn-info'
-                        "
-                        @click="updateTime(digitTimeStart, index, 'start')"
-                      >
-                        {{ "BIB " + button.bibTeam }}
-                      </button>
-                    </b-col>
-                  </b-row>
-                </div>
-              </div>
-
-              <br />
-
-              <div class="card" style="border-radius: 15px">
-                <div class="card-body">
-                  <b-row>
-                    <b-col class="col">
-                      <h5 class="card-title" style="font-weight: 800">
-                        Buffer-Timer-Finish
-                      </h5>
-                      <b-row>
-                        <b-col class="col">
-                          <p>Get Time Finish</p>
-                          <div class="input-group mb-3">
-                            <input
-                              v-model="digitTimeFinish"
-                              type="text"
-                              class="form-control"
-                              placeholder="Timer"
-                              aria-label="Timer"
-                              aria-describedby="basic-addon1"
-                            />
-                          </div>
-                        </b-col>
-                      </b-row>
-                    </b-col>
-                    <b-col class="col-4">
-                      <button
-                        v-for="(button, index) in participant"
-                        id="btnFinish"
-                        :key="index"
-                        type="button"
-                        :disabled="button.result.finishTime ? true : false"
-                        class="btn custom-btn"
-                        :class="
-                          button.result.finishTime
-                            ? 'btn-secondary'
-                            : 'btn-info'
-                        "
-                        @click="updateTime(digitTimeFinish, index, 'finish')"
-                      >
-                        {{ "BIB " + button.bibTeam }}
-                      </button>
-                    </b-col>
-                  </b-row>
-                </div>
-              </div>
-            </b-col>
-          </b-row>
-          <br />
-          <br />
-        </div>
-      </div>
-    </div>
+    <!-- KOMPONEN OPERATION TIME  -->
+    <OperationTimePanel
+      :digit-id="digitId"
+      :digit-time="digitTime"
+      :participant="
+        Array.isArray(participant)
+          ? participant
+          : Object.values(participant || {})
+      "
+      :digit-time-start.sync="digitTimeStart"
+      :digit-time-finish.sync="digitTimeFinish"
+      @update-time="updateTime"
+    />
+    <!-- END KOMPONEN OPERATION TIME  -->
 
     <div class="px-4 mt-4">
       <div class="card-body">
@@ -359,11 +241,13 @@
 import { ipcRenderer } from "electron";
 import VueHtml2pdf from "vue-html2pdf";
 import { SerialPort } from "serialport";
+import OperationTimePanel from "../components/OperationTeamPanel.vue";
 import sprintResult from "../ResultComponent/sprint-pdfResult.vue";
 
 export default {
   name: "SustainableTimingSystemSprintRace",
   components: {
+    OperationTimePanel,
     sprintResult,
     VueHtml2pdf,
   },
@@ -953,17 +837,11 @@ export default {
 </script>
 
 <style scoped>
-.card-time {
-  border-radius: 20px;
-}
-
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
-  overflow: hidden; /* biar radius rapi */
+  overflow: hidden;
 }
-
-/* Foto background */
 .detail-hero .hero-bg {
   position: absolute;
   inset: 0;
@@ -971,22 +849,17 @@ export default {
   background-size: cover;
   background-position: center;
 }
-/* Overlay gelap halus (ganti brightness filter) */
 .detail-hero .hero-bg::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
 }
-
-/* Konten di atas background */
 .detail-hero .hero-inner {
   position: relative;
   z-index: 1;
-  padding: 22px 22px; /* beri ruang kiri-kanan */
+  padding: 22px;
 }
-
-/* Judul besar putih + shadow kuat */
 .detail-hero h2 {
   color: #fff;
   font-weight: 800;
@@ -996,186 +869,89 @@ export default {
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
   letter-spacing: 0.2px;
 }
-
-/* Sub-info (lokasi, sungai, level) */
 .detail-hero .meta {
   color: rgba(255, 255, 255, 0.92);
   font-size: clamp(12px, 1.6vw, 16px);
 }
-
-/* Kotak logo putih membulat dengan bayangan */
+/* Kotak logo */
 .hero-logo {
   width: 100px;
   height: 100px;
   border-radius: 20px;
-  background: #ffffff;
+  background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: inherit; /* ikon ikut warna default */
 }
-
 .hero-logo img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.card-table {
-  max-width: 100%;
-  overflow-x: auto; /* Untuk mengaktifkan horizontal scroll jika tabel terlalu lebar */
-}
-
-.custom-btn {
-  margin: 5px;
-  width: 120px;
-}
-
-.new {
-  color: white;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  transition: box-shadow 0.3s ease;
-  background-color: #4A4A4A;
-}
-
-.v-shadow-on-scroll {
-  box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 1.5);
-  background-color: rgb(195, 195, 195);
-}
-
-/* Styling for Table */
+/* ===== TABLE (List Result) ===== */
 table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: 12px; /* Rounded corners for the entire table */
+  border-radius: 12px;
   overflow: hidden;
 }
-
 thead {
-    background-color: #4A4A4A;
-  color: #ffffff; /* White text */
-  font-weight: 600; /* Bold text */
+  background-color: #4a4a4a;
+  color: #fff;
+  font-weight: 600;
 }
-
 thead th {
-  padding: 12px 15px; /* Spacing inside header cells */
-  text-align: left; /* Align text to the left */
-  font-size: 14px; /* Font size */
-  border-bottom: 2px solid #f1f1f1; /* Light border at the bottom */
+  padding: 12px 15px;
+  text-align: left;
+  font-size: 14px;
+  border-bottom: 2px solid #f1f1f1;
 }
-
 tbody tr:nth-child(odd) {
-  background-color: #f9f9f9; /* Light background for odd rows */
+  background-color: #f9f9f9;
 }
-
 tbody tr:nth-child(even) {
-  background-color: #f2f2f2; /* Slightly darker background for even rows */
+  background-color: #f2f2f2;
 }
-
-th,
-td {
-  border: none; /* Remove borders */
-}
-
-thead th:first-child {
-  border-top-left-radius: 12px; /* Rounded left corner */
-}
-
-thead th:last-child {
-  border-top-right-radius: 12px; /* Rounded right corner */
-}
-
-table,
 th,
 td {
   border: none;
 }
-
-/* Styling List Result  */
-/* Style untuk sel data */
-td {
-  text-align: center;
-  padding: 8px;
+thead th:first-child {
+  border-top-left-radius: 12px;
+}
+thead th:last-child {
+  border-top-right-radius: 12px;
 }
 
-/* Style untuk field "Penalty" */
-td.penalty {
-  display: flex;
-  gap: 28px;
-}
-
-/* Style untuk sel data dalam field "Penalty" */
-td.penalty span {
-  background-color: #4A4A4A;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 5px;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks hitam) */
-td.penalty span.black {
-  background-color: #4A4A4A;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks merah) */
-td.penalty span.red {
-  background-color: red;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks biru) */
-td.penalty span.blue {
-  background-color: #4A4A4A;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks hijau) */
-td.penalty span.green {
-  background-color: green;
-}
-
-/* Style untuk total pinalty */
-td.totalPenalty {
-  font-weight: bold;
-}
-
-/* Style untuk waktu */
-td.time {
-  font-style: italic;
-}
-
-/* Tambahkan ini ke dalam file CSS Anda */
+/* ===== PORT CONNECTION INDICATOR ===== */
 .status-indicator {
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 50%; /* Membuat lingkaran */
-  margin-left: 0px; /* Atur margin sesuai kebutuhan Anda */
-  transition: background-color 0.3s; /* Efek transisi untuk perubahan warna */
+  border-radius: 50%;
+  margin-left: 0;
+  transition: background-color 0.3s;
 }
-
 .connected {
-  background-color: rgb(0, 255, 0); /* Warna saat terhubung (misalnya, hijau) */
+  background-color: rgb(0, 255, 0);
 }
-
-/* Warna saat tidak terhubung (misalnya, merah) */
 .disconnected {
   background-color: red;
 }
 
-/* Custom button styling */
+/* ===== Buttons ===== */
 .custom-button {
-  border-color: #1874a5; /* Set the border color to #1874A5 */
-  color: #1874a5; /* Set the text color to #1874A5 */
-  transition: all 0.3s ease; /* Smooth transition for color changes */
+  border-color: #1874a5;
+  color: #1874a5;
+  transition: all 0.3s ease;
 }
-
 .custom-button:hover {
-  background-color: #1874a5; /* Background color when hovered */
-  color: white; /* Text color when hovered */
-  border-color: #1874a5; /* Border color when hovered */
+  background-color: #1874a5;
+  color: #fff;
+  border-color: #1874a5;
 }
 </style>

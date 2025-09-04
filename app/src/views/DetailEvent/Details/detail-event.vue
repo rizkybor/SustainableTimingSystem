@@ -221,7 +221,7 @@ export default {
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
       dataTeams: [], // alias events.participant
       availableTeams: [], // sumber dropdown (opsional dari IPC)
-      useDummyTeams: true,
+      useDummyTeams: false,
       dummyTeams: [
         { id: "t101", nameTeam: "JAKARTA PUSAT", bibTeam: "001" },
         { id: "t102", nameTeam: "JAKARTA SELATAN", bibTeam: "002" },
@@ -262,7 +262,8 @@ export default {
   async created() {
     const id = this.$route.params.id;
     await this.loadEvent(id); // isi this.events + this.dataTeams
-    await this.loadAvailableTeams(id); // isi dropdown
+    console.log(this.events, "<< cek");
+    await this.loadAvailableTeams("C - D"); // isi dropdown
 
     // set initial pertama bila belum
     if (
@@ -452,18 +453,65 @@ export default {
     },
 
     /* ------------ sumber dropdown ------------ */
-    loadAvailableTeams(eventId) {
+    // helper: tentukan type yang boleh berdasarkan levelName
+    _allowedTypeForLevel(levelName) {
+      console.log(levelName, "<<<<<<");
+      const lv = String(levelName || "")
+        .trim()
+        .toUpperCase();
+
+      if (lv.includes("CLASSIFICATION - G")) return "club";
+      if (lv.includes("CLASSIFICATION - D")) return "club";
+      if (lv.includes("CLASSIFICATION - C")) return "pengcab";
+      if (lv.includes("CLASSIFICATION - B")) return "pengprov";
+      if (lv.includes("CLASSIFICATION - A")) return "country";
+      return null;
+    },
+
+    // sumber dropdown tim yang tersedia (ambil dari teamsCollection)
+    async loadAvailableTeams(/* eventId not needed now */) {
+      // fallback dummy bila pengembangan
       if (this.useDummyTeams) {
         this.availableTeams = this.dummyTeams.slice();
         return;
       }
+
       try {
-        ipcRenderer.send("get-teams-available", { eventId });
-        ipcRenderer.once("get-teams-available-reply", (_e, res) => {
-          this.availableTeams =
-            Array.isArray(res) && res.length ? res : this.dummyTeams.slice();
+        // minta semua teams dari main process
+        ipcRenderer.send("teams:get-all");
+
+        await new Promise((resolve) => {
+          ipcRenderer.once("teams:get-all-reply", (_e, res) => {
+            let items =
+              res && res.ok && Array.isArray(res.items) ? res.items : [];
+
+            // filter by levelName → typeTeam
+            const allow = this._allowedTypeForLevel(this.events.levelName);
+            console.log(allow, items, this.events.levelName, "<< cek bro");
+            if (allow) {
+              const allowLC = String(allow).toLowerCase();
+              items = items.filter(
+                (t) => String(t.typeTeam || "").toLowerCase() === allowLC
+              );
+            }
+
+            // map ke bentuk dropdown kamu: { id, nameTeam, bibTeam }
+            this.availableTeams = items.map((t) => ({
+              id: t._id && t._id.$oid ? t._id.$oid : String(t._id || ""),
+              nameTeam: t.nameTeam,
+              bibTeam: t.bibTeam || "", // boleh kosong, nanti user isi saat add
+            }));
+
+            // jika kosong, tetap sediakan dummy agar UI tidak “blank” (opsional)
+            if (!this.availableTeams.length) {
+              this.availableTeams = this.dummyTeams.slice();
+            }
+
+            resolve();
+          });
         });
-      } catch {
+      } catch (err) {
+        console.error("loadAvailableTeams error:", err);
         this.availableTeams = this.dummyTeams.slice();
       }
     },

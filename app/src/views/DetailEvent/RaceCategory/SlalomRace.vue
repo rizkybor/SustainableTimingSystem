@@ -1,509 +1,572 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between">
-      <b-button @click="goTo()" variant="primary">
-        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back</b-button
-      >
-      <b-button @click="goTo()" variant="primary">
-        New Category
-        <Icon icon="ic:baseline-add-circle-outline" />
-      </b-button>
-    </div>
-    <br />
+    <!-- HERO -->
+    <section class="detail-hero">
+      <div class="hero-bg"></div>
+      <b-container class="hero-inner">
+        <b-row class="align-items-center">
+          <b-col cols="auto" class="pr-0">
+            <div
+              class="hero-logo d-flex align-items-center justify-content-center"
+            >
+              <Icon icon="mdi:shield-crown" width="56" height="56" />
+            </div>
+          </b-col>
+          <b-col>
+            <h2 class="h1 font-weight-bold mb-1 text-white">
+              {{
+                dataEventSafe.eventName ||
+                "Kejurnas Arung Jeram DKI Jakarta 2025"
+              }}
+            </h2>
+            <div class="meta text-white-50">
+              <span class="mr-3"
+                ><strong class="text-white">Location</strong> :
+                {{ dataEventSafe.addressCity || "-" }}</span
+              >
+              <span class="mr-3"
+                ><strong class="text-white">River</strong> : -</span
+              >
+              <span class="mr-3"
+                ><strong class="text-white">Level</strong> : -</span
+              >
+            </div>
+          </b-col>
+        </b-row>
+      </b-container>
+    </section>
 
-    <div class="card new" :class="{ 'v-shadow-on-scroll': isScrolled }">
+    <!-- STICKY HEADER -->
+    <div class="px-5">
       <div class="card-body">
         <b-row>
           <b-col>
-            <h5 style="font-weight: 800; font-style: italic">
-              Kejuaraan Arung Jeram 2024
-            </h5>
             <h6 style="font-weight: 800; font-style: italic">
               Nomor Lomba : Slalom
             </h6>
-            <p style="font-style: italic">
-              Tigaraksa, 01-January-2024 - 10-January-2024
-            </p>
+            <h6 style="font-weight: 800; font-style: italic">
+              Categories : {{ titleCategories || "-" }}
+            </h6>
+            <h6 style="font-weight: 800; font-style: italic">
+              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
+              {{ dataEventSafe.endDateEvent || "-" }}
+            </h6>
           </b-col>
           <b-col>
-            <div
-              style="
-                display: flex;
-                gap: 10px;
-                justify-content: flex-end !important;
-              "
-            >
-              <button type="button" class="btn btn-warning">
+            <div style="display: flex; gap: 10px; justify-content: flex-end">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                @click="saveResult"
+              >
+                <Icon icon="icon-park-outline:save" /> Save Result
+              </button>
+              <button
+                type="button"
+                :class="{
+                  'btn-danger': isPortConnected,
+                  'btn-success': !isPortConnected,
+                }"
+                class="btn"
+                @click="connectPort"
+              >
                 <Icon icon="ic:baseline-sync" />
-
-                Connect Device
+                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
               </button>
-              <button type="button" class="btn btn-info">
-                <Icon icon="ic:outline-local-printshop" />
-                Print Result
-              </button>
-
-              <button type="button" class="btn btn-danger">
-                <Icon icon="ic:outline-delete-sweep" />
-                Reset
-              </button>
+              <span
+                class="status-indicator"
+                :class="{
+                  connected: isPortConnected,
+                  disconnected: !isPortConnected,
+                }"
+              ></span>
             </div>
           </b-col>
         </b-row>
       </div>
     </div>
 
-    <br />
+    <!-- OPERATION TIME (reuse Sprint) -->
+    <OperationTimePanel
+      :digit-id="digitId"
+      :digit-time="digitTime"
+      :participant="participantsForPanel"
+      :digit-time-start.sync="digitTimeStart"
+      :digit-time-finish.sync="digitTimeFinish"
+      @update-time="updateTime"
+    />
 
-    <!-- SPRINT OPERATION TIME  -->
-
-    <div class="card" style="background-color: dodgerblue">
+    <!-- LIST RESULT (Slalom) -->
+    <div class="px-4 mt-4">
       <div class="card-body">
-        <b-row>
-          <b-col class="col-3">
-            <div
-              class="card"
-              style="
-                padding: 10px;
-                height: auto;
-                min-height: 500px;
-                background-color: rgb(32, 32, 32);
-              "
-            >
-              <table class="table table-dark table-sm">
-                <thead>
-                  <tr>
-                    <th scope="col">Id Registrasi</th>
-                    <th scope="col">Racetime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, index) in getItems" :key="index">
-                    <td>{{ item.idReg }}</td>
-                    <td>{{ waktuSaatIni }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </b-col>
+        <h4>List Result (Slalom)</h4>
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Team Name</th>
+                <th>BIB</th>
+                <th>Run</th>
+                <th>Total Penalty</th>
+                <th v-for="n in SLALOM_GATES" :key="'g' + n">{{ n }}</th>
+                <th>Penalty Time</th>
+                <th>Start Time</th>
+                <th>Finish Time</th>
+                <th>Race Time</th>
+                <th>Total Time</th>
+                <th>Best Time</th>
+                <th>Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(team, ti) in teams" :key="team._id">
+                <td>{{ ti + 1 }}</td>
+                <td>{{ team.nameTeam }}</td>
+                <td>{{ team.bibNumber }}</td>
+                <td style="min-width: 120px">
+                  <b-form-select
+                    v-model="selectedSession[team._id]"
+                    :options="sessionOptions(team)"
+                    @change="recalcTeam(team)"
+                  />
+                </td>
+                <td>{{ displayTotalPenalty(team) }}</td>
 
-          <b-col class="col">
-            <div class="card">
-              <div class="card-body">
-                <b-row>
-                  <b-col class="col">
-                    <h5 class="card-title">Buffer-Timer-Start</h5>
-                    <b-row>
-                      <!-- <b-col class="col-2">
-                          <p>Start</p>
-                          <div class="input-group mb-3">
-                            <input
-                              type="text"
-                              class="form-control"
-                              placeholder="Username"
-                              aria-label="Username"
-                              aria-describedby="basic-addon1"
-                            />
-                          </div>
-                        </b-col> -->
-                      <b-col class="col">
-                        <p>Get Time Start</p>
-                        <div class="input-group mb-3">
-                          <input
-                            v-model="hasilKonversi"
-                            type="text"
-                            class="form-control"
-                            placeholder="Timer"
-                            aria-label="Timer"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                        <!-- <button type="button" class="btn btn-primary">
-                            Validate Start Time
-                          </button> -->
-                      </b-col>
-                    </b-row>
-                  </b-col>
-                  <b-col class="col-4">
-                    <button
-                      v-for="(button, index) in buttons"
-                      :key="index"
-                      type="button"
-                      class="btn custom-btn"
-                      :class="button.class"
-                    >
-                      {{ button.label }}
-                    </button>
-                  </b-col>
-                </b-row>
-              </div>
-            </div>
+                <!-- 14 Gates -->
+                <td
+                  v-for="(gate, gi) in currentSession(team).penalties"
+                  :key="team._id + '-' + gi"
+                >
+                  <b-form-select
+                    v-model="
+                      team.sessions[selectedSession[team._id]].penalties[gi]
+                    "
+                    :options="penaltyOptions"
+                    size="sm"
+                    @change="recalcTeam(team)"
+                  />
+                </td>
 
-            <br />
+                <td>{{ currentSession(team).penaltyTime || "-" }}</td>
+                <td>{{ currentSession(team).startTime || "-" }}</td>
+                <td>{{ currentSession(team).finishTime || "-" }}</td>
+                <td>{{ currentSession(team).raceTime || "-" }}</td>
+                <td>{{ currentSession(team).totalTime || "-" }}</td>
+                <td style="background-color: greenyellow">
+                  {{ calculateBestTime(team) || "-" }}
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-warning btn-sm"
+                    @click="openEdit(team)"
+                  >
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-            <div class="card">
-              <div class="card-body">
-                <b-row>
-                  <b-col class="col">
-                    <h5 class="card-title">Buffer-Timer-Finish</h5>
-                    <b-row>
-                      <!-- <b-col class="col-2">
-                          <p>Finish</p>
-                          <div class="input-group mb-3">
-                            <input
-                              type="text"
-                              class="form-control"
-                              placeholder="Username"
-                              aria-label="Username"
-                              aria-describedby="basic-addon1"
-                            />
-                          </div>
-                        </b-col> -->
-                      <b-col class="col">
-                        <p>Get Time Finish</p>
-                        <div class="input-group mb-3">
-                          <input
-                            v-model="hasilKonversi"
-                            type="text"
-                            class="form-control"
-                            placeholder="Timer"
-                            aria-label="Timer"
-                            aria-describedby="basic-addon1"
-                          />
-                        </div>
-                        <!-- <button type="button" class="btn btn-success">
-                            Validate Time Finish
-                          </button> -->
-                      </b-col>
-                    </b-row>
-                  </b-col>
-                  <b-col class="col-4">
-                    <button
-                      v-for="(button, index) in buttons"
-                      id="btnFinish"
-                      :key="index"
-                      type="button"
-                      class="btn custom-btn"
-                      :class="button.class"
-                    >
-                      {{ button.label }}
-                    </button>
-                  </b-col>
-                </b-row>
-              </div>
-            </div>
-          </b-col>
-        </b-row>
-        <br />
-        <br />
-
-        <!-- Team 1  -->
-        <b-row>
-          <b-col class="col">
-            <div class="card">
-              <div class="card-body">
-                <div>
-                  <b-row>
-                    <b-col class="col-12">
-                      <div class="table-responsive">
-                        <table class="table table-bordered">
-                          <thead>
-                            <tr>
-                              <th scope="col">Team Name</th>
-                              <th scope="col">BIB Number</th>
-                              <th scope="col">Run</th>
-                              <th scope="col">Total Penalty</th>
-
-                              <th
-                                scope="col"
-                                v-for="(penalty, index) in 14"
-                                :key="index"
-                              >
-                                {{ index + 1 }}
-                              </th>
-
-                              <th scope="col">Penalty Time</th>
-                              <th scope="col">Start Time</th>
-                              <th scope="col">Finish Time</th>
-                              <th scope="col">Race Time</th>
-                              <th scope="col">Total Time</th>
-                              <th scope="col">Best Time</th>
-                              <th scope="col">Edit</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr
-                              v-for="(team, teamIndex) in data"
-                              :key="team.id"
-                            >
-                              <td>{{ team.nameTeam }}</td>
-                              <td>{{ team.bibNumber }}</td>
-                              <td>
-                                <select v-model="selectedSession[team.id]">
-                                  <option
-                                    v-for="(
-                                      session, sessionIndex
-                                    ) in team.sessions"
-                                    :key="session.id"
-                                    :value="sessionIndex"
-                                  >
-                                    Run {{ sessionIndex + 1 }}
-                                  </option>
-                                </select>
-                              </td>
-
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .totalPenalty ? team.sessions[selectedSession[team.id]]
-                                    .totalPenalty : '-'
-                                }}
-                              </td>
-
-                              <td
-                                v-for="(penalty, index) in team.sessions[
-                                  selectedSession[team.id]
-                                ].penalties"
-                                :key="index"
-                              >
-                                {{ penalty }}
-                              </td>
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .penaltyTime
-                                }}
-                              </td>
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .startTime
-                                }}
-                              </td>
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .finishTime
-                                }}
-                              </td>
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .raceTime
-                                }}
-                              </td>
-                              <td>
-                                {{
-                                  team.sessions[selectedSession[team.id]]
-                                    .totalTime
-                                }}
-                              </td>
-                              <td style="background-color: greenyellow">
-                                {{ calculateBestTime(team) }}
-                              </td>
-                              <td>
-                                <button type="button" class="btn btn-warning">
-                                  Edit
-                                </button>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </b-col>
-                  </b-row>
-                </div>
-              </div>
-            </div>
-          </b-col>
-        </b-row>
+        <b-button
+          @click="saveResult"
+          variant="outline-info"
+          class="custom-button mt-2"
+        >
+          <Icon icon="icon-park-outline:save" /> Save Result
+        </b-button>
+        <b-button
+          @click="goTo"
+          variant="outline-info"
+          class="custom-button mt-2 ml-2"
+        >
+          <Icon icon="ic:baseline-keyboard-double-arrow-left" /> Back
+        </b-button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import { ipcRenderer } from "electron";
+import { SerialPort } from "serialport";
+import OperationTimePanel from "../components/OperationTeamPanel.vue";
+import { Icon } from "@iconify/vue2";
+
+/** ===== constants/helpers (sama dengan Sprint) ===== */
+const RACE_PAYLOAD_KEY = "raceStartPayload";
+function safeJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const val = JSON.parse(raw);
+    return val == null ? fallback : val;
+  } catch {
+    return fallback;
+  }
+}
+function pad(n, w = 2) {
+  return String(n).padStart(w, "0");
+}
+function msToHMSms(ms) {
+  const hr = Math.floor(ms / 3600000);
+  const rem1 = ms % 3600000;
+  const min = Math.floor(rem1 / 60000);
+  const rem2 = rem1 % 60000;
+  const sec = Math.floor(rem2 / 1000);
+  const mss = rem2 % 1000;
+  return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(mss, 3)}`;
+}
+function hmsToMs(str) {
+  const [h = "0", m = "0", sMs = "0.000"] = String(str || "").split(":");
+  const [s = "0", ms = "0"] = String(sMs).split(".");
+  return +h * 3600000 + +m * 60000 + +s * 1000 + +ms;
+}
+
+/** ===== Slalom specifics ===== */
+const SLALOM_GATES = 14;
+const PENALTY_VALUE_TO_MS = { 0: 0, 5: 5000, 50: 50000 };
+
+/** ===== Payload baru: ambil bucket & teams (seperti Sprint Result) ===== */
+function normalizeTeamFromBucketForSlalom(t = {}) {
+  // id internal untuk v-for
+  const _id =
+    t._id ||
+    t.id ||
+    `${String(t.bibTeam || t.bibNumber || "")}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+  const base = {
+    _id,
+    nameTeam: String(t.nameTeam || t.name || ""),
+    bibNumber: String(t.bibTeam || t.bibNumber || ""),
+    // informasi lain yang mungkin dipakai
+    startOrder: String(t.startOrder || ""),
+    praStart: String(t.praStart || ""),
+    intervalRace: String(t.intervalRace || ""),
+    statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+  };
+
+  // siapkan 2 sesi default, dan merge jika ada data existing
+  const emptySession = () => ({
+    penalties: Array.from({ length: SLALOM_GATES }, () => 0),
+    totalPenalty: 0,
+    penaltyTime: "00:00:00.000",
+    startTime: "",
+    finishTime: "",
+    raceTime: "",
+    totalTime: "",
+    ranked: 0,
+    score: 0,
+  });
+
+  const sessions =
+    Array.isArray(t.sessions) && t.sessions.length
+      ? t.sessions.map((s) => ({ ...emptySession(), ...(s || {}) }))
+      : [emptySession(), emptySession()];
+
+  return { ...base, sessions };
+}
+
+function loadFromRaceStartPayloadForSlalom() {
+  const obj = safeJSON(RACE_PAYLOAD_KEY, {});
+  const b = obj.bucket || {};
+  const bucket = {
+    eventId: String(b.eventId || ""),
+    initialId: String(b.initialId || ""),
+    raceId: String(b.raceId || ""),
+    divisionId: String(b.divisionId || ""),
+    eventName: String(b.eventName || "").toUpperCase(),
+    initialName: String(b.initialName || "").toUpperCase(),
+    raceName: String(b.raceName || "").toUpperCase(),
+    divisionName: String(b.divisionName || "").toUpperCase(),
+  };
+  const teams = Array.isArray(b.teams)
+    ? b.teams.map(normalizeTeamFromBucketForSlalom)
+    : [];
+  return { bucket, teams };
+}
+
 export default {
-  name: "SustainableTimingSystemSprintRace",
+  name: "SlalomRacePanel",
+  components: { OperationTimePanel, Icon },
 
   data() {
     return {
-      isScrolled: false,
-      data: [
-        {
-          id: 0,
-          nameTeam: "Makopala Universitas Budi Luhur",
-          bibNumber: "001",
-          sessions: [
-            {
-              id: 0,
-              penalties: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
-              totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:35:00",
-            },
-            {
-              id: 1,
-              penalties: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-              totalPenalty: 8,
-              penaltyTime: "00:08:00",
-              startTime: "00:50:00",
-              finishTime: "00:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:25:00",
-            },
-          ],
-        },
-        {
-          id: 1,
-          nameTeam: "Budi Luhur",
-          bibNumber: "002",
-          sessions: [
-            {
-              id: 0,
-              penalties: [
-                50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
-              ],
-              totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:15:00",
-            },
-            {
-              id: 1,
-              penalties: [0, 50, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
-              totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:35:00",
-            },
-          ],
-        },
-        {
-          id: 2,
-          nameTeam: "Eka Citra UNJ",
-          bibNumber: "003",
-          sessions: [
-            {
-              id: 0,
-              penalties: [
-                50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
-              ],
-              totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:35:00",
-            },
-            {
-              id: 1,
-              penalties: [0, 50, 0, 0, 5, 0, 0, 50, 0, 0, 0, 50, 0, 0],
-              totalPenalty: 8,
-              penaltyTime: "00:05:00",
-              startTime: "09:00:00",
-              finishTime: "09:30:00",
-              raceTime: "00:30:00",
-              totalTime: "00:00:10",
-            },
-          ],
-        },
-      ],
+      SLALOM_GATES,
+      // port/device
+      port: null,
+      isPortConnected: false,
+      digitId: [],
+      digitTime: [],
+      digitTimeStart: null,
+      digitTimeFinish: null,
+
+      // event & category title
+      dataEvent: {},
+      titleCategories: "",
+
+      // list result (tim)
+      teams: [],
       selectedSession: {},
-      getItems: [{ time: "00:00:35.680", idReg: "000500070010000000M" }],
-      buttons: [
-        { label: "Team 1", class: "btn-dark" },
-        { label: "Team 2", class: "btn-secondary" },
-        { label: "Team 3", class: "btn-secondary" },
-        { label: "Team 4", class: "btn-dark" },
-        { label: "Team 5", class: "btn-dark" },
-        { label: "Team 6", class: "btn-secondary" },
-        { label: "Team 7", class: "btn-secondary" },
-        { label: "Team 8", class: "btn-dark" },
+      penaltyOptions: [
+        { text: "0", value: 0 },
+        { text: "5", value: 5 },
+        { text: "50", value: 50 },
       ],
-      currentTime: "",
-      waktuSaatIni: "000000000",
-      hasilKonversi: "",
     };
   },
-  watch: {
-    waktuSaatIni(newVal) {
-      this.hasilKonversi = this.konversiFormatWaktu(newVal);
+
+  computed: {
+    dataEventSafe() {
+      return this.dataEvent && typeof this.dataEvent === "object"
+        ? this.dataEvent
+        : {};
+    },
+
+    /** Mapping untuk OperationTimePanel (1 sesi aktif per tim) */
+    participantsForPanel() {
+      return this.teams.map((t) => {
+        const idx =
+          this.selectedSession[t._id] != null ? this.selectedSession[t._id] : 0;
+        const s = t.sessions[idx] || {};
+        return {
+          nameTeam: t.nameTeam,
+          bibTeam: t.bibNumber,
+          result: {
+            startTime: s.startTime || "",
+            finishTime: s.finishTime || "",
+            raceTime: s.raceTime || "",
+            penaltyTime: s.penaltyTime || "00:00:00.000",
+            totalTime: s.totalTime || s.raceTime || "",
+            ranked: s.ranked || 0,
+            score: s.score || 0,
+          },
+        };
+      });
     },
   },
 
   mounted() {
-    window.addEventListener("scroll", this.handleScroll);
+    // ambil event info
+    this.dataEvent = safeJSON("eventDetails", {});
 
-    setInterval(this.updateClock, 1000);
+    // 1) payload baru (seperti Sprint Result)
+    const { bucket, teams } = loadFromRaceStartPayloadForSlalom();
+    if (teams.length) {
+      this.teams = teams;
+      this.titleCategories =
+        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
+    } else {
+      // 2) fallback format lama
+      const legacyTeams = safeJSON("participantByCategories", []);
+      this.teams = (
+        Array.isArray(legacyTeams)
+          ? legacyTeams
+          : Object.values(legacyTeams || {})
+      )
+        .sort((a, b) =>
+          String(a.praStart || "").localeCompare(String(b.praStart || ""))
+        )
+        .map(normalizeTeamFromBucketForSlalom);
+      this.titleCategories = String(
+        localStorage.getItem("currentCategories") || ""
+      ).trim();
+    }
 
-    // Panggil fungsi updateClock sekali pada awalnya untuk menginisialisasi waktu
-    this.updateClock();
-    this.hasilKonversi = this.konversiFormatWaktu(this.waktuSaatIni);
-
-    this.data.forEach((team) => {
-      this.$set(this.selectedSession, team.id, 0);
-    });
+    // default session index
+    this.teams.forEach((t) => this.$set(this.selectedSession, t._id, 0));
   },
-  destroyed() {
-    window.removeEventListener("scroll", this.handleScroll);
-  },
+
   methods: {
-    calculateBestTime(team) {
-      if (team.sessions.length < 1) {
-        // Tidak ada sesi, gunakan sesi pertama sebagai waktu terbaik
-        return team.sessions[0].totalTime;
-      } else {
-        let bestTime = team.sessions[0].totalTime;
-        for (let i = 1; i < team.sessions.length; i++) {
-          const currentTime = team.sessions[i].totalTime;
-          if (currentTime < bestTime) {
-            bestTime = currentTime;
-          }
-        }
-        return bestTime;
+    /** === Table accessors === */
+    sessionOptions(team) {
+      return team.sessions.map((_, i) => ({ text: `Run ${i + 1}`, value: i }));
+    },
+    currentSession(team) {
+      const idx =
+        this.selectedSession[team._id] != null
+          ? this.selectedSession[team._id]
+          : 0;
+      const s = team.sessions[idx] || { penalties: [] };
+      if (!Array.isArray(s.penalties) || s.penalties.length !== SLALOM_GATES) {
+        this.$set(
+          s,
+          "penalties",
+          Array.from({ length: SLALOM_GATES }, () => 0)
+        );
+      }
+      return s;
+    },
+
+    /** === Perhitungan penalty/time === */
+    recalcSession(s) {
+      s.totalPenalty = s.penalties.reduce((a, v) => a + (Number(v) || 0), 0);
+      const penMs = s.penalties.reduce(
+        (sum, v) => sum + (PENALTY_VALUE_TO_MS[Number(v) || 0] || 0),
+        0
+      );
+      s.penaltyTime = msToHMSms(penMs);
+      if (s.raceTime) {
+        const raceMs = hmsToMs(s.raceTime);
+        s.totalTime = msToHMSms(raceMs + penMs);
       }
     },
-    konversiFormatWaktu(waktu) {
-      const milidetik = waktu % 1000;
-      waktu = Math.floor(waktu / 1000); // Menghapus milidetik dari waktu
-
-      const detik = waktu % 60;
-      waktu = Math.floor(waktu / 60); // Menghapus detik dari waktu
-
-      const menit = waktu % 60;
-      const jam = Math.floor(waktu / 60);
-
-      const formatJam = String(jam).padStart(2, "0");
-      const formatMenit = String(menit).padStart(2, "0");
-      const formatDetik = String(detik).padStart(2, "0");
-      const formatMilidetik = String(milidetik).padStart(3, "0");
-
-      return `${formatJam}:${formatMenit}:${formatDetik}.${formatMilidetik}`;
+    recalcTeam(team) {
+      this.recalcSession(this.currentSession(team));
     },
-    updateClock() {
-      const now = new Date();
-      const totalSeconds = now.getSeconds(); // Batasi waktu hingga detik
-      this.waktuSaatIni = String(
-        totalSeconds * 1000 + now.getMilliseconds()
-      ).padStart(9, "0");
+    displayTotalPenalty(team) {
+      const s = this.currentSession(team);
+      return Number.isFinite(s.totalPenalty) ? s.totalPenalty : 0;
+    },
+    calculateBestTime(team) {
+      const times = team.sessions.map((s) => s.totalTime).filter(Boolean);
+      if (!times.length) return "";
+      const best = times
+        .map(hmsToMs)
+        .reduce((min, ms) => Math.min(min, ms), Infinity);
+      return msToHMSms(best);
+    },
+    onGatePenaltyChange(team, gateIndex, value) {
+      const s = this.currentSession(team);
+      this.$set(s.penalties, gateIndex, Number(value) || 0);
+      this.recalcSession(s);
     },
 
+    /** === Hook dari OperationTimePanel === */
+    async updateTime(val, idx, title) {
+      const team = this.teams[idx];
+      if (!team) return;
+      const s = this.currentSession(team);
+      if (title === "start") s.startTime = val;
+      if (title === "finish") {
+        s.finishTime = val;
+        if (s.startTime && s.finishTime) {
+          const diff = Math.max(
+            0,
+            hmsToMs(s.finishTime) - hmsToMs(s.startTime)
+          );
+          s.raceTime = msToHMSms(diff);
+          this.recalcSession(s);
+        }
+      }
+    },
+
+    /** === Navigasi sederhana === */
     goTo() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-    handleScroll() {
-      if (window.scrollY > 0) {
-        this.isScrolled = true;
-      } else {
-        this.isScrolled = false;
+    openEdit(_team) {
+      /* TODO: modal edit */
+    },
+
+    /** === Device connection (sama pola Sprint, lebih aman) === */
+    async connectPort() {
+      if (this.isPortConnected) return this.disconnected();
+      try {
+        const ports = await SerialPort.list();
+        if (!ports || !ports.length)
+          throw new Error("No serial ports available");
+        const chosen = ports.find((p) => p.path) || ports[0];
+        this.port = new SerialPort({ path: chosen.path, baudRate: 9600 });
+        this.port.on("data", (buf) => {
+          const s = buf.toString();
+          this.digitId.unshift(s.slice(0, 12));
+          this.digitTime.unshift(s.slice(12));
+        });
+        this.isPortConnected = true;
+        alert("Connected");
+      } catch (e) {
+        this.isPortConnected = false;
+ alert((e && e.message) ? e.message : "Failed to connect device");
+      }
+    },
+    async disconnected() {
+      try {
+        if (this.port && this.port.isOpen) this.port.close();
+      } catch {}
+      this.isPortConnected = false;
+      alert("Disconnected");
+    },
+
+    /** === Save: dokumen kompatibel dengan pipeline Sprint Result === */
+    buildDocs() {
+      const { bucket } = loadFromRaceStartPayloadForSlalom();
+      const must = ["eventId", "initialId", "raceId", "divisionId"];
+      const missing = must.filter((k) => !bucket[k]);
+      if (missing.length)
+        throw new Error(`Bucket fields missing: ${missing.join(", ")}`);
+
+      const now = new Date();
+      return this.teams.map((t) => {
+        const idx =
+          this.selectedSession[t._id] != null ? this.selectedSession[t._id] : 0;
+        const s = t.sessions[idx] || {};
+        return {
+          ...bucket,
+          nameTeam: String(t.nameTeam || ""),
+          bibTeam: String(t.bibNumber || ""),
+          startOrder: t.startOrder || "",
+          praStart: t.praStart || "",
+          intervalRace: t.intervalRace || "",
+          statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+          result: {
+            startTime: s.startTime || "",
+            finishTime: s.finishTime || "",
+            raceTime: s.raceTime || "",
+            penalty: s.totalPenalty || 0, // kompatibel dengan Sprint
+            penaltyTime: s.penaltyTime || "00:00:00.000",
+            totalTime: s.totalTime || s.raceTime || "",
+            ranked: s.ranked || 0,
+            score: s.score || 0,
+          },
+          otr: {},
+          meta: {
+            slalom: {
+              selectedRun: idx,
+              penalties: (s.penalties || []).slice(),
+            },
+          },
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
+    },
+    saveResult() {
+      try {
+        const docs = this.buildDocs();
+        if (!docs.length) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            detail: "Belum ada data yang bisa disimpan.",
+            message: "Ups Sorry",
+          });
+          return;
+        }
+        ipcRenderer.send("insert-sprint-result", docs);
+        ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+          if (res && res.ok) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "question",
+              detail: "Result data has been successfully saved",
+              message: "Successfully",
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Save failed",
+              message: "Failed",
+            });
+          }
+        });
+      } catch (e) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: e.message || "Save failed",
+          message: "Failed",
+        });
       }
     },
   },
@@ -511,133 +574,111 @@ export default {
 </script>
 
 <style scoped>
-/* Tabel Team Information */
-.table-info th {
-  background-color: dodgerblue;
-  color: white;
+/* ===== HERO / BANNER ===== */
+.detail-hero {
+  position: relative;
+  overflow: hidden;
 }
-
-/* Tabel Team 1 */
-.table-team th {
-  background-color: #007bff;
-  color: white;
+.detail-hero .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://images.unsplash.com/photo-1520981825232-ece5fae45120?q=80&w=1600&auto=format&fit=crop");
+  background-size: cover;
+  background-position: center;
 }
-
-/* Tombol di dalam tabel */
-.custom-btn {
-  margin: 5px;
-  width: 120px;
+.detail-hero .hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
 }
-
-/* Tabel di dalam buffer-timer-start */
-.table-start {
-  background-color: #202020;
-  color: white;
-}
-
-/* Tabel di dalam buffer-timer-finish */
-.table-finish {
-  background-color: #202020;
-  color: white;
-}
-
-/* Tabel pada tabel Sprint Operation Time */
-.table-sprint th {
-  background-color: #343a40;
-  color: white;
-}
-
-/* Tabel pada tabel Sprint Operation Time */
-.table-sprint td {
-  color: white;
-}
-
-/* Style untuk elemen dengan class "new" */
-.new {
-  color: white;
-  position: sticky;
-  top: 0;
+.detail-hero .hero-inner {
+  position: relative;
   z-index: 1;
-  transition: box-shadow 0.3s ease;
-  background-color: rgb(2, 102, 203);
+  padding: 22px;
+}
+.detail-hero h2 {
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(26px, 4.2vw, 46px);
+  line-height: 1.05;
+  margin-bottom: 6px !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.2px;
+}
+.detail-hero .meta {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(12px, 1.6vw, 16px);
+}
+.hero-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Efek shadow ketika digulirkan */
-.v-shadow-on-scroll {
-  box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 1.5);
-  background-color: rgb(2, 102, 203);
+/* ===== Port indicator ===== */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-left: 0;
+  transition: background-color 0.3s;
+}
+.connected {
+  background: rgb(0, 255, 0);
+}
+.disconnected {
+  background: red;
 }
 
-/* Style untuk tabel */
+/* ===== Table look ===== */
+.table-responsive {
+  overflow-x: auto;
+}
 table {
   width: 100%;
   border-collapse: collapse;
 }
-
-/* Style untuk header kolom */
-th {
-  background-color: #007bff;
-  color: white;
-  text-align: center;
+thead {
+  background: #4a4a4a;
+  color: #fff;
+  font-weight: 600;
 }
-
-/* Style untuk baris ganjil */
-tr:nth-child(odd) {
-  background-color: #f2f2f2;
+thead th {
+  padding: 12px 15px;
+  text-align: left;
+  font-size: 14px;
+  border-bottom: 2px solid #f1f1f1;
 }
-
-/* Style untuk baris genap */
-tr:nth-child(even) {
-  background-color: #e0e0e0;
+tbody tr:nth-child(odd) {
+  background: #f9f9f9;
 }
-
-/* Style untuk sel data */
+tbody tr:nth-child(even) {
+  background: #f2f2f2;
+}
+th,
 td {
+  border: none;
   text-align: center;
-  padding: 8px;
 }
 
-/* Style untuk field "Penalty" */
-td.penalty {
-  display: flex;
-  gap: 28px;
+/* ===== Buttons ===== */
+.custom-button {
+  border-color: #1874a5;
+  color: #1874a5;
+  transition: all 0.3s ease;
 }
-
-/* Style untuk sel data dalam field "Penalty" */
-td.penalty span {
-  background-color: #007bff;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 5px;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks hitam) */
-td.penalty span.black {
-  background-color: black;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks merah) */
-td.penalty span.red {
-  background-color: red;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks biru) */
-td.penalty span.blue {
-  background-color: blue;
-}
-
-/* Style untuk sel data dalam field "Penalty" (Teks hijau) */
-td.penalty span.green {
-  background-color: green;
-}
-
-/* Style untuk total pinalty */
-td.totalPenalty {
-  font-weight: bold;
-}
-
-/* Style untuk waktu */
-td.time {
-  font-style: italic;
+.custom-button:hover {
+  background: #1874a5;
+  color: #fff;
+  border-color: #1874a5;
 }
 </style>

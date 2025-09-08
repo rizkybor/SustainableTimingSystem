@@ -393,7 +393,8 @@ function setupIPCMainHandlers() {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
-      const res = await getTeamsRegistered(identity); // -> null atau dokumen bucket
+      console.log(identity,'<< identitas')
+      const res = await getTeamsRegistered(identity);
       console.log(res, "<<< CEK RES");
       event.reply("get-teams-registered-reply", res);
     } catch (error) {

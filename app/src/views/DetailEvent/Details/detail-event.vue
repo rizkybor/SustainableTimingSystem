@@ -276,7 +276,7 @@ export default {
   async created() {
     const id = this.$route.params.id;
     await this.loadEvent(id);
-    await this.loadAvailableTeams("C - D"); 
+    await this.loadAvailableTeams("C - D");
 
     // set initial pertama bila belum
     if (
@@ -291,6 +291,28 @@ export default {
   },
 
   methods: {
+    // helper: ambil _id event (BSON / string aman)
+    _getEventId() {
+  const ev = this.events || {};
+  const idObj = ev._id;
+
+  // Kalau datang sebagai { $oid: "..." }
+  if (idObj && idObj.$oid) {
+    return String(idObj.$oid);
+  }
+
+  // Kalau datang sebagai ObjectID dari BSON (seperti di screenshot)
+  if (idObj && idObj._bsontype === "ObjectID" && idObj.id) {
+    // konversi Uint8Array ke hex string
+    return Array.from(idObj.id)
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  // fallback
+  return "";
+},
+
     showResult(div, race) {
       const idt = this._buildIdentity(div, race);
       if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
@@ -342,6 +364,7 @@ export default {
     _matchId(list, name) {
       const n = String(name || "").toUpperCase();
       const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
+      console.log(list, name, "<<<< cek return value");
       return f ? String(f.value) : "";
     },
 
@@ -352,9 +375,8 @@ export default {
 
       // kalau placeholder, kosongkan id supaya guard memblok
       const isPlaceholder = initialName === "Silakan Pilih Initial";
-
       return {
-        eventId: this._matchId(this.events.categoriesEvent, eventName),
+        eventId: this._getEventId(),
         initialId: isPlaceholder
           ? ""
           : this._matchId(this.events.categoriesInitial, initialName),
@@ -401,6 +423,7 @@ export default {
     // === READ satu bucket (panel) ===
     async loadTeamsRegistered(div, race) {
       const identity = this._buildIdentity(div, race);
+      console.log(identity, "HELLO");
 
       // Jangan fetch kalau identity belum lengkap → kosongkan tabel kombinasi tsb
       if (
@@ -410,7 +433,7 @@ export default {
         !identity.divisionId
       ) {
         this._clearBucketInState(identity);
-        return;
+        return { div, race, ok: false, reason: "identity-incomplete" };
       }
 
       // Token untuk menangkal balasan telat (race condition)
@@ -424,17 +447,18 @@ export default {
       this._lastToken = token;
 
       // Balut dalam Promise + timeout supaya handler pasti selesai
-      await new Promise((resolve) => {
+      return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
           // Jika sudah ada request baru, abaikan balasan ini
           if (this._lastToken !== token) return resolve();
 
           if (bucket && Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
+            resolve({ div, race, ok: true });
           } else {
             this._clearBucketInState(identity);
+            resolve({ div, race, ok: false, reason: "empty" });
           }
-          resolve();
         };
 
         // kirim permintaan
@@ -446,7 +470,7 @@ export default {
           try {
             ipcRenderer.removeListener("get-teams-registered-reply", onReply);
           } catch {}
-          resolve();
+          resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });
     },
@@ -471,13 +495,13 @@ export default {
     },
 
     // === UI handlers (tetap panggil refresh) ===
-    selectCategory(c) {
+    async selectCategory(c) {
       this.raceActive.selected = { name: c.key };
-      this.refreshVisibleBuckets();
+      await this.refreshVisibleBuckets();
     },
-    selectInitial(i) {
+    async selectInitial(i) {
       this.initialActive.selected = i;
-      this.refreshVisibleBuckets();
+      await this.refreshVisibleBuckets();
     },
 
     /* ------------ visibility panel ------------ */

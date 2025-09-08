@@ -61,6 +61,15 @@
               >
                 <Icon icon="icon-park-outline:save" /> Save Result
               </button>
+
+               <button
+                type="button"
+                class="btn btn-info"
+                @click="toggleSortRanked"
+              >
+                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+              </button>
+
               <button
                 type="button"
                 :class="{
@@ -462,6 +471,22 @@ export default {
       /* TODO: modal edit */
     },
 
+    getScoreByRanked(ranked) {
+      const m = this.dataScore.find((d) => d.ranking === ranked);
+      return m ? m.score : null;
+    },
+
+    toggleSortRanked() {
+      this.isRankedDescending = !this.isRankedDescending;
+      const arr = this.participantArr.slice();
+      arr.sort((a, b) =>
+        this.isRankedDescending
+          ? b.result.ranked - a.result.ranked
+          : a.result.ranked - b.result.ranked
+      );
+      this.participant = arr;
+    },
+
     /** === Device connection (sama pola Sprint, lebih aman) === */
     async connectPort() {
       if (this.isPortConnected) return this.disconnected();
@@ -646,6 +671,8 @@ export default {
 table {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
 }
 thead {
   background: #4a4a4a;

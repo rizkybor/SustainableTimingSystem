@@ -1,7 +1,7 @@
 <template>
-  <div style="height: 86vh">
+  <div style="height: 84vh" class="mt-4">
     <b-row>
-      <b-col cols="10" offset="1" class="mb-5">
+      <b-col cols="10" offset="1" class="mb-4">
         <b-card
           title="Create New Team"
           sub-title="Create your main team and add sub-teams to represent different categories"
@@ -44,16 +44,7 @@
             </b-form-group>
 
             <!-- Actions -->
-            <div class="d-flex mt-4 justify-content-between">
-              <b-button
-                variant="outline-primary"
-                class="btn-outline-pill"
-                @click="goTo()"
-              >
-                <Icon icon="ic:round-arrow-back" class="mr-2" />
-                Back
-              </b-button>
-
+            <div class="d-flex mt-4 justify-content-end">
               <b-button
                 variant="primary"
                 class="btn-primary-pill"
@@ -141,6 +132,16 @@
         </b-card>
       </b-col>
     </b-row>
+    <div class="ml-5">
+      <b-button
+        variant="outline-secondary"
+        class="btn-outline-pill"
+        @click="goTo()"
+      >
+        <Icon icon="ic:round-arrow-back" class="mr-2" />
+        Back
+      </b-button>
+    </div>
 
     <!-- ✏️ Edit Team Modal -->
     <b-modal

@@ -31,10 +31,13 @@ const {
   getAllTeams,
   deleteTeamById,
   updateTeamById,
-  getOptionTeamTypes
+  getOptionTeamTypes,
 } = require("../controllers/INSERT/insertTeams");
 
-const { getSprintResult, existsSprintResult } = require("../controllers/GET/getResult.js");
+const {
+  getSprintResult,
+  existsSprintResult,
+} = require("../controllers/GET/getResult.js");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
@@ -159,21 +162,36 @@ function setupIPCMainHandlers() {
 
   // SAVE SPRINT RESULT
   ipcMain.on("insert-sprint-result", async (event, datas) => {
-  try {
-    const result = await insertSprintResult(datas);
-    event.reply("insert-sprint-result-reply", result);
-  } catch (err) {
-    event.reply("insert-sprint-result-reply", {
-      ok: false,
-      error: err.message || String(err),
-    });
-  }
-});
+    try {
+      const result = await insertSprintResult(datas);
+      event.reply("insert-sprint-result-reply", result);
+    } catch (err) {
+      event.reply("insert-sprint-result-reply", {
+        ok: false,
+        error: err.message || String(err),
+      });
+    }
+  });
 
   // LOAD SPRINT RESULT
+  // ipcMain.on("get-sprint-result", async (event, query = {}) => {
+  //   try {
+  //     const data = await getSprintResult(query.eventId);
+  //     event.reply("get-sprint-result-reply", { ok: true, items: data });
+  //   } catch (error) {
+  //     event.reply("get-sprint-result-reply", {
+  //       ok: false,
+  //       items: [],
+  //       error: error.message,
+  //     });
+  //   }
+  // });
+
+  // main process
   ipcMain.on("get-sprint-result", async (event, query = {}) => {
     try {
-      const data = await getSprintResult(query.eventId);
+      console.log(query, "<<< cek");
+      const data = await getSprintResult(query); // << kirim objek, bukan eventId doang
       event.reply("get-sprint-result-reply", { ok: true, items: data });
     } catch (error) {
       event.reply("get-sprint-result-reply", {
@@ -183,15 +201,6 @@ function setupIPCMainHandlers() {
       });
     }
   });
-
-  ipcMain.on("sprint-result:exists", async (event, identity) => {
-  try {
-    const exists = await existsSprintResult(identity);
-    event.reply("sprint-result:exists-reply", { ok: true, exists });
-  } catch (err) {
-    event.reply("sprint-result:exists-reply", { ok: false, error: err.message });
-  }
-});
 
   // SAVE DRR RESULT
   ipcMain.on("insert-drr-result", async (event, datas) => {
@@ -293,62 +302,78 @@ function setupIPCMainHandlers() {
   // Teams Collection Function
   // ========================================================================
   // Opsi team types
-ipcMain.on("option-team-types", async (event) => {
-  try {
-    const items = await getOptionTeamTypes(); // optional; atau return hardcoded
-    event.reply("option-team-types-reply", items);
-  } catch (e) {
-    event.reply("option-team-types-reply", [
-      { value: "club", name: "Club" },
-      { value: "pengcab", name: "Pengcab" },
-      { value: "pengprov", name: "Pengprov" },
-      { value: "country", name: "Country" },
-    ]);
-  }
-});
+  ipcMain.on("option-team-types", async (event) => {
+    try {
+      const items = await getOptionTeamTypes(); // optional; atau return hardcoded
+      event.reply("option-team-types-reply", items);
+    } catch (e) {
+      event.reply("option-team-types-reply", [
+        { value: "club", name: "Club" },
+        { value: "pengcab", name: "Pengcab" },
+        { value: "pengprov", name: "Pengprov" },
+        { value: "country", name: "Country" },
+      ]);
+    }
+  });
 
-// Insert
-ipcMain.on("insert-new-team", async (event, doc) => {
-  try {
-    const result = await insertNewTeam(doc);
-    event.reply("insert-new-team-reply", { ok: true, ...result });
-  } catch (e) {
-    event.reply("insert-new-team-reply", { ok: false, error: String(e && e.message || e) });
-  }
-});
+  // Insert
+  ipcMain.on("insert-new-team", async (event, doc) => {
+    try {
+      const result = await insertNewTeam(doc);
+      event.reply("insert-new-team-reply", { ok: true, ...result });
+    } catch (e) {
+      event.reply("insert-new-team-reply", {
+        ok: false,
+        error: String((e && e.message) || e),
+      });
+    }
+  });
 
-// List
-ipcMain.on("teams:get-all", async (event) => {
-  try {
-    const items = await getAllTeams();
-    // kirim _id sebagai string agar aman di renderer
-    const mapped = (items || []).map(it => ({ ...it, _id: String(it._id) }));
-    event.reply("teams:get-all-reply", { ok: true, items: mapped });
-  } catch (e) {
-    event.reply("teams:get-all-reply", { ok: false, items: [], error: String(e && e.message || e) });
-  }
-});
+  // List
+  ipcMain.on("teams:get-all", async (event) => {
+    try {
+      const items = await getAllTeams();
+      // kirim _id sebagai string agar aman di renderer
+      const mapped = (items || []).map((it) => ({
+        ...it,
+        _id: String(it._id),
+      }));
+      event.reply("teams:get-all-reply", { ok: true, items: mapped });
+    } catch (e) {
+      event.reply("teams:get-all-reply", {
+        ok: false,
+        items: [],
+        error: String((e && e.message) || e),
+      });
+    }
+  });
 
-// Update
-ipcMain.on("teams:update", async (event, payload) => {
-  try {
-    const ok = await updateTeamById(payload);
-    event.reply("teams:update-reply", { ok });
-  } catch (e) {
-    console.error("teams:update error:", e);
-    event.reply("teams:update-reply", { ok: false, error: String(e && e.message || e) });
-  }
-});
+  // Update
+  ipcMain.on("teams:update", async (event, payload) => {
+    try {
+      const ok = await updateTeamById(payload);
+      event.reply("teams:update-reply", { ok });
+    } catch (e) {
+      console.error("teams:update error:", e);
+      event.reply("teams:update-reply", {
+        ok: false,
+        error: String((e && e.message) || e),
+      });
+    }
+  });
 
-// Delete
-ipcMain.on("teams:delete", async (event, { _id }) => {
-  try {
-    const ok = await deleteTeamById(_id);
-    event.reply("teams:delete-reply", { ok });
-  } catch (e) {
-    event.reply("teams:delete-reply", { ok: false, error: String(e && e.message || e) });
-  }
-});
+  // Delete
+  ipcMain.on("teams:delete", async (event, { _id }) => {
+    try {
+      const ok = await deleteTeamById(_id);
+      event.reply("teams:delete-reply", { ok });
+    } catch (e) {
+      event.reply("teams:delete-reply", {
+        ok: false,
+        error: String((e && e.message) || e),
+      });
+    }
+  });
 
   // ========================================================================
   // Teams Registered Function

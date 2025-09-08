@@ -11,18 +11,9 @@
 
         <!-- Right: Actions -->
         <b-col cols="12" md="6" class="d-flex justify-content-md-end gap-2">
-          <!-- <b-button
-            size="sm"
-            variant="outline-secondary rounded-pill"
-            class="d-flex align-items-center"
-            @click="printResult"
-          >
-            <Icon icon="mdi:printer-outline" class="mr-2" />
-            Print Result
-          </b-button> -->
+
           <!-- 👇 BARU: tampil hanya jika ada result -->
           <b-button
-            v-if="resultAvailable"
             class="btn-add"
             @click="$emit('show-result')"
             title="Show saved results for this category"
@@ -31,7 +22,6 @@
           </b-button>
 
           <b-button
-          :disabled="resultAvailable"
             size="sm"
             variant="primary"
             class="btn-add"
@@ -160,7 +150,6 @@ export default {
     rows: { type: Array, default: () => [] },
     teamsAvailable: { type: Array, default: () => [] },
     draft: { type: Object, default: null },
-    resultAvailable: { type: Boolean, default: false },
   },
   computed: {
     teamsAvailableAll() {
@@ -274,9 +263,6 @@ export default {
         });
       }
     },
-    //   ipcRenderer && ipcRenderer.send && ipcRenderer.send("get-alert-saved", {
-    //     type:"info", message:"Start Race", detail:`${this.title} – ${this.eventName || ""} (${this.initialName || ""})`
-    //   });
   },
 };
 </script>

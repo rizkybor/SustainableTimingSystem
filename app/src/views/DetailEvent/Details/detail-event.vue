@@ -112,7 +112,6 @@
         @draft-cancel="cancelDraft('R4', 'MEN')"
         @delete-row="deleteRow('R4', 'MEN', $event)"
         @start-race="handleStartRace"
-        :result-available="isResultAvailable('R4', 'MEN')"
         @show-result="showResult('R4', 'MEN')"
       />
 
@@ -133,6 +132,7 @@
         @draft-cancel="cancelDraft('R4', 'WOMEN')"
         @delete-row="deleteRow('R4', 'WOMEN', $event)"
         @start-race="handleStartRace"
+        @show-result="showResult('R4', 'WOMEN')"
       />
 
       <team-panel
@@ -152,6 +152,7 @@
         @draft-cancel="cancelDraft('R6', 'MEN')"
         @delete-row="deleteRow('R6', 'MEN', $event)"
         @start-race="handleStartRace"
+        @show-result="showResult('R6', 'MEN')"
       />
 
       <team-panel
@@ -171,6 +172,7 @@
         @draft-cancel="cancelDraft('R6', 'WOMEN')"
         @delete-row="deleteRow('R6', 'WOMEN', $event)"
         @start-race="handleStartRace"
+        @show-result="showResult('R6', 'WOMEN')"
       />
 
       <div v-if="!anyPanelShown" class="text-center text-muted py-5">
@@ -273,9 +275,8 @@ export default {
 
   async created() {
     const id = this.$route.params.id;
-    await this.loadEvent(id); // isi this.events + this.dataTeams
-    console.log(this.events, "<< cek");
-    await this.loadAvailableTeams("C - D"); // isi dropdown
+    await this.loadEvent(id);
+    await this.loadAvailableTeams("C - D"); 
 
     // set initial pertama bila belum
     if (
@@ -290,43 +291,32 @@ export default {
   },
 
   methods: {
-    isResultAvailable(div, race) {
-      return !!this.resultAvailMap[this.keyOf(div, race)];
-    },
-    setResultAvailable(div, race, val) {
-      this.$set(this.resultAvailMap, this.keyOf(div, race), !!val);
-    },
-
-    async checkSprintResultExists(div, race) {
+    showResult(div, race) {
       const idt = this._buildIdentity(div, race);
       if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
-        this.setResultAvailable(div, race, false);
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Data belum lengkap",
+          detail: "Pilih Initials Category / kategori yang valid.",
+        });
         return;
       }
-      await new Promise((resolve) => {
-        const cb = (_e, res) => {
-          const ok = res && res.ok && !!res.exists;
-          this.setResultAvailable(div, race, ok);
-          resolve();
-        };
-        ipcRenderer.send("sprint-result:exists", idt);
-        ipcRenderer.once("sprint-result:exists-reply", cb);
-        setTimeout(() => {
-          try {
-            ipcRenderer.removeListener("sprint-result:exists-reply", cb);
-          } catch {}
-          resolve();
-        }, 3000);
+
+      this.$router.push({
+        path: `/event-detail/${this.$route.params.id}/sprint-result`,
+        query: {
+          eventId: idt.eventId,
+          initialId: idt.initialId,
+          raceId: idt.raceId,
+          divisionId: idt.divisionId,
+          eventName: idt.eventName,
+          initialName: idt.initialName,
+          raceName: idt.raceName,
+          divisionName: idt.divisionName,
+        },
       });
     },
 
-    showResult(div, race) {
-      const idt = this._buildIdentity(div, race);
-      try {
-        localStorage.setItem("resultViewIdentity", JSON.stringify(idt));
-      } catch {}
-      this.$router.push(`/event-detail/${this.$route.params.id}/sprint-result`);
-    },
     _clearBucketInState(identity) {
       const ev = String(identity.eventName).toUpperCase();
       const ini = String(identity.initialName).toUpperCase();
@@ -467,19 +457,15 @@ export default {
       const jobs = [];
       if (this.showPanel("R4", "MEN")) {
         jobs.push(this.loadTeamsRegistered("R4", "MEN"));
-        jobs.push(this.checkSprintResultExists("R4", "MEN"));
       }
       if (this.showPanel("R4", "WOMEN")) {
         jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
-        jobs.push(this.checkSprintResultExists("R4", "WOMEN"));
       }
       if (this.showPanel("R6", "MEN")) {
         jobs.push(this.loadTeamsRegistered("R6", "MEN"));
-        jobs.push(this.checkSprintResultExists("R6", "MEN"));
       }
       if (this.showPanel("R6", "WOMEN")) {
         jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
-        jobs.push(this.checkSprintResultExists("R6", "WOMEN"));
       }
       await Promise.all(jobs);
     },
@@ -512,7 +498,6 @@ export default {
     /* ------------ sumber dropdown ------------ */
     // helper: tentukan type yang boleh berdasarkan levelName
     _allowedTypeForLevel(levelName) {
-      console.log(levelName, "<<<<<<");
       const lv = String(levelName || "")
         .trim()
         .toUpperCase();
@@ -544,7 +529,6 @@ export default {
 
             // filter by levelName → typeTeam
             const allow = this._allowedTypeForLevel(this.events.levelName);
-            console.log(allow, items, this.events.levelName, "<< cek bro");
             if (allow) {
               const allowLC = String(allow).toLowerCase();
               items = items.filter(
@@ -819,7 +803,6 @@ export default {
     },
 
     syncBucketToDB(bucket) {
-      console.log(bucket);
       // kirim satu dokumen bucket untuk di-upsert
       ipcRenderer.send("upsert-teams-registered", bucket);
       ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
@@ -832,8 +815,6 @@ export default {
             message: "Failed",
           });
         }
-        // kalau mau silent success, tidak perlu alert
-        // else { console.log("bucket tersinkron"); }
       });
     },
 

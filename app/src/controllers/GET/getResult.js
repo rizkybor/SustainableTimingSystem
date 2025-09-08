@@ -1,12 +1,23 @@
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 
-async function getSprintResult(eventId) {
+// controllers/getResult.js
+async function getSprintResult(identity = {}) {
   const db = await getDb();
-  const col = db.collection("temporarySprintResult");
+  const col = db.collection("temporarySprintResult"); // ganti jika berbeda
 
   const filter = {};
-  if (eventId) filter.eventId = eventId;  
+  if (identity.eventId) filter.eventId = String(identity.eventId);
+  if (identity.initialId) filter.initialId = String(identity.initialId);
+  if (identity.raceId) filter.raceId = String(identity.raceId);
+  if (identity.divisionId) filter.divisionId = String(identity.divisionId);
+
+  // (opsional) jika kamu ingin guard raceName/divisionName juga:
+  if (identity.raceName)
+    filter.raceName = String(identity.raceName).toUpperCase();
+  if (identity.divisionName)
+    filter.divisionName = String(identity.divisionName).toUpperCase();
+
   const docs = await col.find(filter).sort({ createdAt: -1 }).toArray();
   return docs;
 }
@@ -16,31 +27,10 @@ async function getDrrResult(eventId) {
   const col = db.collection("temporaryDrrResult");
 
   const filter = {};
-  if (eventId) filter.eventId = eventId;  
+  if (eventId) filter.eventId = eventId;
   const docs = await col.find(filter).sort({ createdAt: -1 }).toArray();
   return docs;
 }
 
-/**
- * Cek apakah sprint-result sudah ada berdasarkan identity penuh
- */
-async function existsSprintResult(identity) {
-  const db = await getDb();
-  const col = db.collection("temporarySprintResult");
 
-  const filter = {
-    eventId: String(identity.eventId || ""),
-    initialId: String(identity.initialId || ""),
-    raceId: String(identity.raceId || ""),
-    divisionId: String(identity.divisionId || ""),
-    eventName: String(identity.eventName || "").toUpperCase(),
-    initialName: String(identity.initialName || "").toUpperCase(),
-    raceName: String(identity.raceName || "").toUpperCase(),
-    divisionName: String(identity.divisionName || "").toUpperCase(),
-  };
-
-  const count = await col.countDocuments(filter, { limit: 1 });
-  return count > 0;
-}
-
-module.exports = { existsSprintResult, getSprintResult, getDrrResult };
+module.exports = { getSprintResult, getDrrResult };

@@ -2,7 +2,9 @@
   <div class="sprint-result-page">
     <b-container class="mt-3">
       <div class="text-muted small mb-2">
-        <router-link :to="`/event-detail/${$route.params.id}`">Events</router-link>
+        <router-link :to="`/event-detail/${$route.params.id}`"
+          >Events</router-link
+        >
         / Sprint Result
       </div>
 
@@ -18,15 +20,15 @@
           responsive="sm"
         >
           <template #cell(ranked)="row">
-            <b-badge variant="primary">{{ row.item.result.ranked }}</b-badge>
+            <b-badge variant="primary">{{ row.item.ranked }}</b-badge>
           </template>
           <template #cell(nameTeam)="row">
             <strong>{{ row.item.nameTeam }}</strong>
             <div class="text-muted small">Bib: {{ row.item.bibTeam }}</div>
           </template>
-          <template #cell(totalTime)="row">
+          <!-- <template #cell(totalTime)="row">
             {{ row.item.result.totalTime }}
-          </template>
+          </template> -->
         </b-table>
       </b-card>
     </b-container>
@@ -40,16 +42,19 @@ export default {
   name: "SprintResult",
   data() {
     return {
+      loading: false,
+      error: "",
       results: [],
       fields: [
-        { key: "result.ranked", label: "Rank", sortable: true },
-        { key: "nameTeam", label: "Team" },
-        { key: "result.startTime", label: "Start" },
-        { key: "result.finishTime", label: "Finish" },
-        { key: "result.raceTime", label: "Race Time" },
-        { key: "result.penaltyTime", label: "Penalty" },
-        { key: "result.totalTime", label: "Total Time" },
-        { key: "result.score", label: "Score" },
+        { key: "ranked", label: "Rank", sortable: true },
+        { key: "team", label: "Team" },
+        { key: "startTime", label: "Start" },
+        { key: "finishTime", label: "Finish" },
+        { key: "raceTime", label: "Race Time" },
+        { key: "penaltyTime", label: "Penalty" },
+        { key: "totalTime", label: "Total Time" },
+        { key: "score", label: "Score" },
+        { key: "ranked", label: "Ranked" },
       ],
     };
   },
@@ -58,18 +63,56 @@ export default {
   },
   methods: {
     async loadSprintResult() {
-      const eventId = this.$route.params.id;
-      ipcRenderer.send("get-sprint-result", eventId);
+      const q = this.$route.query || {};
+      // minimal harus punya ke-4 id ini
+      if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) {
+        this.error = "Parameter hasil tidak lengkap.";
+        return;
+      }
+
+      this.loading = true;
+      this.error = "";
+      ipcRenderer.send("get-sprint-result", {
+        eventId: q.eventId,
+        initialId: q.initialId,
+        raceId: q.raceId,
+        divisionId: q.divisionId,
+        eventName: q.eventName,
+        initialName: q.initialName,
+        raceName: q.raceName,
+        divisionName: q.divisionName,
+      });
 
       await new Promise((resolve) => {
         ipcRenderer.once("get-sprint-result-reply", (_e, res) => {
+          this.loading = false;
           if (res && res.ok && Array.isArray(res.items)) {
-            // ambil array result dari DB, flatten tiap tim
-            this.results = res.items.flatMap((doc) =>
-              Array.isArray(doc.result) ? doc.result : []
-            );
+            const rows = [];
+            res.items.forEach((doc) => {
+              const arr = Array.isArray(doc.result) ? doc.result : [];
+              arr.forEach((r) => {
+                rows.push({
+                  team:
+                    (r.nameTeam || doc.nameTeam || "") +
+                    (r.bibTeam || doc.bibTeam
+                      ? ` (BIB ${r.bibTeam || doc.bibTeam})`
+                      : ""),
+                  nameTeam: r.nameTeam || doc.nameTeam || "",
+                  bibTeam: r.bibTeam || doc.bibTeam || "",
+                  ranked: r.result.ranked || "",
+                  startTime: r.result.startTime || "",
+                  finishTime: r.result.finishTime || "",
+                  raceTime: r.result.raceTime || "",
+                  penaltyTime: r.result.penaltyTime || "",
+                  totalTime: r.result.totalTime || "",
+                  score: r.result.score || "",
+                });
+              });
+            });
+            this.results = rows;
           } else {
             this.results = [];
+            this.error = (res && res.error) || "Gagal memuat hasil.";
           }
           resolve();
         });

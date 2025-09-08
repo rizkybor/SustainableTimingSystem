@@ -1,5 +1,5 @@
 // controllers/INSERT/teams.js
-const { connectToDatabase } = require("../index");
+const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 
 /** Konversi aman ke ObjectId dari berbagai bentuk (_id string, { $oid }, ObjectId, dst.) */
@@ -36,7 +36,7 @@ function sanitizeTeam(t = {}) {
 
 /** INSERT */
 async function insertNewTeam(payload = {}) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsCollection");
 
   const doc = sanitizeTeam(payload);
@@ -60,7 +60,7 @@ async function insertNewTeam(payload = {}) {
 
 /** READ all (terbaru dulu) */
 async function getAllTeams() {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsCollection");
 
   const items = await coll.find({}).sort({ createdAt: -1 }).toArray();
@@ -89,7 +89,7 @@ async function updateTeamById(payload = {}) {
 /** DELETE by _id */
 async function deleteTeamById(id) {
   const oid = asObjectId(id);
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsCollection");
   const r = await coll.deleteOne({ _id: oid });
   return r.deletedCount > 0;
@@ -108,7 +108,7 @@ async function getOptionTeamTypes() {
 
 /** Helper: updateOne dengan guard */
 async function collUpdateOneSafe(oid, setDoc) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsCollection");
 
   // Kalau cuma updatedAt saja, tetap jalankan — tidak dianggap error

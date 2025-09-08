@@ -1,9 +1,9 @@
-const { connectToDatabase } = require("../index");
+const { getDb } = require("../index");
 
 // get Option Level
 async function getOptionLevel() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionLevelEvent");
     const data = await collection.find({}).toArray();
     return data;
@@ -16,7 +16,7 @@ async function getOptionLevel() {
 // get Option Event Categories
 async function getOptionCategoriesEvent() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionCategoriesEvent");
     const data = await collection.find({}).toArray();
     return data;
@@ -29,7 +29,7 @@ async function getOptionCategoriesEvent() {
 // get Option Division Categories
 async function getOptionCategoriesDivision() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionCategoriesDivision");
     const data = await collection.find({}).toArray();
     return data;
@@ -42,7 +42,7 @@ async function getOptionCategoriesDivision() {
 // get Option Initial Categories
 async function getOptionCategoriesInitial() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionCategoriesInitial");
     const data = await collection.find({}).toArray();
     return data;
@@ -55,7 +55,7 @@ async function getOptionCategoriesInitial() {
 // get Option Race Categories
 async function getOptionCategoriesRace() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionCategoriesRace");
     const data = await collection.find({}).toArray();
     return data;
@@ -68,7 +68,7 @@ async function getOptionCategoriesRace() {
 // get Option Penalties
 async function getOptionPenalties() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionPenalties");
     const data = await collection.find({}).toArray();
     return data;
@@ -81,7 +81,7 @@ async function getOptionPenalties() {
 // get Option Ranked
 async function getOptionRanked() {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("optionRanked");
     const data = await collection.find({}).toArray();
     return data;

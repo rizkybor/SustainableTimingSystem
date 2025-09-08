@@ -1,1 +1,1 @@
-// const { connectToDatabase } = require("../index");
+// const { getDb } = require("../index");

@@ -1,5 +1,5 @@
 // controllers/INSERT/insertTeamsRegistered.js
-const { connectToDatabase } = require("../index");
+const { getDb } = require("../index");
 
 // --- helpers ---
 function sanitizeBucket(b) {
@@ -31,7 +31,7 @@ function normTeam(t = {}) {
 
 // --- READ one bucket by identity ---
 async function getTeamsRegistered(identityInput) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsRegisteredCollection");
   const identity = normIdentity(identityInput);
   const bucket = await coll.findOne(identity);
@@ -40,7 +40,7 @@ async function getTeamsRegistered(identityInput) {
 
 // --- UPSERT bucket: update teams jika identity sama, else insert baru ---
 async function upsertTeamsRegistered(bucketInput) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsRegisteredCollection");
 
   const bucket = sanitizeBucket(bucketInput);
@@ -59,7 +59,7 @@ async function upsertTeamsRegistered(bucketInput) {
 
 // --- DELETE one team (match by nameTeam + bibTeam, case/space-insensitive) ---
 async function deleteTeamInBucket({ identity, team }) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const coll = db.collection("teamsRegisteredCollection");
 
   const iden = normIdentity(identity);

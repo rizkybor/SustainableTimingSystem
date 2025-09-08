@@ -1,9 +1,9 @@
-const { connectToDatabase } = require("../index");
+const { getDb } = require("../index");
 
 // Insert new event
 async function insertNewEvent(payload) {
   try {
-    const database = await connectToDatabase();
+    const database = await getDb();
     const collection = database.collection("eventsCollection");
 
     // CLEAR ID CAT EVENT
@@ -36,7 +36,7 @@ async function insertNewEvent(payload) {
 
 async function insertSprintResult(payload) {
   try {
-    const db = await connectToDatabase();
+    const db = await getDb();
     const col = db.collection("temporarySprintResult");
 
     if (!Array.isArray(payload)) {
@@ -198,7 +198,7 @@ async function insertSprintResult(payload) {
 
 // async function insertSprintResult(payload) {
 //   try {
-//     const db = await connectToDatabase();
+//     const db = await getDb();
 //     const col = db.collection("temporarySprintResult");
 
 //     if (!Array.isArray(payload)) {
@@ -353,9 +353,9 @@ async function insertSprintResult(payload) {
 
 async function insertDrrResult(payload) {
   try {
-    const db = await connectToDatabase();
+    const db = await getDb();
     if (!db || typeof db.collection !== "function") {
-      throw new Error("connectToDatabase() did not return a Db instance");
+      throw new Error("getDb() did not return a Db instance");
     }
 
     const collection = db.collection("temporaryDrrResult");

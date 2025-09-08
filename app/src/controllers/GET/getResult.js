@@ -1,8 +1,8 @@
-const { connectToDatabase } = require("../index");
+const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 
 async function getSprintResult(eventId) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const col = db.collection("temporarySprintResult");
 
   const filter = {};
@@ -12,7 +12,7 @@ async function getSprintResult(eventId) {
 }
 
 async function getDrrResult(eventId) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const col = db.collection("temporaryDrrResult");
 
   const filter = {};
@@ -25,7 +25,7 @@ async function getDrrResult(eventId) {
  * Cek apakah sprint-result sudah ada berdasarkan identity penuh
  */
 async function existsSprintResult(identity) {
-  const db = await connectToDatabase();
+  const db = await getDb();
   const col = db.collection("temporarySprintResult");
 
   const filter = {

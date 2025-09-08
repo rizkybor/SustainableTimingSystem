@@ -364,7 +364,6 @@ export default {
     _matchId(list, name) {
       const n = String(name || "").toUpperCase();
       const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
-      console.log(list, name, "<<<< cek return value");
       return f ? String(f.value) : "";
     },
 
@@ -423,7 +422,6 @@ export default {
     // === READ satu bucket (panel) ===
     async loadTeamsRegistered(div, race) {
       const identity = this._buildIdentity(div, race);
-      console.log(identity, "HELLO");
 
       // Jangan fetch kalau identity belum lengkap → kosongkan tabel kombinasi tsb
       if (

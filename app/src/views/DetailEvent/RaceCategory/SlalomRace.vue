@@ -62,7 +62,7 @@
                 <Icon icon="icon-park-outline:save" /> Save Result
               </button>
 
-               <button
+              <button
                 type="button"
                 class="btn btn-info"
                 @click="toggleSortRanked"
@@ -129,7 +129,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(team, ti) in teams" :key="team._id">
+              <tr v-for="(team, ti) in visibleTeams" :key="team._id">
                 <td>{{ ti + 1 }}</td>
                 <td>{{ team.nameTeam }}</td>
                 <td>{{ team.bibNumber }}</td>
@@ -304,6 +304,7 @@ export default {
 
   data() {
     return {
+      sortBest: { enabled: false, desc: false },
       SLALOM_GATES,
       // port/device
       port: null,
@@ -333,6 +334,28 @@ export default {
       return this.dataEvent && typeof this.dataEvent === "object"
         ? this.dataEvent
         : {};
+    },
+
+    visibleTeams() {
+      const arr = this.teams.slice();
+
+      if (!this.sortBest.enabled) return arr;
+
+      const toBestMs = (team) => {
+        const times = (Array.isArray(team.sessions) ? team.sessions : [])
+          .map((s) => s && s.totalTime)
+          .filter(Boolean)
+          .map(hmsToMs); // helper kamu sudah ada
+
+        if (!times.length) return Number.POSITIVE_INFINITY; // tanpa waktu → di bawah
+        return Math.min(...times);
+      };
+
+      return arr.sort((a, b) => {
+        const am = toBestMs(a);
+        const bm = toBestMs(b);
+        return this.sortBest.desc ? bm - am : am - bm;
+      });
     },
 
     /** Mapping untuk OperationTimePanel (1 sesi aktif per tim) */
@@ -477,14 +500,15 @@ export default {
     },
 
     toggleSortRanked() {
-      this.isRankedDescending = !this.isRankedDescending;
-      const arr = this.participantArr.slice();
-      arr.sort((a, b) =>
-        this.isRankedDescending
-          ? b.result.ranked - a.result.ranked
-          : a.result.ranked - b.result.ranked
-      );
-      this.participant = arr;
+      // cycle: off → asc → desc → off
+      if (!this.sortBest.enabled) {
+        this.sortBest.enabled = true;
+        this.sortBest.desc = false; // ASC
+      } else if (!this.sortBest.desc) {
+        this.sortBest.desc = true; // DESC
+      } else {
+        this.sortBest.enabled = false; // OFF
+      }
     },
 
     /** === Device connection (sama pola Sprint, lebih aman) === */
@@ -505,7 +529,7 @@ export default {
         alert("Connected");
       } catch (e) {
         this.isPortConnected = false;
- alert((e && e.message) ? e.message : "Failed to connect device");
+        alert(e && e.message ? e.message : "Failed to connect device");
       }
     },
     async disconnected() {
@@ -517,18 +541,32 @@ export default {
     },
 
     /** === Save: dokumen kompatibel dengan pipeline Sprint Result === */
+    /** === Save: dokumen Slalom berisi 2 run per tim === */
+    /** === Save: dokumen Slalom (multi-run + penalty dinamis) === */
     buildDocs() {
       const { bucket } = loadFromRaceStartPayloadForSlalom();
       const must = ["eventId", "initialId", "raceId", "divisionId"];
       const missing = must.filter((k) => !bucket[k]);
-      if (missing.length)
+      if (missing.length) {
+        console.error("Bucket fields missing:", missing, bucket);
         throw new Error(`Bucket fields missing: ${missing.join(", ")}`);
+      }
 
       const now = new Date();
+
       return this.teams.map((t) => {
-        const idx =
-          this.selectedSession[t._id] != null ? this.selectedSession[t._id] : 0;
-        const s = t.sessions[idx] || {};
+        const sessions = Array.isArray(t.sessions) ? t.sessions : [];
+        const results = sessions.map((s) => ({
+          startTime: s.startTime || "",
+          finishTime: s.finishTime || "",
+          raceTime: s.raceTime || "",
+          penaltyTime: s.penaltyTime || "00:00:00.000",
+          penalty: Number(s.totalPenalty) || 0,
+          totalTime: s.totalTime || s.raceTime || "",
+          ranked: Number(s.ranked) || 0,
+          score: Number(s.score) || 0,
+        }));
+
         return {
           ...bucket,
           nameTeam: String(t.nameTeam || ""),
@@ -536,24 +574,9 @@ export default {
           startOrder: t.startOrder || "",
           praStart: t.praStart || "",
           intervalRace: t.intervalRace || "",
-          statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
-          result: {
-            startTime: s.startTime || "",
-            finishTime: s.finishTime || "",
-            raceTime: s.raceTime || "",
-            penalty: s.totalPenalty || 0, // kompatibel dengan Sprint
-            penaltyTime: s.penaltyTime || "00:00:00.000",
-            totalTime: s.totalTime || s.raceTime || "",
-            ranked: s.ranked || 0,
-            score: s.score || 0,
-          },
-          otr: {},
-          meta: {
-            slalom: {
-              selectedRun: idx,
-              penalties: (s.penalties || []).slice(),
-            },
-          },
+          statusId: Number(t.statusId) || 0,
+          result: results,
+          bestTime: this.calculateBestTime(t) || "",
           createdAt: now,
           updatedAt: now,
         };
@@ -570,8 +593,8 @@ export default {
           });
           return;
         }
-        ipcRenderer.send("insert-sprint-result", docs);
-        ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+        ipcRenderer.send("insert-slalom-result", docs);
+        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
           if (res && res.ok) {
             ipcRenderer.send("get-alert-saved", {
               type: "question",

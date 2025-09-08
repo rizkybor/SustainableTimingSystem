@@ -196,160 +196,185 @@ async function insertSprintResult(payload) {
   }
 }
 
-// async function insertSprintResult(payload) {
-//   try {
-//     const db = await getDb();
-//     const col = db.collection("temporarySprintResult");
+async function insertSlalomResult(payload) {
+  try {
+    const db = await getDb();
+    const col = db.collection("temporarySlalomResult");
 
-//     if (!Array.isArray(payload)) {
-//       throw new Error("insertSprintResult: payload must be an array");
-//     }
-//     if (payload.length === 0) {
-//       return { ok: true, upsertedCount: 0 };
-//     }
+    if (!Array.isArray(payload)) {
+      throw new Error("insertSlalomResult: payload must be an array");
+    }
+    if (payload.length === 0) {
+      return { ok: true, upsertedCount: 0 };
+    }
 
-//     // Kelompokkan per meta key (antisipasi payload campur)
-//     const groups = new Map(); // key -> { meta, teams[] }
+    // --- helpers ---
+    const hmsToMs = (str) => {
+      const [h = "0", m = "0", sMs = "0.000"] = String(str || "").split(":");
+      const [s = "0", ms = "0"] = String(sMs).split(".");
+      return (+h || 0) * 3600000 + (+m || 0) * 60000 + (+s || 0) * 1000 + (+ms || 0);
+    };
 
-//     for (let i = 0; i < payload.length; i++) {
-//       const it = payload[i];
-//       if (!it || typeof it !== "object") continue;
+    const normRun = (r = {}) => ({
+      startTime: r.startTime ? String(r.startTime) : "",
+      finishTime: r.finishTime ? String(r.finishTime) : "",
+      raceTime: r.raceTime ? String(r.raceTime) : "",
+      penaltyTime: r.penaltyTime ? String(r.penaltyTime) : "00:00:00.000",
+      penalty: Number.isFinite(r.penalty) ? r.penalty : Number(r.penalty) || 0,
+      totalTime: r.totalTime ? String(r.totalTime) : (r.raceTime ? String(r.raceTime) : ""),
+      ranked: Number.isFinite(r.ranked) ? r.ranked : Number(r.ranked) || 0,
+      score: Number.isFinite(r.score) ? r.score : Number(r.score) || 0,
+    });
 
-//       const meta = {
-//         eventId: String(it.eventId || ""),
-//         initialId: String(it.initialId || ""),
-//         raceId: String(it.raceId || ""),
-//         divisionId: String(it.divisionId || ""),
-//         eventName: String(it.eventName || ""),
-//         initialName: String(it.initialName || ""),
-//         raceName: String(it.raceName || ""),
-//         divisionName: String(it.divisionName || ""),
-//       };
-//       const metaKey =
-//         meta.eventId + "|" + meta.initialId + "|" + meta.raceId + "|" + meta.divisionId;
+    const normTeam = (clean) => ({
+      nameTeam: String(clean.nameTeam || ""),
+      bibTeam: String(clean.bibTeam || ""),
+      startOrder: String(clean.startOrder || ""),
+      praStart: String(clean.praStart || ""),
+      intervalRace: String(clean.intervalRace || ""),
+      statusId: Number.isFinite(clean.statusId) ? Number(clean.statusId) : 0,
 
-//       // deep-clone untuk buang Proxy/fungsi
-//       const clean = JSON.parse(JSON.stringify(it));
-//       if (clean && clean._id) delete clean._id;
+      // array of runs
+      result: Array.isArray(clean.result) ? clean.result.map(normRun) : [],
 
-//       // Normalisasi satu tim
-//       const r = clean && clean.result ? clean.result : {};
-//       const teamEntry = {
-//         nameTeam: String(clean.nameTeam || ""),
-//         bibTeam: String(clean.bibTeam || ""),
-//         startOrder: String(clean.startOrder || ""),
-//         praStart: String(clean.praStart || ""),
-//         intervalRace: String(clean.intervalRace || ""),
-//         statusId: Number.isFinite(clean.statusId) ? Number(clean.statusId) : 0,
-//         result: {
-//           startTime: String(r && r.startTime ? r.startTime : ""),
-//           finishTime: String(r && r.finishTime ? r.finishTime : ""),
-//           raceTime: String(r && r.raceTime ? r.raceTime : ""),
-//           penaltyTime: String(r && r.penaltyTime ? r.penaltyTime : "00:00:00.000"),
-//           penalty: typeof (r && r.penalty) === "number" ? r.penalty : 0,
-//           totalTime: String(
-//             r && r.totalTime
-//               ? r.totalTime
-//               : r && r.raceTime
-//               ? r.raceTime
-//               : ""
-//           ),
-//           ranked: typeof (r && r.ranked) === "number" ? r.ranked : 0,
-//           score: typeof (r && r.score) === "number" ? r.score : 0,
-//         },
-//         otr:
-//           clean && clean.otr
-//             ? clean.otr
-//             : {
-//                 startTime: "",
-//                 finishTime: "",
-//                 raceTime: "",
-//                 penaltyTime: "",
-//                 penalty: "",
-//                 totalTime: "",
-//                 ranked: "",
-//                 score: "",
-//               },
-//       };
+      // best time string (opsional)
+      bestTime: clean.bestTime ? String(clean.bestTime) : "",
 
-//       if (!groups.has(metaKey)) {
-//         groups.set(metaKey, { meta: meta, teams: [teamEntry] });
-//       } else {
-//         groups.get(metaKey).teams.push(teamEntry);
-//       }
-//     }
+      // meta slalom per team (penalties per-run + opsi lain)
+      meta: {
+        slalom: {
+          penalties: Array.isArray(clean?.meta?.slalom?.penalties)
+            ? clean.meta.slalom.penalties.map((arr) =>
+                Array.isArray(arr) ? arr.map((v) => Number(v) || 0) : []
+              )
+            : [],
+          // opsional dari FE
+          gatesCount: Number.isFinite(clean?.meta?.slalom?.gatesCount)
+            ? Number(clean.meta.slalom.gatesCount)
+            : undefined,
+          penaltyValueToMs:
+            clean?.meta?.slalom?.penaltyValueToMs && typeof clean.meta.slalom.penaltyValueToMs === "object"
+              ? clean.meta.slalom.penaltyValueToMs
+              : undefined,
+        },
+      },
+      otr: clean.otr || {
+        startTime: "",
+        finishTime: "",
+        raceTime: "",
+        penaltyTime: "",
+        penalty: "",
+        totalTime: "",
+        ranked: "",
+        score: "",
+      },
+    });
 
-//     // Helper rank
-//     function rankOf(x) {
-//       if (!x || !x.result) return 999999;
-//       const rk = x.result.ranked;
-//       return typeof rk === "number" && rk > 0 ? rk : 999999;
-//     }
+    // --- group by meta ---
+    const groups = new Map(); // key -> { meta, teams[] }
 
-//     const now = new Date();
-//     let upsertedCount = 0;
+    for (let i = 0; i < payload.length; i++) {
+      const raw = payload[i];
+      if (!raw || typeof raw !== "object") continue;
 
-//     // Proses tiap group
-//     const itGroups = groups.values();
-//     let cursor = itGroups.next();
-//     while (!cursor.done) {
-//       const group = cursor.value;
-//       const meta = group.meta;
-//       const teams = group.teams;
+      const meta = {
+        eventId: String(raw.eventId || ""),
+        initialId: String(raw.initialId || ""),
+        raceId: String(raw.raceId || ""),
+        divisionId: String(raw.divisionId || ""),
+        eventName: String(raw.eventName || ""),
+        initialName: String(raw.initialName || ""),
+        raceName: String(raw.raceName || ""),
+        divisionName: String(raw.divisionName || ""),
+      };
+      const metaKey = [meta.eventId, meta.initialId, meta.raceId, meta.divisionId].join("|");
 
-//       const filter = {
-//         eventId: meta.eventId,
-//         initialId: meta.initialId,
-//         raceId: meta.raceId,
-//         divisionId: meta.divisionId,
-//       };
+      const clean = JSON.parse(JSON.stringify(raw));
+      if (clean && clean._id) delete clean._id;
 
-//       // Ambil existing agar bisa merge per bibTeam
-//       const existing = await col.findOne(filter, { projection: { result: 1 } });
-//       const mergedByBib = new Map();
+      const teamEntry = normTeam(clean);
 
-//       // Muat existing.result lebih dulu
-//       if (existing && Array.isArray(existing.result)) {
-//         for (let i = 0; i < existing.result.length; i++) {
-//           const t = existing.result[i];
-//           if (!t) continue;
-//           mergedByBib.set(String(t.bibTeam || ""), t);
-//         }
-//       }
+      if (!groups.has(metaKey)) {
+        groups.set(metaKey, { meta, teams: [teamEntry] });
+      } else {
+        groups.get(metaKey).teams.push(teamEntry);
+      }
+    }
 
-//       // Overwrite dengan data baru berdasarkan bibTeam
-//       for (let i = 0; i < teams.length; i++) {
-//         const t = teams[i];
-//         mergedByBib.set(String(t.bibTeam || ""), t);
-//       }
+    const now = new Date();
+    let upsertedCount = 0;
 
-//       // Ke array + sort by ranked (0/kosong di belakang)
-//       const mergedArray = Array.from(mergedByBib.values()).sort(function (a, b) {
-//         const ra = rankOf(a);
-//         const rb = rankOf(b);
-//         return ra - rb;
-//       });
+    // --- process each group ---
+    for (const { meta, teams } of groups.values()) {
+      const filter = {
+        eventId: meta.eventId,
+        initialId: meta.initialId,
+        raceId: meta.raceId,
+        divisionId: meta.divisionId,
+      };
 
-//       const update = {
-//         $set: Object.assign({}, meta, {
-//           result: mergedArray,
-//           updatedAt: now,
-//         }),
-//         $setOnInsert: { createdAt: now },
-//       };
+      // Ambil SEMUA existing utk meta ini
+      const existingDocs = await col.find(filter, { projection: { result: 1, _id: 0 } }).toArray();
 
-//       const res = await col.updateOne(filter, update, { upsert: true });
-//       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+      // Merge per-tim berdasarkan bibTeam
+      const mergedByBib = new Map();
 
-//       cursor = itGroups.next();
-//     }
+      // existing first
+      for (const ex of existingDocs) {
+        if (ex && Array.isArray(ex.result)) {
+          for (const t of ex.result) {
+            if (!t) continue;
+            const ebib = String(t.bibTeam || "");
+            if (!mergedByBib.has(ebib)) mergedByBib.set(ebib, t);
+          }
+        }
+      }
 
-//     return { ok: true, upsertedCount: upsertedCount };
-//   } catch (err) {
-//     console.error("Error insertSprintResult:", err);
-//     return { ok: false, error: err.message };
-//   }
-// }
+      // overwrite with new teams
+      for (const nt of teams) {
+        const nbib = String(nt.bibTeam || "");
+        mergedByBib.set(nbib, nt);
+      }
+
+      // ke array & sort by bestTime (kecil dulu; tanpa bestTime ditempatkan belakang)
+      const mergedArray = Array.from(mergedByBib.values()).sort((a, b) => {
+        const am = a && a.bestTime ? hmsToMs(a.bestTime) : Number.POSITIVE_INFINITY;
+        const bm = b && b.bestTime ? hmsToMs(b.bestTime) : Number.POSITIVE_INFINITY;
+        return am - bm;
+      });
+
+      // Jika ada >1 dokumen existing utk meta yg sama → bersihkan dulu
+      if (existingDocs.length > 1) {
+        await col.deleteMany(filter);
+      }
+
+      // upsert final
+      const update = {
+        $set: {
+          eventId: meta.eventId,
+          initialId: meta.initialId,
+          raceId: meta.raceId,
+          divisionId: meta.divisionId,
+          eventName: meta.eventName,
+          initialName: meta.initialName,
+          raceName: meta.raceName,
+          divisionName: meta.divisionName,
+          result: mergedArray, // array of team entries (tiap team punya runs array)
+          updatedAt: now,
+        },
+        $setOnInsert: { createdAt: now },
+      };
+
+      const res = await col.updateOne(filter, update, { upsert: true });
+      if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+    }
+
+    return { ok: true, upsertedCount };
+  } catch (err) {
+    console.error("Error insertSlalomResult:", err);
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
 
 async function insertDrrResult(payload) {
   try {
@@ -399,5 +424,6 @@ async function insertDrrResult(payload) {
 module.exports = {
   insertNewEvent,
   insertSprintResult,
+  insertSlalomResult,
   insertDrrResult,
 };

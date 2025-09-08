@@ -174,23 +174,9 @@ function setupIPCMainHandlers() {
   });
 
   // LOAD SPRINT RESULT
-  // ipcMain.on("get-sprint-result", async (event, query = {}) => {
-  //   try {
-  //     const data = await getSprintResult(query.eventId);
-  //     event.reply("get-sprint-result-reply", { ok: true, items: data });
-  //   } catch (error) {
-  //     event.reply("get-sprint-result-reply", {
-  //       ok: false,
-  //       items: [],
-  //       error: error.message,
-  //     });
-  //   }
-  // });
-
   // main process
   ipcMain.on("get-sprint-result", async (event, query = {}) => {
     try {
-      console.log(query, "<<< cek");
       const data = await getSprintResult(query); // << kirim objek, bukan eventId doang
       event.reply("get-sprint-result-reply", { ok: true, items: data });
     } catch (error) {
@@ -202,7 +188,31 @@ function setupIPCMainHandlers() {
     }
   });
 
-  // SAVE DRR RESULT
+  // SAVE SLALOM RESULT
+  ipcMain.on("insert-slalom-result", async (event, datas) => {
+    try {
+      const data = await insertSlalomResult(datas);
+      event.reply("insert-slalom-result-reply", data);
+    } catch (error) {
+      event.reply("insert-slalom-result-reply", null);
+    }
+  });
+
+  // LOAD SLALOM RESULT
+  ipcMain.on("get-slalom-result", async (event, query = {}) => {
+    try {
+      const data = await getSlalomResult(query.eventId);
+      event.reply("get-slalom-result-reply", { ok: true, items: data });
+    } catch (error) {
+      event.reply("get-slalom-result-reply", {
+        ok: false,
+        items: [],
+        error: error.message,
+      });
+    }
+  });
+
+    // SAVE DRR RESULT
   ipcMain.on("insert-drr-result", async (event, datas) => {
     try {
       const data = await insertDrrResult(datas);

@@ -293,25 +293,25 @@ export default {
   methods: {
     // helper: ambil _id event (BSON / string aman)
     _getEventId() {
-  const ev = this.events || {};
-  const idObj = ev._id;
+      const ev = this.events || {};
+      const idObj = ev._id;
 
-  // Kalau datang sebagai { $oid: "..." }
-  if (idObj && idObj.$oid) {
-    return String(idObj.$oid);
-  }
+      // Kalau datang sebagai { $oid: "..." }
+      if (idObj && idObj.$oid) {
+        return String(idObj.$oid);
+      }
 
-  // Kalau datang sebagai ObjectID dari BSON (seperti di screenshot)
-  if (idObj && idObj._bsontype === "ObjectID" && idObj.id) {
-    // konversi Uint8Array ke hex string
-    return Array.from(idObj.id)
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
+      // Kalau datang sebagai ObjectID dari BSON (seperti di screenshot)
+      if (idObj && idObj._bsontype === "ObjectID" && idObj.id) {
+        // konversi Uint8Array ke hex string
+        return Array.from(idObj.id)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+      }
 
-  // fallback
-  return "";
-},
+      // fallback
+      return "";
+    },
 
     showResult(div, race) {
       const idt = this._buildIdentity(div, race);
@@ -969,7 +969,59 @@ export default {
 
       // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
       try {
+        // 1) Selalu simpan payload start
         localStorage.setItem("raceStartPayload", JSON.stringify(startData));
+
+        // 2) Siapkan objek event yang mau disimpan (sekalian pastikan participant terbaru)
+        const currentEvent = {
+          ...(this.events || {}),
+          participant: Array.isArray(this.dataTeams)
+            ? this.dataTeams
+            : (this.events && this.events.participant) || [],
+        };
+
+        // 3) Dapatkan ID event yang stabil (pakai helper kamu _getEventId)
+        const eventId =
+          this._getEventId() ||
+          (currentEvent && currentEvent._id && currentEvent._id.$oid
+            ? String(currentEvent._id.$oid)
+            : "") ||
+          String(currentEvent.id || "") ||
+          String(currentEvent.eventName || "default");
+
+        // 4) Baca yang lama dari localStorage
+        const raw = localStorage.getItem("eventDetails");
+        let payload;
+
+        if (!raw) {
+          // Belum ada -> simpan langsung sebagai objek tunggal
+          payload = currentEvent;
+        } else {
+          let prev;
+          try {
+            prev = JSON.parse(raw);
+          } catch {
+            // Rusak / bukan JSON -> timpa dengan currentEvent
+            prev = null;
+          }
+
+          // Jika prev adalah DICTIONARY multi-event (bukan single object),
+          // kita upsert berdasarkan eventId
+          const looksLikeDict =
+            prev &&
+            typeof prev === "object" &&
+            !Array.isArray(prev) &&
+            !(prev._id || prev.eventName || prev.categoriesInitial);
+
+          if (looksLikeDict && eventId) {
+            payload = { ...prev, [eventId]: currentEvent };
+          } else {
+            // Mode single-object -> timpa langsung
+            payload = currentEvent;
+          }
+        }
+
+        localStorage.setItem("eventDetails", JSON.stringify(payload));
       } catch {}
 
       // Opsional: notifikasi
@@ -1005,7 +1057,7 @@ export default {
 .detail-hero .hero-bg {
   position: absolute;
   inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1520981825232-ece5fae45120?q=80&w=1600&auto=format&fit=crop");
+  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   background-size: cover;
   background-position: center;
 }

@@ -26,10 +26,10 @@
                 {{ dataEventSafe.addressCity || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : -</span
+                ><strong class="text-white">River</strong> : {{ dataEventSafe.riverName || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">Level</strong> : -</span
+                ><strong class="text-white">Level</strong> : {{ dataEventSafe.levelName || "-" }}</span
               >
             </div>
           </b-col>
@@ -1536,7 +1536,7 @@ export default {
 .detail-hero .hero-bg {
   position: absolute;
   inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1520981825232-ece5fae45120?q=80&w=1600&auto=format&fit=crop");
+  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   background-size: cover;
   background-position: center;
 }
@@ -1549,7 +1549,7 @@ export default {
 .detail-hero .hero-inner {
   position: relative;
   z-index: 1;
-  padding: 22px;
+  padding: 50px;
 }
 .detail-hero h2 {
   color: #fff;

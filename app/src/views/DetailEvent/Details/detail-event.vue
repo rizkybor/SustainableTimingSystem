@@ -62,7 +62,8 @@
             @click="selectCategory(c)"
           >
             <div class="race-icon">
-              <Icon :icon="c.icon" width="28" height="28" />
+              <!-- <Icon :icon="c.icon" width="28" height="28" /> -->
+              <img :src="c.icon" width="60" height="60" />
             </div>
             <div class="h6 font-weight-bold mb-1 text-center">
               {{ c.title }}
@@ -183,6 +184,10 @@
 </template>
 
 <script>
+import sprintPng from "@/assets/images/Rectangle-3.png";
+import slalomPng from "@/assets/images/Rectangle-4-1.png";
+import drrPng from "@/assets/images/Rectangle-4-2.png";
+import h2hPng from "@/assets/images/Rectangle-4.png";
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import TeamPanel from "./../components/TeamPanel.vue";
@@ -204,26 +209,26 @@ export default {
         {
           key: "SPRINT",
           title: "Sprint",
-          icon: "mdi:flash",
-          desc: "Short-distance time trial",
+          icon: sprintPng,
+          desc: "Short-distance race against the clock  on grade II-III rapids",
         },
         {
           key: "HEAD2HEAD",
           title: "Head to Head",
-          icon: "mdi:swap-horizontal",
-          desc: "Duel parallel course",
+          icon: h2hPng,
+          desc: "Direct competition between two teams  on parallel courses",
         },
         {
           key: "SLALOM",
           title: "Slalom",
-          icon: "mdi:gate",
-          desc: "Gate navigation on whitewater",
+          icon: slalomPng,
+          desc: "Technical course navigation through  gates on whitewater",
         },
         {
           key: "DRR",
           title: "Down River",
-          icon: "mdi:waves",
-          desc: "Long distance river race",
+          icon: drrPng,
+          desc: "Long-distance endurance race through  varied river conditions",
         },
       ],
 

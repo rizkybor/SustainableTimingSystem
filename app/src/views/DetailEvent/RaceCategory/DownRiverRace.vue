@@ -112,8 +112,9 @@
         <h4>List Result</h4>
         <b-row>
           <b-col>
+            <div class="table-wrapper">
             <table
-              class="table-scroll table"
+              class="table"
               aria-label="Scrollable results table"
             >
               <thead>
@@ -241,6 +242,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
             <br />
           </b-col>
         </b-row>
@@ -957,7 +959,20 @@ td {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
-.table-scroll table {
-  min-width: 1400px;
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;           /* enable horizontal scroll */
+  -webkit-overflow-scrolling: touch; /* smooth on mobile */
+}
+
+.table-wrapper table {
+  min-width: 1200px;          /* adjust sesuai jumlah kolom */
+  border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  white-space: nowrap;        /* prevent wrapping */
 }
 </style>

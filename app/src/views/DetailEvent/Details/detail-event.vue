@@ -412,18 +412,6 @@ export default {
       else this.dataTeams.push(bucket);
     },
 
-    // _clearBucketInState(identity) {
-    //   this.dataTeams = (this.dataTeams || []).filter(
-    //     (b) =>
-    //       !(
-    //         String(b.eventName).toUpperCase() === identity.eventName &&
-    //         String(b.initialName).toUpperCase() === identity.initialName &&
-    //         String(b.raceName).toUpperCase() === identity.raceName &&
-    //         String(b.divisionName).toUpperCase() === identity.divisionName
-    //       )
-    //   );
-    // },
-
     // === READ satu bucket (panel) ===
     async loadTeamsRegistered(div, race) {
       const identity = this._buildIdentity(div, race);

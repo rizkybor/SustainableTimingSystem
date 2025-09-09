@@ -45,14 +45,13 @@
     </p>
 
     <b-table
-      striped
-      bordered
-      hover
-      :items="dataParticipant"
-      :fields="fields"
-      :key="index"
-      style="font-size: 8px"
-    >
+  striped
+  bordered
+  hover
+  :items="dataParticipant"
+  :fields="fields"
+  style="font-size: 8px"
+>
       <template v-slot:cell(num)="data">
         {{ data.index + 1 }}
       </template>
@@ -113,9 +112,9 @@
 <script>
 export default {
   props: {
-    data: Object,
-    dataParticipant: Object,
-    categories: String
+   data: { type: Object, required: true },
+  dataParticipant: { type: Array, required: true },
+  categories: { type: String, default: "" }
   },
   data() {
     return {

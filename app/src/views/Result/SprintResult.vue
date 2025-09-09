@@ -4,9 +4,9 @@
     <div class="topbar">
       <div class="crumbs">
         <span class="sep">›</span>
-        <router-link :to="`/event-detail/${$route.params.id}`" class="muted"
-          >Dashboard</router-link
-        >
+        <router-link :to="`/event-detail/${$route.params.id}`" class="muted">
+          Dashboard
+        </router-link>
         <span class="sep">›</span>
         <span class="muted">Sprint Result</span>
       </div>
@@ -16,9 +16,9 @@
           :disabled="results.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="downloadResult"
+          @click="generatePdf"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result
+          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
         </b-button>
       </div>
     </div>
@@ -30,7 +30,14 @@
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
       </div>
-      <div class="card-title">Sprint Result</div>
+
+      <!-- EVENT HEADER -->
+      <div class="event-header">
+        <h2 class="event-name">{{ eventInfo.eventName || "-" }}</h2>
+        <h4 class="event-location">
+          {{ eventInfo.riverName || "-" }}, {{ eventInfo.addressCity || "-" }}
+        </h4>
+      </div>
 
       <b-alert show variant="danger" v-if="error" class="mb-3">{{
         error
@@ -39,7 +46,7 @@
         <b-spinner small class="mr-2" /> Loading results...
       </div>
 
-      <!-- Jika tidak ada data: tampilkan full-screen center -->
+      <!-- Empty state -->
       <EmptyStateFull
         v-if="!loading && results.length === 0"
         :img-src="require('@/assets/images/404.png')"
@@ -101,25 +108,86 @@
                 </b-button>
               </td>
             </tr>
-            <tr v-if="!loading && results.length === 0">
-              <td colspan="12" class="empty">No data</td>
-            </tr>
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ===== Komponen PDF (disembunyikan dari layar, tapi tetap ada di DOM) ===== -->
+    <div class="pdf-host sr-only" ref="pdfHost">
+      <SprintPdf
+        :data="pdfEventData"
+        :dataParticipant="pdfParticipants"
+        :categories="pdfCategories"
+      />
     </div>
   </div>
 </template>
 
 <script>
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
-
+import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue"; // <-- simpan komponen pdf result-mu dengan nama ini
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 
+/* ========= Helpers untuk baca localStorage ========= */
+const RACE_PAYLOAD_KEY = "raceStartPayload";
+const EVENT_DETAILS_KEY = "eventDetails";
+
+function safeParse(str, fallback) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
+}
+
+function evIdToString(ev) {
+  if (ev && ev._id) {
+    if (typeof ev._id === "object" && ev._id.$oid) return String(ev._id.$oid);
+    return String(ev._id);
+  }
+  return "";
+}
+function currentEventIdFromBucket() {
+  const payload = safeParse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}", {});
+  const b = payload && payload.bucket ? payload.bucket : {};
+  return String(b.eventId || "");
+}
+function pickEventFromStore() {
+  const store = safeParse(
+    localStorage.getItem(EVENT_DETAILS_KEY) || "null",
+    null
+  );
+  if (!store) return {};
+  const activeId = currentEventIdFromBucket();
+
+  const isDict =
+    typeof store === "object" &&
+    !Array.isArray(store) &&
+    !store.eventName &&
+    !store._id;
+  if (isDict)
+    return activeId && store[activeId]
+      ? store[activeId]
+      : Object.values(store)[0] || {};
+
+  if (Array.isArray(store)) {
+    if (activeId) {
+      const found = store.find(function (ev) {
+        return evIdToString(ev) === activeId;
+      });
+      if (found) return found;
+    }
+    return store[0] || {};
+  }
+  return store; // single object
+}
+
 export default {
   name: "SprintResult",
-  components: { Icon, EmptyStateFull },
+  components: { Icon, EmptyStateFull, SprintPdf },
+
   data() {
     return {
       loading: false,
@@ -160,6 +228,69 @@ export default {
         { ranking: 32, score: 12 },
       ],
     };
+  },
+
+  computed: {
+    // Info event dari localStorage (fallback ke query bila ada yang kosong)
+    eventInfo() {
+      const ev = pickEventFromStore();
+      const q = this.$route.query || {};
+      return {
+        eventName: ev.eventName || q.eventName || "",
+        addressCity:
+          ev.addressCity || ev.location || q.addressCity || q.location || "",
+        riverName: ev.riverName || q.riverName || "",
+        levelName: ev.levelName || q.levelName || "",
+        startDateEvent: ev.startDateEvent || q.startDateEvent || "",
+        endDateEvent: ev.endDateEvent || q.endDateEvent || "",
+        addressVillage: ev.addressVillage || "",
+        addressDistrict: ev.addressDistrict || "",
+        addressSubDistrict: ev.addressSubDistrict || "",
+        addressProvince: ev.addressProvince || "",
+        addressState: ev.addressState || "",
+        addressZipCode: ev.addressZipCode || "",
+        raceDirector: ev.raceDirector || "",
+        chiefJudge: ev.chiefJudge || "",
+      };
+    },
+
+    // ====== Data untuk komponen PDF ======
+    pdfEventData() {
+      // komponen PDF memerlukan field seperti di template pdf (data.*)
+      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+    },
+    pdfParticipants() {
+      // Komponen PDF mengharapkan struktur: { nameTeam, bibTeam, result: {...} }
+      return (this.results || []).map((r) => ({
+        nameTeam: r.nameTeam,
+        bibTeam: r.bibTeam,
+        result: {
+          startTime: r.startTime || "",
+          finishTime: r.finishTime || "",
+          raceTime: r.raceTime || "",
+          penaltyTime: r.penaltyTime || "00:00:00.000",
+          penalty: Number(r.totalPenalty) || 0,
+          totalTime: r.totalTime || r.resultTime || r.raceTime || "",
+          ranked: r.ranked || "",
+          score:
+            r.score !== undefined && r.score !== null && r.score !== ""
+              ? r.score
+              : this.getScoreByRanked(r.ranked) || 0,
+        },
+      }));
+    },
+    pdfCategories() {
+      // Ambil dari payload bucket jika ada
+      const payload = safeParse(
+        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      const title = [b.divisionName, b.raceName, b.initialName]
+        .filter(Boolean)
+        .join(" – ");
+      return title || "SPRINT";
+    },
   },
 
   created() {
@@ -209,45 +340,7 @@ export default {
         merged.penaltyTime = merged.totalPenaltyTime || "00:00:00.000";
       return merged;
     },
-    toCsv(rows) {
-      const header = [
-        "No",
-        "Team Name",
-        "BIB",
-        "Start Time",
-        "Finish Time",
-        "Race Time",
-        "Penalty",
-        "Penalty Time",
-        "Result",
-        "Ranked",
-        "Score",
-      ];
-      const lines = [header.join(",")];
-      rows.forEach((r, i) => {
-        const line = [
-          i + 1,
-          this.csvSafe(r.nameTeam),
-          this.csvSafe(r.bibTeam),
-          this.csvSafe(r.startTime),
-          this.csvSafe(r.finishTime),
-          this.csvSafe(r.raceTime),
-          r.totalPenalty || 0,
-          this.csvSafe(r.penaltyTime),
-          this.csvSafe(r.resultTime),
-          r.ranked || "",
-          r.score !== undefined && r.score !== null && r.score !== ""
-            ? r.score
-            : this.getScoreByRanked(r.ranked) || 0,
-        ].join(",");
-        lines.push(line);
-      });
-      return lines.join("\n");
-    },
-    csvSafe(v) {
-      const s = String(v == null ? "" : v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    },
+
     async loadSprintResult() {
       const q = this.$route.query || {};
       if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) {
@@ -303,15 +396,36 @@ export default {
         });
       });
     },
-    downloadResult() {
-      const csv = this.toCsv(this.results);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "sprint_result.csv";
-      a.click();
-      URL.revokeObjectURL(url);
+
+    // ====== PDF ======
+    async generatePdf() {
+      // butuh elemen DOM dari komponen PDF
+      const host = this.$refs.pdfHost;
+      if (!host || !window.html2pdf) {
+        this.error = "PDF generator tidak ditemukan.";
+        return;
+      }
+
+      // pastikan konten sudah render
+      await this.$nextTick();
+
+      const filename =
+        (this.eventInfo.eventName ? `${this.eventInfo.eventName} - ` : "") +
+        "Sprint Result.pdf";
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+
+      try {
+        await window.html2pdf().set(opt).from(host).save();
+      } catch (e) {
+        this.error = "Gagal membuat PDF.";
+      }
     },
   },
 };
@@ -363,16 +477,25 @@ export default {
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 8px 22px rgba(28, 39, 49, 0.06);
-  padding: 18px 18px 8px 18px;
+  padding: 18px 18px 8px;
 }
-.card-title {
-  font-size: 24px;
+
+/* event header */
+.event-header {
+  text-align: center;
+  margin: 16px 0 20px;
+}
+.event-name {
+  font-size: 28px;
   font-weight: 800;
-  margin: 4px 0 16px 2px;
+  color: #2d2d2d;
+  margin: 0;
 }
-.card-back {
-  text-align: left;
-  margin-bottom: 6px;
+.event-location {
+  font-size: 18px;
+  font-weight: 700;
+  color: #444;
+  margin: 4px 0 0;
 }
 
 /* table */
@@ -383,7 +506,7 @@ export default {
 .result-table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 8px; /* row gap like screenshot */
+  border-spacing: 0 8px;
 }
 .result-table thead th {
   background: #f4f5f7;
@@ -407,7 +530,7 @@ export default {
 }
 .bold {
   font-weight: 800;
-} /* Result in bold like screenshot */
+}
 .text-center {
   text-align: center;
 }
@@ -415,18 +538,6 @@ export default {
   text-align: center;
   color: #9aa0aa;
   padding: 16px;
-}
-
-.col-no {
-  width: 60px;
-}
-.col-bib {
-  width: 90px;
-  text-align: center;
-}
-.col-action {
-  width: 90px;
-  text-align: center;
 }
 
 /* buttons */
@@ -439,5 +550,15 @@ export default {
   align-items: center;
   margin: 8px 0 12px;
   color: #6a6f7a;
+}
+
+/* sr-only: hadir di DOM untuk html2pdf, tapi tidak tampak di layar */
+.sr-only {
+  position: absolute !important;
+  left: -99999px !important;
+  top: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 </style>

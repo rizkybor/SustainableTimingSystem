@@ -203,7 +203,7 @@ export default {
         R6_MEN: false,
         R6_WOMEN: false,
       },
-      _lastToken: "",
+      lastToken: "",
       // kategori UI
       raceCategories: [
         {
@@ -412,17 +412,17 @@ export default {
       else this.dataTeams.push(bucket);
     },
 
-    _clearBucketInState(identity) {
-      this.dataTeams = (this.dataTeams || []).filter(
-        (b) =>
-          !(
-            String(b.eventName).toUpperCase() === identity.eventName &&
-            String(b.initialName).toUpperCase() === identity.initialName &&
-            String(b.raceName).toUpperCase() === identity.raceName &&
-            String(b.divisionName).toUpperCase() === identity.divisionName
-          )
-      );
-    },
+    // _clearBucketInState(identity) {
+    //   this.dataTeams = (this.dataTeams || []).filter(
+    //     (b) =>
+    //       !(
+    //         String(b.eventName).toUpperCase() === identity.eventName &&
+    //         String(b.initialName).toUpperCase() === identity.initialName &&
+    //         String(b.raceName).toUpperCase() === identity.raceName &&
+    //         String(b.divisionName).toUpperCase() === identity.divisionName
+    //       )
+    //   );
+    // },
 
     // === READ satu bucket (panel) ===
     async loadTeamsRegistered(div, race) {
@@ -447,13 +447,13 @@ export default {
         identity.raceName,
         Date.now(),
       ].join("|");
-      this._lastToken = token;
+      this.lastToken = token;
 
       // Balut dalam Promise + timeout supaya handler pasti selesai
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
           // Jika sudah ada request baru, abaikan balasan ini
-          if (this._lastToken !== token) return resolve();
+          if (this.lastToken !== token) return resolve();
 
           if (bucket && Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
@@ -472,7 +472,12 @@ export default {
         setTimeout(() => {
           try {
             ipcRenderer.removeListener("get-teams-registered-reply", onReply);
-          } catch {}
+          } catch (e) {
+            // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+            this.participant = Array.isArray(this.dataTeams)
+              ? this.dataTeams.slice()
+              : [];
+          }
           resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });
@@ -579,7 +584,6 @@ export default {
           });
         });
       } catch (err) {
-        console.error("loadAvailableTeams error:", err);
         this.availableTeams = this.dummyTeams.slice();
       }
     },
@@ -857,7 +861,7 @@ export default {
       // if (!srcTeam) return;
 
       // Cek duplicate TEAM di panel yang sama (pakai teamId; fallback nameTeam)
-      
+
       const srcTeam = (this.availableTeams || []).find(
         (t) => String(t.id) === String(d.teamId)
       );
@@ -1000,7 +1004,12 @@ export default {
           eventId: this.$route.params.id,
           participant: this.dataTeams,
         });
-      } catch {}
+      } catch (e) {
+        // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+        this.participant = Array.isArray(this.dataTeams)
+          ? this.dataTeams.slice()
+          : [];
+      }
     },
     _toUpperSafe(v) {
       return String(v || "").toUpperCase();
@@ -1109,7 +1118,12 @@ export default {
         }
 
         localStorage.setItem("eventDetails", JSON.stringify(payload));
-      } catch {}
+      } catch (e) {
+        // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+        this.participant = Array.isArray(this.dataTeams)
+          ? this.dataTeams.slice()
+          : [];
+      }
 
       // Opsional: notifikasi
       ipcRenderer &&

@@ -3,7 +3,7 @@ import VueRouter from "vue-router";
 import Home from "../views/Home.vue";
 import CreateEvent from "../views/CreateEvent/index.vue";
 import DetailEvent from "../views/DetailEvent/index.vue";
-import DetailsEventId from "../views/DetailEvent/Details/detail-event.vue"
+import DetailsEventId from "../views/DetailEvent/Details/detail-event.vue";
 import SprintRace from "../views/DetailEvent/RaceCategory/SprintRace.vue";
 import SlalomRace from "../views/DetailEvent/RaceCategory/SlalomRace.vue";
 import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
@@ -14,9 +14,13 @@ import SprintResult from "@/views/Result/SprintResult.vue";
 Vue.use(VueRouter);
 
 const routes = [
+  {
+    path: "*",
+    component: () => import("@/views/_errors/NotFound.vue"),
+  },
   { path: "/", name: "home", component: Home },
   { path: "/create-new", component: CreateEvent },
-    { path: "/team-create", name: "create-team", component: CreateTeam },
+  { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/slalom-race", component: SlalomRace },
   {
     path: "/event-detail/:id",
@@ -48,9 +52,9 @@ const routes = [
         name: "head2head-race",
         component: Head2Head,
       },
-       {
+      {
         path: "sprint-result",
-       name: 'SprintResult',
+        name: "SprintResult",
         component: SprintResult,
       },
     ],

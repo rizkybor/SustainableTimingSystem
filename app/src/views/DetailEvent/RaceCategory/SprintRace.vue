@@ -26,10 +26,12 @@
                 {{ dataEventSafe.addressCity || "-" }}
               </span>
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : {{ dataEventSafe.riverName || "-" }}</span
+                ><strong class="text-white">River</strong> :
+                {{ dataEventSafe.riverName || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">Level</strong> : {{ dataEventSafe.levelName || "-" }}</span
+                ><strong class="text-white">Level</strong> :
+                {{ dataEventSafe.levelName || "-" }}</span
               >
             </div>
           </b-col>
@@ -392,7 +394,9 @@ function loadRaceStartPayloadForSprint() {
   let obj = {};
   try {
     obj = JSON.parse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}");
-  } catch {}
+  } catch {
+    obj = {};
+  }
   const b = obj.bucket || {};
   const bucket = {
     eventId: String(b.eventId || ""),
@@ -498,15 +502,27 @@ export default {
 
   /** gunakan guard rute yang benar (bukan di methods) */
   beforeRouteLeave(to, from, next) {
-    try {
-      localStorage.removeItem("raceStartPayload");
-      localStorage.removeItem("participantByCategories");
-      localStorage.removeItem("currentCategories");
-    } catch {}
+    localStorage.removeItem("raceStartPayload");
+    localStorage.removeItem("participantByCategories");
+    localStorage.removeItem("currentCategories");
+
     next();
   },
 
   methods: {
+    notify(type, detail, message = "Info") {
+      if (this.$ipc || (window && window.ipcRenderer)) {
+        const ir = this.$ipc || window.ipcRenderer;
+        ir.send && ir.send("get-alert", { type, detail, message });
+      }
+      // bisa juga set state:
+      this.lastErrorMessage = `${message}: ${detail}`;
+    },
+    notifyError(err, message = "Error") {
+      const detail =
+        (err && (err.message || err.toString())) || "Unknown error";
+      this.notify("error", detail, message);
+    },
     /** load dari payload baru */
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForSprint();
@@ -533,7 +549,11 @@ export default {
       try {
         dataStorage = localStorage.getItem("participantByCategories");
         events = localStorage.getItem("eventDetails");
-      } catch {}
+      } catch (e) {
+        // fallback aman bila storage tidak tersedia / rusak
+        dataStorage = null;
+        events = null;
+      }
 
       this.dataEvent = events ? JSON.parse(events) : {};
 
@@ -730,15 +750,23 @@ export default {
                   return true;
                 });
               } else {
-                console.error("Selected port path is undefined.");
+                this.notify(
+                  "warning",
+                  "Selected serial port path is undefined.",
+                  "Device"
+                );
+                this.isPortConnected = false;
               }
             } else {
-              console.error("No serial ports available.");
+              this.notify("warning", "No serial ports available.", "Device");
+              this.isPortConnected = false;
             }
           })
-          .catch((err) => console.error("Error:", err.message));
+          .catch((err) =>
+            this.notifyError(err, "Serial port enumeration failed")
+          );
       } catch (err) {
-        console.error("Error:", err.message);
+        this.notifyError(err, "Serial setup failed");
       }
     },
 
@@ -822,13 +850,10 @@ export default {
     },
 
     goTo() {
-      try {
-        localStorage.removeItem("raceStartPayload");
-        localStorage.removeItem("participantByCategories");
-        localStorage.removeItem("currentCategories");
-      } catch (e) {
-        console.warn("Gagal menghapus raceStartPayload:", e);
-      }
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
+
       this.participant = [];
       this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);

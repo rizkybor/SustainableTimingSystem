@@ -219,15 +219,17 @@ export default {
     _idToHex(_id, fallback = "") {
       // case: { $oid: "..." }
       if (_id && _id.$oid) return String(_id.$oid);
-
-      // case: BSON ObjectId { id: Uint8Array }
-      if (_id && _id.id) {
-        try {
-          return Array.from(_id.id)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
-        } catch {}
-      }
+       
+  if (_id && _id.id) {
+    try {
+      return Array.from(_id.id)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    } catch (e) {
+      // gagal konversi → pakai fallback
+      return fallback;
+    }
+  }
 
       // case: string langsung
       if (typeof _id === "string") return _id;

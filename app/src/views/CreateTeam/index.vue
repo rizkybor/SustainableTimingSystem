@@ -318,7 +318,10 @@ export default {
       ipcRenderer.once("option-team-types-reply", (_e, data) => {
         if (Array.isArray(data) && data.length) this.optionTeamTypes = data;
       });
-    } catch {}
+    } catch (e) {
+      // fallback: pastikan tetap berupa array agar UI tidak error
+      if (!Array.isArray(this.optionTeamTypes)) this.optionTeamTypes = [];
+    }
 
     const firstVisitKey = "visited_CreateTeam";
     const isFirstVisit = !sessionStorage.getItem(firstVisitKey);

@@ -26,10 +26,12 @@
                 {{ dataEventSafe.addressCity || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : {{ dataEventSafe.riverName || "-" }}</span
+                ><strong class="text-white">River</strong> :
+                {{ dataEventSafe.riverName || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">Level</strong> : {{ dataEventSafe.levelName || "-" }}</span
+                ><strong class="text-white">Level</strong> :
+                {{ dataEventSafe.levelName || "-" }}</span
               >
             </div>
           </b-col>
@@ -298,26 +300,26 @@
                 </div> -->
 
                 <div
-  class="bracket__actions"
-  v-if="m.team1.name && m.team2.name"
->
-  <button
-    class="btn btn-xs btn-outline-success"
-    @click="advanceWinner(rIdx, mIdx, 1)"
-    title="Set winner: top"
-    :disabled="editBracketTeams"
-  >
-    <Icon icon="mdi:crown-outline" /> Top Win
-  </button>
-  <button
-    class="btn btn-xs btn-outline-primary"
-    @click="advanceWinner(rIdx, mIdx, 2)"
-    title="Set winner: bottom"
-    :disabled="editBracketTeams"
-  >
-    <Icon icon="mdi:crown-outline" /> Bottom Win
-  </button>
-</div>
+                  class="bracket__actions"
+                  v-if="m.team1.name && m.team2.name"
+                >
+                  <button
+                    class="btn btn-xs btn-outline-success"
+                    @click="advanceWinner(rIdx, mIdx, 1)"
+                    title="Set winner: top"
+                    :disabled="editBracketTeams"
+                  >
+                    <Icon icon="mdi:crown-outline" /> Top Win
+                  </button>
+                  <button
+                    class="btn btn-xs btn-outline-primary"
+                    @click="advanceWinner(rIdx, mIdx, 2)"
+                    title="Set winner: bottom"
+                    :disabled="editBracketTeams"
+                  >
+                    <Icon icon="mdi:crown-outline" /> Bottom Win
+                  </button>
+                </div>
 
                 <div class="bracket__winner" v-if="m.winner && m.winner.name">
                   <Icon icon="mdi:trophy-variant-outline" />
@@ -579,7 +581,9 @@ function loadRaceStartPayloadForH2H() {
   let obj = {};
   try {
     obj = JSON.parse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}");
-  } catch {}
+  } catch {
+    obj = {};
+  }
   const b = obj.bucket || {};
   const bucket = {
     eventId: String(b.eventId || ""),
@@ -795,6 +799,19 @@ export default {
   },
 
   methods: {
+    notify(type, detail, message = "Info") {
+      if (this.$ipc || (window && window.ipcRenderer)) {
+        const ir = this.$ipc || window.ipcRenderer;
+        ir.send && ir.send("get-alert", { type, detail, message });
+      }
+      // bisa juga set state:
+      this.lastErrorMessage = `${message}: ${detail}`;
+    },
+    notifyError(err, message = "Error") {
+      const detail =
+        (err && (err.message || err.toString())) || "Unknown error";
+      this.notify("error", detail, message);
+    },
     /** Method podium config */
     /** Cari round final (size==2) dan bronze (round.bronze) */
     getFinalRound() {
@@ -1224,10 +1241,9 @@ export default {
     async checkValueStorage() {
       let dataStorage = null,
         events = null;
-      try {
-        dataStorage = localStorage.getItem("participantByCategories");
-        events = localStorage.getItem("eventDetails");
-      } catch {}
+
+      dataStorage = localStorage.getItem("participantByCategories");
+      events = localStorage.getItem("eventDetails");
 
       this.dataEvent = events ? JSON.parse(events) : {};
       const raw = dataStorage ? JSON.parse(dataStorage) : [];
@@ -1378,8 +1394,7 @@ export default {
         });
         return true;
       } catch (err) {
-        console.error("Serial error:", err && err.message);
-        return false;
+        this.notifyError(err, "Serial setup failed");
       }
     },
 
@@ -1510,11 +1525,10 @@ export default {
     },
 
     goTo() {
-      try {
-        localStorage.removeItem("raceStartPayload");
-        localStorage.removeItem("participantByCategories");
-        localStorage.removeItem("currentCategories");
-      } catch {}
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
+
       this.participant = [];
       this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);

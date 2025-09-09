@@ -102,6 +102,24 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <h4 class="mb-0">Bracket Head 2 Head</h4>
         <div class="d-flex" style="gap: 8px">
+          <div class="d-flex align-items-center" style="gap: 8px">
+            <button class="btn btn-outline-secondary" @click="prevRound">
+              <Icon icon="mdi:chevron-left" /> Prev
+            </button>
+
+            <!-- NEW: pilih babak aktif -->
+            <b-form-select
+              v-model="currentRoundIndex"
+              :options="roundOptions"
+              class="w-auto"
+              style="min-width: 180px"
+            ></b-form-select>
+
+            <button class="btn btn-outline-secondary" @click="nextRound">
+              Next <Icon icon="mdi:chevron-right" />
+            </button>
+          </div>
+
           <button
             class="btn btn-outline-secondary"
             @click="
@@ -283,7 +301,7 @@
     <OperationTimePanel
       :digit-id="digitId"
       :digit-time="digitTime"
-      :participant="participantArr"
+      :participant="visibleParticipants"
       :digit-time-start.sync="digitTimeStart"
       :digit-time-finish.sync="digitTimeFinish"
       @update-time="updateTime"
@@ -318,7 +336,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(item, index) in participantArr" :key="index">
+                  <tr v-for="(item, index) in visibleParticipants" :key="index">
                     <td>{{ index + 1 }}</td>
                     <td class="large-bold text-strong max-char">
                       {{ item.nameTeam }}
@@ -545,6 +563,7 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      currentRoundIndex: -1,
       editBracketTeams: false,
       rounds: [],
       showBronze: true,
@@ -649,6 +668,61 @@ export default {
       });
       return ids;
     },
+
+    // NEW: opsi dropdown babak (ikut urutan this.rounds)
+    roundOptions() {
+      return (this.rounds || []).map((r, i) => ({
+        value: i,
+        text: r.bronze ? "Third Place" : r.name,
+      }));
+    },
+
+    // NEW: ambil round aktif (null-safe)
+    currentRound() {
+      const i = this.currentRoundIndex;
+      return i >= 0 && i < (this.rounds || []).length ? this.rounds[i] : null;
+    },
+
+    // NEW: tim (nama) yang tampil pada babak aktif → array of strings (nama tim)
+    teamsInCurrentRound() {
+      const r = this.currentRound;
+      if (!r) return [];
+      const names = [];
+      (r.matches || []).forEach((m) => {
+        if (m.team1 && m.team1.name) names.push(String(m.team1.name));
+        if (m.team2 && m.team2.name) names.push(String(m.team2.name));
+      });
+      // unik
+      return Array.from(new Set(names));
+    },
+
+    // NEW: participant yang “terlihat” = hanya mereka yang ada di babak aktif
+    visibleParticipants() {
+      const want = new Set(
+        this.teamsInCurrentRound.map((n) => n.toUpperCase())
+      );
+      const list = this.participantArr.filter((p) => {
+        const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
+        return nm && want.has(nm);
+      });
+
+      // Jika ada tim di bracket yang belum ada di participant (misal hanya nama),
+      // kita buat placeholder agar tetap terlihat di panel & table:
+      if (want.size && list.length < want.size) {
+        const existing = new Set(
+          list.map((p) => String(p.nameTeam || p.teamName || "").toUpperCase())
+        );
+        this.teamsInCurrentRound.forEach((n) => {
+          const up = n.toUpperCase();
+          if (!existing.has(up)) {
+            list.push(
+              this.normalizeTeamForViewPlaceholder(n) // helper di methods
+            );
+          }
+        });
+      }
+      return list;
+    },
   },
 
   async mounted() {
@@ -666,6 +740,57 @@ export default {
   },
 
   methods: {
+    /** Babak configuration */
+    // NEW: buat placeholder participant jika tim ada di bracket tapi belum ada di data
+    normalizeTeamForViewPlaceholder(name) {
+      return {
+        nameTeam: String(name),
+        bibTeam: "",
+        startOrder: "",
+        praStart: "",
+        intervalRace: "",
+        statusId: 0,
+        result: {
+          startTime: "",
+          finishTime: "",
+          raceTime: "",
+          penaltyTime: "00:00:00.000",
+          penalty: 0,
+          totalTime: "",
+          ranked: "",
+          score: "",
+        },
+        otr: {
+          startTime: "",
+          finishTime: "",
+          raceTime: "",
+          penaltyTime: "00:00:00.000",
+          penalty: 0,
+          totalTime: "",
+          ranked: "",
+          score: "",
+        },
+      };
+    },
+
+    // CHANGED: setelah build, set currentRoundIndex = round awal terbesar (firstRoundIndex)
+    rebuildBracketDynamic(nTeams) {
+      this.rounds = this.buildEmptyBracket(nTeams);
+      this.populateFirstRoundWithSeeds(nTeams);
+      // set babak aktif ke ronde kompetitif paling awal (bukan bronze)
+      this.currentRoundIndex = this.firstRoundIndex; // NEW
+    },
+
+    // NEW: navigasi babak
+    prevRound() {
+      if (this.currentRoundIndex > 0) this.currentRoundIndex--;
+    },
+    nextRound() {
+      if (this.currentRoundIndex < this.rounds.length - 1)
+        this.currentRoundIndex++;
+    },
+    /** End babak configuration */
+
     /** Hitung pangkat dua berikutnya */
     nextPow2(n) {
       let p = 1;
@@ -875,12 +1000,6 @@ export default {
       }
     },
 
-    /** API utama untuk dipanggil saat mounted / ketika jumlah tim berubah */
-    rebuildBracketDynamic(nTeams) {
-      this.rounds = this.buildEmptyBracket(nTeams);
-      this.populateFirstRoundWithSeeds(nTeams); // default seed → kolom 1
-    },
-
     /** Ambil opsi yang masih tersedia (bebas duplikat kecuali id yang sedang dipilih) */
     availableTeamOptions(keepId = null) {
       const used = this.assignedIdsFirstRound;
@@ -1043,19 +1162,19 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(selectedValue, item) {
-      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
-      if (sel) item.result.penaltyTime = sel.timePen;
+   async updateTimePen(selectedValue, item) {
+  const sel = this.dataPenalties.find((p) => p.value === selectedValue);
+  if (sel) item.result.penaltyTime = sel.timePen;
 
-      if (item.result.raceTime && item.result.penaltyTime) {
-        item.result.totalTime = await this.tambahWaktu(
-          item.result.raceTime,
-          item.result.penaltyTime
-        );
-      }
-      this.editResult = true;
-      await this.assignRanks(this.participant);
-    },
+  if (item.result.raceTime && item.result.penaltyTime) {
+    item.result.totalTime = await this.tambahWaktu(
+      item.result.raceTime,
+      item.result.penaltyTime
+    );
+  }
+  this.editResult = true;
+  await this.assignRanks(this.visibleParticipants); // CHANGED
+},
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
@@ -1144,22 +1263,36 @@ export default {
       }
     },
 
-    async updateTime(val, id, title) {
-      if (!Array.isArray(this.participant) || !this.participant[id]) return;
-      if (title === "start") this.participant[id].result.startTime = val;
-      if (title === "finish") {
-        this.participant[id].result.finishTime = val;
-        if (
-          this.participant[id].result.startTime &&
-          this.participant[id].result.finishTime
-        ) {
-          this.participant[id].result.raceTime = await this.hitungSelisihWaktu(
-            this.participant[id].result.startTime,
-            this.participant[id].result.finishTime
-          );
-        }
-      }
-    },
+   async updateTime(val, visIndex, title) {
+  // ambil item yang sedang terlihat (subset babak aktif)
+  const visItem = this.visibleParticipants[visIndex];
+  if (!visItem) return;
+
+  // cari index sebenarnya di this.participant
+  const targetIndex = this.participantArr.findIndex((p) => {
+    const nameMatch =
+      String(p.nameTeam || p.teamName || "").toUpperCase() ===
+      String(visItem.nameTeam || visItem.teamName || "").toUpperCase();
+    const bibMatch = String(p.bibTeam || "") === String(visItem.bibTeam || "");
+    // cocokkan nama; kalau ada BIB, bantu perkuat kecocokan
+    return nameMatch && (!visItem.bibTeam ? true : bibMatch);
+  });
+
+  if (targetIndex === -1) return;
+
+  const target = this.participant[targetIndex];
+
+  if (title === "start") target.result.startTime = val;
+  if (title === "finish") {
+    target.result.finishTime = val;
+    if (target.result.startTime && target.result.finishTime) {
+      target.result.raceTime = await this.hitungSelisihWaktu(
+        target.result.startTime,
+        target.result.finishTime
+      );
+    }
+  }
+},
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
       const [h1, m1, s1] = String(waktuAwal).split(":");

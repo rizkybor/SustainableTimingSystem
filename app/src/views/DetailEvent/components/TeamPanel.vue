@@ -24,7 +24,7 @@
             size="sm"
             variant="primary"
             class="btn-add"
-            @click="startRace(rows)"
+            @click="startRace()"
           >
             <Icon icon="mdi:flag-variant" class="mr-2" />
             Start Race
@@ -48,26 +48,18 @@
           <tr v-if="draft" class="row-card">
             <td class="muted">1</td>
             <td>
-              <div class="field">
-             <b-form-group label="Pilih Tim" class="mb-2">
-    <SearchableSelect
-      v-model="draft.teamId"
-      :options="selectOptions"
-      placeholder="Select team name"
-      search-placeholder="Select team name"
-      :clearable="true"
-      :show-empty-option="true"
-      @input="onPickTeam"
-      class="ss-inline"
-    />
-  </b-form-group>
-                <Icon
-                  icon="mdi:chevron-down"
-                  width="18"
-                  height="18"
-                  class="suffix"
-                />
-              </div>
+                <b-form-group label="Pilih Tim" class="mb-2">
+                  <SearchableSelect
+                    v-model="draft.teamId"
+                    :options="selectOptions"
+                    placeholder="Select team name"
+                    search-placeholder="Select team name"
+                    :clearable="true"
+                    :show-empty-option="true"
+                    @input="onPickTeam"
+                    class="ss-inline"
+                  />
+                </b-form-group>
             </td>
             <td>
               <input
@@ -133,9 +125,7 @@
 
 <script>
 import { Icon } from "@iconify/vue2";
-import { ipcRenderer } from "electron";
 import SearchableSelect from "@/components/SearchableSelect.vue";
-
 
 export default {
   name: "TeamPanel",
@@ -151,16 +141,15 @@ export default {
     draft: { type: Object, default: null },
   },
   computed: {
-    teamsAvailableAll() {
-      return Array.isArray(this.teamsAvailable) ? this.teamsAvailable : [];
-    },
     selectOptions() {
-      const base = Array.isArray(this.teamsAvailable) ? this.teamsAvailable : [];
+      const base = Array.isArray(this.teamsAvailable)
+        ? this.teamsAvailable
+        : [];
       return base.map(function (t) {
         return {
-          value: (t.id !== undefined && t.id !== null) ? t.id : null, // hindari '??'
-          text: t.nameTeam + (t.bibTeam ? ' — ' + t.bibTeam : ''),
-          meta: t.bibTeam ? `BIB: ${t.bibTeam}` : '',
+          value: t.id !== undefined && t.id !== null ? t.id : null, // hindari '??'
+          text: t.nameTeam + (t.bibTeam ? " — " + t.bibTeam : ""),
+          meta: t.bibTeam ? `BIB: ${t.bibTeam}` : "",
           disabled: !!(t.disabled || t.bibConflict),
         };
       });
@@ -170,13 +159,7 @@ export default {
     onPickTeam(val) {
       this.$emit("draft-change", {
         ...(this.draft || {}),
-        teamId: val
-      });
-    },
-    onTeamChange(e) {
-      this.$emit("draft-change", {
-        ...(this.draft || {}),
-        teamId: e.target.value,
+        teamId: val,
       });
     },
     onBibChange(e) {
@@ -214,28 +197,6 @@ export default {
       }
       if (ok) this.$emit("delete-row", row); // ⬅️ emit objek row lengkap
     },
-    // startRace(params) {
-    //   console.log(params, "<<< checked teams");
-    //   // INSERT ICP to TABLE TEAMS
-    //   // this.$router.push(`/event-detail/${this.$route.params.id}/sprint-race`);
-
-    //   // Periksa apakah draft dan teamId tersedia
-    //   //   if (this.draft && this.draft.teamId) {
-    //   //     const selectedTeam = this.teamsAvailable.find(
-    //   //       (team) => team.id === this.draft.teamId
-    //   //     );
-
-    //   //     if (selectedTeam) {
-    //   //       console.log("Tim yang dipilih:", selectedTeam.nameTeam);
-    //   //       // Kirim pesan atau logika lain jika diperlukan
-    //   //       // ipcRenderer.send("get-alert-saved", { ... });
-    //   //     } else {
-    //   //       console.error("Tim tidak ditemukan!");
-    //   //     }
-    //   //   } else {
-    //   //     console.error("Team ID belum dipilih!");
-    //   //   }
-    // },
     startRace() {
       // kirim identity + rows milik panel ini
       this.$emit("start-race", {
@@ -245,39 +206,6 @@ export default {
         initialName: this.initialName,
         rows: Array.isArray(this.rows) ? this.rows : [],
       });
-    },
-    goTo(val, payload, teamTitle) {
-      // Validasi form
-      let formValid = this.validateForm();
-      if (formValid) {
-        // Menentukan jenis kategori berdasarkan event
-        val =
-          val === "SPRINT"
-            ? "sprint-race"
-            : val == "SLALOM"
-            ? "slalom-race"
-            : val == "DRR"
-            ? "drr-race"
-            : val == "HEAD2HEAD"
-            ? "head2head-race"
-            : val;
-
-        // Menyimpan data ke localStorage
-        const obj = JSON.stringify(payload);
-        localStorage.setItem("participantByCategories", obj);
-        localStorage.setItem("currentCategories", teamTitle);
-
-        // Navigasi ke halaman berdasarkan kategori
-        this.$router.push(`/event-detail/${this.$route.params.id}/${val}`);
-      } else {
-        // Jika form tidak valid, kirim notifikasi
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail:
-            "Fill in the pre-Start and interval first, before starting the race",
-          message: "Ups Sorry",
-        });
-      }
     },
   },
 };
@@ -318,16 +246,6 @@ export default {
 }
 
 /* konsisten padding panel */
-.btn-start {
-  appearance: none;
-  border: 1px solid #d0d9e8;
-  background: #f4f7fb;
-  color: #56627a;
-  border-radius: 10px;
-  padding: 6px 12px;
-  font-weight: 700;
-  line-height: 1;
-}
 .panel-body {
   padding: 10px 16px 6px 16px;
 }
@@ -378,9 +296,6 @@ export default {
 }
 
 /* ===== Input & Select (look lembut) ===== */
-.field {
-  position: relative;
-}
 .input {
   width: 100%;
   height: 38px;
@@ -396,14 +311,7 @@ export default {
   border-color: #9ec5ff;
   box-shadow: 0 0 0 4px rgba(42, 104, 196, 0.15);
 }
-.suffix {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: #7b8aa6;
-}
+
 
 /* ===== Tombol aksi (kanan) ===== */
 .text-right {
@@ -444,102 +352,111 @@ export default {
   padding: 8px 14px;
 }
 
-.team-select {
-  max-height: 70px;     /* tinggi pas, muat ±8 item */
-  overflow-y: auto;      /* aktifkan scroll vertikal */
-  border-radius: 10px;   /* biar rounded */
-  border: 1px solid #d0d7e2;
-  background: #f9fafc;
-  font-size: 14px;
-  padding: 4px 8px;
-}
-
-.team-select option[disabled] {
-  color: #999;             /* warna lebih redup utk disabled */
-  background: #f1f3f7;     /* latar belakang abu */
-  font-style: italic;
-}
-
 /* ==== SearchableSelect tweaks agar mirip mockup ==== */
 
 /* lebar penuh di dalam sel tabel */
-:deep(td) .ss-inline { width: 100%; }
+:deep(td) .ss-inline {
+  width: 100%;
+}
 
 /* tombol tertutup = single border putih, rounded 12px */
-:deep(.ss-inline .ss-toggle){
+:deep(.ss-inline .ss-toggle) {
   min-height: 46px;
   border-radius: 12px;
-  background: #FFFFFF;
-  border: 1px solid #D6DFEA; /* lebih soft */
+  background: #ffffff;
+  border: 1px solid #d6dfea; /* lebih soft */
   padding: 10px 14px;
 }
-:deep(.ss-inline .ss-toggle:hover){
-  background:#FFFFFF;
-  border-color:#C9D6E8;
+:deep(.ss-inline .ss-toggle:hover) {
+  background: #ffffff;
+  border-color: #c9d6e8;
 }
-:deep(.ss-inline .ss-toggle--open){
-  background:#FFFFFF;
-  border-color:#9EC5FF;
-  box-shadow: 0 0 0 3px rgba(42,104,196,0.12);
+:deep(.ss-inline .ss-toggle--open) {
+  background: #ffffff;
+  border-color: #9ec5ff;
+  box-shadow: 0 0 0 3px rgba(42, 104, 196, 0.12);
 }
 
 /* posisi dropdown persis di bawah tombol */
-:deep(.ss-inline .dropdown-menu){
+:deep(.ss-inline .dropdown-menu) {
   margin-top: 6px !important;
 }
 
 /* panel dropdown = kartu putih dengan padding */
-:deep(.ss-inline .ss-panel){
+:deep(.ss-inline .ss-panel) {
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #E6EBF4;
-  box-shadow: 0 16px 32px rgba(31,56,104,0.12);
-  background: #FFFFFF;
+  border: 1px solid #e6ebf4;
+  box-shadow: 0 16px 32px rgba(31, 56, 104, 0.12);
+  background: #ffffff;
 }
 
 /* search bar di dalam panel (ikon di kiri, input rata) */
-:deep(.ss-inline .ss-search){
-  background:#FFFFFF;
-  border:1px solid #E5EBF4;
-  border-radius:10px;
+:deep(.ss-inline .ss-search) {
+  background: #ffffff;
+  border: 1px solid #e5ebf4;
+  border-radius: 10px;
   padding: 8px 10px 8px 36px; /* ruang ikon kiri */
 }
-:deep(.ss-inline .ss-search__icon){ color:#7B8AA6; left:12px; }
-:deep(.ss-inline .ss-search__input){
-  font-size:14px; line-height:1.2;
+:deep(.ss-inline .ss-search__icon) {
+  color: #7b8aa6;
+  left: 12px;
+}
+:deep(.ss-inline .ss-search__input) {
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 /* tombol Clear kecil di sisi kanan search */
-:deep(.ss-inline .ss-search__clear){
-  padding:4px 10px; font-size:12px;
-  border-radius:8px; border:1px solid #E2E8F0;
+:deep(.ss-inline .ss-search__clear) {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
 }
 
 /* list item = kartu tipis, rounded, tanpa border tebal */
-:deep(.ss-inline .ss-list){ margin-top: 10px; max-height: 300px; overflow-y:auto; }
-:deep(.ss-inline .ss-item){
-  background:#FFFFFF;
-  border-radius:10px;
-  padding:12px 14px;
-  margin-bottom:8px;
-  box-shadow: inset 0 0 0 1px #EEF2F7; /* garis tipis */
+:deep(.ss-inline .ss-list) {
+  margin-top: 10px;
+  max-height: 300px;
+  overflow-y: auto;
 }
-:deep(.ss-inline .ss-item:hover){
-  box-shadow: inset 0 0 0 1px #DDE7F4;
-  background:#F9FBFF;
+:deep(.ss-inline .ss-item) {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: inset 0 0 0 1px #eef2f7; /* garis tipis */
 }
-:deep(.ss-inline .ss-item__text){ color:#1F2940; font-size:14px; }
-:deep(.ss-inline .ss-item__meta){ color:#7A879A; }
+:deep(.ss-inline .ss-item:hover) {
+  box-shadow: inset 0 0 0 1px #dde7f4;
+  background: #f9fbff;
+}
+:deep(.ss-inline .ss-item__text) {
+  color: #1f2940;
+  font-size: 14px;
+}
+:deep(.ss-inline .ss-item__meta) {
+  color: #7a879a;
+}
 
 /* footer Kosongkan */
-:deep(.ss-inline .ss-footer){
-  margin-top: 6px; padding: 8px; text-align:center;
-  color:#1c4c7a; border-radius:8px; cursor:pointer;
+:deep(.ss-inline .ss-footer) {
+  margin-top: 6px;
+  padding: 8px;
+  text-align: center;
+  color: #1c4c7a;
+  border-radius: 8px;
+  cursor: pointer;
 }
-:deep(.ss-inline .ss-footer:hover){ background:#F5F9FF; }
+:deep(.ss-inline .ss-footer:hover) {
+  background: #f5f9ff;
+}
 
 /* HAPUS efek lama dari wrapper .field & ikon suffix (tidak dipakai lagi) */
-.field .suffix { display: none !important; }
+.field .suffix {
+  display: none !important;
+}
 
 /* ===== Responsif kecil ===== */
 @media (max-width: 576px) {

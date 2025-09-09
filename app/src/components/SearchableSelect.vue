@@ -7,7 +7,6 @@
     @show="onShow"
     @hidden="onHidden"
     :offset="6"
-    :right="false"
   >
     <!-- Tombol: tampak seperti input -->
     <template #button-content>
@@ -16,7 +15,6 @@
           {{ selectedLabel || placeholder }}
         </span>
         <span class="ss-toggle__chevron" :class="{ open: isOpen }" aria-hidden="true">
-          <!-- chevron svg, biar tak bergantung mdi -->
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
@@ -112,11 +110,25 @@ export default {
     },
   },
   methods: {
-    onShow() { this.isOpen = true; this.$nextTick(() => this.$refs.search && this.$refs.search.focus()); },
-    onHidden() { this.isOpen = false; this.search = ''; },
-    select(opt) { this.$emit('input', opt.value); this.$emit('change', opt); this.$refs.dd.hide(true); },
-    clearSelection() { this.$emit('input', null); this.$emit('change', null); },
-    setEmpty() { this.$emit('input', ''); this.$emit('change', null); this.$refs.dd.hide(true); },
+    onShow() {
+      this.isOpen = true;
+      this.$nextTick(() => this.$refs.search && this.$refs.search.focus());
+    },
+    onHidden() {
+      this.isOpen = false;
+      this.search = '';
+    },
+    select(opt) {
+      this.$emit('input', opt.value);
+      this.$refs.dd.hide(true);
+    },
+    clearSelection() {
+      this.$emit('input', null);
+    },
+    setEmpty() {
+      this.$emit('input', '');
+      this.$refs.dd.hide(true);
+    },
   },
 };
 </script>
@@ -124,8 +136,9 @@ export default {
 <style scoped>
 /* ==== Closed state (button as input) ==== */
 .ss :deep(.dropdown-toggle) {
-  /* hilangkan default toggle */
-  padding: 0; border: 0; background: transparent !important;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
 }
 .ss-toggle{
   width: 100%;
@@ -153,7 +166,7 @@ export default {
   width: 100%;
   padding: 0;
   border: 0;
-  background: transparent; /* biar panel kita yang tampil */
+  background: transparent; /* panel custom di bawah ini */
 }
 .ss-panel{
   background:#fff;

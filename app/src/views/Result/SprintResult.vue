@@ -33,7 +33,10 @@
 
       <!-- EVENT HEADER -->
       <div class="event-header">
-        <h2 class="event-name">{{ eventInfo.eventName || "-" }}</h2>
+        <h2 class="event-name">
+          {{ eventInfo.eventName || "-" }}
+          <span class="muted">| SPRINT RESULT</span>
+        </h2>
         <h4 class="event-location">
           {{ eventInfo.riverName || "-" }}, {{ eventInfo.addressCity || "-" }}
         </h4>
@@ -67,7 +70,6 @@
               <th>Start Time</th>
               <th>Finish Time</th>
               <th>Race Time</th>
-              <th>Penalty</th>
               <th>Penalty Time</th>
               <th>Result</th>
               <th>Ranked</th>
@@ -86,7 +88,6 @@
               <td>{{ r.startTime || "00:00:000" }}</td>
               <td>{{ r.finishTime || "00:00:000" }}</td>
               <td>{{ r.raceTime || "00:00:000" }}</td>
-              <td class="text-center">{{ r.totalPenalty || 0 }}</td>
               <td>{{ r.penaltyTime || "00:00:000" }}</td>
               <td class="bold">{{ r.resultTime || "00:00:000" }}</td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
@@ -113,7 +114,7 @@
       </div>
     </div>
 
-    <!-- ===== Komponen PDF (disembunyikan dari layar, tapi tetap ada di DOM) ===== -->
+    <!-- Komponen PDF (disembunyikan dari layar, tapi ada di DOM) -->
     <div class="pdf-host sr-only" ref="pdfHost">
       <SprintPdf
         :data="pdfEventData"
@@ -126,11 +127,11 @@
 
 <script>
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
-import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue"; // <-- simpan komponen pdf result-mu dengan nama ini
+import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 
-/* ========= Helpers untuk baca localStorage ========= */
+/* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 const EVENT_DETAILS_KEY = "eventDetails";
 
@@ -141,7 +142,6 @@ function safeParse(str, fallback) {
     return fallback;
   }
 }
-
 function evIdToString(ev) {
   if (ev && ev._id) {
     if (typeof ev._id === "object" && ev._id.$oid) return String(ev._id.$oid);
@@ -167,16 +167,14 @@ function pickEventFromStore() {
     !Array.isArray(store) &&
     !store.eventName &&
     !store._id;
-  if (isDict)
+  if (isDict) {
     return activeId && store[activeId]
       ? store[activeId]
       : Object.values(store)[0] || {};
-
+  }
   if (Array.isArray(store)) {
     if (activeId) {
-      const found = store.find(function (ev) {
-        return evIdToString(ev) === activeId;
-      });
+      const found = store.find((ev) => evIdToString(ev) === activeId);
       if (found) return found;
     }
     return store[0] || {};
@@ -231,7 +229,7 @@ export default {
   },
 
   computed: {
-    // Info event dari localStorage (fallback ke query bila ada yang kosong)
+    // Info event dari localStorage (fallback ke query)
     eventInfo() {
       const ev = pickEventFromStore();
       const q = this.$route.query || {};
@@ -254,13 +252,11 @@ export default {
       };
     },
 
-    // ====== Data untuk komponen PDF ======
+    // Data untuk komponen PDF
     pdfEventData() {
-      // komponen PDF memerlukan field seperti di template pdf (data.*)
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
     pdfParticipants() {
-      // Komponen PDF mengharapkan struktur: { nameTeam, bibTeam, result: {...} }
       return (this.results || []).map((r) => ({
         nameTeam: r.nameTeam,
         bibTeam: r.bibTeam,
@@ -280,7 +276,6 @@ export default {
       }));
     },
     pdfCategories() {
-      // Ambil dari payload bucket jika ada
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
@@ -308,7 +303,9 @@ export default {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
       return m ? m.score : 0;
     },
-    normalizeResult(r) {
+
+    /** Normalisasi baris hasil; aman untuk 2 bentuk: flat atau r.result */
+    normalizeResult(raw) {
       const base = {
         startTime: "",
         finishTime: "",
@@ -325,20 +322,93 @@ export default {
         ranked: "",
         score: "",
       };
-      let obj = r;
-      if (Array.isArray(obj)) obj = obj[0] || {};
-      if (!obj || typeof obj !== "object") obj = {};
-      const merged = { ...base, ...obj };
-      if (
-        !merged.totalPenalty &&
-        (merged.startPenalty || merged.finishPenalty)
-      ) {
-        merged.totalPenalty =
-          Number(merged.startPenalty) + Number(merged.finishPenalty);
+
+      // dukung schema lama/baru
+      const src =
+        raw && raw.result && typeof raw.result === "object"
+          ? { ...raw, ...raw.result } // flatten
+          : { ...raw };
+
+      const merged = {
+        ...base,
+        startTime: String(src.startTime || ""),
+        finishTime: String(src.finishTime || ""),
+        raceTime: String(src.raceTime || ""),
+        penalty: Number(src.penalty) || 0,
+        totalPenalty: Number(src.totalPenalty) || 0,
+        startPenalty: Number(src.startPenalty) || 0,
+        finishPenalty: Number(src.finishPenalty) || 0,
+        startPenaltyTime: String(src.startPenaltyTime || "00:00:00.000"),
+        finishPenaltyTime: String(src.finishPenaltyTime || "00:00:00.000"),
+        totalPenaltyTime: String(
+          src.totalPenaltyTime || src.penaltyTime || "00:00:00.000"
+        ),
+        penaltyTime: String(
+          src.penaltyTime || src.totalPenaltyTime || "00:00:00.000"
+        ),
+        totalTime: String(src.totalTime || ""),
+        ranked:
+          src.ranked === 0 || src.ranked === "0" ? 0 : Number(src.ranked) || "",
+        score:
+          src.score === 0 || src.score === "0" ? 0 : Number(src.score) || "",
+      };
+
+      // hitung totalPenalty jika belum ada
+      if (!merged.totalPenalty) {
+        merged.totalPenalty = merged.startPenalty + merged.finishPenalty;
       }
-      if (!merged.penaltyTime)
-        merged.penaltyTime = merged.totalPenaltyTime || "00:00:00.000";
+
       return merged;
+    },
+
+    /** "HH:MM:SS.mmm" -> ms (Infinity kalau kosong/tidak valid) */
+    timeToMs(str) {
+      if (!str) return Number.POSITIVE_INFINITY;
+      const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
+      const [ss = "0", ms = "0"] = String(ssms).split(".");
+      const h = parseInt(hh, 10) || 0;
+      const m = parseInt(mm, 10) || 0;
+      const s = parseInt(ss, 10) || 0;
+      const mil = parseInt(ms, 10) || 0;
+      return h * 3600000 + m * 60000 + s * 1000 + mil;
+    },
+
+    /** Hitung rank & score otomatis */
+    computeRanksAndScores(rows) {
+      const withTime = rows
+        .map((r, i) => {
+          const t = r.resultTime || r.totalTime || r.raceTime || "";
+          return { i, ms: this.timeToMs(t) };
+        })
+        .filter(
+          (x) => Number.isFinite(x.ms) && x.ms !== Number.POSITIVE_INFINITY
+        );
+
+      withTime.sort((a, b) => a.ms - b.ms);
+
+      withTime.forEach((item, idx) => {
+        const rank = idx + 1;
+        rows[item.i].ranked = rank;
+        rows[item.i].score = this.getScoreByRanked(rank);
+      });
+
+      rows.forEach((r) => {
+        if (!r.ranked || r.ranked === "-" || Number(r.ranked) <= 0) {
+          r.ranked = r.ranked ? r.ranked : "-";
+          r.score =
+            r.score !== undefined && r.score !== null && r.score !== ""
+              ? Number(r.score) || 0
+              : 0;
+        }
+      });
+
+      rows.sort((a, b) => {
+        const ra = Number(a.ranked) || Infinity;
+        const rb = Number(b.ranked) || Infinity;
+        return ra - rb;
+      });
+
+      return rows;
     },
 
     async loadSprintResult() {
@@ -347,68 +417,86 @@ export default {
         this.error = "Parameter hasil tidak lengkap.";
         return;
       }
+
       this.loading = true;
       this.error = "";
+
+      // kirim permintaan
       ipcRenderer.send("get-sprint-result", q);
 
+      // timeout failsafe supaya UI tidak menggantung
+      let timeoutId;
+      const TIMEOUT_MS = 8000;
+
       await new Promise((resolve) => {
-        ipcRenderer.once("get-sprint-result-reply", (_e, res) => {
+        timeoutId = setTimeout(() => {
           this.loading = false;
-          if (res && res.ok && Array.isArray(res.items)) {
-            const rows = [];
-            res.items.forEach((doc) => {
-              const arr = Array.isArray(doc.result)
-                ? doc.result
-                : [doc.result || {}];
-              arr.forEach((r) => {
-                const R = this.normalizeResult(r);
-                rows.push({
-                  nameTeam: r.nameTeam || doc.nameTeam || "",
-                  bibTeam: r.bibTeam || doc.bibTeam || "",
-                  startTime: R.startTime || "",
-                  finishTime: R.finishTime || "",
-                  raceTime: R.raceTime || "",
-                  totalPenalty: Number(R.totalPenalty) || 0,
-                  penaltyTime:
-                    R.totalPenaltyTime || R.penaltyTime || "00:00:00.000",
-                  resultTime: R.penaltyTime
-                    ? R.totalTime || R.raceTime || ""
-                    : R.raceTime || "",
-                  totalTime: R.totalTime || "",
-                  ranked: R.ranked || "",
-                  score:
-                    R.score !== undefined && R.score !== null && R.score !== ""
-                      ? Number(R.score)
-                      : this.getScoreByRanked(R.ranked),
+          this.error = "Gagal memuat hasil (timeout). Coba ulangi.";
+          resolve();
+        }, TIMEOUT_MS);
+
+        ipcRenderer.once("get-sprint-result-reply", (_e, res) => {
+          clearTimeout(timeoutId);
+          try {
+            if (res && res.ok && Array.isArray(res.items)) {
+              const rows = [];
+              res.items.forEach((doc) => {
+                const arr = Array.isArray(doc.result)
+                  ? doc.result
+                  : [doc.result || {}];
+                arr.forEach((r) => {
+                  const R = this.normalizeResult(r);
+                  rows.push({
+                    nameTeam: r.nameTeam || doc.nameTeam || "",
+                    bibTeam: r.bibTeam || doc.bibTeam || "",
+                    startTime: R.startTime || "",
+                    finishTime: R.finishTime || "",
+                    raceTime: R.raceTime || "",
+                    totalPenalty: Number(R.totalPenalty) || 0,
+                    penaltyTime:
+                      R.totalPenaltyTime || R.penaltyTime || "00:00:00.000",
+                    resultTime: R.penaltyTime
+                      ? R.totalTime || R.raceTime || ""
+                      : R.raceTime || "",
+                    totalTime: R.totalTime || "",
+                    ranked: Number(R.ranked) || 0,
+                    score:
+                      R.score !== undefined &&
+                      R.score !== null &&
+                      R.score !== ""
+                        ? Number(R.score)
+                        : 0,
+                  });
                 });
               });
-            });
-            rows.sort(
-              (a, b) =>
-                (Number(a.ranked) || Infinity) - (Number(b.ranked) || Infinity)
-            );
-            this.results = rows;
-          } else {
+
+              this.results = this.computeRanksAndScores(rows);
+              this.loading = false;
+            } else {
+              this.results = [];
+              this.error = (res && res.error) || "Gagal memuat hasil.";
+              this.loading = false;
+            }
+          } catch (err) {
+            // jika parsing error, jangan biarkan UI menggantung
             this.results = [];
-            this.error = (res && res.error) || "Gagal memuat hasil.";
+            this.error = "Terjadi kesalahan saat memproses data.";
+            this.loading = false;
+          } finally {
+            resolve();
           }
-          resolve();
         });
       });
     },
 
-    // ====== PDF ======
+    // PDF
     async generatePdf() {
-      // butuh elemen DOM dari komponen PDF
       const host = this.$refs.pdfHost;
       if (!host || !window.html2pdf) {
         this.error = "PDF generator tidak ditemukan.";
         return;
       }
-
-      // pastikan konten sudah render
       await this.$nextTick();
-
       const filename =
         (this.eventInfo.eventName ? `${this.eventInfo.eventName} - ` : "") +
         "Sprint Result.pdf";
@@ -423,7 +511,7 @@ export default {
 
       try {
         await window.html2pdf().set(opt).from(host).save();
-      } catch (e) {
+      } catch {
         this.error = "Gagal membuat PDF.";
       }
     },
@@ -552,7 +640,7 @@ export default {
   color: #6a6f7a;
 }
 
-/* sr-only: hadir di DOM untuk html2pdf, tapi tidak tampak di layar */
+/* sr-only untuk html2pdf */
 .sr-only {
   position: absolute !important;
   left: -99999px !important;

@@ -14,7 +14,9 @@
         ><span style="background-color: #99cc00; color: #ffffff"
           >SCORE BOARD&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
           &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{{ categories }}</span
+          &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{{
+            categories
+          }}</span
         ></strong
       >
     </p>
@@ -45,13 +47,13 @@
     </p>
 
     <b-table
-  striped
-  bordered
-  hover
-  :items="dataParticipant"
-  :fields="fields"
-  style="font-size: 8px"
->
+      striped
+      bordered
+      hover
+      :items="dataParticipant"
+      :fields="fields"
+      style="font-size: 8px"
+    >
       <template v-slot:cell(num)="data">
         {{ data.index + 1 }}
       </template>
@@ -112,9 +114,9 @@
 <script>
 export default {
   props: {
-   data: { type: Object, required: true },
-  dataParticipant: { type: Array, required: true },
-  categories: { type: String, default: "" }
+    data: { type: Object, required: true },
+    dataParticipant: { type: Array, required: true },
+    categories: { type: String, default: "" },
   },
   data() {
     return {

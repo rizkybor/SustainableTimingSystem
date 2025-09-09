@@ -1,36 +1,10 @@
 <template>
   <div class="sts-page">
-    <!-- 1) NAVBAR -->
-    <!-- <b-navbar toggleable="lg" type="light" variant="white" class="sts-navbar shadow-sm">
-      <b-container>
-        <b-navbar-brand class="d-flex align-items-center">
-          <div class="brand-box mr-2 d-flex align-items-center justify-content-center">
-            <Icon icon="mdi:image" width="18" height="18" />
-          </div>
-          <span class="font-weight-bold">Sustainable Timing System</span>
-        </b-navbar-brand>
-
-        <b-navbar-toggle target="main-nav"></b-navbar-toggle>
-
-        <b-collapse id="main-nav" is-nav>
-          <b-navbar-nav class="ml-3">
-            <b-nav-item @click="goTo('')" active>Home</b-nav-item>
-            <b-nav-item @click="goTo('events')">Events</b-nav-item>
-            <b-nav-item @click="goTo('team')">Team</b-nav-item>
-          </b-navbar-nav>
-
-          <b-navbar-nav class="ml-auto">
-            <b-nav-item @click="goTo('login')">Login/Create account</b-nav-item>
-          </b-navbar-nav>
-        </b-collapse>
-      </b-container>
-    </b-navbar> -->
-
     <!-- 2) JUMBOTRON -->
     <section class="sts-jumbotron">
       <b-container>
         <b-row>
-          <b-col cols="12" md="7" class="py-4">
+          <b-col cols="12" md="7" class="py-4 mt-5">
             <h1 class="display-5 font-weight-bold mb-3">
               Sustainable Timing System
             </h1>
@@ -52,9 +26,9 @@
             class="d-flex align-items-center justify-content-center mt-4 mt-md-0"
           >
             <div
-              class="hero-image placeholder d-flex align-items-center justify-content-center"
+              class="hero-image placeholder d-flex align-items-center justify-content-center m-5"
             >
-              <Icon icon="mdi:image" width="64" height="64" />
+              <!-- <Icon icon="mdi:image" width="64" height="64" /> -->
             </div>
           </b-col>
         </b-row>
@@ -124,7 +98,7 @@
         <div v-if="!loading && events.length" class="slider-track">
           <article
             v-for="(ev, idx) in events"
-            :key="ev._id && ev._id.id ? ev._id.id : idx"
+            :key="_idToHex(ev._id, idx)"
             class="event-card"
             @click="clickRow(ev)"
           >
@@ -198,7 +172,7 @@
               </div>
               <div class="font-weight-bold text-truncate">{{ t.name }}</div>
             </div>
-            <small class="text-muted d-block mb-3">{{ t.count }} team</small>
+            <small class="text-muted d-block mb-3">{{ t.typeTeam }}</small>
             <b-button
               size="sm"
               variant="secondary"
@@ -234,18 +208,33 @@ export default {
       events: [],
       loading: false,
       // contoh data untuk slider Teams; sambungkan ke sumber aslimu bila sudah ada
-      teams: [
-        { name: "FAJI DKI Jakarta", count: 4 },
-        { name: "FAJI Jawa Barat", count: 3 },
-        { name: "FAJI Jawa Tengah", count: 5 },
-        { name: "FAJI DIY", count: 2 },
-      ],
+      teams: [],
     };
   },
   mounted() {
     this.getEvents();
+    this.loadTeamsRegistered();
   },
   methods: {
+    _idToHex(_id, fallback = "") {
+      // case: { $oid: "..." }
+      if (_id && _id.$oid) return String(_id.$oid);
+
+      // case: BSON ObjectId { id: Uint8Array }
+      if (_id && _id.id) {
+        try {
+          return Array.from(_id.id)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        } catch {}
+      }
+
+      // case: string langsung
+      if (typeof _id === "string") return _id;
+
+      // fallback ke index atau string kosong
+      return String(fallback);
+    },
     formatDate(inputDate) {
       if (!inputDate) return "-";
 
@@ -285,19 +274,34 @@ export default {
         });
       }, 400);
     },
+    loadTeamsRegistered() {
+      ipcRenderer.send("teams:get-all");
+      ipcRenderer.once("teams:get-all-reply", (_e, res) => {
+        const items =
+          res && res.ok && Array.isArray(res.items) ? res.items : [];
+
+        // Group by nameTeam+typeTeam => { name, typeTeam, count }
+        const grouped = items.reduce((acc, t) => {
+          const name = String(t.nameTeam || "Unknown").trim();
+          const typeTeam = String(t.typeTeam || "Unknown").trim();
+          const key = `${name}__${typeTeam}`;
+
+          if (!acc[key]) {
+            acc[key] = { name, typeTeam, count: 0 };
+          }
+          acc[key].count += 1;
+          return acc;
+        }, {});
+
+        this.teams = Object.values(grouped);
+      });
+    },
     goTo(path) {
       if (!path) return this.$router.push("/");
       this.$router.push("/" + path);
     },
     clickRow(item) {
-      // _id.id adalah Uint8Array → ubah ke hex
-      var bytes = Array.prototype.slice.call(item._id.id);
-      var idHex = bytes
-        .map(function (b) {
-          var h = b.toString(16);
-          return h.length === 1 ? "0" + h : h;
-        })
-        .join("");
+      const idHex = this._idToHex(item._id, 0);
       this.$router.push("/event-detail/" + idHex);
     },
     viewTeam(team) {
@@ -339,7 +343,8 @@ export default {
   max-width: 100%;
   height: 220px;
   border-radius: 20px;
-  background: #dfe7f7;
+  /* background: #dfe7f7; */
+  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=40&w=400&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   box-shadow: 0 6px 24px rgba(31, 51, 117, 0.08);
 }
 

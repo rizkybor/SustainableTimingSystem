@@ -97,115 +97,8 @@
       </div>
     </div>
 
-    <!-- OPERATION TIME (shared component) -->
-    <OperationTimePanel
-      :digit-id="digitId"
-      :digit-time="digitTime"
-      :participant="participantArr"
-      :digit-time-start.sync="digitTimeStart"
-      :digit-time-finish.sync="digitTimeFinish"
-      @update-time="updateTime"
-    />
-
-    <!-- LIST RESULT -->
-    <div class="px-4 mt-4">
-      <div class="card-body">
-        <h4>List Result One by One</h4>
-        <b-row>
-          <b-col>
-            <div
-              class="table-wrapper"
-              aria-label="Scrollable results table"
-              role="region"
-            >
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Team Name</th>
-                    <th>BIB</th>
-                    <th>Start Time</th>
-                    <th>Finish Time</th>
-                    <th>Race Time</th>
-                    <th>Penalties</th>
-                    <th>Penalty Time</th>
-                    <th>Result</th>
-                    <th>Ranked</th>
-                    <th>Score</th>
-                    <th v-if="editResult">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, index) in participantArr" :key="index">
-                    <td>{{ index + 1 }}</td>
-                    <td class="large-bold text-strong max-char">
-                      {{ item.nameTeam }}
-                    </td>
-                    <td class="large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-monospace">{{ item.result.startTime }}</td>
-                    <td class="text-monospace">{{ item.result.finishTime }}</td>
-                    <td class="large-bold text-monospace">
-                      {{ item.result.raceTime }}
-                    </td>
-
-                    <!-- Penalties (single dropdown like Sprint) -->
-                    <td>
-                      <b-select
-                        v-if="item.result.startTime"
-                        v-model="item.result.penalty"
-                        @change="updateTimePen($event, item)"
-                      >
-                        <option
-                          v-for="pen in dataPenalties"
-                          :key="pen.value"
-                          :value="pen.value"
-                        >
-                          {{ pen.label }}
-                        </option>
-                      </b-select>
-                    </td>
-
-                    <td class="text-monospace large-bold">
-                      {{ item.result.penaltyTime }}
-                    </td>
-                    <td class="text-monospace large-bold">
-                      {{
-                        item.result.penaltyTime
-                          ? item.result.totalTime
-                          : item.result.raceTime
-                      }}
-                    </td>
-                    <td class="large-bold">{{ item.result.ranked }}</td>
-                    <td class="large-bold">
-                      {{ getScoreByRanked(item.result.ranked) }}
-                    </td>
-
-                    <td v-if="editResult">
-                      <button
-                        type="button"
-                        class="btn btn-warning"
-                        @click="openModal(item)"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <br />
-          </b-col>
-        </b-row>
-      </div>
-
-      <b-button @click="goTo" variant="outline-info" class="custom-button">
-        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-      </b-button>
-    </div>
-
     <!-- BRACKET -->
-    <!-- BRACKET (refined) -->
-    <div class="px-4 mt-4">
+    <div class="px-4 mt-4 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <h4 class="mb-0">Bracket Head 2 Head</h4>
         <div class="d-flex" style="gap: 8px">
@@ -386,11 +279,20 @@
       <!-- /bracket -->
     </div>
 
+    <!-- OPERATION TIME (shared component) -->
+    <OperationTimePanel
+      :digit-id="digitId"
+      :digit-time="digitTime"
+      :participant="participantArr"
+      :digit-time-start.sync="digitTimeStart"
+      :digit-time-finish.sync="digitTimeFinish"
+      @update-time="updateTime"
+    />
 
-        <!-- LIST RESULT -->
+    <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>List Result Head 2 Head</h4>
+        <h4>List Result One by One</h4>
         <b-row>
           <b-col>
             <div

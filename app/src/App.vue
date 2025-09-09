@@ -1,42 +1,42 @@
 <template>
-  <div id="app">
+  <div id="app" class="app-shell">
     <!-- <img alt="Vue logo" src="./assets/logo.png"> -->
     <div v-if="showNavbar">
       <Navbar />
     </div>
     <div>
       <Navbar />
-      <br/>
-      <br/>
-      <br/>
-      <br/>
-      <router-view></router-view>
+      <br />
+      <br />
+      <br />
+      <br />
+<main class="app-main">
+      <router-view />
+    </main>
     </div>
-    <FooterVue />
+    <FooterVue class="app-footer" />
   </div>
 </template>
-
 
 <script>
 import FooterVue from "./components/Footer.vue";
 import Navbar from "./components/Navbar.vue";
-import Banner from "./components/Banner.vue";
 
 export default {
   name: "app",
   components: {
     Navbar,
     FooterVue,
-    Banner
   },
   computed: {
     showNavbar() {
       let currentPath = this.$route.path;
-      return !(currentPath.includes("sprint-race") || currentPath.includes("slalom"));
-    }
-  }
+      return !(
+        currentPath.includes("sprint-race") || currentPath.includes("slalom")
+      );
+    },
+  },
 };
-
 </script>
 
 <style>
@@ -49,5 +49,25 @@ export default {
 .content {
   padding: 50px;
   margin-top: 10vh;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+.app-shell {
+  min-height: 100vh; /* setinggi viewport */
+  display: flex;
+  flex-direction: column; /* kolom: header, main, footer */
+}
+
+.app-main {
+  flex: 1 0 auto; /* isi mengembang mendorong footer ke bawah */
+}
+
+.app-footer {
+  margin-top: auto; /* pastikan footer selalu di dasar */
 }
 </style>

@@ -590,14 +590,50 @@ export default {
         ""
       ).toUpperCase();
       const bucket = this._getBucket(ev, divisionName, raceName, init);
-      const usedBibs = new Set(
-        (bucket && bucket.teams ? bucket.teams : []).map((t) =>
-          String(t.bibTeam).trim()
+      // const usedBibs = new Set(
+      //   (bucket && bucket.teams ? bucket.teams : []).map((t) =>
+      //     String(t.bibTeam).trim()
+      //   )
+      // );
+      // return (this.availableTeams || []).filter(
+      //   (t) => !usedBibs.has(String(t.bibTeam).trim())
+      // );
+      const teamsInBucket = bucket && bucket.teams ? bucket.teams : [];
+      // dukung data lama (mungkin belum ada teamId)
+      const usedIds = new Set(
+        teamsInBucket
+          .map((t) => (t.teamId ? String(t.teamId) : ""))
+          .filter(Boolean)
+      );
+      const usedNames = new Set(
+        teamsInBucket.map((t) =>
+          String(t.nameTeam || "")
+            .trim()
+            .toUpperCase()
         )
       );
-      return (this.availableTeams || []).filter(
-        (t) => !usedBibs.has(String(t.bibTeam).trim())
+      const usedBibs = new Set(
+        teamsInBucket.map((t) => String(t.bibTeam || "").trim())
       );
+
+      // Kembalikan semua opsi, tapi tandai disabled bila:
+      // - teamId sudah dipakai di panel ini ATAU
+      // - (fallback) nameTeam sudah dipakai di panel ini
+      // NOTE: kita tidak mem-filter keluar; biar terlihat tapi tidak bisa dipilih.
+      return (this.availableTeams || []).map((t) => {
+        const id = String(t.id || "");
+        const nm = String(t.nameTeam || "")
+          .trim()
+          .toUpperCase();
+        const alreadyUsed = (id && usedIds.has(id)) || usedNames.has(nm);
+        return {
+          ...t,
+          disabled: alreadyUsed,
+          // opsional: kalau BIB-nya sudah dipakai, juga disable untuk mencegah duplikat BIB
+          // (bisa kamu hilangkan kalau BIB mau boleh sama antar tim – biasanya tidak)
+          bibConflict: usedBibs.has(String(t.bibTeam || "").trim()),
+        };
+      });
     },
 
     /* ------------ akses data participant ------------ */
@@ -702,6 +738,7 @@ export default {
     _buildTeamRecord(eventName, teamObj) {
       const ev = String(eventName || "").toUpperCase();
       const base = {
+        teamId: teamObj.id ? String(teamObj.id) : "", // simpan id sumber tim
         nameTeam: teamObj.nameTeam,
         bibTeam: String(teamObj.bibTeam || "").trim(),
         startOrder: "",
@@ -807,17 +844,62 @@ export default {
       const bucket = this._ensureBucket(evName, div, race, init);
 
       // Cek duplicate BIB
-      if (
-        bucket.teams.some(
-          (t) => String(t.bibTeam).trim() === String(d.bib).trim()
-        )
-      )
-        return;
+      // if (
+      //   bucket.teams.some(
+      //     (t) => String(t.bibTeam).trim() === String(d.bib).trim()
+      //   )
+      // )
+      //   return;
 
+      // const srcTeam = (this.availableTeams || []).find(
+      //   (t) => String(t.id) === String(d.teamId)
+      // );
+      // if (!srcTeam) return;
+
+      // Cek duplicate TEAM di panel yang sama (pakai teamId; fallback nameTeam)
+      
       const srcTeam = (this.availableTeams || []).find(
         (t) => String(t.id) === String(d.teamId)
       );
       if (!srcTeam) return;
+
+      const willDuplicateTeam =
+        bucket.teams.some(
+          (t) => t.teamId && String(t.teamId) === String(srcTeam.id)
+        ) ||
+        bucket.teams.some(
+          (t) =>
+            String(t.nameTeam || "")
+              .trim()
+              .toUpperCase() ===
+            String(srcTeam.nameTeam || "")
+              .trim()
+              .toUpperCase()
+        );
+      if (willDuplicateTeam) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Tim sudah terdaftar di panel ini",
+          detail: `${srcTeam.nameTeam} sudah ada pada ${div}/${race} – ${
+            this.raceActive.selected.name
+          } (${init || "-"})`,
+        });
+        return;
+      }
+
+      // Cek duplicate BIB (di panel yang sama)
+      if (
+        bucket.teams.some(
+          (t) => String(t.bibTeam).trim() === String(d.bib).trim()
+        )
+      ) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "BIB sudah dipakai",
+          detail: `Nomor BIB ${d.bib} sudah digunakan di panel ini.`,
+        });
+        return;
+      }
 
       bucket.teams.push(
         this._buildTeamRecord(evName, { ...srcTeam, bibTeam: d.bib })

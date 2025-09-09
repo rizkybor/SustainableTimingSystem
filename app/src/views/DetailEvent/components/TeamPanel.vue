@@ -11,7 +11,6 @@
 
         <!-- Right: Actions -->
         <b-col cols="12" md="6" class="d-flex justify-content-md-end gap-2">
-
           <!-- 👇 BARU: tampil hanya jika ada result -->
           <b-button
             class="btn-add"
@@ -50,20 +49,22 @@
             <td class="muted">1</td>
             <td>
               <div class="field">
-                <select
-                  class="input"
-                  :value="draft.teamId || ''"
-                  @change="onTeamChange"
-                >
-                  <option value="" disabled>Select team name</option>
-                  <option
-                    v-for="t in teamsAvailableAll"
-                    :key="t.id"
-                    :value="t.id"
-                  >
-                    {{ t.nameTeam }}
-                  </option>
-                </select>
+                <b-form-group label="Pilih Tim">
+  <b-form-select
+    v-model="draft.teamId"
+    :options="teamsAvailable.map(t => ({
+      value: t.id,
+      text: t.nameTeam + (t.bibTeam ? ' — ' + t.bibTeam : ''),
+      disabled: t.disabled || t.bibConflict
+    }))"
+    :select-size="8"
+    class="team-select"
+  >
+    <template #first>
+      <b-form-select-option :value="''" disabled>Pilih tim…</b-form-select-option>
+    </template>
+  </b-form-select>
+</b-form-group>
                 <Icon
                   icon="mdi:chevron-down"
                   width="18"
@@ -426,6 +427,22 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+.team-select {
+  max-height: 70px;     /* tinggi pas, muat ±8 item */
+  overflow-y: auto;      /* aktifkan scroll vertikal */
+  border-radius: 10px;   /* biar rounded */
+  border: 1px solid #d0d7e2;
+  background: #f9fafc;
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
+.team-select option[disabled] {
+  color: #999;             /* warna lebih redup utk disabled */
+  background: #f1f3f7;     /* latar belakang abu */
+  font-style: italic;
 }
 
 /* ===== Responsif kecil ===== */

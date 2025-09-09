@@ -94,6 +94,21 @@
             </div>
           </b-col>
         </b-row>
+
+        <div class="d-flex flex-wrap mt-2" style="gap: 8px">
+          <span v-if="podium.gold" class="badge badge-success"
+            >🥇 Juara 1: {{ podium.gold }}</span
+          >
+          <span v-if="podium.silver" class="badge badge-primary"
+            >🥈 Juara 2: {{ podium.silver }}</span
+          >
+          <span v-if="podium.bronze" class="badge badge-warning"
+            >🥉 Juara 3: {{ podium.bronze }}</span
+          >
+          <span v-if="podium.fourth" class="badge badge-secondary"
+            >4th: {{ podium.fourth }}</span
+          >
+        </div>
       </div>
     </div>
 
@@ -260,7 +275,7 @@
                   >Auto-advance (BYE)</span
                 >
 
-                <div
+                <!-- <div
                   class="bracket__actions"
                   v-if="!round.bronze && m.team1.name && m.team2.name"
                 >
@@ -280,7 +295,29 @@
                   >
                     <Icon icon="mdi:crown-outline" /> Bottom Win
                   </button>
-                </div>
+                </div> -->
+
+                <div
+  class="bracket__actions"
+  v-if="m.team1.name && m.team2.name"
+>
+  <button
+    class="btn btn-xs btn-outline-success"
+    @click="advanceWinner(rIdx, mIdx, 1)"
+    title="Set winner: top"
+    :disabled="editBracketTeams"
+  >
+    <Icon icon="mdi:crown-outline" /> Top Win
+  </button>
+  <button
+    class="btn btn-xs btn-outline-primary"
+    @click="advanceWinner(rIdx, mIdx, 2)"
+    title="Set winner: bottom"
+    :disabled="editBracketTeams"
+  >
+    <Icon icon="mdi:crown-outline" /> Bottom Win
+  </button>
+</div>
 
                 <div class="bracket__winner" v-if="m.winner && m.winner.name">
                   <Icon icon="mdi:trophy-variant-outline" />
@@ -563,6 +600,12 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      podium: {
+        gold: null, // Juara 1
+        silver: null, // Juara 2
+        bronze: null, // Juara 3
+        fourth: null, // Juara 4
+      },
       currentRoundIndex: -1,
       editBracketTeams: false,
       rounds: [],
@@ -725,6 +768,18 @@ export default {
     },
   },
 
+  watch: {
+    rounds: {
+      deep: true,
+      handler() {
+        this.computePodium();
+      },
+    },
+    currentRoundIndex() {
+      this.computePodium();
+    },
+  },
+
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
     const ok = this.loadFromRaceStartPayload();
@@ -740,6 +795,55 @@ export default {
   },
 
   methods: {
+    /** Method podium config */
+    /** Cari round final (size==2) dan bronze (round.bronze) */
+    getFinalRound() {
+      return (this.rounds || []).find((r) => !r.bronze && r.size === 2) || null;
+    },
+    getBronzeRound() {
+      return (this.rounds || []).find((r) => r.bronze) || null;
+    },
+
+    /** Reset podium */
+    clearPodium() {
+      this.podium = { gold: null, silver: null, bronze: null, fourth: null };
+    },
+
+    /** Hitung podium dari keadaan Final & Bronze saat ini */
+    computePodium() {
+      this.clearPodium();
+
+      const final = this.getFinalRound();
+      if (final && final.matches && final.matches[0]) {
+        const fm = final.matches[0];
+        if (fm.winner && fm.winner.name) {
+          // Juara 1 = pemenang final
+          this.podium.gold = fm.winner.name;
+          // Juara 2 = lawan pemenang final
+          const runnerUp =
+            fm.winner.name === (fm.team1 && fm.team1.name)
+              ? fm.team2
+              : fm.team1;
+          if (runnerUp && runnerUp.name) this.podium.silver = runnerUp.name;
+        }
+      }
+
+      const bronze = this.getBronzeRound();
+      if (bronze && bronze.matches && bronze.matches[0]) {
+        const bm = bronze.matches[0];
+        if (bm.winner && bm.winner.name) {
+          // Juara 3 = pemenang bronze
+          this.podium.bronze = bm.winner.name;
+          // Juara 4 = lawan pemenang bronze
+          const fourth =
+            bm.winner.name === (bm.team1 && bm.team1.name)
+              ? bm.team2
+              : bm.team1;
+          if (fourth && fourth.name) this.podium.fourth = fourth.name;
+        }
+      }
+    },
+
     /** Babak configuration */
     // NEW: buat placeholder participant jika tim ada di bracket tapi belum ada di data
     normalizeTeamForViewPlaceholder(name) {
@@ -778,7 +882,8 @@ export default {
       this.rounds = this.buildEmptyBracket(nTeams);
       this.populateFirstRoundWithSeeds(nTeams);
       // set babak aktif ke ronde kompetitif paling awal (bukan bronze)
-      this.currentRoundIndex = this.firstRoundIndex; // NEW
+      this.currentRoundIndex = this.firstRoundIndex;
+      this.computePodium();
     },
 
     // NEW: navigasi babak
@@ -952,26 +1057,41 @@ export default {
     /** Pindahkan pemenang secara manual ke ronde berikutnya (untuk non-BYE) */
     advanceWinner(roundIndex, matchIndex, winnerIdx /* 1 atau 2 */) {
       const round = this.rounds[roundIndex];
-      if (!round || round.bronze) return;
-
-      // cari next round non-bronze
-      let nextRoundIndex = -1;
-      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
-        if (!this.rounds[i].bronze) {
-          nextRoundIndex = i;
-          break;
-        }
-      }
-      if (nextRoundIndex === -1) return;
+      if (!round) return;
 
       const match = round.matches[matchIndex];
+      if (!match) return;
+
+      // set pemenang match ini
       const winner = winnerIdx === 1 ? match.team1 : match.team2;
       match.winner = winner;
 
-      const next = this.rounds[nextRoundIndex];
-      const slot = Math.floor(matchIndex / 2);
-      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
-      if (next.matches[slot]) next.matches[slot][pos] = winner;
+      // Jika ini BUKAN bronze, dorong pemenang ke ronde kompetitif berikutnya (kalau ada)
+      if (!round.bronze) {
+        let nextRoundIndex = -1;
+        for (let i = roundIndex + 1; i < this.rounds.length; i++) {
+          if (!this.rounds[i].bronze) {
+            nextRoundIndex = i;
+            break;
+          }
+        }
+
+        if (nextRoundIndex !== -1) {
+          const next = this.rounds[nextRoundIndex];
+          const slot = Math.floor(matchIndex / 2);
+          const pos = matchIndex % 2 === 0 ? "team1" : "team2";
+          if (next && next.matches[slot]) {
+            next.matches[slot][pos] = winner;
+          }
+        }
+      }
+
+      // Jika ini Final (size==2 & non-bronze) atau Bronze, hitung podium (Juara 1–4)
+      const isFinal = !round.bronze && round.size === 2;
+      const isBronze = !!round.bronze;
+      if (isFinal || isBronze) {
+        this.computePodium();
+      }
     },
 
     /** Isi Bronze (3rd place) setelah SF selesai */
@@ -1162,19 +1282,19 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-   async updateTimePen(selectedValue, item) {
-  const sel = this.dataPenalties.find((p) => p.value === selectedValue);
-  if (sel) item.result.penaltyTime = sel.timePen;
+    async updateTimePen(selectedValue, item) {
+      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
+      if (sel) item.result.penaltyTime = sel.timePen;
 
-  if (item.result.raceTime && item.result.penaltyTime) {
-    item.result.totalTime = await this.tambahWaktu(
-      item.result.raceTime,
-      item.result.penaltyTime
-    );
-  }
-  this.editResult = true;
-  await this.assignRanks(this.visibleParticipants); // CHANGED
-},
+      if (item.result.raceTime && item.result.penaltyTime) {
+        item.result.totalTime = await this.tambahWaktu(
+          item.result.raceTime,
+          item.result.penaltyTime
+        );
+      }
+      this.editResult = true;
+      await this.assignRanks(this.visibleParticipants); // CHANGED
+    },
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
@@ -1263,36 +1383,37 @@ export default {
       }
     },
 
-   async updateTime(val, visIndex, title) {
-  // ambil item yang sedang terlihat (subset babak aktif)
-  const visItem = this.visibleParticipants[visIndex];
-  if (!visItem) return;
+    async updateTime(val, visIndex, title) {
+      // ambil item yang sedang terlihat (subset babak aktif)
+      const visItem = this.visibleParticipants[visIndex];
+      if (!visItem) return;
 
-  // cari index sebenarnya di this.participant
-  const targetIndex = this.participantArr.findIndex((p) => {
-    const nameMatch =
-      String(p.nameTeam || p.teamName || "").toUpperCase() ===
-      String(visItem.nameTeam || visItem.teamName || "").toUpperCase();
-    const bibMatch = String(p.bibTeam || "") === String(visItem.bibTeam || "");
-    // cocokkan nama; kalau ada BIB, bantu perkuat kecocokan
-    return nameMatch && (!visItem.bibTeam ? true : bibMatch);
-  });
+      // cari index sebenarnya di this.participant
+      const targetIndex = this.participantArr.findIndex((p) => {
+        const nameMatch =
+          String(p.nameTeam || p.teamName || "").toUpperCase() ===
+          String(visItem.nameTeam || visItem.teamName || "").toUpperCase();
+        const bibMatch =
+          String(p.bibTeam || "") === String(visItem.bibTeam || "");
+        // cocokkan nama; kalau ada BIB, bantu perkuat kecocokan
+        return nameMatch && (!visItem.bibTeam ? true : bibMatch);
+      });
 
-  if (targetIndex === -1) return;
+      if (targetIndex === -1) return;
 
-  const target = this.participant[targetIndex];
+      const target = this.participant[targetIndex];
 
-  if (title === "start") target.result.startTime = val;
-  if (title === "finish") {
-    target.result.finishTime = val;
-    if (target.result.startTime && target.result.finishTime) {
-      target.result.raceTime = await this.hitungSelisihWaktu(
-        target.result.startTime,
-        target.result.finishTime
-      );
-    }
-  }
-},
+      if (title === "start") target.result.startTime = val;
+      if (title === "finish") {
+        target.result.finishTime = val;
+        if (target.result.startTime && target.result.finishTime) {
+          target.result.raceTime = await this.hitungSelisihWaktu(
+            target.result.startTime,
+            target.result.finishTime
+          );
+        }
+      }
+    },
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
       const [h1, m1, s1] = String(waktuAwal).split(":");

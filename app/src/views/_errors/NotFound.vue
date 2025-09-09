@@ -1,6 +1,6 @@
 <template>
   <div class="empty-full">
-    <img v-if="imgSrc" :src="imgSrc" alt="404 Not Found" class="empty-illustration" />
+    <img :src="imgToShow" :alt="title" class="empty-illustration" />
     <h2 class="empty-title">404 – Page Not Found</h2>
     <p class="empty-subtitle">Halaman yang Anda cari tidak ditemukan.</p>
     <div class="empty-actions">
@@ -10,10 +10,21 @@
 </template>
 
 <script>
+import emptyState from "@/assets/images/404.png";
+
 export default {
   name: "NotFound",
-  props: {
-    imgSrc: { type: String, default: "" }, // contoh: require('@/assets/404-raft.png')
+  computed: {
+    imgToShow() {
+      return this.imgSrc || emptyState; // kalau prop kosong, pakai default
+    },
+  },
+props: {
+    title: { type: String, default: "No data available" },
+    subtitle: { type: String, default: "" },
+    imgSrc: { type: String, default: "" },
+    primaryText: { type: String, default: "" },
+    primaryVariant: { type: String, default: "primary" },
   },
   methods:{
     goHome(){ this.$router.push({ path: "/" }); }

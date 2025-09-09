@@ -56,6 +56,10 @@ async function createWindow() {
   }
 }
 
+ipcMain.handle('app:exit', () => {
+  app.quit();
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

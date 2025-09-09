@@ -22,6 +22,13 @@ function expose(key, api) {
   }
 }
 
+expose('app', {
+  exit: () => ipcRenderer.invoke('app:exit'),
+  closeWindow: () => ipcRenderer.invoke('app:close-window'),
+  minimize: () => ipcRenderer.invoke('app:minimize'),
+  toggleMaximize: () => ipcRenderer.invoke('app:toggle-maximize'),
+});
+
 // file picker (dipanggil renderer: window.fileAPI.pickImage())
 expose('fileAPI', {
   pickImage: () => ipcRenderer.invoke('file:pick-image'),

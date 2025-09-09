@@ -4,7 +4,7 @@
       toggleable="lg"
       type="dark"
       class="navbar navbar-expand-lg navbar-dark fixed-top shadow-s"
-      style="background-color: #1874A5"
+      style="background-color: #1874a5"
     >
       <div class="container">
         <a class="navbar-brand" @click="goTo()">
@@ -15,17 +15,7 @@
           />
         </a>
 
-        <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
-        
-
-        <!-- <b-collapse id="nav-collapse" is-nav class="justify-content-end">
-          <b-navbar-nav>
-            <b-nav-item @click="goTo('home')">Homepage</b-nav-item>
-          </b-navbar-nav>
-        </b-collapse> -->
-
-<b-navbar-toggle target="main-nav"></b-navbar-toggle>
-
+        <b-navbar-toggle target="main-nav"></b-navbar-toggle>
         <b-collapse id="main-nav" is-nav>
           <b-navbar-nav class="ml-3">
             <b-nav-item @click="goTo('')" active>Home</b-nav-item>
@@ -35,9 +25,9 @@
 
           <b-navbar-nav class="ml-auto">
             <b-nav-item @click="goTo('login')">Login/Create account</b-nav-item>
+            <b-nav-item @click="exitApp">Exit</b-nav-item>
           </b-navbar-nav>
         </b-collapse>
-
       </div>
     </b-navbar>
   </div>
@@ -59,8 +49,11 @@ export default {
       //   localStorage.removeItem("formNewEvent");
       //   this.$router.push({ name: payload });
       // }
-       if (!path) return this.$router.push("/");
+      if (!path) return this.$router.push("/");
       this.$router.push("/" + path);
+    },
+    exitApp() {
+      window.app.exit();
     },
   },
 };

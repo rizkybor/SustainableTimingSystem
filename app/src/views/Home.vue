@@ -37,7 +37,7 @@
     <b-container class="mt-4 mb-5">
       <!-- 3) ACTION CARDS -->
       <b-row>
-        <b-col cols="12" md="6" class="mb-4">
+        <b-col cols="12" md="4" class="mb-4">
           <b-card class="action-card shadow-sm">
             <div class="d-flex flex-column align-items-center text-center">
               <div
@@ -60,7 +60,7 @@
           </b-card>
         </b-col>
 
-        <b-col cols="12" md="6" class="mb-4">
+        <b-col cols="12" md="4" class="mb-4">
           <b-card class="action-card shadow-sm">
             <div class="d-flex flex-column align-items-center text-center">
               <div
@@ -78,6 +78,29 @@
                 @click="goTo('team-create')"
               >
                 Create Team
+              </b-button>
+            </div>
+          </b-card>
+        </b-col>
+
+        <b-col cols="12" md="4" class="mb-4">
+          <b-card class="action-card shadow-sm">
+            <div class="d-flex flex-column align-items-center text-center">
+              <div
+                class="action-icon mb-2 d-flex align-items-center justify-content-center"
+              >
+                <Icon icon="mdi:account" width="36" height="36" />
+              </div>
+              <h5 class="mb-1 font-weight-bold">Create Jury's Account</h5>
+              <small class="text-muted d-block mb-3">
+                  Register jury accounts and assign roles to manage evaluation efficiently.
+              </small>
+              <b-button
+                variant="secondary"
+                class="w-100 rounded-pill"
+                @click="goTo('jurys-account')"
+              >
+                Create Account
               </b-button>
             </div>
           </b-card>

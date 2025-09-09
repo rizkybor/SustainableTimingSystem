@@ -1,14 +1,14 @@
 <template>
   <div class="sts-page">
     <!-- 2) JUMBOTRON -->
-    <section class="sts-jumbotron">
+    <section class="sts-jumbotron p-5">
       <b-container>
         <b-row>
-          <b-col cols="12" md="7" class="py-4 mt-5">
+          <b-col cols="12" md="7" class="py-4 ">
             <h1 class="display-5 font-weight-bold mb-3">
               Sustainable Timing System
             </h1>
-            <p class="lead text-muted mb-4">
+            <p class="lead mb-4">
               Everything you need for a successful competition.
             </p>
             <b-button
@@ -25,11 +25,10 @@
             md="5"
             class="d-flex align-items-center justify-content-center mt-4 mt-md-0"
           >
-            <div
+            <!-- <div
               class="hero-image placeholder d-flex align-items-center justify-content-center m-5"
             >
-              <!-- <Icon icon="mdi:image" width="64" height="64" /> -->
-            </div>
+            </div> -->
           </b-col>
         </b-row>
       </b-container>
@@ -155,7 +154,7 @@
         class="d-flex align-items-center justify-content-between mt-4 mb-2"
       >
         <h5 class="font-weight-bold mb-0">Teams Registered</h5>
-        <b-button variant="link" class="p-0" @click="goTo('team')">
+        <b-button variant="link" class="p-0" @click="goTo('team-create')">
           See all
           <Icon icon="mdi:arrow-right" class="ml-1" />
         </b-button>
@@ -337,9 +336,27 @@ export default {
 
 /* JUMBOTRON */
 .sts-jumbotron {
-  background: linear-gradient(180deg, #eef3ff 0%, #f5f7fb 100%);
+  position: relative;
+  background-image: url("https://images.unsplash.com/uploads/141327328038701afeede/eda0fb7c?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
   border-bottom: 1px solid #e9edf5;
+  color: #fff; /* agar teks tetap terlihat */
 }
+
+.sts-jumbotron::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4); /* overlay hitam transparan */
+  z-index: 1;
+}
+
+.sts-jumbotron > * {
+  position: relative;
+  z-index: 2; /* konten tetap di atas overlay */
+}
+
 .sts-jumbotron .hero-image {
   width: 320px;
   max-width: 100%;

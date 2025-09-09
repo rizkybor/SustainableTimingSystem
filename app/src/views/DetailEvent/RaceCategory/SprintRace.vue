@@ -124,7 +124,7 @@
 
                   <!-- urutan baru -->
                   <th>Start Penalties</th>
-                  <th>Penalties</th> <!-- legacy -->
+                  <!-- REMOVED: Penalties (legacy/middle) column -->
                   <th>Finish Penalties</th>
                   <th>Total Penalties</th>
                   <th>Penalty Time</th>
@@ -162,22 +162,7 @@
                     </b-select>
                   </td>
 
-                  <!-- Penalties (legacy / middle) -->
-                  <td>
-                    <b-select
-                      v-if="item.result.startTime"
-                      v-model.number="item.result.penalty"
-                      @change="updateTimePen($event, item)"
-                    >
-                      <option
-                        v-for="penalty in dataPenalties"
-                        :key="'mp' + penalty.value"
-                        :value="penalty.value"
-                      >
-                        {{ penalty.value }}
-                      </option>
-                    </b-select>
-                  </td>
+                  <!-- REMOVED: Penalties (legacy / middle) select -->
 
                   <!-- Finish Penalties -->
                   <td>
@@ -294,20 +279,20 @@ function buildResultDocs(participantArr, bucket) {
     result.finishTime = String(result.finishTime || "");
     result.raceTime = String(result.raceTime || "");
 
-    // normalisasi penalti (tiga sumber)
+    // normalisasi penalti (HANYA start & finish)
     result.startPenalty = Number.isFinite(result.startPenalty)
       ? Number(result.startPenalty)
-      : 0;
-    result.penalty = Number.isFinite(result.penalty)
-      ? Number(result.penalty)
       : 0;
     result.finishPenalty = Number.isFinite(result.finishPenalty)
       ? Number(result.finishPenalty)
       : 0;
 
+    // legacy middle penalty di-nolkan dan tidak digunakan
+    result.penalty = 0;
+
     result.totalPenalty = Number.isFinite(result.totalPenalty)
       ? Number(result.totalPenalty)
-      : result.startPenalty + result.penalty + result.finishPenalty;
+      : result.startPenalty + result.finishPenalty;
 
     result.startPenaltyTime = String(result.startPenaltyTime || "00:00:00.000");
     result.finishPenaltyTime = String(
@@ -372,17 +357,19 @@ function normalizeTeamForSprint(t = {}) {
     finishTime: "",
     raceTime: "",
 
-    // baru: tiga penalti
+    // hanya 2 penalti aktif (start & finish)
     startPenalty: 0,
     finishPenalty: 0,
-    penalty: 0, // legacy, letakkan di tengah
+
+    // legacy, dibiarkan ada tapi tidak dipakai
+    penalty: 0,
 
     startPenaltyTime: "00:00:00.000",
     finishPenaltyTime: "00:00:00.000",
     totalPenalty: 0, // angka detik (akumulasi)
     totalPenaltyTime: "00:00:00.000",
 
-    penaltyTime: "", // legacy (akan diset = totalPenaltyTime)
+    penaltyTime: "", // legacy (diset = totalPenaltyTime)
     totalTime: "",
     ranked: "",
     score: "",
@@ -601,38 +588,21 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    /** dropdown legacy "Penalties" (middle) */
-    async updateTimePen(selectedValue, item) {
-      const sel = this.findPenalty(selectedValue);
-      item.result.penalty = Number(sel.value) || 0;
-      await this.recalcPenalties(item);
-    },
-
-    findPenalty(val) {
-      return (
-        this.dataPenalties.find((p) => Number(p.value) === Number(val)) || {
-          value: 0,
-          timePen: "00:00:00.000",
-        }
-      );
-    },
-
-    /** hitung total penalti dari tiga sumber + update totalTime */
+    /**
+     * Hitung total penalti dari dua sumber (start & finish) + update totalTime
+     */
     async recalcPenalties(item) {
       const sp = this.findPenalty(item.result.startPenalty);
-      const mp = this.findPenalty(item.result.penalty); // legacy / middle
       const fp = this.findPenalty(item.result.finishPenalty);
 
       item.result.startPenaltyTime = sp.timePen;
       item.result.finishPenaltyTime = fp.timePen;
 
-      // total angka penalti (detik)
-      item.result.totalPenalty =
-        Number(sp.value) + Number(mp.value) + Number(fp.value);
+      // total angka penalti (detik) hanya dari start+finish
+      item.result.totalPenalty = Number(sp.value) + Number(fp.value);
 
-      // total waktu penalti = start + middle + finish
-      const sf = await this.tambahWaktu(sp.timePen, mp.timePen);
-      const totalPenaltyTime = await this.tambahWaktu(sf, fp.timePen);
+      // total waktu penalti = start + finish
+      const totalPenaltyTime = await this.tambahWaktu(sp.timePen, fp.timePen);
       item.result.totalPenaltyTime = totalPenaltyTime;
 
       // sinkron legacy
@@ -648,6 +618,15 @@ export default {
 
       this.editResult = true;
       await this.assignRanks(this.participant);
+    },
+
+    findPenalty(val) {
+      return (
+        this.dataPenalties.find((p) => Number(p.value) === Number(val)) || {
+          value: 0,
+          timePen: "00:00:00.000",
+        }
+      );
     },
 
     async updateStartPenalty(item) {

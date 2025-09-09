@@ -191,6 +191,7 @@ function setupIPCMainHandlers() {
   // SAVE SLALOM RESULT
   ipcMain.on("insert-slalom-result", async (event, datas) => {
     try {
+      console.log(event, datas,'<<<<< event & datas')
       const data = await insertSlalomResult(datas);
       event.reply("insert-slalom-result-reply", data);
     } catch (error) {

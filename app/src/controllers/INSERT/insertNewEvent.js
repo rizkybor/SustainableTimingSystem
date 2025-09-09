@@ -198,8 +198,15 @@ async function insertSprintResult(payload) {
 
 async function insertSlalomResult(payload) {
   try {
+    console.log("[DAO] insertSlalomResult called", {
+      isArray: Array.isArray(payload),
+      length: (payload && payload.length) || 0,
+    });
+
     const db = await getDb();
+    console.log("[DAO] connected to DB:", db.databaseName);
     const col = db.collection("temporarySlalomResult");
+    console.log("[DAO] use collection:", col.collectionName);
 
     if (!Array.isArray(payload)) {
       throw new Error("insertSlalomResult: payload must be an array");
@@ -209,75 +216,103 @@ async function insertSlalomResult(payload) {
     }
 
     // --- helpers ---
-    const hmsToMs = (str) => {
-      const [h = "0", m = "0", sMs = "0.000"] = String(str || "").split(":");
-      const [s = "0", ms = "0"] = String(sMs).split(".");
+    function hmsToMs(str) {
+      var parts = String(str || "").split(":");
+      var h = parts[0] || "0";
+      var m = parts[1] || "0";
+      var sMs = parts[2] || "0.000";
+      var sParts = String(sMs).split(".");
+      var s = sParts[0] || "0";
+      var ms = sParts[1] || "0";
       return (+h || 0) * 3600000 + (+m || 0) * 60000 + (+s || 0) * 1000 + (+ms || 0);
-    };
+    }
 
-    const normRun = (r = {}) => ({
-      startTime: r.startTime ? String(r.startTime) : "",
-      finishTime: r.finishTime ? String(r.finishTime) : "",
-      raceTime: r.raceTime ? String(r.raceTime) : "",
-      penaltyTime: r.penaltyTime ? String(r.penaltyTime) : "00:00:00.000",
-      penalty: Number.isFinite(r.penalty) ? r.penalty : Number(r.penalty) || 0,
-      totalTime: r.totalTime ? String(r.totalTime) : (r.raceTime ? String(r.raceTime) : ""),
-      ranked: Number.isFinite(r.ranked) ? r.ranked : Number(r.ranked) || 0,
-      score: Number.isFinite(r.score) ? r.score : Number(r.score) || 0,
-    });
+    function normRun(r) {
+      r = r || {};
+      return {
+        startTime: r.startTime ? String(r.startTime) : "",
+        finishTime: r.finishTime ? String(r.finishTime) : "",
+        raceTime: r.raceTime ? String(r.raceTime) : "",
+        penaltyTime: r.penaltyTime ? String(r.penaltyTime) : "00:00:00.000",
+        penalty: Number.isFinite(r.penalty) ? r.penalty : Number(r.penalty) || 0,
+        totalTime: r.totalTime ? String(r.totalTime) : (r.raceTime ? String(r.raceTime) : ""),
+        ranked: Number.isFinite(r.ranked) ? r.ranked : Number(r.ranked) || 0,
+        score: Number.isFinite(r.score) ? r.score : Number(r.score) || 0,
+      };
+    }
 
-    const normTeam = (clean) => ({
-      nameTeam: String(clean.nameTeam || ""),
-      bibTeam: String(clean.bibTeam || ""),
-      startOrder: String(clean.startOrder || ""),
-      praStart: String(clean.praStart || ""),
-      intervalRace: String(clean.intervalRace || ""),
-      statusId: Number.isFinite(clean.statusId) ? Number(clean.statusId) : 0,
+    function normTeam(clean) {
+      clean = clean || {};
+      var penaltiesSrc =
+        clean &&
+        clean.meta &&
+        clean.meta.slalom &&
+        Array.isArray(clean.meta.slalom.penalties)
+          ? clean.meta.slalom.penalties
+          : [];
 
-      // array of runs
-      result: Array.isArray(clean.result) ? clean.result.map(normRun) : [],
+      var mappedPenalties = penaltiesSrc.map(function (arr) {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(function (v) { return Number(v) || 0; });
+      });
 
-      // best time string (opsional)
-      bestTime: clean.bestTime ? String(clean.bestTime) : "",
+      var gatesCount =
+        clean && clean.meta && clean.meta.slalom && Number.isFinite(clean.meta.slalom.gatesCount)
+          ? Number(clean.meta.slalom.gatesCount)
+          : undefined;
 
-      // meta slalom per team (penalties per-run + opsi lain)
-      meta: {
-        slalom: {
-          penalties: Array.isArray(clean?.meta?.slalom?.penalties)
-            ? clean.meta.slalom.penalties.map((arr) =>
-                Array.isArray(arr) ? arr.map((v) => Number(v) || 0) : []
-              )
-            : [],
-          // opsional dari FE
-          gatesCount: Number.isFinite(clean?.meta?.slalom?.gatesCount)
-            ? Number(clean.meta.slalom.gatesCount)
-            : undefined,
-          penaltyValueToMs:
-            clean?.meta?.slalom?.penaltyValueToMs && typeof clean.meta.slalom.penaltyValueToMs === "object"
-              ? clean.meta.slalom.penaltyValueToMs
-              : undefined,
+      var penaltyValueToMs =
+        clean && clean.meta && clean.meta.slalom && typeof clean.meta.slalom.penaltyValueToMs === "object"
+          ? clean.meta.slalom.penaltyValueToMs
+          : undefined;
+
+      return {
+        nameTeam: String(clean.nameTeam || ""),
+        bibTeam: String(clean.bibTeam || ""),
+        startOrder: String(clean.startOrder || ""),
+        praStart: String(clean.praStart || ""),
+        intervalRace: String(clean.intervalRace || ""),
+        statusId: Number.isFinite(clean.statusId) ? Number(clean.statusId) : 0,
+
+        // array of runs
+        result: Array.isArray(clean.result) ? clean.result.map(normRun) : [],
+
+        // best time string (opsional)
+        bestTime: clean.bestTime ? String(clean.bestTime) : "",
+
+        // meta slalom per team
+        meta: {
+          slalom: {
+            penalties: mappedPenalties,
+            gatesCount: gatesCount,
+            penaltyValueToMs: penaltyValueToMs,
+          },
         },
-      },
-      otr: clean.otr || {
-        startTime: "",
-        finishTime: "",
-        raceTime: "",
-        penaltyTime: "",
-        penalty: "",
-        totalTime: "",
-        ranked: "",
-        score: "",
-      },
-    });
+
+        // OTR fallback
+        otr:
+          clean.otr ||
+          {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
+      };
+    }
 
     // --- group by meta ---
-    const groups = new Map(); // key -> { meta, teams[] }
+    var groups = new Map(); // key -> { meta, teams[] }
 
-    for (let i = 0; i < payload.length; i++) {
-      const raw = payload[i];
+    for (var i = 0; i < payload.length; i++) {
+      var raw = payload[i];
       if (!raw || typeof raw !== "object") continue;
 
-      const meta = {
+      var meta = {
         eventId: String(raw.eventId || ""),
         initialId: String(raw.initialId || ""),
         raceId: String(raw.raceId || ""),
@@ -287,92 +322,118 @@ async function insertSlalomResult(payload) {
         raceName: String(raw.raceName || ""),
         divisionName: String(raw.divisionName || ""),
       };
-      const metaKey = [meta.eventId, meta.initialId, meta.raceId, meta.divisionId].join("|");
 
-      const clean = JSON.parse(JSON.stringify(raw));
+      if (!meta.eventId || !meta.initialId || !meta.raceId || !meta.divisionId) {
+        console.warn("[DAO] Skip item karena meta tidak lengkap:", meta);
+        continue;
+      }
+
+      var metaKey = [meta.eventId, meta.initialId, meta.raceId, meta.divisionId].join("|");
+
+      var clean = JSON.parse(JSON.stringify(raw));
       if (clean && clean._id) delete clean._id;
 
-      const teamEntry = normTeam(clean);
+      var teamEntry = normTeam(clean);
 
       if (!groups.has(metaKey)) {
-        groups.set(metaKey, { meta, teams: [teamEntry] });
+        groups.set(metaKey, { meta: meta, teams: [teamEntry] });
       } else {
         groups.get(metaKey).teams.push(teamEntry);
       }
     }
 
-    const now = new Date();
-    let upsertedCount = 0;
+    if (groups.size === 0) {
+      console.warn("[DAO] Tidak ada group valid (filter meta kosong).");
+      return { ok: false, error: "Meta bucket kosong di payload" };
+    }
+
+    var now = new Date();
+    var upsertedCount = 0;
 
     // --- process each group ---
-    for (const { meta, teams } of groups.values()) {
-      const filter = {
-        eventId: meta.eventId,
-        initialId: meta.initialId,
-        raceId: meta.raceId,
-        divisionId: meta.divisionId,
+    var iter = groups.values();
+    var step = iter.next();
+    while (!step.done) {
+      var group = step.value;
+      var meta2 = group.meta;
+      var teams = group.teams;
+
+      var filter = {
+        eventId: meta2.eventId,
+        initialId: meta2.initialId,
+        raceId: meta2.raceId,
+        divisionId: meta2.divisionId,
       };
 
-      // Ambil SEMUA existing utk meta ini
-      const existingDocs = await col.find(filter, { projection: { result: 1, _id: 0 } }).toArray();
+      var existingDocs = await col
+        .find(filter, { projection: { result: 1, _id: 0 } })
+        .toArray();
 
-      // Merge per-tim berdasarkan bibTeam
-      const mergedByBib = new Map();
+      var mergedByBib = new Map();
 
       // existing first
-      for (const ex of existingDocs) {
+      for (var ei = 0; ei < existingDocs.length; ei++) {
+        var ex = existingDocs[ei];
         if (ex && Array.isArray(ex.result)) {
-          for (const t of ex.result) {
+          for (var ti = 0; ti < ex.result.length; ti++) {
+            var t = ex.result[ti];
             if (!t) continue;
-            const ebib = String(t.bibTeam || "");
+            var ebib = String(t.bibTeam || "");
             if (!mergedByBib.has(ebib)) mergedByBib.set(ebib, t);
           }
         }
       }
 
       // overwrite with new teams
-      for (const nt of teams) {
-        const nbib = String(nt.bibTeam || "");
+      for (var nti = 0; nti < teams.length; nti++) {
+        var nt = teams[nti];
+        var nbib = String(nt.bibTeam || "");
         mergedByBib.set(nbib, nt);
       }
 
-      // ke array & sort by bestTime (kecil dulu; tanpa bestTime ditempatkan belakang)
-      const mergedArray = Array.from(mergedByBib.values()).sort((a, b) => {
-        const am = a && a.bestTime ? hmsToMs(a.bestTime) : Number.POSITIVE_INFINITY;
-        const bm = b && b.bestTime ? hmsToMs(b.bestTime) : Number.POSITIVE_INFINITY;
+      var mergedArray = Array.from(mergedByBib.values()).sort(function (a, b) {
+        var am = a && a.bestTime ? hmsToMs(a.bestTime) : Number.POSITIVE_INFINITY;
+        var bm = b && b.bestTime ? hmsToMs(b.bestTime) : Number.POSITIVE_INFINITY;
         return am - bm;
       });
 
-      // Jika ada >1 dokumen existing utk meta yg sama → bersihkan dulu
       if (existingDocs.length > 1) {
+        console.warn("[DAO] Found >1 doc untuk filter, cleanup dulu:", filter);
         await col.deleteMany(filter);
       }
 
-      // upsert final
-      const update = {
+      var update = {
         $set: {
-          eventId: meta.eventId,
-          initialId: meta.initialId,
-          raceId: meta.raceId,
-          divisionId: meta.divisionId,
-          eventName: meta.eventName,
-          initialName: meta.initialName,
-          raceName: meta.raceName,
-          divisionName: meta.divisionName,
-          result: mergedArray, // array of team entries (tiap team punya runs array)
+          eventId: meta2.eventId,
+          initialId: meta2.initialId,
+          raceId: meta2.raceId,
+          divisionId: meta2.divisionId,
+          eventName: meta2.eventName,
+          initialName: meta2.initialName,
+          raceName: meta2.raceName,
+          divisionName: meta2.divisionName,
+          result: mergedArray, // array of team entries
           updatedAt: now,
         },
         $setOnInsert: { createdAt: now },
       };
 
-      const res = await col.updateOne(filter, update, { upsert: true });
+      var res = await col.updateOne(filter, update, { upsert: true });
+      console.log(
+        "[DAO] updateOne result:",
+        (res && res.matchedCount) || 0,
+        (res && res.modifiedCount) || 0,
+        (res && res.upsertedCount) || 0
+      );
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+
+      step = iter.next();
     }
 
-    return { ok: true, upsertedCount };
+    return { ok: true, upsertedCount: upsertedCount };
   } catch (err) {
-    console.error("Error insertSlalomResult:", err);
-    return { ok: false, error: err && err.message ? err.message : String(err) };
+    console.error("Error insertSlalomResult:", err && err.stack ? err.stack : err);
+    return { ok: false, error: (err && err.message) ? err.message : String(err) };
   }
 }
 

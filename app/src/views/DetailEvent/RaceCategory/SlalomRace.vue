@@ -540,52 +540,96 @@ export default {
       alert("Disconnected");
     },
 
-    /** === Save: dokumen kompatibel dengan pipeline Sprint Result === */
-    /** === Save: dokumen Slalom berisi 2 run per tim === */
     /** === Save: dokumen Slalom (multi-run + penalty dinamis) === */
+    /** === Build docs (parity dengan Sprint) === */
     buildDocs() {
+      // Ambil bucket dari payload baru (harus identik dgn Team Registered)
       const { bucket } = loadFromRaceStartPayloadForSlalom();
       const must = ["eventId", "initialId", "raceId", "divisionId"];
       const missing = must.filter((k) => !bucket[k]);
       if (missing.length) {
-        console.error("Bucket fields missing:", missing, bucket);
         throw new Error(`Bucket fields missing: ${missing.join(", ")}`);
       }
 
       const now = new Date();
 
-      return this.teams.map((t) => {
+      // deep-clone biar aman (parity dgn Sprint yang clone participantArr)
+      const cleanTeams = JSON.parse(JSON.stringify(this.teams || []));
+      if (!Array.isArray(cleanTeams) || cleanTeams.length === 0) return [];
+
+      return cleanTeams.map((t) => {
         const sessions = Array.isArray(t.sessions) ? t.sessions : [];
+
+        // Normalisasi tiap run/sesi
         const results = sessions.map((s) => ({
-          startTime: s.startTime || "",
-          finishTime: s.finishTime || "",
-          raceTime: s.raceTime || "",
-          penaltyTime: s.penaltyTime || "00:00:00.000",
-          penalty: Number(s.totalPenalty) || 0,
-          totalTime: s.totalTime || s.raceTime || "",
-          ranked: Number(s.ranked) || 0,
-          score: Number(s.score) || 0,
+          startTime: String(s.startTime || ""),
+          finishTime: String(s.finishTime || ""),
+          raceTime: String(s.raceTime || ""),
+          penaltyTime: String(s.penaltyTime || "00:00:00.000"),
+          penalty: Number.isFinite(s.totalPenalty)
+            ? Number(s.totalPenalty)
+            : Number(s.totalPenalty) || 0,
+          totalTime: String(s.totalTime || s.raceTime || ""),
+          ranked: Number.isFinite(s.ranked)
+            ? Number(s.ranked)
+            : Number(s.ranked) || 0,
+          score: Number.isFinite(s.score)
+            ? Number(s.score)
+            : Number(s.score) || 0,
         }));
 
         return {
-          ...bucket,
+          // KUNCI RELASI (harus sama dengan Teams Registered)
+          eventId: bucket.eventId,
+          initialId: bucket.initialId,
+          raceId: bucket.raceId,
+          divisionId: bucket.divisionId,
+          eventName: bucket.eventName,
+          initialName: bucket.initialName,
+          raceName: bucket.raceName,
+          divisionName: bucket.divisionName,
+
+          // DATA TIM
           nameTeam: String(t.nameTeam || ""),
-          bibTeam: String(t.bibNumber || ""),
-          startOrder: t.startOrder || "",
-          praStart: t.praStart || "",
-          intervalRace: t.intervalRace || "",
-          statusId: Number(t.statusId) || 0,
+          bibTeam: String(t.bibNumber || t.bibTeam || ""),
+          startOrder: String(t.startOrder || ""),
+          praStart: String(t.praStart || ""),
+          intervalRace: String(t.intervalRace || ""),
+          statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+
+          // ARRAY RUN (slalom multi-run)
           result: results,
-          bestTime: this.calculateBestTime(t) || "",
+
+          // Best time opsional
+          bestTime: String(this.calculateBestTime(t) || ""),
+
+          // Meta opsional (boleh diabaikan kalau tidak dipakai di BE)
+          // otr dibiarkan kosong agar kompatibel
+          otr: {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyTime: "",
+            penalty: "",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          },
+
+          // meta waktu
           createdAt: now,
           updatedAt: now,
         };
       });
     },
+    /** === Save (parity dengan Sprint) === */
     saveResult() {
       try {
         const docs = this.buildDocs();
-        if (!docs.length) {
+        // Debug optional
+        // console.log("DEBUG saveResult (Slalom):", docs);
+
+        if (!Array.isArray(docs) || docs.length === 0) {
           ipcRenderer.send("get-alert", {
             type: "warning",
             detail: "Belum ada data yang bisa disimpan.",
@@ -593,7 +637,11 @@ export default {
           });
           return;
         }
+
+        // Kirim ARRAY langsung (bukan objek) — sama seperti Sprint
         ipcRenderer.send("insert-slalom-result", docs);
+
+        // Tunggu balasan — pola sama dengan Sprint
         ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
           if (res && res.ok) {
             ipcRenderer.send("get-alert-saved", {
@@ -612,7 +660,7 @@ export default {
       } catch (e) {
         ipcRenderer.send("get-alert", {
           type: "error",
-          detail: e.message || "Save failed",
+          detail: e && e.message ? e.message : "Save failed",
           message: "Failed",
         });
       }

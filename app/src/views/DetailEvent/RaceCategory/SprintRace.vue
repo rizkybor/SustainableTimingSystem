@@ -121,14 +121,21 @@
                   <th>Start Time</th>
                   <th>Finish Time</th>
                   <th>Race Time</th>
-                  <th>Penalties</th>
+
+                  <!-- urutan baru -->
+                  <th>Start Penalties</th>
+                  <th>Penalties</th> <!-- legacy -->
+                  <th>Finish Penalties</th>
+                  <th>Total Penalties</th>
                   <th>Penalty Time</th>
+
                   <th>Result</th>
                   <th>Ranked</th>
                   <th>Score</th>
                   <th v-if="editResult">Action</th>
                 </tr>
               </thead>
+
               <tbody>
                 <tr v-for="(item, index) in participantArr" :key="index">
                   <td>{{ index + 1 }}</td>
@@ -137,22 +144,64 @@
                   <td>{{ item.result.startTime }}</td>
                   <td>{{ item.result.finishTime }}</td>
                   <td>{{ item.result.raceTime }}</td>
+
+                  <!-- Start Penalties -->
                   <td>
                     <b-select
                       v-if="item.result.startTime"
-                      v-model="item.result.penalty"
+                      v-model.number="item.result.startPenalty"
+                      @change="updateStartPenalty(item)"
+                    >
+                      <option
+                        v-for="p in dataPenalties"
+                        :key="'sp' + p.value"
+                        :value="p.value"
+                      >
+                        {{ p.value }}
+                      </option>
+                    </b-select>
+                  </td>
+
+                  <!-- Penalties (legacy / middle) -->
+                  <td>
+                    <b-select
+                      v-if="item.result.startTime"
+                      v-model.number="item.result.penalty"
                       @change="updateTimePen($event, item)"
                     >
                       <option
                         v-for="penalty in dataPenalties"
-                        :key="penalty.value"
+                        :key="'mp' + penalty.value"
                         :value="penalty.value"
                       >
                         {{ penalty.value }}
                       </option>
                     </b-select>
                   </td>
+
+                  <!-- Finish Penalties -->
+                  <td>
+                    <b-select
+                      v-if="item.result.finishTime"
+                      v-model.number="item.result.finishPenalty"
+                      @change="updateFinishPenalty(item)"
+                    >
+                      <option
+                        v-for="p in dataPenalties"
+                        :key="'fp' + p.value"
+                        :value="p.value"
+                      >
+                        {{ p.value }}
+                      </option>
+                    </b-select>
+                  </td>
+
+                  <!-- Total Penalties (detik) -->
+                  <td>{{ item.result.totalPenalty }}</td>
+
+                  <!-- Penalty Time total (format waktu) -->
                   <td>{{ item.result.penaltyTime }}</td>
+
                   <td>
                     {{
                       item.result.penaltyTime
@@ -244,12 +293,35 @@ function buildResultDocs(participantArr, bucket) {
     result.startTime = String(result.startTime || "");
     result.finishTime = String(result.finishTime || "");
     result.raceTime = String(result.raceTime || "");
+
+    // normalisasi penalti (tiga sumber)
+    result.startPenalty = Number.isFinite(result.startPenalty)
+      ? Number(result.startPenalty)
+      : 0;
     result.penalty = Number.isFinite(result.penalty)
-      ? result.penalty
-      : result.penalty
       ? Number(result.penalty)
       : 0;
-    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
+    result.finishPenalty = Number.isFinite(result.finishPenalty)
+      ? Number(result.finishPenalty)
+      : 0;
+
+    result.totalPenalty = Number.isFinite(result.totalPenalty)
+      ? Number(result.totalPenalty)
+      : result.startPenalty + result.penalty + result.finishPenalty;
+
+    result.startPenaltyTime = String(result.startPenaltyTime || "00:00:00.000");
+    result.finishPenaltyTime = String(
+      result.finishPenaltyTime || "00:00:00.000"
+    );
+    result.totalPenaltyTime = String(
+      result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
+    );
+
+    // sinkronisasi legacy
+    result.penaltyTime = String(
+      result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
+    );
+
     result.totalTime = String(result.totalTime || result.raceTime || "");
     result.ranked = Number.isFinite(result.ranked)
       ? result.ranked
@@ -299,8 +371,18 @@ function normalizeTeamForSprint(t = {}) {
     startTime: "",
     finishTime: "",
     raceTime: "",
-    penaltyTime: "",
-    penalty: "",
+
+    // baru: tiga penalti
+    startPenalty: 0,
+    finishPenalty: 0,
+    penalty: 0, // legacy, letakkan di tengah
+
+    startPenaltyTime: "00:00:00.000",
+    finishPenaltyTime: "00:00:00.000",
+    totalPenalty: 0, // angka detik (akumulasi)
+    totalPenaltyTime: "00:00:00.000",
+
+    penaltyTime: "", // legacy (akan diset = totalPenaltyTime)
     totalTime: "",
     ranked: "",
     score: "",
@@ -519,18 +601,61 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
+    /** dropdown legacy "Penalties" (middle) */
     async updateTimePen(selectedValue, item) {
-      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
-      if (sel) item.result.penaltyTime = sel.timePen;
+      const sel = this.findPenalty(selectedValue);
+      item.result.penalty = Number(sel.value) || 0;
+      await this.recalcPenalties(item);
+    },
 
-      if (item.result.raceTime && item.result.penaltyTime) {
+    findPenalty(val) {
+      return (
+        this.dataPenalties.find((p) => Number(p.value) === Number(val)) || {
+          value: 0,
+          timePen: "00:00:00.000",
+        }
+      );
+    },
+
+    /** hitung total penalti dari tiga sumber + update totalTime */
+    async recalcPenalties(item) {
+      const sp = this.findPenalty(item.result.startPenalty);
+      const mp = this.findPenalty(item.result.penalty); // legacy / middle
+      const fp = this.findPenalty(item.result.finishPenalty);
+
+      item.result.startPenaltyTime = sp.timePen;
+      item.result.finishPenaltyTime = fp.timePen;
+
+      // total angka penalti (detik)
+      item.result.totalPenalty =
+        Number(sp.value) + Number(mp.value) + Number(fp.value);
+
+      // total waktu penalti = start + middle + finish
+      const sf = await this.tambahWaktu(sp.timePen, mp.timePen);
+      const totalPenaltyTime = await this.tambahWaktu(sf, fp.timePen);
+      item.result.totalPenaltyTime = totalPenaltyTime;
+
+      // sinkron legacy
+      item.result.penaltyTime = totalPenaltyTime;
+
+      // total lomba = raceTime + penaltyTime (jika raceTime ada)
+      if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
-          item.result.penaltyTime
+          totalPenaltyTime
         );
       }
+
       this.editResult = true;
       await this.assignRanks(this.participant);
+    },
+
+    async updateStartPenalty(item) {
+      await this.recalcPenalties(item);
+    },
+
+    async updateFinishPenalty(item) {
+      await this.recalcPenalties(item);
     },
 
     async resetRace() {
@@ -539,13 +664,7 @@ export default {
 
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
-        const it = this.participant[i];
-        if (it.result.raceTime && it.result.penaltyTime) {
-          it.result.totalTime = await this.tambahWaktu(
-            it.result.raceTime,
-            it.result.penaltyTime
-          );
-        }
+        await this.recalcPenalties(this.participant[i]);
       }
       this.editResult = true;
       await this.assignRanks(this.participant);
@@ -574,7 +693,6 @@ export default {
           this.isPortConnected = true;
           alert("Connected");
         } else {
-          // gagal konek: jangan ubah tombol jadi connected
           this.isPortConnected = false;
           alert("No valid serial port found / failed to open.");
         }
@@ -657,18 +775,20 @@ export default {
 
     async updateTime(val, id, title) {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
-      if (title === "start") this.participant[id].result.startTime = val;
+      const row = this.participant[id];
+
+      if (title === "start") row.result.startTime = val;
       if (title === "finish") {
-        this.participant[id].result.finishTime = val;
-        if (
-          this.participant[id].result.startTime &&
-          this.participant[id].result.finishTime
-        ) {
-          this.participant[id].result.raceTime = await this.hitungSelisihWaktu(
-            this.participant[id].result.startTime,
-            this.participant[id].result.finishTime
-          );
-        }
+        row.result.finishTime = val;
+      }
+
+      if (row.result.startTime && row.result.finishTime) {
+        row.result.raceTime = await this.hitungSelisihWaktu(
+          row.result.startTime,
+          row.result.finishTime
+        );
+        // panggil kalkulasi penalti agar totalTime langsung update
+        await this.recalcPenalties(row);
       }
     },
 

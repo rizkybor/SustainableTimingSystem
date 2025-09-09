@@ -49,22 +49,18 @@
             <td class="muted">1</td>
             <td>
               <div class="field">
-                <b-form-group label="Pilih Tim">
-  <b-form-select
-    v-model="draft.teamId"
-    :options="teamsAvailable.map(t => ({
-      value: t.id,
-      text: t.nameTeam + (t.bibTeam ? ' — ' + t.bibTeam : ''),
-      disabled: t.disabled || t.bibConflict
-    }))"
-    :select-size="8"
-    class="team-select"
-  >
-    <template #first>
-      <b-form-select-option :value="''" disabled>Pilih tim…</b-form-select-option>
-    </template>
-  </b-form-select>
-</b-form-group>
+             <b-form-group label="Pilih Tim" class="mb-2">
+    <SearchableSelect
+      v-model="draft.teamId"
+      :options="selectOptions"
+      placeholder="Select team name"
+      search-placeholder="Select team name"
+      :clearable="true"
+      :show-empty-option="true"
+      @input="onPickTeam"
+      class="ss-inline"
+    />
+  </b-form-group>
                 <Icon
                   icon="mdi:chevron-down"
                   width="18"
@@ -138,10 +134,12 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
+import SearchableSelect from "@/components/SearchableSelect.vue";
+
 
 export default {
   name: "TeamPanel",
-  components: { Icon },
+  components: { Icon, SearchableSelect },
   props: {
     title: String,
     division: String,
@@ -156,8 +154,25 @@ export default {
     teamsAvailableAll() {
       return Array.isArray(this.teamsAvailable) ? this.teamsAvailable : [];
     },
+    selectOptions() {
+      const base = Array.isArray(this.teamsAvailable) ? this.teamsAvailable : [];
+      return base.map(function (t) {
+        return {
+          value: (t.id !== undefined && t.id !== null) ? t.id : null, // hindari '??'
+          text: t.nameTeam + (t.bibTeam ? ' — ' + t.bibTeam : ''),
+          meta: t.bibTeam ? `BIB: ${t.bibTeam}` : '',
+          disabled: !!(t.disabled || t.bibConflict),
+        };
+      });
+    },
   },
   methods: {
+    onPickTeam(val) {
+      this.$emit("draft-change", {
+        ...(this.draft || {}),
+        teamId: val
+      });
+    },
     onTeamChange(e) {
       this.$emit("draft-change", {
         ...(this.draft || {}),
@@ -444,6 +459,87 @@ export default {
   background: #f1f3f7;     /* latar belakang abu */
   font-style: italic;
 }
+
+/* ==== SearchableSelect tweaks agar mirip mockup ==== */
+
+/* lebar penuh di dalam sel tabel */
+:deep(td) .ss-inline { width: 100%; }
+
+/* tombol tertutup = single border putih, rounded 12px */
+:deep(.ss-inline .ss-toggle){
+  min-height: 46px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1px solid #D6DFEA; /* lebih soft */
+  padding: 10px 14px;
+}
+:deep(.ss-inline .ss-toggle:hover){
+  background:#FFFFFF;
+  border-color:#C9D6E8;
+}
+:deep(.ss-inline .ss-toggle--open){
+  background:#FFFFFF;
+  border-color:#9EC5FF;
+  box-shadow: 0 0 0 3px rgba(42,104,196,0.12);
+}
+
+/* posisi dropdown persis di bawah tombol */
+:deep(.ss-inline .dropdown-menu){
+  margin-top: 6px !important;
+}
+
+/* panel dropdown = kartu putih dengan padding */
+:deep(.ss-inline .ss-panel){
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #E6EBF4;
+  box-shadow: 0 16px 32px rgba(31,56,104,0.12);
+  background: #FFFFFF;
+}
+
+/* search bar di dalam panel (ikon di kiri, input rata) */
+:deep(.ss-inline .ss-search){
+  background:#FFFFFF;
+  border:1px solid #E5EBF4;
+  border-radius:10px;
+  padding: 8px 10px 8px 36px; /* ruang ikon kiri */
+}
+:deep(.ss-inline .ss-search__icon){ color:#7B8AA6; left:12px; }
+:deep(.ss-inline .ss-search__input){
+  font-size:14px; line-height:1.2;
+}
+
+/* tombol Clear kecil di sisi kanan search */
+:deep(.ss-inline .ss-search__clear){
+  padding:4px 10px; font-size:12px;
+  border-radius:8px; border:1px solid #E2E8F0;
+}
+
+/* list item = kartu tipis, rounded, tanpa border tebal */
+:deep(.ss-inline .ss-list){ margin-top: 10px; max-height: 300px; overflow-y:auto; }
+:deep(.ss-inline .ss-item){
+  background:#FFFFFF;
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:8px;
+  box-shadow: inset 0 0 0 1px #EEF2F7; /* garis tipis */
+}
+:deep(.ss-inline .ss-item:hover){
+  box-shadow: inset 0 0 0 1px #DDE7F4;
+  background:#F9FBFF;
+}
+:deep(.ss-inline .ss-item__text){ color:#1F2940; font-size:14px; }
+:deep(.ss-inline .ss-item__meta){ color:#7A879A; }
+
+/* footer Kosongkan */
+:deep(.ss-inline .ss-footer){
+  margin-top: 6px; padding: 8px; text-align:center;
+  color:#1c4c7a; border-radius:8px; cursor:pointer;
+}
+:deep(.ss-inline .ss-footer:hover){ background:#F5F9FF; }
+
+/* HAPUS efek lama dari wrapper .field & ikon suffix (tidak dipakai lagi) */
+.field .suffix { display: none !important; }
 
 /* ===== Responsif kecil ===== */
 @media (max-width: 576px) {

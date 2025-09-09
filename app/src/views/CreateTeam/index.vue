@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 84vh" class="mt-4">
+  <div style="height: 110vh" class="mt-4">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
         <b-card
@@ -86,10 +86,12 @@
             :fields="fields"
             responsive="md"
             class="teams-table"
+            :per-page="perPage"
+            :current-page="currentPage"
           >
             <!-- Index Number -->
             <template #cell(index)="row">
-              {{ row.index + 1 }}
+              {{ (currentPage - 1) * perPage + row.index + 1 }}
             </template>
 
             <!-- Type -->
@@ -129,6 +131,27 @@
               </b-button>
             </template>
           </b-table>
+          <div class="d-flex align-items-center justify-content-between mt-3">
+            <small class="text-muted">
+              Showing
+              <strong>
+                {{ totalRows === 0 ? 0 : (currentPage - 1) * perPage + 1 }}
+                –
+                {{ Math.min(currentPage * perPage, totalRows) }}
+              </strong>
+              of <strong>{{ totalRows }}</strong> teams
+            </small>
+
+            <b-pagination
+              v-model="currentPage"
+              :total-rows="totalRows"
+              :per-page="perPage"
+              align="right"
+              size="sm"
+              first-number
+              last-number
+            />
+          </div>
         </b-card>
       </b-col>
     </b-row>
@@ -225,6 +248,8 @@ export default {
       },
       teams: [], // ✅ list teams
       filterType: "ALL",
+      currentPage: 1,
+      perPage: 10,
       fields: [
         {
           key: "index",
@@ -267,6 +292,9 @@ export default {
     };
   },
   computed: {
+    totalRows() {
+      return (this.filteredTeams || []).length;
+    },
     // Opsi dropdown filter (All + dari optionTeamTypes)
     filterTypeOptions() {
       const base = [{ value: "ALL", text: "All Types" }];
@@ -312,6 +340,15 @@ export default {
       handler(v) {
         localStorage.setItem("formNewTeam", JSON.stringify(v));
       },
+    },
+
+    filterType() {
+      this.currentPage = 1;
+    },
+    teams() {
+      // jaga-jaga supaya halaman tidak “kosong” ketika data berubah
+      const maxPage = Math.max(1, Math.ceil(this.totalRows / this.perPage));
+      if (this.currentPage > maxPage) this.currentPage = maxPage;
     },
   },
   methods: {

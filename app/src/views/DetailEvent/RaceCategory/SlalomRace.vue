@@ -318,13 +318,7 @@
           </table>
         </div>
 
-        <b-button
-          @click="saveResult"
-          variant="outline-info"
-          class="custom-button mt-2"
-        >
-          <Icon icon="icon-park-outline:save" /> Save Result
-        </b-button>
+        
         <b-button
           @click="goTo"
           variant="outline-info"

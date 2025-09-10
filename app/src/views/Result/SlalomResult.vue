@@ -58,7 +58,7 @@
         v-if="!loading && results.length === 0"
         :img-src="require('@/assets/images/404.png')"
         title="No data available"
-        subtitle="Hasil Sprint belum tersedia untuk kategori ini."
+        subtitle="Hasil Slalom belum tersedia untuk kategori ini."
         primary-text="Kembali ke Event"
         @primary="goBack"
       />
@@ -120,7 +120,7 @@
 
     <!-- Komponen PDF (disembunyikan dari layar, tapi ada di DOM) -->
     <div class="pdf-host sr-only" ref="pdfHost">
-      <SprintPdf
+      <SlalomPdf
         :data="pdfEventData"
         :dataParticipant="pdfParticipants"
         :categories="pdfCategories"
@@ -131,7 +131,7 @@
 
 <script>
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
-import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
+import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 
@@ -187,8 +187,8 @@ function pickEventFromStore() {
 }
 
 export default {
-  name: "SprintResult",
-  components: { Icon, EmptyStateFull, SprintPdf },
+  name: "SlalomResult",
+  components: { Icon, EmptyStateFull, SlalomPdf },
 
   data() {
     return {
@@ -288,12 +288,12 @@ export default {
       const title = [b.divisionName, b.raceName, b.initialName]
         .filter(Boolean)
         .join(" – ");
-      return title || "SPRINT";
+      return title || "SLALOM";
     },
   },
 
   created() {
-    this.loadSprintResult();
+    this.loadSlalomResult();
   },
 
   methods: {
@@ -308,7 +308,40 @@ export default {
       return m ? m.score : 0;
     },
 
-    /** Normalisasi baris hasil; aman untuk 2 bentuk: flat atau r.result */
+    /** "HH:MM:SS.mmm" -> ms (Infinity kalau kosong/tidak valid) */
+    timeToMs(str) {
+      if (!str) return Number.POSITIVE_INFINITY;
+      const [hh = "0", mm = "0", ssms = "0"] = String(str).trim().split(":");
+      const [ss = "0", ms = "0"] = String(ssms).split(".");
+      const h = parseInt(hh, 10) || 0;
+      const m = parseInt(mm, 10) || 0;
+      const s = parseInt(ss, 10) || 0;
+      const mil = parseInt(ms, 10) || 0;
+      return h * 3600000 + m * 60000 + s * 1000 + mil;
+    },
+    /** ms -> "HH:MM:SS.mmm" */
+    msToTime(ms) {
+      if (!Number.isFinite(ms) || ms < 0) ms = 0;
+      const h = Math.floor(ms / 3600000);
+      ms %= 3600000;
+      const m = Math.floor(ms / 60000);
+      ms %= 60000;
+      const s = Math.floor(ms / 1000);
+      const mil = Math.floor(ms % 1000);
+      const pad = (n, l = 2) => String(n).padStart(l, "0");
+      return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(mil, 3)}`;
+    },
+
+    /** Hitung penalti slalom (opsional): touch=2s, miss=50s */
+    calcSlalomPenaltyMs(src = {}) {
+      const touch = Number(src.gateTouch || src.touchCount || 0) || 0;
+      const miss = Number(src.gateMiss || src.missCount || 0) || 0;
+      const extra = Number(src.extraPenaltySec || 0) || 0; // jika ada penalti tambahan (detik)
+      const totalSec = touch * 2 + miss * 50 + extra;
+      return totalSec * 1000;
+    },
+
+    /** Normalisasi baris hasil; dukung schema sprint/baru slalom */
     normalizeResult(raw) {
       const base = {
         startTime: "",
@@ -333,23 +366,28 @@ export default {
           ? { ...raw, ...raw.result } // flatten
           : { ...raw };
 
+      // Jika tidak ada penaltyTime tapi ada gateTouch/gateMiss -> hitung otomatis
+      let penaltyMs = this.calcSlalomPenaltyMs(src);
+      let penaltyTime = String(src.penaltyTime || src.totalPenaltyTime || "");
+      if (!penaltyTime) {
+        // fallback jika penaltyTime belum ada
+        penaltyTime = this.msToTime(penaltyMs);
+      }
+
       const merged = {
         ...base,
         startTime: String(src.startTime || ""),
         finishTime: String(src.finishTime || ""),
         raceTime: String(src.raceTime || ""),
         penalty: Number(src.penalty) || 0,
-        totalPenalty: Number(src.totalPenalty) || 0,
+        totalPenalty:
+          Number(src.totalPenalty) || Number(src.penalty) || 0, // angka (opsional)
         startPenalty: Number(src.startPenalty) || 0,
         finishPenalty: Number(src.finishPenalty) || 0,
         startPenaltyTime: String(src.startPenaltyTime || "00:00:00.000"),
         finishPenaltyTime: String(src.finishPenaltyTime || "00:00:00.000"),
-        totalPenaltyTime: String(
-          src.totalPenaltyTime || src.penaltyTime || "00:00:00.000"
-        ),
-        penaltyTime: String(
-          src.penaltyTime || src.totalPenaltyTime || "00:00:00.000"
-        ),
+        totalPenaltyTime: String(src.totalPenaltyTime || penaltyTime || "00:00:00.000"),
+        penaltyTime: String(penaltyTime || "00:00:00.000"),
         totalTime: String(src.totalTime || ""),
         ranked:
           src.ranked === 0 || src.ranked === "0" ? 0 : Number(src.ranked) || "",
@@ -357,24 +395,20 @@ export default {
           src.score === 0 || src.score === "0" ? 0 : Number(src.score) || "",
       };
 
-      // hitung totalPenalty jika belum ada
-      if (!merged.totalPenalty) {
-        merged.totalPenalty = merged.startPenalty + merged.finishPenalty;
+      // Jika totalTime kosong -> hitung dari raceTime + penaltyTime
+      if (!merged.totalTime) {
+        const raceMs = this.timeToMs(merged.raceTime);
+        const penMs = this.timeToMs(merged.penaltyTime);
+        if (Number.isFinite(raceMs) && Number.isFinite(penMs)) {
+          merged.totalTime = this.msToTime(raceMs + penMs);
+        }
       }
 
-      return merged;
-    },
+      // resultTime untuk tampilan adalah totalTime jika ada penalti, else raceTime
+      const hasPenalty = this.timeToMs(merged.penaltyTime) > 0;
+      merged.resultTime = hasPenalty ? merged.totalTime || merged.raceTime : merged.raceTime;
 
-    /** "HH:MM:SS.mmm" -> ms (Infinity kalau kosong/tidak valid) */
-    timeToMs(str) {
-      if (!str) return Number.POSITIVE_INFINITY;
-      const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
-      const [ss = "0", ms = "0"] = String(ssms).split(".");
-      const h = parseInt(hh, 10) || 0;
-      const m = parseInt(mm, 10) || 0;
-      const s = parseInt(ss, 10) || 0;
-      const mil = parseInt(ms, 10) || 0;
-      return h * 3600000 + m * 60000 + s * 1000 + mil;
+      return merged;
     },
 
     /** Hitung rank & score otomatis */
@@ -384,9 +418,7 @@ export default {
           const t = r.resultTime || r.totalTime || r.raceTime || "";
           return { i, ms: this.timeToMs(t) };
         })
-        .filter(
-          (x) => Number.isFinite(x.ms) && x.ms !== Number.POSITIVE_INFINITY
-        );
+        .filter((x) => Number.isFinite(x.ms) && x.ms !== Number.POSITIVE_INFINITY);
 
       withTime.sort((a, b) => a.ms - b.ms);
 
@@ -415,7 +447,7 @@ export default {
       return rows;
     },
 
-    async loadSprintResult() {
+    async loadSlalomResult() {
       const q = this.$route.query || {};
       if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) {
         this.error = "Parameter hasil tidak lengkap.";
@@ -425,8 +457,8 @@ export default {
       this.loading = true;
       this.error = "";
 
-      // kirim permintaan
-      ipcRenderer.send("get-sprint-result", q);
+      // kirim permintaan ke channel slalom
+      ipcRenderer.send("get-slalom-result", q);
 
       // timeout failsafe supaya UI tidak menggantung
       let timeoutId;
@@ -439,16 +471,16 @@ export default {
           resolve();
         }, TIMEOUT_MS);
 
-        ipcRenderer.once("get-sprint-result-reply", (_e, res) => {
+        ipcRenderer.once("get-slalom-result-reply", (_e, res) => {
           clearTimeout(timeoutId);
           try {
             if (res && res.ok && Array.isArray(res.items)) {
               const rows = [];
               res.items.forEach((doc) => {
-                const arr = Array.isArray(doc.result)
+                const candidates = Array.isArray(doc.result)
                   ? doc.result
-                  : [doc.result || {}];
-                arr.forEach((r) => {
+                  : [doc.result || doc]; // dukung schema langsung di root
+                candidates.forEach((r) => {
                   const R = this.normalizeResult(r);
                   rows.push({
                     nameTeam: r.nameTeam || doc.nameTeam || "",
@@ -457,17 +489,12 @@ export default {
                     finishTime: R.finishTime || "",
                     raceTime: R.raceTime || "",
                     totalPenalty: Number(R.totalPenalty) || 0,
-                    penaltyTime:
-                      R.totalPenaltyTime || R.penaltyTime || "00:00:00.000",
-                    resultTime: R.penaltyTime
-                      ? R.totalTime || R.raceTime || ""
-                      : R.raceTime || "",
+                    penaltyTime: R.totalPenaltyTime || R.penaltyTime || "00:00:00.000",
+                    resultTime: R.resultTime || R.totalTime || R.raceTime || "",
                     totalTime: R.totalTime || "",
                     ranked: Number(R.ranked) || 0,
                     score:
-                      R.score !== undefined &&
-                      R.score !== null &&
-                      R.score !== ""
+                      R.score !== undefined && R.score !== null && R.score !== ""
                         ? Number(R.score)
                         : 0,
                   });
@@ -503,7 +530,7 @@ export default {
       await this.$nextTick();
       const filename =
         (this.eventInfo.eventName ? `${this.eventInfo.eventName} - ` : "") +
-        "Sprint Result.pdf";
+        "Slalom Result.pdf";
 
       const opt = {
         margin: [10, 10, 10, 10],

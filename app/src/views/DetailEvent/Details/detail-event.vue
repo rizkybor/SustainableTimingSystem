@@ -329,8 +329,17 @@ export default {
         return;
       }
 
+      const pathMap = {
+        SPRINT: "sprint-result",
+        DRR: "drr-result",
+        SLALOM: "slalom-result",
+        HEAD2HEAD: "headtohead-result",
+      };
+
+      let path = pathMap[idt.eventName] || "";
+      
       this.$router.push({
-        path: `/event-detail/${this.$route.params.id}/sprint-result`,
+        path: `/event-detail/${this.$route.params.id}/${path}`,
         query: {
           eventId: idt.eventId,
           initialId: idt.initialId,

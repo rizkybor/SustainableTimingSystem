@@ -10,6 +10,10 @@ import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
 import Head2Head from "../views/DetailEvent/RaceCategory/HeadToHead.vue";
 import CreateTeam from "@/views/CreateTeam/index.vue";
 import SprintResult from "@/views/Result/SprintResult.vue";
+import HeadToHeadResult from "@/views/Result/HeadToHeadResult.vue";
+import SlalomResult from "@/views/Result/SlalomResult.vue";
+import DrrResult from "@/views/Result/DrrResult.vue";
+import OverallResult from "@/views/Result/OverallResult.vue";
 
 Vue.use(VueRouter);
 
@@ -56,6 +60,26 @@ const routes = [
         path: "sprint-result",
         name: "SprintResult",
         component: SprintResult,
+      },
+      {
+        path: "slalom-result",
+        name: "SlalomResult",
+        component: SlalomResult,
+      },
+      {
+        path: "drr-result",
+        name: "DrrResult",
+        component: DrrResult,
+      },
+      {
+        path: "headtohead-result",
+        name: "HeadToHeadResult",
+        component: HeadToHeadResult,
+      },
+      {
+        path: "overall-result",
+        name: "OverallResult",
+        component: OverallResult,
       },
     ],
   },

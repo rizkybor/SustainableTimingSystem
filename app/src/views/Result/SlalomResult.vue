@@ -8,7 +8,7 @@
           Dashboard
         </router-link>
         <span class="sep">›</span>
-        <span class="muted">Sprint Result</span>
+        <span class="muted">Slalom Result</span>
       </div>
 
       <div class="right-actions">
@@ -25,31 +25,21 @@
 
     <!-- Card -->
     <div class="card">
-      <div class="card-back d-flex justify-content-between align-items-center">
+     <div class="card-back d-flex justify-content-between align-items-center">
         <!-- Back di kiri -->
         <b-button variant="link" class="p-0 back-link" @click="goBack">
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <!-- Stamp di kanan: klik untuk toggle -->
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-          @click="toggleOfficial"
-          title="Klik untuk toggle OFFICIAL/UNOFFICIAL"
-          role="button"
-          tabindex="0"
-          @keyup.enter="toggleOfficial"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
+        <!-- Unofficial di kanan dengan style stamp -->
+        <span class="unofficial-stamp">UNOFFICIAL</span>
       </div>
 
       <!-- EVENT HEADER -->
       <div class="event-header">
         <h2 class="event-name">
           {{ eventInfo.eventName || "-" }}
-          <span class="muted">| SPRINT RESULT</span>
+          <span class="muted">| SLALOM RESULT</span>
         </h2>
         <h4 class="event-location">
           {{ eventInfo.riverName || "-" }}, {{ eventInfo.addressCity || "-" }}
@@ -88,7 +78,7 @@
               <th>Result</th>
               <th>Ranked</th>
               <th>Score</th>
-              <th v-if="!isOfficial">Action</th>
+              <th>Action</th>
             </tr>
           </thead>
 
@@ -112,7 +102,7 @@
                     : getScoreByRanked(r.ranked) || 0
                 }}
               </td>
-              <td class="text-center" v-if="!isOfficial">
+              <td class="text-center">
                 <b-button
                   size="sm"
                   variant="warning"
@@ -202,7 +192,6 @@ export default {
 
   data() {
     return {
-      isOfficial: false,
       loading: false,
       error: "",
       results: [],
@@ -304,30 +293,12 @@ export default {
   },
 
   created() {
-    // load mode OFFICIAL dari localStorage (per event)
-    const k = this.officialKey();
-    const saved = localStorage.getItem(k);
-    if (saved !== null) this.isOfficial = saved === "1";
-
     this.loadSprintResult();
   },
 
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
-    },
-    // NEW: key penyimpanan per event
-    officialKey() {
-      // coba pakai eventId dari query atau bucket
-      const q = this.$route.query || {};
-      const id = q.eventId || currentEventIdFromBucket() || "global";
-      return `resultOfficialMode:${id}`;
-    },
-
-    // NEW: toggle & persist
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
     },
     openEdit(row) {
       this.$emit("edit-row", row);
@@ -695,13 +666,5 @@ export default {
   font-size: 1.3rem;
   letter-spacing: 1px;
   display: inline-block;
-}
-
-.official-stamp {
-  color: #148a3b; /* hijau */
-  border-color: #148a3b;
-  transform: rotate(0deg); /* lurus */
-  opacity: 1;
-  box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
 </style>

@@ -25,10 +25,12 @@
                 {{ dataEventSafe.addressCity || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : {{ dataEventSafe.riverName || "-" }}</span
+                ><strong class="text-white">River</strong> :
+                {{ dataEventSafe.riverName || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">Level</strong> : {{ dataEventSafe.levelName || "-" }}</span
+                ><strong class="text-white">Level</strong> :
+                {{ dataEventSafe.levelName || "-" }}</span
               >
             </div>
           </b-col>
@@ -113,26 +115,63 @@
           <table class="table table-bordered">
             <thead>
               <tr>
-                <th>No</th>
-                <th>Team Name</th>
-                <th>BIB</th>
-                <th>Run</th>
-                <th>Total Penalty</th>
-                <th v-for="n in SLALOM_GATES" :key="'g' + n">{{ n }}</th>
-                <th>Penalty Time</th>
-                <th>Start Time</th>
-                <th>Finish Time</th>
-                <th>Race Time</th>
-                <th>Total Time</th>
-                <th>Best Time</th>
-                <th>Edit</th>
+                <th rowspan="2">No</th>
+                <th class="text-center" rowspan="2">Team Name</th>
+                <th class="text-center" rowspan="2">BIB</th>
+                <th rowspan="2">Run</th>
+
+                <!-- Judul grup penalties: S + 1..N + F -->
+                <!-- Klik untuk toggle -->
+                <th
+                  v-if="!penaltiesWrapped"
+                  class="text-center penalties-title is-clickable"
+                  :colspan="SLALOM_GATES.length + 2"
+                  @click="penaltiesWrapped = true"
+                  title="Klik untuk bungkus (wrap) penalties"
+                >
+                  Penalties
+                </th>
+                <!-- Mode wrapped: cuma 1 kolom -->
+                <th
+                  v-else
+                  class="text-center penalties-title is-clickable"
+                  rowspan="2"
+                  @click="penaltiesWrapped = false"
+                  title="Klik untuk tampilkan penuh (un-wrap) penalties"
+                >
+                  Penalties
+                </th>
+
+                <th rowspan="2">Total Penalty</th>
+
+                <th class="text-center" rowspan="2">Penalty Time</th>
+                <th class="text-center" rowspan="2">Start Time</th>
+                <th class="text-center" rowspan="2">Finish Time</th>
+                <th class="text-center" rowspan="2">Race Time</th>
+                <th class="text-center" rowspan="2">Total Time</th>
+                <th class="text-center" rowspan="2">Best Time</th>
+                <th class="text-center" rowspan="2">Ranked</th>
+                <th class="text-center" rowspan="2">Score</th>
+                <th class="text-center" rowspan="2">Edit</th>
+              </tr>
+              <tr v-if="!penaltiesWrapped">
+                <th class="text-center">Start</th>
+                <th
+                  v-for="n in SLALOM_GATES"
+                  :key="'g' + n"
+                  class="text-center"
+                >
+                  {{ n }}
+                </th>
+                <th class="text-center">Finish</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(team, ti) in visibleTeams" :key="team._id">
                 <td>{{ ti + 1 }}</td>
-                <td>{{ team.nameTeam }}</td>
+                <td style="min-width: 150px">{{ team.nameTeam }}</td>
                 <td>{{ team.bibNumber }}</td>
+
                 <td style="min-width: 120px">
                   <b-form-select
                     v-model="selectedSession[team._id]"
@@ -140,30 +179,130 @@
                     @change="recalcTeam(team)"
                   />
                 </td>
-                <td>{{ displayTotalPenalty(team) }}</td>
 
-                <!-- 14 Gates -->
-                <td
-                  v-for="(gate, gi) in currentSession(team).penalties"
-                  :key="team._id + '-' + gi"
-                >
-                  <b-form-select
-                    v-model="
-                      team.sessions[selectedSession[team._id]].penalties[gi]
-                    "
-                    :options="penaltyOptions"
-                    size="sm"
-                    @change="recalcTeam(team)"
-                  />
+                <!-- ========== PENALTIES ========== -->
+                <!-- Mode WRAPPED: 1 kolom berisi grid S,1..N,F -->
+                <td v-if="penaltiesWrapped" class="p-1">
+                  <div class="penalties-grid">
+                    <!-- S -->
+                    <div class="p-item">
+                      <div class="p-label">S</div>
+                      <b-form-select
+                        class="p-select"
+                        v-model="
+                          team.sessions[selectedSession[team._id]].startPenalty
+                        "
+                        :options="penaltyOptions"
+                        size="sm"
+                        @change="recalcTeam(team)"
+                      />
+                    </div>
+
+                    <!-- 1..N -->
+                    <div
+                      v-for="(gate, gi) in currentSession(team).penalties"
+                      :key="team._id + '-wrap-' + gi"
+                      class="p-item"
+                    >
+                      <div class="p-label">{{ gi + 1 }}</div>
+                      <b-form-select
+                        class="p-select"
+                        v-model="
+                          team.sessions[selectedSession[team._id]].penalties[gi]
+                        "
+                        :options="penaltyOptions"
+                        size="sm"
+                        @change="recalcTeam(team)"
+                      />
+                    </div>
+
+                    <!-- F -->
+                    <div class="p-item">
+                      <div class="p-label">F</div>
+                      <b-form-select
+                        class="p-select"
+                        v-model="
+                          team.sessions[selectedSession[team._id]].finishPenalty
+                        "
+                        :options="penaltyOptions"
+                        size="sm"
+                        @change="recalcTeam(team)"
+                      />
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Mode EXPANDED: kolom S,1..N,F terpisah (seperti sebelumnya) -->
+                <template v-else>
+                  <!-- S -->
+                  <td>
+                    <b-form-select
+                      style="min-width: 50px"
+                      v-model="
+                        team.sessions[selectedSession[team._id]].startPenalty
+                      "
+                      :options="penaltyOptions"
+                      size="sm"
+                      @change="recalcTeam(team)"
+                    />
+                  </td>
+
+                  <!-- 1..N -->
+                  <td
+                    v-for="(gate, gi) in currentSession(team).penalties"
+                    :key="team._id + '-' + gi"
+                  >
+                    <b-form-select
+                      style="min-width: 50px"
+                      v-model="
+                        team.sessions[selectedSession[team._id]].penalties[gi]
+                      "
+                      :options="penaltyOptions"
+                      size="sm"
+                      @change="recalcTeam(team)"
+                    />
+                  </td>
+
+                  <!-- F -->
+                  <td>
+                    <b-form-select
+                      style="min-width: 50px"
+                      v-model="
+                        team.sessions[selectedSession[team._id]].finishPenalty
+                      "
+                      :options="penaltyOptions"
+                      size="sm"
+                      @change="recalcTeam(team)"
+                    />
+                  </td>
+                </template>
+                <!-- ========== /PENALTIES ========== -->
+
+                <td style="min-width: 120px">
+                  {{ displayTotalPenalty(team) }}
                 </td>
 
                 <td>{{ currentSession(team).penaltyTime || "-" }}</td>
-                <td>{{ currentSession(team).startTime || "-" }}</td>
-                <td>{{ currentSession(team).finishTime || "-" }}</td>
-                <td>{{ currentSession(team).raceTime || "-" }}</td>
-                <td>{{ currentSession(team).totalTime || "-" }}</td>
-                <td style="background-color: greenyellow">
+                <td style="min-width: 120px">
+                  {{ currentSession(team).startTime || "-" }}
+                </td>
+                <td style="min-width: 120px">
+                  {{ currentSession(team).finishTime || "-" }}
+                </td>
+                <td style="min-width: 120px">
+                  {{ currentSession(team).raceTime || "-" }}
+                </td>
+                <td style="min-width: 120px">
+                  {{ currentSession(team).totalTime || "-" }}
+                </td>
+                <td style="background-color: greenyellow; min-width: 120px">
                   {{ calculateBestTime(team) || "-" }}
+                </td>
+                <td style="min-width: 120px" class="text-center">
+                  {{ rankOf(team._id) }}
+                </td>
+                <td style="min-width: 120px" class="text-center">
+                  {{ scoreOf(team._id) }}
                 </td>
                 <td>
                   <button
@@ -235,7 +374,7 @@ function hmsToMs(str) {
 }
 
 /** ===== Slalom specifics ===== */
-const SLALOM_GATES = 14;
+const SLALOM_GATES = Array.from({ length: 14 }, (_, i) => i + 1);
 const PENALTY_VALUE_TO_MS = { 0: 0, 5: 5000, 50: 50000 };
 
 /** ===== Payload baru: ambil bucket & teams (seperti Sprint Result) ===== */
@@ -260,7 +399,9 @@ function normalizeTeamFromBucketForSlalom(t = {}) {
 
   // siapkan 2 sesi default, dan merge jika ada data existing
   const emptySession = () => ({
-    penalties: Array.from({ length: SLALOM_GATES }, () => 0),
+    startPenalty: 0,
+    penalties: Array.from({ length: SLALOM_GATES.length }, () => 0),
+    finishPenalty: 0,
     totalPenalty: 0,
     penaltyTime: "00:00:00.000",
     startTime: "",
@@ -326,6 +467,41 @@ export default {
         { text: "5", value: 5 },
         { text: "50", value: 50 },
       ],
+      dataScore: [
+        { ranking: 1, score: 350 },
+        { ranking: 2, score: 322 },
+        { ranking: 3, score: 301 },
+        { ranking: 4, score: 287 },
+        { ranking: 5, score: 277 },
+        { ranking: 6, score: 266 },
+        { ranking: 7, score: 256 },
+        { ranking: 8, score: 245 },
+        { ranking: 9, score: 235 },
+        { ranking: 10, score: 224 },
+        { ranking: 11, score: 214 },
+        { ranking: 12, score: 203 },
+        { ranking: 13, score: 193 },
+        { ranking: 14, score: 182 },
+        { ranking: 15, score: 172 },
+        { ranking: 16, score: 161 },
+        { ranking: 17, score: 151 },
+        { ranking: 18, score: 140 },
+        { ranking: 19, score: 133 },
+        { ranking: 20, score: 126 },
+        { ranking: 21, score: 119 },
+        { ranking: 22, score: 112 },
+        { ranking: 23, score: 105 },
+        { ranking: 24, score: 98 },
+        { ranking: 25, score: 91 },
+        { ranking: 26, score: 84 },
+        { ranking: 27, score: 77 },
+        { ranking: 28, score: 70 },
+        { ranking: 29, score: 63 },
+        { ranking: 30, score: 56 },
+        { ranking: 31, score: 49 },
+        { ranking: 32, score: 42 },
+      ],
+      penaltiesWrapped: false,
     };
   },
 
@@ -379,6 +555,36 @@ export default {
         };
       });
     },
+
+    // NEW: ranking & score per team berdasarkan best time
+    ranksMap() {
+      // ambil best time ms per tim
+      const arr = this.teams.map((t) => {
+        const times = (t.sessions || [])
+          .map((s) => s && s.totalTime)
+          .filter(Boolean)
+          .map(hmsToMs);
+        const bestMs = times.length ? Math.min(...times) : Infinity;
+        return { id: t._id, bestMs };
+      });
+
+      // sort ascending (kecil = lebih cepat)
+      arr.sort((a, b) => a.bestMs - b.bestMs);
+
+      // assign rank; tim tanpa waktu (Infinity) tidak diranking
+      const map = {};
+      let rankCounter = 1;
+      for (const item of arr) {
+        if (!Number.isFinite(item.bestMs)) {
+          map[item.id] = { rank: "-", score: 0 };
+        } else {
+          const rank = rankCounter++;
+          const scoreObj = this.dataScore.find((d) => d.ranking === rank);
+          map[item.id] = { rank, score: scoreObj ? scoreObj.score : 0 };
+        }
+      }
+      return map;
+    },
   },
 
   mounted() {
@@ -413,6 +619,15 @@ export default {
   },
 
   methods: {
+    rankOf(id) {
+      const r = this.ranksMap && this.ranksMap[id];
+      // jika tidak ada best time → '-'
+      return r && (typeof r.rank === "number" || r.rank === "-") ? r.rank : "-";
+    },
+    scoreOf(id) {
+      const r = this.ranksMap && this.ranksMap[id];
+      return r && typeof r.score === "number" ? r.score : 0;
+    },
     /** === Table accessors === */
     sessionOptions(team) {
       return team.sessions.map((_, i) => ({ text: `Run ${i + 1}`, value: i }));
@@ -422,25 +637,42 @@ export default {
         this.selectedSession[team._id] != null
           ? this.selectedSession[team._id]
           : 0;
-      const s = team.sessions[idx] || { penalties: [] };
-      if (!Array.isArray(s.penalties) || s.penalties.length !== SLALOM_GATES) {
+      const s = team.sessions[idx] || {};
+      if (
+        !Array.isArray(s.penalties) ||
+        s.penalties.length !== SLALOM_GATES.length
+      ) {
         this.$set(
           s,
           "penalties",
-          Array.from({ length: SLALOM_GATES }, () => 0)
+          Array.from({ length: SLALOM_GATES.length }, () => 0)
         );
       }
+      if (s.startPenalty == null) this.$set(s, "startPenalty", 0);
+      if (s.finishPenalty == null) this.$set(s, "finishPenalty", 0);
       return s;
     },
 
     /** === Perhitungan penalty/time === */
     recalcSession(s) {
-      s.totalPenalty = s.penalties.reduce((a, v) => a + (Number(v) || 0), 0);
-      const penMs = s.penalties.reduce(
-        (sum, v) => sum + (PENALTY_VALUE_TO_MS[Number(v) || 0] || 0),
+      // total penalty (angka) = S + sum(1..N) + F
+      const core = (s.penalties || []).reduce(
+        (a, v) => a + (Number(v) || 0),
         0
       );
+      const sVal = Number(s.startPenalty) || 0;
+      const fVal = Number(s.finishPenalty) || 0;
+      s.totalPenalty = sVal + core + fVal;
+
+      // konversi ke ms dengan peta nilai
+      const toMs = (v) => PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
+      const penMs =
+        toMs(sVal) +
+        (s.penalties || []).reduce((sum, v) => sum + toMs(v), 0) +
+        toMs(fVal);
+
       s.penaltyTime = msToHMSms(penMs);
+
       if (s.raceTime) {
         const raceMs = hmsToMs(s.raceTime);
         s.totalTime = msToHMSms(raceMs + penMs);
@@ -451,7 +683,7 @@ export default {
     },
     displayTotalPenalty(team) {
       const s = this.currentSession(team);
-      return Number.isFinite(s.totalPenalty) ? s.totalPenalty : 0;
+      return Number(s.totalPenalty) || 0;
     },
     calculateBestTime(team) {
       const times = team.sessions.map((s) => s.totalTime).filter(Boolean);
@@ -778,5 +1010,63 @@ td {
   background: #1874a5;
   color: #fff;
   border-color: #1874a5;
+}
+
+/* Header clickable cue */
+.is-clickable {
+  cursor: pointer;
+}
+
+/* Kolom penalties WRAPPED */
+.penalties-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    8,
+    minmax(56px, 1fr)
+  ); /* 8 kolom x 2 baris -> 16 item + S/F = 16 + 2 = 18; akan auto-wrap */
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.p-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.p-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1;
+  margin-bottom: 2px;
+  color: #666;
+}
+
+/* Lebarkan sedikit select agar enak dilihat */
+::v-deep .p-select .custom-select,
+.p-select .custom-select,
+.p-select :deep(.custom-select) {
+  min-width: 56px; /* set 56–72px sesuai selera */
+  padding-left: 6px;
+  padding-right: 18px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.table-bordered th {
+  vertical-align: middle !important; /* teks header vertikal rata tengah */
+}
+
+/* Responsif: jika layar sempit, kurangi kolom grid */
+@media (max-width: 992px) {
+  .penalties-grid {
+    grid-template-columns: repeat(6, minmax(52px, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .penalties-grid {
+    grid-template-columns: repeat(4, minmax(50px, 1fr));
+  }
 }
 </style>

@@ -414,6 +414,11 @@
 
                     <td class="large-bold text-strong max-char">
                       {{ item.nameTeam }}
+                      <span
+                        v-if="isByeTeam(item)"
+                        class="badge badge-light ml-2"
+                        >BYE</span
+                      >
                     </td>
                     <td class="large-bold">{{ item.bibTeam }}</td>
                     <td class="text-monospace">{{ item.result.startTime }}</td>
@@ -425,6 +430,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -517,6 +523,7 @@
                         type="button"
                         class="btn btn-warning"
                         @click="openModal(item)"
+                        :disabled="isByeTeam(item)"
                       >
                         Edit
                       </button>
@@ -946,7 +953,8 @@ export default {
     },
     currentRoundIndex() {
       this.computePodium();
-      this.$nextTick(this.ensureDefaultHeatForVisible); // NEW
+      this.$nextTick(this.ensureDefaultHeatForVisible);
+      this.loadRoundResultsForCurrentRound(); // <-- tambah ini
     },
   },
 
@@ -973,6 +981,76 @@ export default {
   },
 
   methods: {
+    evaluateHeatWinnersForCurrentRound() {
+      const r = this.currentRound;
+      if (!r || !r.matches) return;
+
+      const toKey = (p) =>
+        String((p && (p.nameTeam || p.teamName)) || "").toUpperCase();
+
+      // map nama → object participant (subset visible)
+      const map = new Map(this.visibleParticipants.map((p) => [toKey(p), p]));
+
+      r.matches.forEach((m) => {
+        const n1 = m.team1 && m.team1.name ? m.team1.name.toUpperCase() : "";
+        const n2 = m.team2 && m.team2.name ? m.team2.name.toUpperCase() : "";
+
+        // BYE dibiarkan mekanisme bye yang menetapkan pemenang
+        if (m.bye || !n1 || !n2) return;
+
+        const P1 = map.get(n1);
+        const P2 = map.get(n2);
+        if (!P1 || !P2) return;
+
+        const t1 =
+          (P1.result && (P1.result.totalTime || P1.result.raceTime)) || "";
+        const t2 =
+          (P2.result && (P2.result.totalTime || P2.result.raceTime)) || "";
+
+        const T1 = this.parsesTime(t1);
+        const T2 = this.parsesTime(t2);
+        if (!isFinite(T1) || !isFinite(T2)) return; // belum lengkap
+
+        if (T1 < T2) {
+          m.winner = m.team1;
+          P1.result.winLose = "Win";
+          P2.result.winLose = "Lose";
+        } else if (T2 < T1) {
+          m.winner = m.team2;
+          P1.result.winLose = "Lose";
+          P2.result.winLose = "Win";
+        } else {
+          m.winner = null;
+          P1.result.winLose = null;
+          P2.result.winLose = null;
+        }
+      });
+
+      this.computePodium();
+      this.persistRoundResults();
+    },
+    isByeTeam(item) {
+      const r = this.currentRound;
+      if (!r || !r.matches) return false;
+      const name = String(
+        (item && (item.nameTeam || item.teamName)) || ""
+      ).toUpperCase();
+      if (!name) return false;
+
+      for (var i = 0; i < r.matches.length; i++) {
+        var m = r.matches[i];
+        if (!m || !m.bye) continue;
+
+        var n1 = m.team1 && m.team1.name ? m.team1.name.toUpperCase() : "";
+        var n2 = m.team2 && m.team2.name ? m.team2.name.toUpperCase() : "";
+
+        // Pada BYE, hanya satu dari n1/n2 yang ada.
+        if ((n1 && n1 === name && !n2) || (n2 && n2 === name && !n1)) {
+          return true; // tim ini lolos BYE → disable inputnya
+        }
+      }
+      return false;
+    },
     getPenaltyCount(item) {
       const has = item && item.result;
       const pb = has && item.result.penalties;
@@ -1041,6 +1119,8 @@ export default {
           item.result.penaltyTime
         );
       }
+
+      this.evaluateHeatWinnersForCurrentRound();
 
       // re-rank subset & persist
       await this.assignRanks(this.visibleParticipants);
@@ -1757,7 +1837,8 @@ export default {
         );
       }
       this.editResult = true;
-      await this.assignRanks(this.visibleParticipants); // CHANGED
+      await this.assignRanks(this.visibleParticipants);
+      this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants(); // NEW
       this.persistRoundResults(); // NEW
     },
@@ -1880,6 +1961,7 @@ export default {
       }
 
       await this.assignRanks(this.visibleParticipants);
+      this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants(); // NEW
       this.persistRoundResults(); // NEW
     },
@@ -1936,11 +2018,11 @@ export default {
 
     /** SAVE RESULT (channel khusus H2H) */
     saveResult() {
-      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
-      if (!Array.isArray(clean) || clean.length === 0) {
+      const subset = JSON.parse(JSON.stringify(this.visibleParticipants || []));
+      if (!Array.isArray(subset) || subset.length === 0) {
         ipcRenderer.send("get-alert", {
           type: "warning",
-          detail: "Belum ada data yang bisa disimpan.",
+          detail: "Belum ada data yang bisa disimpan untuk babak ini.",
           message: "Ups Sorry",
         });
         return;
@@ -1958,14 +2040,28 @@ export default {
         return;
       }
 
-      const docs = buildResultDocs(clean, bucket);
-      ipcRenderer.send("insert-h2h-result", docs);
+      // tag metadata babak di dalam result
+      const roundId = this.currentRoundKey();
+      const roundName = this.currentRound ? this.currentRound.name : "";
 
+      const docs = subset.map((t) => {
+        const base = buildResultDocs([t], bucket)[0];
+        base.result = {
+          ...(base.result || {}),
+          _roundId: roundId,
+          _roundName: roundName,
+        };
+        return base;
+      });
+
+      ipcRenderer.send("insert-h2h-result", docs);
       ipcRenderer.once("insert-h2h-result-reply", (_e, res) => {
         if (res && res.ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
-            detail: "Result data has been successfully saved",
+            detail: `Result telah disimpan untuk babak: ${
+              roundName || roundId
+            }`,
             message: "Successfully",
           });
         } else {

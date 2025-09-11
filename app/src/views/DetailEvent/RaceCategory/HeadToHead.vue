@@ -40,7 +40,7 @@
     </section>
 
     <!-- SUBHEADER -->
-    <div class="px-5">
+    <div class="px-4">
       <div class="card-body">
         <b-row>
           <b-col>
@@ -58,22 +58,6 @@
 
           <b-col>
             <div style="display: flex; gap: 10px; justify-content: flex-end">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                @click="saveResult"
-              >
-                <Icon icon="icon-park-outline:save" /> Save Result
-              </button>
-
-              <button
-                type="button"
-                class="btn btn-info"
-                @click="toggleSortRanked"
-              >
-                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-              </button>
-
               <button
                 type="button"
                 :class="{
@@ -115,58 +99,69 @@
     </div>
 
     <!-- BRACKET -->
-    <div class="px-4 mt-4 mb-4">
+    <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <h4 class="mb-0">Bracket Head 2 Head</h4>
-        <div class="d-flex" style="gap: 8px">
-          <div class="d-flex align-items-center" style="gap: 8px">
-            <button class="btn btn-outline-secondary" @click="prevRound">
-              <Icon icon="mdi:chevron-left" /> Prev
+        <div class="toolbar-actions">
+          <!-- Build / Edit -->
+          <div class="btn-group mr-2" role="group" aria-label="Build actions">
+            <button
+              class="btn"
+              :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
+              @click="editBracketTeams = !editBracketTeams"
+              v-b-tooltip.hover="
+                editBracketTeams
+                  ? 'Selesai edit tim'
+                  : 'Edit tim di ronde pertama'
+              "
+            >
+              <Icon icon="mdi:pencil-outline" class="mr-1" />
+              {{ editBracketTeams ? "Done" : "Edit Teams" }}
             </button>
-
-            <!-- NEW: pilih babak aktif -->
-            <b-form-select
-              v-model="currentRoundIndex"
-              :options="roundOptions"
-              class="w-auto"
-              style="min-width: 180px"
-            ></b-form-select>
-
-            <button class="btn btn-outline-secondary" @click="nextRound">
-              Next <Icon icon="mdi:chevron-right" />
+            <button
+              class="btn btn-outline-danger"
+              @click="clearFirstRoundAssignments"
+              v-b-tooltip.hover="'Kosongkan ronde pertama'"
+            >
+              <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
+            </button>
+            <button
+              class="btn btn-outline-warning"
+              @click="populateBronzeFromSemis"
+              v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
+            >
+              <Icon icon="mdi:medal-outline" class="mr-1" /> Bronze
             </button>
           </div>
 
-          <button
-            class="btn btn-outline-secondary"
-            @click="
-              rebuildBracketDynamic(
-                Math.min(Math.max(participantArr.length || 8, 4), 32)
-              )
-            "
-          >
-            <Icon icon="mdi:refresh" /> Rebuild by Participants
-          </button>
-          <button
-            class="btn"
-            :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
-            @click="editBracketTeams = !editBracketTeams"
-          >
-            <Icon icon="mdi:pencil-outline" />
-            {{ editBracketTeams ? "Done" : "Edit Teams" }}
-          </button>
-          <button
-            class="btn btn-outline-danger"
-            @click="clearFirstRoundAssignments"
-          >
-            <Icon icon="mdi:eraser-variant" /> Clear First Round
-          </button>
-          <button
-            class="btn btn-outline-warning"
-            @click="populateBronzeFromSemis"
-          >
-            <Icon icon="mdi:medal-outline" /> Populate Bronze
-          </button>
+          <!-- Divider -->
+          <div class="toolbar-divider d-none d-md-block"></div>
+
+          <!-- Navigation -->
+          <div class="round-nav ml-md-3">
+            <button
+              class="btn btn-outline-secondary"
+              @click="prevRound"
+              v-b-tooltip.hover="'Ronde sebelumnya'"
+            >
+              Prev
+            </button>
+
+            <b-form-select
+              v-model="currentRoundIndex"
+              :options="roundOptions"
+              class="round-select mx-2"
+              v-b-tooltip.hover="'Pilih ronde aktif'"
+            />
+
+            <button
+              class="btn btn-outline-secondary"
+              @click="nextRound"
+              v-b-tooltip.hover="'Ronde berikutnya'"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -207,7 +202,7 @@
 
                   <!-- Editor slot Team 1 (ronde pertama saja) -->
                   <div v-else class="w-100">
-                    <b-select
+                    <b-form-select
                       :value="m.team1.__pid || ''"
                       @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
                       class="w-100"
@@ -222,7 +217,7 @@
                       >
                         {{ opt.label }}
                       </option>
-                    </b-select>
+                    </b-form-select>
                   </div>
                 </div>
                 <span class="bracket__score" v-if="m.score1 != null">{{
@@ -248,7 +243,7 @@
 
                   <!-- Editor slot Team 2 (ronde pertama saja) -->
                   <div v-else class="w-100">
-                    <b-select
+                    <b-form-select
                       :value="m.team2.__pid || ''"
                       @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
                       class="w-100"
@@ -263,7 +258,7 @@
                       >
                         {{ opt.label }}
                       </option>
-                    </b-select>
+                    </b-form-select>
                   </div>
                 </div>
                 <span class="bracket__score" v-if="m.score2 != null">{{
@@ -314,29 +309,34 @@
       <!-- /bracket -->
     </div>
 
-    <!-- OPERATION TIME (shared component) -->
-    <OperationTimePanel
-      :digit-id="digitId"
-      :digit-time="digitTime"
-      :participant="visibleParticipants"
-      :digit-time-start.sync="digitTimeStart"
-      :digit-time-finish.sync="digitTimeFinish"
-      @update-time="updateTime"
-    />
-
     <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>
-          List Result —
-          {{
-            currentRound
-              ? currentRound.bronze
-                ? "Third Place"
-                : currentRound.name
-              : "—"
-          }}
-        </h4>
+        <div class="py-3" style="display: flex; justify-content: space-between">
+          <div>
+            <h4>
+              List Result —
+              {{
+                currentRound
+                  ? currentRound.bronze
+                    ? "Third Place"
+                    : currentRound.name
+                  : "—"
+              }}
+            </h4>
+          </div>
+          <div class="d-flex" style="gap: 8px">
+            <button class="btn btn-outline-success" @click="saveAllRoundsLocal">
+              <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
+            </button>
+            <button class="btn btn-outline-primary" @click="saveAllRoundsToDB">
+              <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
+            </button>
+            <button class="btn btn-outline-dark" @click="exportAllRoundsJSON">
+              <Icon icon="mdi:download" /> Export JSON
+            </button>
+          </div>
+        </div>
         <b-row>
           <b-col>
             <div
@@ -354,7 +354,7 @@
                     <th rowspan="2">Start Time</th>
 
                     <!-- Grup Penalties -->
-                    <th colspan="8" class="text-center">Penalties</th>
+                    <th colspan="9" class="text-center">Penalties</th>
 
                     <th rowspan="2">Total Penalty</th>
                     <th rowspan="2">Penalty Time</th>
@@ -365,14 +365,15 @@
                     <th v-if="editResult" rowspan="2">Action</th>
                   </tr>
                   <tr>
-                    <th>S</th>
-                    <th>CL</th>
-                    <th>R1</th>
-                    <th>R2</th>
-                    <th>L1</th>
-                    <th>L2</th>
-                    <th>PB</th>
-                    <th>F</th>
+                    <th class="text-center">S</th>
+                    <th class="text-center">CL</th>
+                    <th class="text-center">R1</th>
+                    <th class="text-center">R2</th>
+                    <th class="text-center">L1</th>
+                    <th class="text-center">L2</th>
+                    <th class="text-center">PB</th>
+                    <th class="text-center">F</th>
+                    <th class="text-center">Others</th>
                   </tr>
                 </thead>
 
@@ -389,7 +390,7 @@
                         ]"
                         size="sm"
                         class="w-auto"
-                        @change="onHeatChanged(item)"
+                        @change="onHeatChanged(item, $event)"
                         :disabled="isByeTeam(item)"
                       />
                     </td>
@@ -426,8 +427,8 @@
                     </td>
                     <td>
                       <b-form-select
-                        v-model.number="item.result.penalties.r1"
-                        :options="penaltyChoices"
+                        v-model="item.result.penalties.r1"
+                        :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -435,8 +436,8 @@
                     </td>
                     <td>
                       <b-form-select
-                        v-model.number="item.result.penalties.r2"
-                        :options="penaltyChoices"
+                        v-model="item.result.penalties.r2"
+                        :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -444,8 +445,8 @@
                     </td>
                     <td>
                       <b-form-select
-                        v-model.number="item.result.penalties.l1"
-                        :options="penaltyChoices"
+                        v-model="item.result.penalties.l1"
+                        :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -453,25 +454,37 @@
                     </td>
                     <td>
                       <b-form-select
-                        v-model.number="item.result.penalties.l2"
-                        :options="penaltyChoices"
+                        v-model="item.result.penalties.l2"
+                        :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
                       />
                     </td>
-                    <td>
-                      <b-form-select
-                        v-model.number="item.result.penalties.pb"
-                        :options="penaltyChoices"
-                        size="sm"
-                        @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
-                      />
+                    <td class="text-center">
+                      <span
+                        :class="{
+                          'badge badge-success': item.result.penalties.pb === 0,
+                          'badge badge-danger': item.result.penalties.pb === 50,
+                        }"
+                        class="p-2"
+                      >
+                        {{ item.result.penalties.pb }}
+                      </span>
                     </td>
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.f"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
+                      />
+                    </td>
+
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.o"
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
@@ -525,7 +538,19 @@
           </b-col>
         </b-row>
       </div>
+    </div>
 
+    <!-- OPERATION TIME (shared component) -->
+    <OperationTimePanel
+      :digit-id="digitId"
+      :digit-time="digitTime"
+      :participant="visibleParticipants"
+      :digit-time-start.sync="digitTimeStart"
+      :digit-time-finish.sync="digitTimeFinish"
+      @update-time="updateTime"
+    />
+
+    <div class="ml-5">
       <b-button @click="goTo" variant="outline-info" class="custom-button">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
@@ -792,6 +817,28 @@ export default {
   },
 
   computed: {
+    ynChoices() {
+      return [
+        { value: "N", text: "N" },
+        { value: "Y", text: "Y" },
+      ];
+    },
+    storedResultsByRound() {
+      // baca semua yang sudah dipersist ke localStorage untuk bucket saat ini
+      if (!this.roundResultsRootKey) return {};
+      const all = readAllRoundResults(this.roundResultsRootKey) || {};
+      // bentuk: { "R1": { roundName: "Round of 16", items:[...] }, ... }
+      const map = {};
+      (this.rounds || []).forEach((r) => {
+        const roundId = String(r.id);
+        const items = Array.isArray(all[roundId]) ? all[roundId] : [];
+        map[roundId] = {
+          roundName: r.bronze ? "Third Place" : r.name,
+          items,
+        };
+      });
+      return map;
+    },
     // ... (computed lain tetap)
     allHeatChoices() {
       return Array.from({ length: MAX_HEAT_NUMBER }, (_, i) => i + 1);
@@ -981,11 +1028,11 @@ export default {
         this.computePodium();
       },
     },
-   currentRoundIndex() {
-    this.computePodium();
-    this.loadRoundResultsForCurrentRound();
-    this.computeWinLoseByHeat(); // << tambah
-  },
+    currentRoundIndex() {
+      this.computePodium();
+      this.loadRoundResultsForCurrentRound();
+      this.computeWinLoseByHeat(); // << tambah
+    },
   },
 
   beforeRouteLeave(to, from, next) {
@@ -1010,53 +1057,131 @@ export default {
   },
 
   methods: {
+    /** Dapatkan daftar peserta utk sebuah round TANPA mengganti currentRoundIndex */
+    participantsForRound(roundObj) {
+      if (!roundObj) return [];
+      const want = new Set();
+      (roundObj.matches || []).forEach((m) => {
+        if (m.team1 && m.team1.name) want.add(m.team1.name.toUpperCase());
+        if (m.team2 && m.team2.name) want.add(m.team2.name.toUpperCase());
+      });
+      // map dari participantArr yg namanya ada di round ini
+      const list = (this.participantArr || []).filter((p) =>
+        want.has(String(p.nameTeam || p.teamName || "").toUpperCase())
+      );
+      // placeholder utk tim yang belum ada di participant (kalau ada)
+      if (want.size && list.length < want.size) {
+        const existing = new Set(
+          list.map((p) => String(p.nameTeam || p.teamName || "").toUpperCase())
+        );
+        want.forEach((up) => {
+          if (!existing.has(up))
+            list.push(this.normalizeTeamForViewPlaceholder(up));
+        });
+      }
+      return list;
+    },
+
+    /** Simpan hasil utk round tertentu (bukan hanya currentRound) */
+    persistRoundResultsFor(roundObj) {
+      if (!this.roundResultsRootKey || !roundObj) return;
+      const roundKey = String(roundObj.id);
+      const subset = this.participantsForRound(roundObj);
+      const pack = subset.map((p) => ({
+        nameTeam: String(p.nameTeam || p.teamName || ""),
+        bibTeam: String(p.bibTeam || ""),
+        result: { ...(p.result || {}) },
+      }));
+      const all = readAllRoundResults(this.roundResultsRootKey) || {};
+      all[roundKey] = pack;
+      writeAllRoundResults(this.roundResultsRootKey, all);
+    },
+
+    /** Simpan hasil utk SEMUA babak (Round of 32→Final + Bronze) */
+    saveAllRoundsLocal() {
+      (this.rounds || []).forEach((r) => this.persistRoundResultsFor(r));
+      this.$bvToast &&
+        this.$bvToast.toast("Semua hasil per-babak tersimpan lokal.", {
+          variant: "success",
+          autoHideDelay: 2000,
+          title: "Saved",
+        });
+    },
+
+    /** (Opsional) Ekspor semua hasil per-round (JSON) utk arsip/backup */
+    exportAllRoundsJSON() {
+      if (!this.roundResultsRootKey) return;
+      const payload = {
+        bucket: getBucket(),
+        savedAt: new Date().toISOString(),
+        rounds: Object.entries(this.storedResultsByRound).map(([rid, v]) => ({
+          roundId: rid,
+          roundName: v.roundName,
+          items: v.items,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `h2h-results-${payload.bucket.eventId || "event"}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
     // Tambahkan di methods:
-computeWinLoseByHeat() {
-  // kelompokkan visibleParticipants berdasarkan nomor heat (yang valid)
-  const groups = new Map();
-  (this.visibleParticipants || []).forEach((p) => {
-    const h = p && p.result && p.result.heat != null ? Number(p.result.heat) : null;
-    if (!h || !isFinite(h)) return; // abaikan yang belum pilih heat
-    if (!groups.has(h)) groups.set(h, []);
-    groups.get(h).push(p);
-  });
+    computeWinLoseByHeat() {
+      // kelompokkan visibleParticipants berdasarkan nomor heat (yang valid)
+      const groups = new Map();
+      (this.visibleParticipants || []).forEach((p) => {
+        const h =
+          p && p.result && p.result.heat != null ? Number(p.result.heat) : null;
+        if (!h || !isFinite(h)) return; // abaikan yang belum pilih heat
+        if (!groups.has(h)) groups.set(h, []);
+        groups.get(h).push(p);
+      });
 
-  // reset default (biar yang tidak berpasangan tidak menampilkan sisa status lama)
-  (this.visibleParticipants || []).forEach((p) => {
-    if (!p || !p.result) return;
-    p.result.winLose = null;
-  });
+      // reset default (biar yang tidak berpasangan tidak menampilkan sisa status lama)
+      (this.visibleParticipants || []).forEach((p) => {
+        if (!p || !p.result) return;
+        p.result.winLose = null;
+      });
 
-  // bandingkan per grup heat
-  groups.forEach((arr) => {
-    if (!Array.isArray(arr) || arr.length < 2) {
-      // belum lengkap pasangannya → biarkan null
-      return;
-    }
-    // jika lebih dari 2 (kasus input ganda), ambil 2 pertama saja
-    const [A, B] = arr;
+      // bandingkan per grup heat
+      groups.forEach((arr) => {
+        if (!Array.isArray(arr) || arr.length < 2) {
+          // belum lengkap pasangannya → biarkan null
+          return;
+        }
+        // jika lebih dari 2 (kasus input ganda), ambil 2 pertama saja
+        const [A, B] = arr;
 
-    const tA = this.parsesTime((A.result && (A.result.totalTime || A.result.raceTime)) || "");
-    const tB = this.parsesTime((B.result && (B.result.totalTime || B.result.raceTime)) || "");
+        const tA = this.parsesTime(
+          (A.result && (A.result.totalTime || A.result.raceTime)) || ""
+        );
+        const tB = this.parsesTime(
+          (B.result && (B.result.totalTime || B.result.raceTime)) || ""
+        );
 
-    if (!isFinite(tA) || !isFinite(tB)) {
-      // waktu belum lengkap → biarkan null
-      return;
-    }
+        if (!isFinite(tA) || !isFinite(tB)) {
+          // waktu belum lengkap → biarkan null
+          return;
+        }
 
-    if (tA < tB) {
-      A.result.winLose = "Win";
-      B.result.winLose = "Lose";
-    } else if (tB < tA) {
-      A.result.winLose = "Lose";
-      B.result.winLose = "Win";
-    } else {
-      // seri → kosongkan (atau ganti "Draw" kalau mau)
-      A.result.winLose = null;
-      B.result.winLose = null;
-    }
-  });
-},
+        if (tA < tB) {
+          A.result.winLose = "Win";
+          B.result.winLose = "Lose";
+        } else if (tB < tA) {
+          A.result.winLose = "Lose";
+          B.result.winLose = "Win";
+        } else {
+          // seri → kosongkan (atau ganti "Draw" kalau mau)
+          A.result.winLose = null;
+          B.result.winLose = null;
+        }
+      });
+    },
     getGlobalHeatUsageCount() {
       var counts = Object.create(null);
       var rootKey = this.roundResultsRootKey;
@@ -1131,58 +1256,75 @@ computeWinLoseByHeat() {
       });
     },
 
-    onHeatChanged(item) {
+    onHeatChanged(item, newVal) {
       if (!item || !item.result) return;
 
-      var val = item.result.heat;
-      var prev =
-        typeof item.__prevHeat !== "undefined"
-          ? item.__prevHeat
-          : isFinite(+val)
-          ? +val
-          : null;
+      // heat sebelumnya yang benar2 kita simpan sendiri
+      const prev = Number.isFinite(item.__prevHeat)
+        ? item.__prevHeat
+        : Number.isFinite(+item.result.heat)
+        ? +item.result.heat
+        : null;
 
-      // normalize
-      if (val !== null && val !== "") {
-        val = Number(val);
-        if (!isFinite(val)) val = null;
-      } else {
+      // normalisasi nilai baru dari event
+      let val =
+        newVal === "" || newVal === null || typeof newVal === "undefined"
+          ? null
+          : Number(newVal);
+
+      if (
+        val !== null &&
+        (!Number.isFinite(val) || val < 1 || val > MAX_HEAT_NUMBER)
+      ) {
         val = null;
       }
 
-      // cek limit global
+      // kalau sama dengan sebelumnya, cukup persist & recompute ringan
+      if (prev !== null && val === prev) {
+        this.persistRoundResults();
+        this.computeWinLoseByHeat();
+        this.evaluateHeatWinnersForCurrentRound();
+        return;
+      }
+
+      // cek limit global (kecuali kalau sedang mempertahankan heat lama)
       if (val !== null) {
-        var usage = this.getGlobalHeatUsageCount();
-        var used = usage[val] || 0;
-
-        var keep = isFinite(+prev) ? +prev : null;
-        var isSameAsKeep = keep !== null && keep === val;
-
-        if (!isSameAsKeep && used >= HEAT_USAGE_LIMIT) {
-          // revert
-          this.$set(item.result, "heat", keep !== null ? keep : null);
-          if (this.$bvToast) {
+        const usage = this.getGlobalHeatUsageCount();
+        const used = usage[val] || 0;
+        if (used >= HEAT_USAGE_LIMIT && val !== prev) {
+          // revert ke nilai sebelumnya
+          this.$set(item.result, "heat", prev);
+          item.__prevHeat = prev;
+          this.$bvToast &&
             this.$bvToast.toast(
-              "Heat " + val + " sudah dipakai " + HEAT_USAGE_LIMIT + "×.",
+              `Heat ${val} sudah dipakai ${HEAT_USAGE_LIMIT}×.`,
               {
                 variant: "warning",
                 autoHideDelay: 2500,
                 title: "Limit heat tercapai",
               }
             );
-          }
           return;
         }
       }
 
-      // set & simpan
-      this.$set(item.result, "heat", val !== null ? val : null);
-      item.__prevHeat = val !== null ? val : null;
+      // set nilai baru
+      this.$set(item.result, "heat", val);
+      item.__prevHeat = val;
 
+      // simpan & hitung ulang konsekuensi heat
       this.persistRoundResults();
-      if (this.$forceUpdate) this.$forceUpdate();
 
+      // re-evaluate win/lose berdasarkan pasangan heat & waktu
       this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+
+      // perbarui ranking subset yang tampil
+      this.assignRanks(this.visibleParticipants);
+
+      // jaga UI sinkron (opsional)
+      this.$nextTick &&
+        this.$nextTick(() => this.$forceUpdate && this.$forceUpdate());
     },
     makeEmptyResult() {
       return {
@@ -1273,7 +1415,7 @@ computeWinLoseByHeat() {
       const has = item && item.result;
       const pb = has && item.result.penalties;
       if (!pb || typeof pb !== "object") return 0;
-      const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
+      const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f", "o"];
       // hitung berapa field yang > 0
       return keys.reduce(
         (cnt, k) => cnt + ((Number(pb[k]) || 0) > 0 ? 1 : 0),
@@ -1291,44 +1433,62 @@ computeWinLoseByHeat() {
     },
     ensurePenaltiesObject(result) {
       if (!result || typeof result !== "object") return;
-
-      // NEW: pastikan field heat selalu ada & boleh null
-      if (!("heat" in result)) this.$set(result, "heat", null);
-
       if (!result.penalties || typeof result.penalties !== "object") {
         this.$set(result, "penalties", {
           s: 0,
           cl: 0,
-          r1: 0,
-          r2: 0,
-          l1: 0,
-          l2: 0,
+          r1: "N",
+          r2: "N",
+          l1: "N",
+          l2: "N",
           pb: 0,
           f: 0,
+          o: 0,
         });
       } else {
-        const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
-        keys.forEach((k) => {
-          const v = result.penalties[k];
-          if (typeof v === "undefined") this.$set(result.penalties, k, 0);
-          else result.penalties[k] = Number(v) || 0;
-        });
+        if (typeof result.penalties.r1 === "undefined")
+          this.$set(result.penalties, "r1", "N");
+        if (typeof result.penalties.r2 === "undefined")
+          this.$set(result.penalties, "r2", "N");
+        if (typeof result.penalties.l1 === "undefined")
+          this.$set(result.penalties, "l1", "N");
+        if (typeof result.penalties.l2 === "undefined")
+          this.$set(result.penalties, "l2", "N");
+        if (typeof result.penalties.pb === "undefined")
+          this.$set(result.penalties, "pb", 0);
+        if (typeof result.penalties.o === "undefined")
+          this.$set(result.penalties, "o", 0);
       }
     },
+
     async onPenaltyChange(item) {
       if (!item || !item.result) return;
-
-      // pastikan struktur penalties exist & numeric
       this.ensurePenaltiesObject(item.result);
 
-      // total poin penalty (detik)
-      const totalPenaltySeconds = this.getTotalPenalty(item);
-      item.result.penalty = totalPenaltySeconds;
+      const p = item.result.penalties;
 
-      // detik → HH:MM:SS.mmm
+      // --- rule Y/N ---
+      const r1 = p.r1 === "Y";
+      const r2 = p.r2 === "Y";
+      const l1 = p.l1 === "Y";
+      const l2 = p.l2 === "Y";
+
+      const comboValid = (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
+
+      // PB menampilkan hasil rule: 0 jika valid, 50 jika tidak
+      this.$set(p, "pb", comboValid ? 0 : 50);
+
+      // --- total penalti (detik) ---
+      const totalPenaltySeconds =
+        (Number(p.s) || 0) +
+        (Number(p.cl) || 0) +
+        (Number(p.pb) || 0) +
+        (Number(p.f) || 0) +
+        (Number(p.o) || 0);
+
+      item.result.penalty = totalPenaltySeconds;
       item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
 
-      // hitung total time jika sudah ada raceTime
       if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
@@ -1337,12 +1497,9 @@ computeWinLoseByHeat() {
       }
 
       this.evaluateHeatWinnersForCurrentRound();
-
-      // re-rank subset & persist
       await this.assignRanks(this.visibleParticipants);
       this.syncWinLoseFromBracketToParticipants();
       this.persistRoundResults();
-
       this.computeWinLoseByHeat();
     },
 
@@ -1405,7 +1562,7 @@ computeWinLoseByHeat() {
       const has = item && item.result;
       const pb = has && item.result.penalties;
       if (pb && typeof pb === "object") {
-        const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
+        const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f", "o"];
         return keys.reduce((sum, k) => sum + (Number(pb[k]) || 0), 0);
       }
       // fallback ke skema lama (single value)
@@ -2062,17 +2219,6 @@ computeWinLoseByHeat() {
       return m ? m.score : null;
     },
 
-    toggleSortRanked() {
-      this.isRankedDescending = !this.isRankedDescending;
-      const arr = this.participantArr.slice();
-      arr.sort((a, b) =>
-        this.isRankedDescending
-          ? b.result.ranked - a.result.ranked
-          : a.result.ranked - b.result.ranked
-      );
-      this.participant = arr;
-    },
-
     /** Serial connect */
     async connectPort() {
       if (!this.isPortConnected) {
@@ -2231,17 +2377,8 @@ computeWinLoseByHeat() {
     },
 
     /** SAVE RESULT (channel khusus H2H) */
-    saveResult() {
-      const subset = JSON.parse(JSON.stringify(this.visibleParticipants || []));
-      if (!Array.isArray(subset) || subset.length === 0) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data yang bisa disimpan untuk babak ini.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-
+    // ...existing
+    saveAllRoundsToDB() {
       const bucket = getBucket();
       const must = ["eventId", "initialId", "raceId", "divisionId"];
       const missing = must.filter((k) => !bucket[k]);
@@ -2254,28 +2391,45 @@ computeWinLoseByHeat() {
         return;
       }
 
-      // tag metadata babak di dalam result
-      const roundId = this.currentRoundKey();
-      const roundName = this.currentRound ? this.currentRound.name : "";
+      const docs = [];
+      (this.rounds || []).forEach((r) => {
+        // ambil hasil tersimpan; kalau belum ada, bangun dari memory saat ini
+        const roundKey = String(r.id);
+        const all = readAllRoundResults(this.roundResultsRootKey) || {};
+        const arr = Array.isArray(all[roundKey])
+          ? all[roundKey]
+          : this.participantsForRound(r).map((t) => ({
+              nameTeam: t.nameTeam,
+              bibTeam: t.bibTeam,
+              result: t.result,
+            }));
 
-      const docs = subset.map((t) => {
-        const base = buildResultDocs([t], bucket)[0];
-        base.result = {
-          ...(base.result || {}),
-          _roundId: roundId,
-          _roundName: roundName,
-        };
-        return base;
+        arr.forEach((row) => {
+          const base = buildResultDocs([row], bucket)[0];
+          base.result = {
+            ...(base.result || {}),
+            _roundId: roundKey,
+            _roundName: r.bronze ? "Third Place" : r.name,
+          };
+          docs.push(base);
+        });
       });
+
+      if (!docs.length) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Belum ada data yang bisa disimpan.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
 
       ipcRenderer.send("insert-h2h-result", docs);
       ipcRenderer.once("insert-h2h-result-reply", (_e, res) => {
         if (res && res.ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
-            detail: `Result telah disimpan untuk babak: ${
-              roundName || roundId
-            }`,
+            detail: "Semua hasil per-babak berhasil disimpan.",
             message: "Successfully",
           });
         } else {
@@ -2622,5 +2776,70 @@ thead th[rowspan="2"] {
 }
 thead th[colspan="8"] {
   text-align: center;
+}
+
+.bracket-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 5; /* tetap terlihat saat scroll */
+}
+.toolbar-title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 6px;
+}
+.round-nav {
+  display: flex;
+  align-items: center;
+}
+.round-select {
+  min-width: 200px;
+}
+.bracket-toolbar .btn {
+  border-radius: 10px;
+}
+.bracket-toolbar .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  transition: all 0.15s ease;
+}
+
+/* Responsif: tumpuk di layar kecil */
+@media (max-width: 768px) {
+  .bracket-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .toolbar-actions {
+    width: 100%;
+    gap: 8px;
+  }
+  .round-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .round-select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 </style>

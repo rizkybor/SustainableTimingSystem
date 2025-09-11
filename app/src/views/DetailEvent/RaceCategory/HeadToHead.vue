@@ -349,7 +349,7 @@
     <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>List Result One by One</h4>
+    <h4>List Result — {{ currentRound ? (currentRound.bronze ? 'Third Place' : currentRound.name) : '—' }}</h4>
         <b-row>
           <b-col>
             <div
@@ -357,80 +357,99 @@
               aria-label="Scrollable results table"
               role="region"
             >
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Team Name</th>
-                    <th>BIB</th>
-                    <th>Start Time</th>
-                    <th>Finish Time</th>
-                    <th>Race Time</th>
-                    <th>Penalties</th>
-                    <th>Penalty Time</th>
-                    <th>Result</th>
-                    <th>Ranked</th>
-                    <th>Score</th>
-                    <th v-if="editResult">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, index) in visibleParticipants" :key="index">
-                    <td>{{ index + 1 }}</td>
-                    <td class="large-bold text-strong max-char">
-                      {{ item.nameTeam }}
-                    </td>
-                    <td class="large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-monospace">{{ item.result.startTime }}</td>
-                    <td class="text-monospace">{{ item.result.finishTime }}</td>
-                    <td class="large-bold text-monospace">
-                      {{ item.result.raceTime }}
-                    </td>
+             <table class="table">
+  <thead>
+    <tr>
+      <th rowspan="2">Heat</th>
+      <th rowspan="2">Team Name</th>
+      <th rowspan="2">BIB</th>
+      <th rowspan="2">Start Time</th>
 
-                    <!-- Penalties (single dropdown like Sprint) -->
-                    <td>
-                      <b-select
-                        v-if="item.result.startTime"
-                        v-model="item.result.penalty"
-                        @change="updateTimePen($event, item)"
-                      >
-                        <option
-                          v-for="pen in dataPenalties"
-                          :key="pen.value"
-                          :value="pen.value"
-                        >
-                          {{ pen.label }}
-                        </option>
-                      </b-select>
-                    </td>
+      <!-- Grup Penalties -->
+      <th colspan="8" class="text-center">Penalties</th>
 
-                    <td class="text-monospace large-bold">
-                      {{ item.result.penaltyTime }}
-                    </td>
-                    <td class="text-monospace large-bold">
-                      {{
-                        item.result.penaltyTime
-                          ? item.result.totalTime
-                          : item.result.raceTime
-                      }}
-                    </td>
-                    <td class="large-bold">{{ item.result.ranked }}</td>
-                    <td class="large-bold">
-                      {{ getScoreByRanked(item.result.ranked) }}
-                    </td>
+      <th rowspan="2">Total Penalty</th>
+      <th rowspan="2">Penalty Time</th>
+      <th rowspan="2">Finish Time</th>
+      <th rowspan="2">Race Time</th>
+      <th rowspan="2">Result</th>
+      <th rowspan="2">Win/Lose</th>
+      <th v-if="editResult" rowspan="2">Action</th>
+    </tr>
+    <tr>
+      <th>S</th>
+      <th>CL</th>
+      <th>R1</th>
+      <th>R2</th>
+      <th>L1</th>
+      <th>L2</th>
+      <th>PB</th>
+      <th>F</th>
+    </tr>
+  </thead>
 
-                    <td v-if="editResult">
-                      <button
-                        type="button"
-                        class="btn btn-warning"
-                        @click="openModal(item)"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+  <tbody>
+    <tr v-for="(item, index) in visibleParticipants" :key="index">
+      <!-- Heat = index match pada babak aktif -->
+      <td>{{ getHeatNumber(item) }}</td>
+
+      <td class="large-bold text-strong max-char">
+        {{ item.nameTeam }}
+      </td>
+      <td class="large-bold">{{ item.bibTeam }}</td>
+      <td class="text-monospace">{{ item.result.startTime }}</td>
+
+      <!-- Penalties breakdown (read-only jika belum ada rincian) -->
+      <td>{{ getPB(item,'s') }}</td>
+      <td>{{ getPB(item,'cl') }}</td>
+      <td>{{ getPB(item,'r1') }}</td>
+      <td>{{ getPB(item,'r2') }}</td>
+      <td>{{ getPB(item,'l1') }}</td>
+      <td>{{ getPB(item,'l2') }}</td>
+      <td>{{ getPB(item,'pb') }}</td>
+      <td>{{ getPB(item,'f') }}</td>
+
+      <!-- Total Penalty (pakai sum breakdown; fallback ke item.result.penalty) -->
+      <td class="large-bold">{{ getTotalPenalty(item) }}</td>
+
+      <!-- Penalty selector tetap ada (biar gampang input) -->
+      <td class="text-monospace large-bold">
+        <div class="d-flex align-items-center" style="gap:6px">
+          <span>{{ item.result.penaltyTime }}</span>
+          <b-select
+            v-if="item.result.startTime"
+            v-model="item.result.penalty"
+            @change="updateTimePen($event, item)"
+            size="sm"
+            style="min-width:120px"
+          >
+            <option v-for="pen in dataPenalties" :key="pen.value" :value="pen.value">
+              {{ pen.label }}
+            </option>
+          </b-select>
+        </div>
+      </td>
+
+      <td class="text-monospace">{{ item.result.finishTime }}</td>
+
+      <td class="large-bold text-monospace">
+        {{ item.result.raceTime }}
+      </td>
+
+      <td class="text-monospace large-bold">
+        {{ item.result.penaltyTime ? item.result.totalTime : item.result.raceTime }}
+      </td>
+
+      <td class="large-bold">{{ item.result.winLose || '' }}</td>
+
+      <td v-if="editResult">
+        <button type="button" class="btn btn-warning" @click="openModal(item)">
+          Edit
+        </button>
+      </td>
+    </tr>
+  </tbody>
+</table>
             </div>
             <br />
           </b-col>
@@ -451,6 +470,31 @@ import { ipcRenderer } from "electron";
 import { SerialPort } from "serialport";
 import OperationTimePanel from "../components/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
+
+// NEW: key penyimpanan hasil per-babak
+const RESULTS_KEY_PREFIX = "h2hRoundResults:";
+
+// gabungkan kunci unik berdasar bucket (event/initial/race/division)
+function getResultsRootKey() {
+  const b = getBucket();
+  if (!b.eventId || !b.initialId || !b.raceId || !b.divisionId) return null;
+  return (
+    RESULTS_KEY_PREFIX +
+    [b.eventId, b.initialId, b.raceId, b.divisionId].join("|")
+  );
+}
+
+// NEW: helper baca/tulis ke localStorage
+function readAllRoundResults(rootKey) {
+  try {
+    return JSON.parse(localStorage.getItem(rootKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+function writeAllRoundResults(rootKey, obj) {
+  localStorage.setItem(rootKey, JSON.stringify(obj || {}));
+}
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -604,6 +648,7 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      roundResultsRootKey: null,
       podium: {
         gold: null, // Juara 1
         silver: null, // Juara 2
@@ -779,10 +824,20 @@ export default {
         this.computePodium();
       },
     },
+     currentRoundIndex() {
+    this.computePodium();
+    this.loadRoundResultsForCurrentRound(); // NEW
+  },
     currentRoundIndex() {
       this.computePodium();
     },
   },
+
+  beforeRouteLeave(to, from, next) {
+  // NEW: reset data hasil pertandingan di localStorage ketika berpindah halaman
+  this.clearAllRoundResults();
+  next();
+},
 
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
@@ -792,6 +847,11 @@ export default {
     // jumlah tim aktual (4..32), bisa diambil dari participantArr.length
     const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
     this.rebuildBracketDynamic(n); // bangun + seed kolom pertama
+this.syncWinLoseFromBracketToParticipants(); // NEW
+
+    this.roundResultsRootKey = getResultsRootKey(); // NEW
+// load hasil tersimpan utk babak awal (jika ada)
+this.loadRoundResultsForCurrentRound(); // NEW
   },
 
   beforeDestroy() {
@@ -799,6 +859,122 @@ export default {
   },
 
   methods: {
+// mapping tim -> nomor heat (index match + 1) pada babak aktif
+getPB(item, key) {
+  const has = item && item.result;
+  const pb = has && item.result.penalties;
+  const v = pb && typeof pb[key] !== 'undefined' ? pb[key] : 0;
+  return Number.isFinite(+v) ? +v : 0;
+},
+
+getHeatNumber(item) {
+  const r = this.currentRound;
+  if (!r) return '';
+  const name = String((item && (item.nameTeam || item.teamName)) || '').toUpperCase();
+  const idx = (r.matches || []).findIndex(m => {
+    const t1 = ((m.team1 && m.team1.name) || '').toUpperCase();
+    const t2 = ((m.team2 && m.team2.name) || '').toUpperCase();
+    return name && (name === t1 || name === t2);
+  });
+  return idx >= 0 ? (idx + 1) : '';
+},
+getTotalPenalty(item) {
+  const has = item && item.result;
+  const pb = has && item.result.penalties;
+  if (pb && typeof pb === 'object') {
+    const keys = ['s','cl','r1','r2','l1','l2','pb','f'];
+    return keys.reduce((sum, k) => sum + (Number(pb[k]) || 0), 0);
+  }
+  // fallback ke skema lama (single value)
+  const pen = has && typeof item.result.penalty !== 'undefined'
+    ? item.result.penalty
+    : 0;
+  return Number(pen || 0);
+},
+
+    // identitas round saat ini utk map penyimpanan
+currentRoundKey() {
+  const r = this.currentRound;
+  return r ? String(r.id) : null;
+},
+
+// NEW: kumpulkan hasil tim-tim yg sedang tampil (babak aktif) & simpan ke localStorage
+persistRoundResults() {
+  if (!this.roundResultsRootKey) return;
+  const roundKey = this.currentRoundKey();
+  if (!roundKey) return;
+
+  // hanya simpan subset tim pada babak aktif (visibleParticipants)
+  const pack = this.visibleParticipants.map(p => ({
+    nameTeam: String(p.nameTeam || p.teamName || ""),
+    bibTeam: String(p.bibTeam || ""),
+    result: { ...(p.result || {}) } // start, finish, race, penalty, total, ranked, winLose, dll.
+  }));
+
+  const all = readAllRoundResults(this.roundResultsRootKey);
+  all[roundKey] = pack;
+  writeAllRoundResults(this.roundResultsRootKey, all);
+},
+
+// NEW: muat hasil tersimpan utk babak aktif lalu merge ke this.participant
+loadRoundResultsForCurrentRound() {
+  if (!this.roundResultsRootKey) return;
+  const roundKey = this.currentRoundKey();
+  if (!roundKey) return;
+
+  const all = readAllRoundResults(this.roundResultsRootKey);
+  const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
+  if (!arr.length) {
+    // tetap sinkron status win/lose walau belum ada simpanan
+    this.syncWinLoseFromBracketToParticipants();
+    return;
+  }
+
+  // merge by name (fallback bib)
+  const indexByName = new Map(
+    this.participantArr.map((p, i) => [String(p.nameTeam || p.teamName || "").toUpperCase(), i])
+  );
+  arr.forEach(row => {
+    const key = String(row.nameTeam || "").toUpperCase();
+    const idx = indexByName.get(key);
+    if (idx != null && idx > -1) {
+      // masukkan kembali ke objek utama
+      const tgt = this.participant[idx];
+      tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
+    }
+  });
+
+  // hitung ranking ulang utk subset babak aktif
+  this.assignRanks(this.visibleParticipants);
+  this.syncWinLoseFromBracketToParticipants();
+},
+
+// NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
+clearAllRoundResults() {
+  if (!this.roundResultsRootKey) return;
+  localStorage.removeItem(this.roundResultsRootKey);
+},
+
+    // NEW: tandai Win/Lose utk list berdasarkan winner di bracket utk babak aktif
+syncWinLoseFromBracketToParticipants() {
+  const r = this.currentRound;
+  if (!r) return;
+  const nameMap = new Map(
+    this.visibleParticipants.map(p => [String(p.nameTeam || p.teamName || '').toUpperCase(), p])
+  );
+
+  (r.matches || []).forEach(m => {
+    const t1 = (m.team1 && m.team1.name) ? m.team1.name.toUpperCase() : "";
+    const t2 = (m.team2 && m.team2.name) ? m.team2.name.toUpperCase() : "";
+    const w  = (m.winner && m.winner.name) ? m.winner.name.toUpperCase() : "";
+
+    const P1 = nameMap.get(t1);
+    const P2 = nameMap.get(t2);
+
+    if (P1) P1.result.winLose = (w && t1 && w === t1) ? "Win" : (t2 ? "Lose" : "");
+    if (P2) P2.result.winLose = (w && t2 && w === t2) ? "Win" : (t1 ? "Lose" : "");
+  });
+},
     notify(type, detail, message = "Info") {
       if (this.$ipc || (window && window.ipcRenderer)) {
         const ir = this.$ipc || window.ipcRenderer;
@@ -1069,6 +1245,8 @@ export default {
           }
         });
       }
+      this.syncWinLoseFromBracketToParticipants(); // NEW
+this.persistRoundResults(); // NEW
     },
 
     /** Pindahkan pemenang secara manual ke ronde berikutnya (untuk non-BYE) */
@@ -1109,6 +1287,8 @@ export default {
       if (isFinal || isBronze) {
         this.computePodium();
       }
+      this.syncWinLoseFromBracketToParticipants(); // NEW
+this.persistRoundResults(); // NEW: simpan setiap ada perubahan pemenang
     },
 
     /** Isi Bronze (3rd place) setelah SF selesai */
@@ -1310,6 +1490,8 @@ export default {
       }
       this.editResult = true;
       await this.assignRanks(this.visibleParticipants); // CHANGED
+      this.syncWinLoseFromBracketToParticipants(); // NEW
+this.persistRoundResults(); // NEW
     },
 
     getScoreByRanked(ranked) {
@@ -1428,6 +1610,10 @@ export default {
           );
         }
       }
+
+      await this.assignRanks(this.visibleParticipants);
+this.syncWinLoseFromBracketToParticipants(); // NEW
+this.persistRoundResults(); // NEW
     },
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
@@ -1531,6 +1717,7 @@ export default {
 
       this.participant = [];
       this.titleCategories = "";
+      this.clearAllRoundResults(); // NEW
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
@@ -1854,4 +2041,7 @@ td {
   background: #f9fafb;
   border-style: dashed;
 }
+
+thead th[rowspan="2"] { vertical-align: middle; }
+thead th[colspan="8"] { text-align: center; }
 </style>

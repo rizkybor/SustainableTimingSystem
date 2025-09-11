@@ -20,7 +20,7 @@
           <b-navbar-nav class="ml-3">
             <b-nav-item @click="goTo('')" active>Home</b-nav-item>
             <b-nav-item @click="goTo('events')">Events</b-nav-item>
-            <b-nav-item @click="goTo('team')">Team</b-nav-item>
+            <b-nav-item @click="goTo('team-create')">Team</b-nav-item>
           </b-navbar-nav>
 
           <b-navbar-nav class="ml-auto">

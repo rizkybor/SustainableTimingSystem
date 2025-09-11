@@ -126,11 +126,11 @@
               <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
             </button>
             <button
-              class="btn btn-outline-warning"
+              class="btn btn-secondary"
               @click="populateBronzeFromSemis"
               v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
             >
-              <Icon icon="mdi:medal-outline" class="mr-1" /> Bronze
+              <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
             </button>
           </div>
 
@@ -177,7 +177,7 @@
             <span class="bracket__round-meta" v-if="!round.bronze"
               >Matches: {{ round.matches.length }}</span
             >
-            <span class="bracket__round-meta" v-else>Third Place</span>
+            <span class="bracket__round-meta" v-else>Final B</span>
           </div>
 
           <div class="bracket__list">
@@ -319,7 +319,7 @@
               {{
                 currentRound
                   ? currentRound.bronze
-                    ? "Third Place"
+                    ? "Final B"
                     : currentRound.name
                   : "—"
               }}
@@ -833,7 +833,7 @@ export default {
         const roundId = String(r.id);
         const items = Array.isArray(all[roundId]) ? all[roundId] : [];
         map[roundId] = {
-          roundName: r.bronze ? "Third Place" : r.name,
+          roundName: r.bronze ? "Final B" : r.name,
           items,
         };
       });
@@ -928,7 +928,7 @@ export default {
     roundOptions() {
       return (this.rounds || []).map((r, i) => ({
         value: i,
-        text: r.bronze ? "Third Place" : r.name,
+        text: r.bronze ? "Final B" : r.name,
       }));
     },
 
@@ -1057,6 +1057,17 @@ export default {
   },
 
   methods: {
+    // ADD: helper untuk reset result di round tertentu
+    resetResultsForRound(roundObj) {
+      const list = this.participantsForRound(roundObj);
+      list.forEach((p) => {
+        // kosongkan hasil round ini
+        p.result = this.makeEmptyResult();
+        // pastikan penalties lengkap & reactive
+        this.ensurePenaltiesObject(p.result);
+      });
+    },
+
     /** Dapatkan daftar peserta utk sebuah round TANPA mengganti currentRoundIndex */
     participantsForRound(roundObj) {
       if (!roundObj) return [];
@@ -1597,17 +1608,20 @@ export default {
       writeAllRoundResults(this.roundResultsRootKey, all);
     },
 
-    // NEW: muat hasil tersimpan utk babak aktif lalu merge ke this.participant
+    // CHANGE: muat hasil tersimpan utk babak aktif
     loadRoundResultsForCurrentRound() {
       if (!this.roundResultsRootKey) return;
-      const roundKey = this.currentRoundKey();
-      if (!roundKey) return;
 
-      // 3) Ambil simpanan utk babak aktif ini
+      const r = this.currentRound;
+      if (!r) return;
+
+      // ⬇️ Reset dulu hasil untuk round ini
+      this.resetResultsForRound(r);
+
+      const roundKey = String(r.id);
       const all = readAllRoundResults(this.roundResultsRootKey);
       const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
 
-      // 4) Merge (by name; fallback bib bila perlu)
       if (arr.length) {
         const indexByName = new Map(
           this.participantArr.map((p, i) => [
@@ -1621,17 +1635,17 @@ export default {
           const idx = indexByName.get(key);
           if (idx != null && idx > -1) {
             const tgt = this.participant[idx];
-            tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
-            // pastikan object penalties reactive & numeric
+            // merge hasil dari storage ke result yang baru di-reset
+            tgt.result = { ...tgt.result, ...(row.result || {}) };
             this.ensurePenaltiesObject(tgt.result);
           }
         });
       }
 
-      // 5) Re-calc utk babak aktif saat ini
+      // hitung ulang konsekuensi untuk round ini
       this.assignRanks(this.visibleParticipants);
-      this.evaluateHeatWinnersForCurrentRound(); // penting: tentukan winner/Win-Lose dari waktu di babak ini
-      this.syncWinLoseFromBracketToParticipants(); // jaga konsistensi label Win/Lose di tabel
+      this.evaluateHeatWinnersForCurrentRound();
+      this.syncWinLoseFromBracketToParticipants();
       this.computeWinLoseByHeat();
     },
 
@@ -1798,9 +1812,12 @@ export default {
 
     // NEW: navigasi babak
     prevRound() {
+      this.persistRoundResults();
       if (this.currentRoundIndex > 0) this.currentRoundIndex--;
     },
     nextRound() {
+      // simpan hasil round aktif dulu
+      this.persistRoundResults();
       if (this.currentRoundIndex < this.rounds.length - 1)
         this.currentRoundIndex++;
     },
@@ -1815,7 +1832,7 @@ export default {
 
     /** Nama ronde human friendly berdasar size */
     roundName(size) {
-      if (size === 2) return "Final";
+      if (size === 2) return "Final A";
       if (size === 4) return "Semifinals";
       if (size === 8) return "Quarterfinals";
       if (size === 16) return "Round of 16";
@@ -1846,12 +1863,12 @@ export default {
       for (let size = base; size >= 2; size >>= 1) {
         rounds.push(this.makeEmptyRound(id++, size));
       }
-      // Tambah Third Place bila size awal >= 4
+      // Tambah Final B bila size awal >= 4
       if (this.showBronze && base >= 4) {
         rounds.splice(rounds.length - 1, 0, {
           // sisipkan sebelum Final
           id: "R_B",
-          name: "Third Place",
+          name: "Final B",
           size: 2,
           matches: [
             {
@@ -2409,7 +2426,7 @@ export default {
           base.result = {
             ...(base.result || {}),
             _roundId: roundKey,
-            _roundName: r.bronze ? "Third Place" : r.name,
+            _roundName: r.bronze ? "Final B" : r.name,
           };
           docs.push(base);
         });

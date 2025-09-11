@@ -385,7 +385,7 @@
                         v-model="item.result.heat"
                         :options="[
                           { value: null, text: '— pilih heat —' },
-                          ...heatOptionsLabeled,
+                          ...heatOptionsForItem(item),
                         ]"
                         size="sm"
                         class="w-auto"
@@ -543,6 +543,8 @@ import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
+const MAX_HEAT_NUMBER = 24;
+const HEAT_USAGE_LIMIT = 2;
 
 // gabungkan kunci unik berdasar bucket (event/initial/race/division)
 function getResultsRootKey() {
@@ -678,6 +680,8 @@ function normalizeTeamForH2H(t = {}) {
     ranked: "",
     score: "",
     winLose: null,
+    /** NEW */
+    heat: null,
   };
 
   // dukung format lama (array result)
@@ -788,6 +792,10 @@ export default {
   },
 
   computed: {
+    // ... (computed lain tetap)
+    allHeatChoices() {
+      return Array.from({ length: MAX_HEAT_NUMBER }, (_, i) => i + 1);
+    },
     penaltyChoices() {
       // opsi untuk semua dropdown penalty (S, CL, R1, R2, L1, L2, PB, F)
       // ambil dari dataPenalties supaya satu sumber data
@@ -1000,6 +1008,131 @@ export default {
   },
 
   methods: {
+    getGlobalHeatUsageCount() {
+      var counts = Object.create(null);
+      var rootKey = this.roundResultsRootKey;
+      if (!rootKey) return counts;
+
+      var all = readAllRoundResults(rootKey) || {};
+      var self = this;
+
+      Object.keys(all).forEach(function (roundId) {
+        var arr = all[roundId] || [];
+        arr.forEach(function (row) {
+          var heat =
+            row && row.result && row.result.heat != null
+              ? Number(row.result.heat)
+              : null;
+          var name = String(
+            (row && (row.nameTeam || row.teamName)) || ""
+          ).toUpperCase();
+          if (!heat || !name) return;
+
+          var key = roundId + "|" + name + "|" + heat;
+          if (!self.__seenHeatKeys) self.__seenHeatKeys = new Set();
+          if (self.__seenHeatKeys.has(key)) return;
+          self.__seenHeatKeys.add(key);
+
+          counts[heat] = (counts[heat] || 0) + 1;
+        });
+      });
+
+      // tambahkan yang ada di memori babak aktif (belum tersimpan)
+      var roundKey =
+        typeof this.currentRoundKey === "function"
+          ? this.currentRoundKey()
+          : null;
+      if (roundKey) {
+        (this.visibleParticipants || []).forEach(function (p) {
+          var heat =
+            p && p.result && p.result.heat != null
+              ? Number(p.result.heat)
+              : null;
+          var name = String(
+            (p && (p.nameTeam || p.teamName)) || ""
+          ).toUpperCase();
+          if (!heat || !name) return;
+
+          var k = roundKey + "|" + name + "|" + heat;
+          if (self.__seenHeatKeys && self.__seenHeatKeys.has(k)) return;
+          counts[heat] = (counts[heat] || 0) + 1;
+        });
+      }
+
+      self.__seenHeatKeys = null; // bersihkan cache
+      return counts;
+    },
+
+    // opsi heat per baris (sembunyikan yang sudah 2x dipakai global,
+    // tapi pertahankan nilai milik baris itu sendiri agar tetap terlihat)
+    heatOptionsForItem(item) {
+      var keep =
+        item && item.result && item.result.heat != null
+          ? Number(item.result.heat)
+          : null;
+      var usage = this.getGlobalHeatUsageCount();
+
+      var allowed = this.allHeatChoices.filter(function (h) {
+        var used = usage[h] || 0;
+        return used < HEAT_USAGE_LIMIT || keep === h;
+      });
+
+      return allowed.map(function (v) {
+        return { value: v, text: "Heat " + v };
+      });
+    },
+
+    onHeatChanged(item) {
+      if (!item || !item.result) return;
+
+      var val = item.result.heat;
+      var prev =
+        typeof item.__prevHeat !== "undefined"
+          ? item.__prevHeat
+          : isFinite(+val)
+          ? +val
+          : null;
+
+      // normalize
+      if (val !== null && val !== "") {
+        val = Number(val);
+        if (!isFinite(val)) val = null;
+      } else {
+        val = null;
+      }
+
+      // cek limit global
+      if (val !== null) {
+        var usage = this.getGlobalHeatUsageCount();
+        var used = usage[val] || 0;
+
+        var keep = isFinite(+prev) ? +prev : null;
+        var isSameAsKeep = keep !== null && keep === val;
+
+        if (!isSameAsKeep && used >= HEAT_USAGE_LIMIT) {
+          // revert
+          this.$set(item.result, "heat", keep !== null ? keep : null);
+          if (this.$bvToast) {
+            this.$bvToast.toast(
+              "Heat " + val + " sudah dipakai " + HEAT_USAGE_LIMIT + "×.",
+              {
+                variant: "warning",
+                autoHideDelay: 2500,
+                title: "Limit heat tercapai",
+              }
+            );
+          }
+          return;
+        }
+      }
+
+      // set & simpan
+      this.$set(item.result, "heat", val !== null ? val : null);
+      item.__prevHeat = val !== null ? val : null;
+
+      this.persistRoundResults();
+      if (this.$forceUpdate) this.$forceUpdate();
+    },
     makeEmptyResult() {
       return {
         startTime: "",
@@ -1012,6 +1145,7 @@ export default {
         ranked: "",
         score: "",
         winLose: null,
+        heat: null,
       };
     },
     evaluateHeatWinnersForCurrentRound() {
@@ -1107,8 +1241,10 @@ export default {
     ensurePenaltiesObject(result) {
       if (!result || typeof result !== "object") return;
 
+      // NEW: pastikan field heat selalu ada & boleh null
+      if (!("heat" in result)) this.$set(result, "heat", null);
+
       if (!result.penalties || typeof result.penalties !== "object") {
-        // pastikan reactive (Vue 2)
         this.$set(result, "penalties", {
           s: 0,
           cl: 0,
@@ -1123,12 +1259,8 @@ export default {
         const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
         keys.forEach((k) => {
           const v = result.penalties[k];
-          // paksa ke number & reactive kalau belum ada
-          if (typeof v === "undefined") {
-            this.$set(result.penalties, k, 0);
-          } else {
-            result.penalties[k] = Number(v) || 0;
-          }
+          if (typeof v === "undefined") this.$set(result.penalties, k, 0);
+          else result.penalties[k] = Number(v) || 0;
         });
       }
     },
@@ -1197,28 +1329,17 @@ export default {
     },
 
     // Pastikan setiap item punya result.heat; jika kosong → isi dari bracket
-    ensureDefaultHeatForVisible() {
-      var heatMap = this.buildHeatMapFromBracket();
-      this.visibleParticipants.forEach(function (p) {
-        if (!p.result) p.result = {};
-        if (!p.result.heat || Number(p.result.heat) <= 0) {
-          var key = String(p.nameTeam || p.teamName || "").toUpperCase();
-          p.result.heat = heatMap[key] || 1;
-        }
-      });
-    },
+    // ensureDefaultHeatForVisible() {
+    //   var heatMap = this.buildHeatMapFromBracket();
+    //   this.visibleParticipants.forEach(function (p) {
+    //     if (!p.result) p.result = {};
+    //     if (!p.result.heat || Number(p.result.heat) <= 0) {
+    //       var key = String(p.nameTeam || p.teamName || "").toUpperCase();
+    //       p.result.heat = heatMap[key] || 1;
+    //     }
+    //   });
+    // },
 
-    // Saat user ubah dropdown heat pada baris
-    onHeatChanged(item) {
-      var val = item && item.result ? item.result.heat : null;
-      // biarkan null/'' untuk BYE / belum ditentukan
-      if (val !== null && val !== "") val = Number(val) || null;
-      if (item && item.result) item.result.heat = val;
-
-      if (typeof this.persistRoundResults === "function")
-        this.persistRoundResults();
-      if (typeof this.$forceUpdate === "function") this.$forceUpdate();
-    },
     // mapping tim -> nomor heat (index match + 1) pada babak aktif
     getPB(item, key) {
       const has = item && item.result;
@@ -1454,6 +1575,7 @@ export default {
           ranked: "",
           score: "",
           winLose: null,
+          heat: null,
         },
         otr: {
           startTime: "",
@@ -1465,6 +1587,7 @@ export default {
           ranked: "",
           score: "",
           winLose: null,
+          heat: null,
         },
       };
     },
@@ -2129,6 +2252,7 @@ export default {
       localStorage.removeItem("raceStartPayload");
       localStorage.removeItem("participantByCategories");
       localStorage.removeItem("currentCategories");
+      localStorage.removeItem("h2hRoundResults");
 
       this.participant = [];
       this.titleCategories = "";

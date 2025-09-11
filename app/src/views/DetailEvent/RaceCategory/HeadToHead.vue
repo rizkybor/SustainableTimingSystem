@@ -981,10 +981,11 @@ export default {
         this.computePodium();
       },
     },
-    currentRoundIndex() {
-      this.computePodium();
-      this.loadRoundResultsForCurrentRound(); // <-- tambah ini
-    },
+   currentRoundIndex() {
+    this.computePodium();
+    this.loadRoundResultsForCurrentRound();
+    this.computeWinLoseByHeat(); // << tambah
+  },
   },
 
   beforeRouteLeave(to, from, next) {
@@ -1005,9 +1006,57 @@ export default {
     this.roundResultsRootKey = getResultsRootKey(); // NEW
     // load hasil tersimpan utk babak awal (jika ada)
     this.loadRoundResultsForCurrentRound(); // NEW
+    this.computeWinLoseByHeat();
   },
 
   methods: {
+    // Tambahkan di methods:
+computeWinLoseByHeat() {
+  // kelompokkan visibleParticipants berdasarkan nomor heat (yang valid)
+  const groups = new Map();
+  (this.visibleParticipants || []).forEach((p) => {
+    const h = p && p.result && p.result.heat != null ? Number(p.result.heat) : null;
+    if (!h || !isFinite(h)) return; // abaikan yang belum pilih heat
+    if (!groups.has(h)) groups.set(h, []);
+    groups.get(h).push(p);
+  });
+
+  // reset default (biar yang tidak berpasangan tidak menampilkan sisa status lama)
+  (this.visibleParticipants || []).forEach((p) => {
+    if (!p || !p.result) return;
+    p.result.winLose = null;
+  });
+
+  // bandingkan per grup heat
+  groups.forEach((arr) => {
+    if (!Array.isArray(arr) || arr.length < 2) {
+      // belum lengkap pasangannya → biarkan null
+      return;
+    }
+    // jika lebih dari 2 (kasus input ganda), ambil 2 pertama saja
+    const [A, B] = arr;
+
+    const tA = this.parsesTime((A.result && (A.result.totalTime || A.result.raceTime)) || "");
+    const tB = this.parsesTime((B.result && (B.result.totalTime || B.result.raceTime)) || "");
+
+    if (!isFinite(tA) || !isFinite(tB)) {
+      // waktu belum lengkap → biarkan null
+      return;
+    }
+
+    if (tA < tB) {
+      A.result.winLose = "Win";
+      B.result.winLose = "Lose";
+    } else if (tB < tA) {
+      A.result.winLose = "Lose";
+      B.result.winLose = "Win";
+    } else {
+      // seri → kosongkan (atau ganti "Draw" kalau mau)
+      A.result.winLose = null;
+      B.result.winLose = null;
+    }
+  });
+},
     getGlobalHeatUsageCount() {
       var counts = Object.create(null);
       var rootKey = this.roundResultsRootKey;
@@ -1132,6 +1181,8 @@ export default {
 
       this.persistRoundResults();
       if (this.$forceUpdate) this.$forceUpdate();
+
+      this.computeWinLoseByHeat();
     },
     makeEmptyResult() {
       return {
@@ -1291,6 +1342,8 @@ export default {
       await this.assignRanks(this.visibleParticipants);
       this.syncWinLoseFromBracketToParticipants();
       this.persistRoundResults();
+
+      this.computeWinLoseByHeat();
     },
 
     // map: NAMA_TIM (UPPER) -> { heat: number, pos: 0|1 }  (pos: team1=0, team2=1)
@@ -1393,22 +1446,6 @@ export default {
       const roundKey = this.currentRoundKey();
       if (!roundKey) return;
 
-      // 1) Kumpulkan tim yang tampil di babak aktif (by name, uppercase)
-      // const namesInRound = new Set(
-      //   (this.teamsInCurrentRound || []).map((n) =>
-      //     String(n || "").toUpperCase()
-      //   )
-      // );
-
-      // 2) RESET result utk tim yang tampil di babak aktif
-      // this.participantArr.forEach((p) => {
-      //   const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
-      //   if (nm && namesInRound.has(nm)) {
-      //     // reset seluruh field result per-babak
-      //     p.result = this.makeEmptyResult();
-      //   }
-      // });
-
       // 3) Ambil simpanan utk babak aktif ini
       const all = readAllRoundResults(this.roundResultsRootKey);
       const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
@@ -1438,6 +1475,7 @@ export default {
       this.assignRanks(this.visibleParticipants);
       this.evaluateHeatWinnersForCurrentRound(); // penting: tentukan winner/Win-Lose dari waktu di babak ini
       this.syncWinLoseFromBracketToParticipants(); // jaga konsistensi label Win/Lose di tabel
+      this.computeWinLoseByHeat();
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
@@ -2015,6 +2053,8 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants(); // NEW
       this.persistRoundResults(); // NEW
+
+      this.computeWinLoseByHeat();
     },
 
     getScoreByRanked(ranked) {

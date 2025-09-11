@@ -24,7 +24,7 @@
           </b-navbar-nav>
 
           <b-navbar-nav class="ml-auto">
-            <b-nav-item @click="goTo('login')">Login/Create account</b-nav-item>
+            <!-- <b-nav-item @click="goTo('login')">Login/Create account</b-nav-item> -->
             <b-nav-item @click="exitApp">Exit</b-nav-item>
           </b-navbar-nav>
         </b-collapse>

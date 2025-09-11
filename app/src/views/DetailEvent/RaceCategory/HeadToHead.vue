@@ -357,10 +357,10 @@
                     <th colspan="9" class="text-center">Penalties</th>
 
                     <th rowspan="2">Total Penalty</th>
-                    <th rowspan="2">Penalty Time</th>
-                    <th rowspan="2">Finish Time</th>
-                    <th rowspan="2">Race Time</th>
-                    <th rowspan="2">Result</th>
+                    <th class="text-center" rowspan="2">Penalty Time</th>
+                    <th class="text-center" rowspan="2">Finish Time</th>
+                    <th class="text-center" rowspan="2">Race Time</th>
+                    <th class="text-center" rowspan="2">Result</th>
                     <th rowspan="2">Win/Lose</th>
                     <th v-if="editResult" rowspan="2">Action</th>
                   </tr>
@@ -466,6 +466,7 @@
                         :class="{
                           'badge badge-success': item.result.penalties.pb === 0,
                           'badge badge-danger': item.result.penalties.pb === 50,
+                          'badge badge-danger': item.result.penalties.pb === 100,
                         }"
                         class="p-2"
                       >
@@ -1484,10 +1485,14 @@ export default {
       const l1 = p.l1 === "Y";
       const l2 = p.l2 === "Y";
 
-      const comboValid = (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
-
-      // PB menampilkan hasil rule: 0 jika valid, 50 jika tidak
-      this.$set(p, "pb", comboValid ? 0 : 50);
+      // jika semua N → PB = 100
+      if (!r1 && !r2 && !l1 && !l2) {
+        this.$set(p, "pb", 100);
+      } else {
+        const comboValid = (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
+        // PB menampilkan hasil rule: 0 jika valid, 50 jika tidak
+        this.$set(p, "pb", comboValid ? 0 : 50);
+      }
 
       // --- total penalti (detik) ---
       const totalPenaltySeconds =

@@ -383,7 +383,10 @@
                     <td style="min-width: 110px">
                       <b-form-select
                         v-model="item.result.heat"
-                        :options="heatOptionsLabeled"
+                        :options="[
+                          { value: null, text: '— pilih heat —' },
+                          ...heatOptionsLabeled,
+                        ]"
                         size="sm"
                         class="w-auto"
                         @change="onHeatChanged(item)"
@@ -793,18 +796,35 @@ export default {
         text: `${p.label} (${p.value}s)`,
       }));
     },
-    // jumlah opsi heat = banyaknya match pada babak aktif
-    heatOptions() {
-      var r = this.currentRound;
-      var n = r && r.matches ? r.matches.length : 0;
-      return Array.from({ length: n }, function (_, i) {
-        return { value: i + 1, text: i + 1 }; // 1..n (bukan index)
+    globalHeatOffsets() {
+      // offset heat kumulatif per round index (hanya round kompetitif; bronze ikut offset berjalan)
+      let offset = 0;
+      const offsets = [];
+      (this.rounds || []).forEach((r, i) => {
+        offsets[i] = offset;
+        if (!r.bronze) {
+          offset += r.matches ? r.matches.length : 0;
+        } else {
+          // bronze tidak menambah jumlah heat total di babak kompetitif
+          // tapi tetap memakai offset yang sudah berjalan
+        }
       });
+      return offsets;
+    },
+    heatOptions() {
+      const r = this.currentRound;
+      const n = r && r.matches ? r.matches.length : 0;
+      const base = (this.globalHeatOffsets[this.currentRoundIndex] || 0) + 1;
+      return Array.from({ length: n }, (_, i) => ({
+        value: base + i,
+        text: base + i,
+      }));
     },
     heatOptionsLabeled() {
-      return this.heatOptions.map(function (o) {
-        return { value: o.value, text: "Heat " + o.text };
-      });
+      return this.heatOptions.map((o) => ({
+        value: o.value,
+        text: `Heat ${o.text}`,
+      }));
     },
     participantArr() {
       return Array.isArray(this.participant)
@@ -902,26 +922,43 @@ export default {
         }, this);
       }
 
-      // ===== NEW: sort agar Heat 1,1, 2,2, dst (berdasarkan heat & posisi team1/team2)
       const orderMap = this.buildHeatOrderPosMapFromBracket();
+
       list.sort(function (a, b) {
-        // A
-        var nameA = String(a.nameTeam || a.teamName || "").toUpperCase();
-        var recA = orderMap[nameA];
+        var nameA = String(
+          (a && (a.nameTeam || a.teamName)) || ""
+        ).toUpperCase();
+        var nameB = String(
+          (b && (b.nameTeam || b.teamName)) || ""
+        ).toUpperCase();
+
+        // heat boleh null/'' (BYE / belum diisi) → disortir ke belakang
         var heatA =
-          (a && a.result && Number(a.result.heat)) || (recA ? recA.heat : 9999);
-        var posA = recA ? recA.pos : 9;
+          a &&
+          a.result &&
+          a.result.heat !== null &&
+          a.result.heat !== "" &&
+          typeof a.result.heat !== "undefined"
+            ? Number(a.result.heat)
+            : Number.POSITIVE_INFINITY;
 
-        // B
-        var nameB = String(b.nameTeam || b.teamName || "").toUpperCase();
-        var recB = orderMap[nameB];
         var heatB =
-          (b && b.result && Number(b.result.heat)) || (recB ? recB.heat : 9999);
-        var posB = recB ? recB.pos : 9;
+          b &&
+          b.result &&
+          b.result.heat !== null &&
+          b.result.heat !== "" &&
+          typeof b.result.heat !== "undefined"
+            ? Number(b.result.heat)
+            : Number.POSITIVE_INFINITY;
 
-        if (heatA !== heatB) return heatA - heatB; // heat dulu
-        if (posA !== posB) return posA - posB; // team1 sebelum team2
-        // stabilizer (biar konsisten)
+        if (heatA !== heatB) return heatA - heatB;
+
+        var recA = orderMap[nameA];
+        var recB = orderMap[nameB];
+        var posA = recA && typeof recA.pos !== "undefined" ? recA.pos : 9; // team1=0, team2=1
+        var posB = recB && typeof recB.pos !== "undefined" ? recB.pos : 9;
+
+        if (posA !== posB) return posA - posB;
         return nameA.localeCompare(nameB);
       });
 
@@ -934,12 +971,10 @@ export default {
       deep: true,
       handler() {
         this.computePodium();
-        this.$nextTick(this.ensureDefaultHeatForVisible);
       },
     },
     currentRoundIndex() {
       this.computePodium();
-      this.$nextTick(this.ensureDefaultHeatForVisible);
       this.loadRoundResultsForCurrentRound(); // <-- tambah ini
     },
   },
@@ -962,8 +997,6 @@ export default {
     this.roundResultsRootKey = getResultsRootKey(); // NEW
     // load hasil tersimpan utk babak awal (jika ada)
     this.loadRoundResultsForCurrentRound(); // NEW
-
-    this.$nextTick(this.ensureDefaultHeatForVisible);
   },
 
   methods: {
@@ -1177,13 +1210,14 @@ export default {
 
     // Saat user ubah dropdown heat pada baris
     onHeatChanged(item) {
-      var n = Number(item && item.result && item.result.heat) || 1;
-      item.result.heat = n;
-      if (typeof this.persistRoundResults === "function") {
+      var val = item && item.result ? item.result.heat : null;
+      // biarkan null/'' untuk BYE / belum ditentukan
+      if (val !== null && val !== "") val = Number(val) || null;
+      if (item && item.result) item.result.heat = val;
+
+      if (typeof this.persistRoundResults === "function")
         this.persistRoundResults();
-      }
-      // trigger re-render (opsional, biasanya tidak perlu karena reactive)
-      this.$forceUpdate && this.$forceUpdate();
+      if (typeof this.$forceUpdate === "function") this.$forceUpdate();
     },
     // mapping tim -> nomor heat (index match + 1) pada babak aktif
     getPB(item, key) {
@@ -1239,20 +1273,20 @@ export default {
       if (!roundKey) return;
 
       // 1) Kumpulkan tim yang tampil di babak aktif (by name, uppercase)
-      const namesInRound = new Set(
-        (this.teamsInCurrentRound || []).map((n) =>
-          String(n || "").toUpperCase()
-        )
-      );
+      // const namesInRound = new Set(
+      //   (this.teamsInCurrentRound || []).map((n) =>
+      //     String(n || "").toUpperCase()
+      //   )
+      // );
 
       // 2) RESET result utk tim yang tampil di babak aktif
-      this.participantArr.forEach((p) => {
-        const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
-        if (nm && namesInRound.has(nm)) {
-          // reset seluruh field result per-babak
-          p.result = this.makeEmptyResult();
-        }
-      });
+      // this.participantArr.forEach((p) => {
+      //   const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
+      //   if (nm && namesInRound.has(nm)) {
+      //     // reset seluruh field result per-babak
+      //     p.result = this.makeEmptyResult();
+      //   }
+      // });
 
       // 3) Ambil simpanan utk babak aktif ini
       const all = readAllRoundResults(this.roundResultsRootKey);

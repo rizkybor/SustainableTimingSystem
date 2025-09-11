@@ -277,28 +277,6 @@
                   >Auto-advance (BYE)</span
                 >
 
-                <!-- <div
-                  class="bracket__actions"
-                  v-if="!round.bronze && m.team1.name && m.team2.name"
-                >
-                  <button
-                    class="btn btn-xs btn-outline-success"
-                    @click="advanceWinner(rIdx, mIdx, 1)"
-                    title="Set winner: top"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Top Win
-                  </button>
-                  <button
-                    class="btn btn-xs btn-outline-primary"
-                    @click="advanceWinner(rIdx, mIdx, 2)"
-                    title="Set winner: bottom"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Bottom Win
-                  </button>
-                </div> -->
-
                 <div
                   class="bracket__actions"
                   v-if="m.team1.name && m.team2.name"
@@ -409,6 +387,7 @@
                         size="sm"
                         class="w-auto"
                         @change="onHeatChanged(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
 
@@ -439,6 +418,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -447,6 +427,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -455,6 +436,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -463,6 +445,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -471,6 +454,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -479,6 +463,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
                     <td>
@@ -487,6 +472,7 @@
                         :options="penaltyChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
+                        :disabled="isByeTeam(item)"
                       />
                     </td>
 
@@ -981,6 +967,20 @@ export default {
   },
 
   methods: {
+    makeEmptyResult() {
+      return {
+        startTime: "",
+        finishTime: "",
+        raceTime: "",
+        penaltyTime: "00:00:00.000",
+        penalty: 0,
+        penalties: { s: 0, cl: 0, r1: 0, r2: 0, l1: 0, l2: 0, pb: 0, f: 0 },
+        totalTime: "",
+        ranked: "",
+        score: "",
+        winLose: null,
+      };
+    },
     evaluateHeatWinnersForCurrentRound() {
       const r = this.currentRound;
       if (!r || !r.matches) return;
@@ -1238,34 +1238,51 @@ export default {
       const roundKey = this.currentRoundKey();
       if (!roundKey) return;
 
-      const all = readAllRoundResults(this.roundResultsRootKey);
-      const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
-      if (!arr.length) {
-        // tetap sinkron status win/lose walau belum ada simpanan
-        this.syncWinLoseFromBracketToParticipants();
-        return;
-      }
-
-      // merge by name (fallback bib)
-      const indexByName = new Map(
-        this.participantArr.map((p, i) => [
-          String(p.nameTeam || p.teamName || "").toUpperCase(),
-          i,
-        ])
+      // 1) Kumpulkan tim yang tampil di babak aktif (by name, uppercase)
+      const namesInRound = new Set(
+        (this.teamsInCurrentRound || []).map((n) =>
+          String(n || "").toUpperCase()
+        )
       );
-      arr.forEach((row) => {
-        const key = String(row.nameTeam || "").toUpperCase();
-        const idx = indexByName.get(key);
-        if (idx != null && idx > -1) {
-          // masukkan kembali ke objek utama
-          const tgt = this.participant[idx];
-          tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
+
+      // 2) RESET result utk tim yang tampil di babak aktif
+      this.participantArr.forEach((p) => {
+        const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
+        if (nm && namesInRound.has(nm)) {
+          // reset seluruh field result per-babak
+          p.result = this.makeEmptyResult();
         }
       });
 
-      // hitung ranking ulang utk subset babak aktif
+      // 3) Ambil simpanan utk babak aktif ini
+      const all = readAllRoundResults(this.roundResultsRootKey);
+      const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
+
+      // 4) Merge (by name; fallback bib bila perlu)
+      if (arr.length) {
+        const indexByName = new Map(
+          this.participantArr.map((p, i) => [
+            String(p.nameTeam || p.teamName || "").toUpperCase(),
+            i,
+          ])
+        );
+
+        arr.forEach((row) => {
+          const key = String(row.nameTeam || "").toUpperCase();
+          const idx = indexByName.get(key);
+          if (idx != null && idx > -1) {
+            const tgt = this.participant[idx];
+            tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
+            // pastikan object penalties reactive & numeric
+            this.ensurePenaltiesObject(tgt.result);
+          }
+        });
+      }
+
+      // 5) Re-calc utk babak aktif saat ini
       this.assignRanks(this.visibleParticipants);
-      this.syncWinLoseFromBracketToParticipants();
+      this.evaluateHeatWinnersForCurrentRound(); // penting: tentukan winner/Win-Lose dari waktu di babak ini
+      this.syncWinLoseFromBracketToParticipants(); // jaga konsistensi label Win/Lose di tabel
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)

@@ -349,7 +349,16 @@
     <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-    <h4>List Result — {{ currentRound ? (currentRound.bronze ? 'Third Place' : currentRound.name) : '—' }}</h4>
+        <h4>
+          List Result —
+          {{
+            currentRound
+              ? currentRound.bronze
+                ? "Third Place"
+                : currentRound.name
+              : "—"
+          }}
+        </h4>
         <b-row>
           <b-col>
             <div
@@ -357,99 +366,164 @@
               aria-label="Scrollable results table"
               role="region"
             >
-             <table class="table">
-  <thead>
-    <tr>
-      <th rowspan="2">Heat</th>
-      <th rowspan="2">Team Name</th>
-      <th rowspan="2">BIB</th>
-      <th rowspan="2">Start Time</th>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">Heat</th>
+                    <th rowspan="2">Team Name</th>
+                    <th rowspan="2">BIB</th>
+                    <th rowspan="2">Start Time</th>
 
-      <!-- Grup Penalties -->
-      <th colspan="8" class="text-center">Penalties</th>
+                    <!-- Grup Penalties -->
+                    <th colspan="8" class="text-center">Penalties</th>
 
-      <th rowspan="2">Total Penalty</th>
-      <th rowspan="2">Penalty Time</th>
-      <th rowspan="2">Finish Time</th>
-      <th rowspan="2">Race Time</th>
-      <th rowspan="2">Result</th>
-      <th rowspan="2">Win/Lose</th>
-      <th v-if="editResult" rowspan="2">Action</th>
-    </tr>
-    <tr>
-      <th>S</th>
-      <th>CL</th>
-      <th>R1</th>
-      <th>R2</th>
-      <th>L1</th>
-      <th>L2</th>
-      <th>PB</th>
-      <th>F</th>
-    </tr>
-  </thead>
+                    <th rowspan="2">Total Penalty</th>
+                    <th rowspan="2">Penalty Time</th>
+                    <th rowspan="2">Finish Time</th>
+                    <th rowspan="2">Race Time</th>
+                    <th rowspan="2">Result</th>
+                    <th rowspan="2">Win/Lose</th>
+                    <th v-if="editResult" rowspan="2">Action</th>
+                  </tr>
+                  <tr>
+                    <th>S</th>
+                    <th>CL</th>
+                    <th>R1</th>
+                    <th>R2</th>
+                    <th>L1</th>
+                    <th>L2</th>
+                    <th>PB</th>
+                    <th>F</th>
+                  </tr>
+                </thead>
 
-  <tbody>
-    <tr v-for="(item, index) in visibleParticipants" :key="index">
-      <!-- Heat = index match pada babak aktif -->
-      <td>{{ getHeatNumber(item) }}</td>
+                <tbody>
+                  <tr v-for="(item, index) in visibleParticipants" :key="index">
+                    <td>{{ index + 1 }}</td>
+                    <!-- Heat = index match pada babak aktif -->
+                    <td style="min-width: 110px">
+                      <b-form-select
+                        v-model="item.result.heat"
+                        :options="heatOptionsLabeled"
+                        size="sm"
+                        class="w-auto"
+                        @change="onHeatChanged(item)"
+                      />
+                    </td>
 
-      <td class="large-bold text-strong max-char">
-        {{ item.nameTeam }}
-      </td>
-      <td class="large-bold">{{ item.bibTeam }}</td>
-      <td class="text-monospace">{{ item.result.startTime }}</td>
+                    <td class="large-bold text-strong max-char">
+                      {{ item.nameTeam }}
+                    </td>
+                    <td class="large-bold">{{ item.bibTeam }}</td>
+                    <td class="text-monospace">{{ item.result.startTime }}</td>
 
-      <!-- Penalties breakdown (read-only jika belum ada rincian) -->
-      <td>{{ getPB(item,'s') }}</td>
-      <td>{{ getPB(item,'cl') }}</td>
-      <td>{{ getPB(item,'r1') }}</td>
-      <td>{{ getPB(item,'r2') }}</td>
-      <td>{{ getPB(item,'l1') }}</td>
-      <td>{{ getPB(item,'l2') }}</td>
-      <td>{{ getPB(item,'pb') }}</td>
-      <td>{{ getPB(item,'f') }}</td>
+                    <!-- Penalties breakdown (read-only jika belum ada rincian) -->
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.s"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.cl"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.r1"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.r2"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.l1"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.l2"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.pb"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
+                    <td>
+                      <b-form-select
+                        v-model.number="item.result.penalties.f"
+                        :options="penaltyChoices"
+                        size="sm"
+                        @change="onPenaltyChange(item)"
+                      />
+                    </td>
 
-      <!-- Total Penalty (pakai sum breakdown; fallback ke item.result.penalty) -->
-      <td class="large-bold">{{ getTotalPenalty(item) }}</td>
+                    <td class="large-bold">
+                      {{ getTotalPenalty(item) }}
+                      <small class="text-muted"
+                        >({{ getPenaltyCount(item) }}x)</small
+                      >
+                    </td>
 
-      <!-- Penalty selector tetap ada (biar gampang input) -->
-      <td class="text-monospace large-bold">
-        <div class="d-flex align-items-center" style="gap:6px">
-          <span>{{ item.result.penaltyTime }}</span>
-          <b-select
-            v-if="item.result.startTime"
-            v-model="item.result.penalty"
-            @change="updateTimePen($event, item)"
-            size="sm"
-            style="min-width:120px"
-          >
-            <option v-for="pen in dataPenalties" :key="pen.value" :value="pen.value">
-              {{ pen.label }}
-            </option>
-          </b-select>
-        </div>
-      </td>
+                    <!-- Penalty selector tetap ada (biar gampang input) -->
+                    <td class="text-monospace large-bold">
+                      {{ item.result.penaltyTime }}
+                    </td>
 
-      <td class="text-monospace">{{ item.result.finishTime }}</td>
+                    <td class="text-monospace">{{ item.result.finishTime }}</td>
 
-      <td class="large-bold text-monospace">
-        {{ item.result.raceTime }}
-      </td>
+                    <td class="large-bold text-monospace">
+                      {{ item.result.raceTime }}
+                    </td>
 
-      <td class="text-monospace large-bold">
-        {{ item.result.penaltyTime ? item.result.totalTime : item.result.raceTime }}
-      </td>
+                    <td class="text-monospace large-bold">
+                      {{
+                        item.result.penaltyTime
+                          ? item.result.totalTime
+                          : item.result.raceTime
+                      }}
+                    </td>
 
-      <td class="large-bold">{{ item.result.winLose || '' }}</td>
+                    <td class="large-bold">{{ item.result.winLose || "" }}</td>
 
-      <td v-if="editResult">
-        <button type="button" class="btn btn-warning" @click="openModal(item)">
-          Edit
-        </button>
-      </td>
-    </tr>
-  </tbody>
-</table>
+                    <td v-if="editResult">
+                      <button
+                        type="button"
+                        class="btn btn-warning"
+                        @click="openModal(item)"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <br />
           </b-col>
@@ -603,9 +677,11 @@ function normalizeTeamForH2H(t = {}) {
     raceTime: "",
     penaltyTime: "00:00:00.000",
     penalty: 0,
+    penalties: { s: 0, cl: 0, r1: 0, r2: 0, l1: 0, l2: 0, pb: 0, f: 0 },
     totalTime: "",
     ranked: "",
     score: "",
+    winLose: null,
   };
 
   // dukung format lama (array result)
@@ -661,15 +737,14 @@ export default {
       showBronze: true,
       editForm: "",
       editResult: false,
-      isScrolled: false,
       port: null,
       isPortConnected: false,
       digitId: [],
       digitTime: [],
       dataPenalties: [
-        { label: "clear", value: 0, timePen: "00:00:00.000" },
-        { label: "pen 1", value: 5, timePen: "00:00:05.000" },
-        { label: "pen 2", value: 50, timePen: "00:00:50.000" },
+        { label: "0", value: 0, timePen: "00:00:00.000" },
+        { label: "5", value: 5, timePen: "00:00:05.000" },
+        { label: "50", value: 50, timePen: "00:00:50.000" },
       ],
       dataScore: [
         { ranking: 1, score: 100 },
@@ -707,7 +782,6 @@ export default {
       ],
       digitTimeStart: null,
       digitTimeFinish: null,
-      currentPort: "",
       isRankedDescending: false,
 
       /** penting: tipe konsisten */
@@ -718,6 +792,27 @@ export default {
   },
 
   computed: {
+    penaltyChoices() {
+      // opsi untuk semua dropdown penalty (S, CL, R1, R2, L1, L2, PB, F)
+      // ambil dari dataPenalties supaya satu sumber data
+      return (this.dataPenalties || []).map((p) => ({
+        value: Number(p.value) || 0,
+        text: `${p.label} (${p.value}s)`,
+      }));
+    },
+    // jumlah opsi heat = banyaknya match pada babak aktif
+    heatOptions() {
+      var r = this.currentRound;
+      var n = r && r.matches ? r.matches.length : 0;
+      return Array.from({ length: n }, function (_, i) {
+        return { value: i + 1, text: i + 1 }; // 1..n (bukan index)
+      });
+    },
+    heatOptionsLabeled() {
+      return this.heatOptions.map(function (o) {
+        return { value: o.value, text: "Heat " + o.text };
+      });
+    },
     participantArr() {
       return Array.isArray(this.participant)
         ? this.participant
@@ -791,28 +886,52 @@ export default {
     // NEW: participant yang “terlihat” = hanya mereka yang ada di babak aktif
     visibleParticipants() {
       const want = new Set(
-        this.teamsInCurrentRound.map((n) => n.toUpperCase())
+        this.teamsInCurrentRound.map(function (n) {
+          return n.toUpperCase();
+        })
       );
-      const list = this.participantArr.filter((p) => {
+      const list = this.participantArr.filter(function (p) {
         const nm = String(p.nameTeam || p.teamName || "").toUpperCase();
         return nm && want.has(nm);
       });
 
-      // Jika ada tim di bracket yang belum ada di participant (misal hanya nama),
-      // kita buat placeholder agar tetap terlihat di panel & table:
+      // placeholder jika belum ada di participant
       if (want.size && list.length < want.size) {
         const existing = new Set(
-          list.map((p) => String(p.nameTeam || p.teamName || "").toUpperCase())
+          list.map(function (p) {
+            return String(p.nameTeam || p.teamName || "").toUpperCase();
+          })
         );
-        this.teamsInCurrentRound.forEach((n) => {
+        this.teamsInCurrentRound.forEach(function (n) {
           const up = n.toUpperCase();
-          if (!existing.has(up)) {
-            list.push(
-              this.normalizeTeamForViewPlaceholder(n) // helper di methods
-            );
-          }
-        });
+          if (!existing.has(up))
+            list.push(this.normalizeTeamForViewPlaceholder(n));
+        }, this);
       }
+
+      // ===== NEW: sort agar Heat 1,1, 2,2, dst (berdasarkan heat & posisi team1/team2)
+      const orderMap = this.buildHeatOrderPosMapFromBracket();
+      list.sort(function (a, b) {
+        // A
+        var nameA = String(a.nameTeam || a.teamName || "").toUpperCase();
+        var recA = orderMap[nameA];
+        var heatA =
+          (a && a.result && Number(a.result.heat)) || (recA ? recA.heat : 9999);
+        var posA = recA ? recA.pos : 9;
+
+        // B
+        var nameB = String(b.nameTeam || b.teamName || "").toUpperCase();
+        var recB = orderMap[nameB];
+        var heatB =
+          (b && b.result && Number(b.result.heat)) || (recB ? recB.heat : 9999);
+        var posB = recB ? recB.pos : 9;
+
+        if (heatA !== heatB) return heatA - heatB; // heat dulu
+        if (posA !== posB) return posA - posB; // team1 sebelum team2
+        // stabilizer (biar konsisten)
+        return nameA.localeCompare(nameB);
+      });
+
       return list;
     },
   },
@@ -822,159 +941,305 @@ export default {
       deep: true,
       handler() {
         this.computePodium();
+        this.$nextTick(this.ensureDefaultHeatForVisible);
       },
     },
-     currentRoundIndex() {
-    this.computePodium();
-    this.loadRoundResultsForCurrentRound(); // NEW
-  },
     currentRoundIndex() {
       this.computePodium();
+      this.$nextTick(this.ensureDefaultHeatForVisible); // NEW
     },
   },
 
   beforeRouteLeave(to, from, next) {
-  // NEW: reset data hasil pertandingan di localStorage ketika berpindah halaman
-  this.clearAllRoundResults();
-  next();
-},
+    // NEW: reset data hasil pertandingan di localStorage ketika berpindah halaman
+    this.clearAllRoundResults();
+    next();
+  },
 
   async mounted() {
-    window.addEventListener("scroll", this.handleScroll);
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
     // jumlah tim aktual (4..32), bisa diambil dari participantArr.length
     const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
     this.rebuildBracketDynamic(n); // bangun + seed kolom pertama
-this.syncWinLoseFromBracketToParticipants(); // NEW
+    this.syncWinLoseFromBracketToParticipants(); // NEW
 
     this.roundResultsRootKey = getResultsRootKey(); // NEW
-// load hasil tersimpan utk babak awal (jika ada)
-this.loadRoundResultsForCurrentRound(); // NEW
-  },
+    // load hasil tersimpan utk babak awal (jika ada)
+    this.loadRoundResultsForCurrentRound(); // NEW
 
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
+    this.$nextTick(this.ensureDefaultHeatForVisible);
   },
 
   methods: {
-// mapping tim -> nomor heat (index match + 1) pada babak aktif
-getPB(item, key) {
-  const has = item && item.result;
-  const pb = has && item.result.penalties;
-  const v = pb && typeof pb[key] !== 'undefined' ? pb[key] : 0;
-  return Number.isFinite(+v) ? +v : 0;
-},
+    getPenaltyCount(item) {
+      const has = item && item.result;
+      const pb = has && item.result.penalties;
+      if (!pb || typeof pb !== "object") return 0;
+      const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
+      // hitung berapa field yang > 0
+      return keys.reduce(
+        (cnt, k) => cnt + ((Number(pb[k]) || 0) > 0 ? 1 : 0),
+        0
+      );
+    },
+    secondsToTimeString(totalSec) {
+      const t = Math.max(0, Number(totalSec) || 0);
+      const ms = 0;
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+    },
+    ensurePenaltiesObject(result) {
+      if (!result || typeof result !== "object") return;
 
-getHeatNumber(item) {
-  const r = this.currentRound;
-  if (!r) return '';
-  const name = String((item && (item.nameTeam || item.teamName)) || '').toUpperCase();
-  const idx = (r.matches || []).findIndex(m => {
-    const t1 = ((m.team1 && m.team1.name) || '').toUpperCase();
-    const t2 = ((m.team2 && m.team2.name) || '').toUpperCase();
-    return name && (name === t1 || name === t2);
-  });
-  return idx >= 0 ? (idx + 1) : '';
-},
-getTotalPenalty(item) {
-  const has = item && item.result;
-  const pb = has && item.result.penalties;
-  if (pb && typeof pb === 'object') {
-    const keys = ['s','cl','r1','r2','l1','l2','pb','f'];
-    return keys.reduce((sum, k) => sum + (Number(pb[k]) || 0), 0);
-  }
-  // fallback ke skema lama (single value)
-  const pen = has && typeof item.result.penalty !== 'undefined'
-    ? item.result.penalty
-    : 0;
-  return Number(pen || 0);
-},
+      if (!result.penalties || typeof result.penalties !== "object") {
+        // pastikan reactive (Vue 2)
+        this.$set(result, "penalties", {
+          s: 0,
+          cl: 0,
+          r1: 0,
+          r2: 0,
+          l1: 0,
+          l2: 0,
+          pb: 0,
+          f: 0,
+        });
+      } else {
+        const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
+        keys.forEach((k) => {
+          const v = result.penalties[k];
+          // paksa ke number & reactive kalau belum ada
+          if (typeof v === "undefined") {
+            this.$set(result.penalties, k, 0);
+          } else {
+            result.penalties[k] = Number(v) || 0;
+          }
+        });
+      }
+    },
+    async onPenaltyChange(item) {
+      if (!item || !item.result) return;
+
+      // pastikan struktur penalties exist & numeric
+      this.ensurePenaltiesObject(item.result);
+
+      // total poin penalty (detik)
+      const totalPenaltySeconds = this.getTotalPenalty(item);
+      item.result.penalty = totalPenaltySeconds;
+
+      // detik → HH:MM:SS.mmm
+      item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
+
+      // hitung total time jika sudah ada raceTime
+      if (item.result.raceTime) {
+        item.result.totalTime = await this.tambahWaktu(
+          item.result.raceTime,
+          item.result.penaltyTime
+        );
+      }
+
+      // re-rank subset & persist
+      await this.assignRanks(this.visibleParticipants);
+      this.syncWinLoseFromBracketToParticipants();
+      this.persistRoundResults();
+    },
+
+    // map: NAMA_TIM (UPPER) -> { heat: number, pos: 0|1 }  (pos: team1=0, team2=1)
+    buildHeatOrderPosMapFromBracket() {
+      var r = this.currentRound;
+      var map = Object.create(null);
+      if (!r || !r.matches) return map;
+
+      r.matches.forEach(function (m, i) {
+        var h = i + 1;
+        var n1 =
+          m.team1 && m.team1.name ? String(m.team1.name).toUpperCase() : "";
+        var n2 =
+          m.team2 && m.team2.name ? String(m.team2.name).toUpperCase() : "";
+        if (n1) map[n1] = { heat: h, pos: 0 };
+        if (n2) map[n2] = { heat: h, pos: 1 };
+      });
+      return map;
+    },
+    // Map nama tim → nomor heat (match index + 1) dari babak aktif
+    buildHeatMapFromBracket() {
+      var r = this.currentRound;
+      var map = Object.create(null);
+      if (!r || !r.matches) return map;
+
+      r.matches.forEach(function (m, i) {
+        var h = i + 1;
+        var n1 =
+          m.team1 && m.team1.name ? String(m.team1.name).toUpperCase() : "";
+        var n2 =
+          m.team2 && m.team2.name ? String(m.team2.name).toUpperCase() : "";
+        if (n1) map[n1] = h;
+        if (n2) map[n2] = h;
+      });
+      return map;
+    },
+
+    // Pastikan setiap item punya result.heat; jika kosong → isi dari bracket
+    ensureDefaultHeatForVisible() {
+      var heatMap = this.buildHeatMapFromBracket();
+      this.visibleParticipants.forEach(function (p) {
+        if (!p.result) p.result = {};
+        if (!p.result.heat || Number(p.result.heat) <= 0) {
+          var key = String(p.nameTeam || p.teamName || "").toUpperCase();
+          p.result.heat = heatMap[key] || 1;
+        }
+      });
+    },
+
+    // Saat user ubah dropdown heat pada baris
+    onHeatChanged(item) {
+      var n = Number(item && item.result && item.result.heat) || 1;
+      item.result.heat = n;
+      if (typeof this.persistRoundResults === "function") {
+        this.persistRoundResults();
+      }
+      // trigger re-render (opsional, biasanya tidak perlu karena reactive)
+      this.$forceUpdate && this.$forceUpdate();
+    },
+    // mapping tim -> nomor heat (index match + 1) pada babak aktif
+    getPB(item, key) {
+      const has = item && item.result;
+      const pb = has && item.result.penalties;
+      const v = pb && typeof pb[key] !== "undefined" ? pb[key] : 0;
+      return Number.isFinite(+v) ? +v : 0;
+    },
+
+    getTotalPenalty(item) {
+      const has = item && item.result;
+      const pb = has && item.result.penalties;
+      if (pb && typeof pb === "object") {
+        const keys = ["s", "cl", "r1", "r2", "l1", "l2", "pb", "f"];
+        return keys.reduce((sum, k) => sum + (Number(pb[k]) || 0), 0);
+      }
+      // fallback ke skema lama (single value)
+      const pen =
+        has && typeof item.result.penalty !== "undefined"
+          ? item.result.penalty
+          : 0;
+      return Number(pen || 0);
+    },
 
     // identitas round saat ini utk map penyimpanan
-currentRoundKey() {
-  const r = this.currentRound;
-  return r ? String(r.id) : null;
-},
+    currentRoundKey() {
+      const r = this.currentRound;
+      return r ? String(r.id) : null;
+    },
 
-// NEW: kumpulkan hasil tim-tim yg sedang tampil (babak aktif) & simpan ke localStorage
-persistRoundResults() {
-  if (!this.roundResultsRootKey) return;
-  const roundKey = this.currentRoundKey();
-  if (!roundKey) return;
+    // NEW: kumpulkan hasil tim-tim yg sedang tampil (babak aktif) & simpan ke localStorage
+    persistRoundResults() {
+      if (!this.roundResultsRootKey) return;
+      const roundKey = this.currentRoundKey();
+      if (!roundKey) return;
 
-  // hanya simpan subset tim pada babak aktif (visibleParticipants)
-  const pack = this.visibleParticipants.map(p => ({
-    nameTeam: String(p.nameTeam || p.teamName || ""),
-    bibTeam: String(p.bibTeam || ""),
-    result: { ...(p.result || {}) } // start, finish, race, penalty, total, ranked, winLose, dll.
-  }));
+      // hanya simpan subset tim pada babak aktif (visibleParticipants)
+      const pack = this.visibleParticipants.map((p) => ({
+        nameTeam: String(p.nameTeam || p.teamName || ""),
+        bibTeam: String(p.bibTeam || ""),
+        result: { ...(p.result || {}) }, // start, finish, race, penalty, total, ranked, winLose, dll.
+      }));
 
-  const all = readAllRoundResults(this.roundResultsRootKey);
-  all[roundKey] = pack;
-  writeAllRoundResults(this.roundResultsRootKey, all);
-},
+      const all = readAllRoundResults(this.roundResultsRootKey);
+      all[roundKey] = pack;
+      writeAllRoundResults(this.roundResultsRootKey, all);
+    },
 
-// NEW: muat hasil tersimpan utk babak aktif lalu merge ke this.participant
-loadRoundResultsForCurrentRound() {
-  if (!this.roundResultsRootKey) return;
-  const roundKey = this.currentRoundKey();
-  if (!roundKey) return;
+    // NEW: muat hasil tersimpan utk babak aktif lalu merge ke this.participant
+    loadRoundResultsForCurrentRound() {
+      if (!this.roundResultsRootKey) return;
+      const roundKey = this.currentRoundKey();
+      if (!roundKey) return;
 
-  const all = readAllRoundResults(this.roundResultsRootKey);
-  const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
-  if (!arr.length) {
-    // tetap sinkron status win/lose walau belum ada simpanan
-    this.syncWinLoseFromBracketToParticipants();
-    return;
-  }
+      const all = readAllRoundResults(this.roundResultsRootKey);
+      const arr = Array.isArray(all[roundKey]) ? all[roundKey] : [];
+      if (!arr.length) {
+        // tetap sinkron status win/lose walau belum ada simpanan
+        this.syncWinLoseFromBracketToParticipants();
+        return;
+      }
 
-  // merge by name (fallback bib)
-  const indexByName = new Map(
-    this.participantArr.map((p, i) => [String(p.nameTeam || p.teamName || "").toUpperCase(), i])
-  );
-  arr.forEach(row => {
-    const key = String(row.nameTeam || "").toUpperCase();
-    const idx = indexByName.get(key);
-    if (idx != null && idx > -1) {
-      // masukkan kembali ke objek utama
-      const tgt = this.participant[idx];
-      tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
-    }
-  });
+      // merge by name (fallback bib)
+      const indexByName = new Map(
+        this.participantArr.map((p, i) => [
+          String(p.nameTeam || p.teamName || "").toUpperCase(),
+          i,
+        ])
+      );
+      arr.forEach((row) => {
+        const key = String(row.nameTeam || "").toUpperCase();
+        const idx = indexByName.get(key);
+        if (idx != null && idx > -1) {
+          // masukkan kembali ke objek utama
+          const tgt = this.participant[idx];
+          tgt.result = { ...(tgt.result || {}), ...(row.result || {}) };
+        }
+      });
 
-  // hitung ranking ulang utk subset babak aktif
-  this.assignRanks(this.visibleParticipants);
-  this.syncWinLoseFromBracketToParticipants();
-},
+      // hitung ranking ulang utk subset babak aktif
+      this.assignRanks(this.visibleParticipants);
+      this.syncWinLoseFromBracketToParticipants();
+    },
 
-// NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
-clearAllRoundResults() {
-  if (!this.roundResultsRootKey) return;
-  localStorage.removeItem(this.roundResultsRootKey);
-},
+    // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
+    clearAllRoundResults() {
+      if (!this.roundResultsRootKey) return;
+      localStorage.removeItem(this.roundResultsRootKey);
+    },
 
     // NEW: tandai Win/Lose utk list berdasarkan winner di bracket utk babak aktif
-syncWinLoseFromBracketToParticipants() {
-  const r = this.currentRound;
-  if (!r) return;
-  const nameMap = new Map(
-    this.visibleParticipants.map(p => [String(p.nameTeam || p.teamName || '').toUpperCase(), p])
-  );
+    syncWinLoseFromBracketToParticipants() {
+      const r = this.currentRound;
+      if (!r) return;
 
-  (r.matches || []).forEach(m => {
-    const t1 = (m.team1 && m.team1.name) ? m.team1.name.toUpperCase() : "";
-    const t2 = (m.team2 && m.team2.name) ? m.team2.name.toUpperCase() : "";
-    const w  = (m.winner && m.winner.name) ? m.winner.name.toUpperCase() : "";
+      // map nama tim → object participant yg sedang tampil di tabel
+      const nameMap = new Map(
+        this.visibleParticipants.map(function (p) {
+          return [String(p.nameTeam || p.teamName || "").toUpperCase(), p];
+        })
+      );
 
-    const P1 = nameMap.get(t1);
-    const P2 = nameMap.get(t2);
+      (r.matches || []).forEach(function (m) {
+        const t1 = m.team1 && m.team1.name ? m.team1.name.toUpperCase() : "";
+        const t2 = m.team2 && m.team2.name ? m.team2.name.toUpperCase() : "";
+        const w = m.winner && m.winner.name ? m.winner.name.toUpperCase() : "";
+        const isBye = !!m.bye; // flag BYE dari bracket
 
-    if (P1) P1.result.winLose = (w && t1 && w === t1) ? "Win" : (t2 ? "Lose" : "");
-    if (P2) P2.result.winLose = (w && t2 && w === t2) ? "Win" : (t1 ? "Lose" : "");
-  });
-},
+        const P1 = t1 ? nameMap.get(t1) : null;
+        const P2 = t2 ? nameMap.get(t2) : null;
+
+        // default: null
+        var v1 = null,
+          v2 = null;
+
+        if (isBye) {
+          // kalau BYE, pemenang otomatis ada 1 tim saja
+          if (w && t1 && w === t1) v1 = "Bye";
+          if (w && t2 && w === t2) v2 = "Bye";
+        } else if (w) {
+          // match normal: Win/Lose sesuai pemenang
+          if (t1) v1 = w === t1 ? "Win" : t2 ? "Lose" : null;
+          if (t2) v2 = w === t2 ? "Win" : t1 ? "Lose" : null;
+        }
+        // kalau belum ada pemenang & bukan BYE → tetap null
+
+        if (P1) {
+          if (!P1.result) P1.result = {};
+          P1.result.winLose = v1;
+        }
+        if (P2) {
+          if (!P2.result) P2.result = {};
+          P2.result.winLose = v2;
+        }
+      });
+    },
     notify(type, detail, message = "Info") {
       if (this.$ipc || (window && window.ipcRenderer)) {
         const ir = this.$ipc || window.ipcRenderer;
@@ -1041,6 +1306,7 @@ syncWinLoseFromBracketToParticipants() {
     // NEW: buat placeholder participant jika tim ada di bracket tapi belum ada di data
     normalizeTeamForViewPlaceholder(name) {
       return {
+        penaltyChoices: [0, 5, 10],
         nameTeam: String(name),
         bibTeam: "",
         startOrder: "",
@@ -1056,6 +1322,7 @@ syncWinLoseFromBracketToParticipants() {
           totalTime: "",
           ranked: "",
           score: "",
+          winLose: null,
         },
         otr: {
           startTime: "",
@@ -1066,6 +1333,7 @@ syncWinLoseFromBracketToParticipants() {
           totalTime: "",
           ranked: "",
           score: "",
+          winLose: null,
         },
       };
     },
@@ -1246,7 +1514,7 @@ syncWinLoseFromBracketToParticipants() {
         });
       }
       this.syncWinLoseFromBracketToParticipants(); // NEW
-this.persistRoundResults(); // NEW
+      this.persistRoundResults(); // NEW
     },
 
     /** Pindahkan pemenang secara manual ke ronde berikutnya (untuk non-BYE) */
@@ -1288,7 +1556,7 @@ this.persistRoundResults(); // NEW
         this.computePodium();
       }
       this.syncWinLoseFromBracketToParticipants(); // NEW
-this.persistRoundResults(); // NEW: simpan setiap ada perubahan pemenang
+      this.persistRoundResults(); // NEW: simpan setiap ada perubahan pemenang
     },
 
     /** Isi Bronze (3rd place) setelah SF selesai */
@@ -1491,7 +1759,7 @@ this.persistRoundResults(); // NEW: simpan setiap ada perubahan pemenang
       this.editResult = true;
       await this.assignRanks(this.visibleParticipants); // CHANGED
       this.syncWinLoseFromBracketToParticipants(); // NEW
-this.persistRoundResults(); // NEW
+      this.persistRoundResults(); // NEW
     },
 
     getScoreByRanked(ranked) {
@@ -1537,7 +1805,7 @@ this.persistRoundResults(); // NEW
       try {
         const ports = await SerialPort.list();
         if (!ports || ports.length === 0) return false;
-        this.currentPort = ports;
+
         const selectedPort = ports[6] || ports[5] || ports[ports.length - 1];
         if (!selectedPort || !selectedPort.path) return false;
 
@@ -1612,8 +1880,8 @@ this.persistRoundResults(); // NEW
       }
 
       await this.assignRanks(this.visibleParticipants);
-this.syncWinLoseFromBracketToParticipants(); // NEW
-this.persistRoundResults(); // NEW
+      this.syncWinLoseFromBracketToParticipants(); // NEW
+      this.persistRoundResults(); // NEW
     },
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
@@ -1719,10 +1987,6 @@ this.persistRoundResults(); // NEW
       this.titleCategories = "";
       this.clearAllRoundResults(); // NEW
       this.$router.push(`/event-detail/${this.$route.params.id}`);
-    },
-
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
     },
   },
 };
@@ -2042,6 +2306,10 @@ td {
   border-style: dashed;
 }
 
-thead th[rowspan="2"] { vertical-align: middle; }
-thead th[colspan="8"] { text-align: center; }
+thead th[rowspan="2"] {
+  vertical-align: middle;
+}
+thead th[colspan="8"] {
+  text-align: center;
+}
 </style>

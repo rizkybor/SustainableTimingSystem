@@ -46,7 +46,7 @@
     </section>
 
     <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
-      Kirim Pesan Realtime (Electron → Semua)
+      Kirim Pesan ke Judges
     </b-button>
 
     <b-container class="mt-4 mb-5">
@@ -202,6 +202,7 @@ export default {
   components: { Icon, TeamPanel },
   data() {
     return {
+      selfSocketId: null,
       resultAvailMap: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -259,16 +260,43 @@ export default {
   },
   mounted() {
     const socket = getSocket();
-    socket.on("custom:event", (msg) => {
+
+    // simpan id saat connect (atau reconnect)
+    const onConnect = () => {
+      this.selfSocketId = socket.id || null;
+      console.log("[Electron] socket connected:", this.selfSocketId);
+    };
+    socket.on("connect", onConnect);
+
+    // terima pesan: tampilkan toast hanya jika BUKAN dari diri sendiri
+    const onMessage = (msg) => {
+      // safety: kalau server belum broadcast-only, tetap filter di client
+      if (
+        msg &&
+        msg.senderId &&
+        this.selfSocketId &&
+        msg.senderId === this.selfSocketId
+      ) {
+        // pesan pantulan dari diri sendiri → jangan tampilkan
+        return;
+      }
       console.log("[Electron] terima:", msg);
-      // contoh notifikasi
+
       if (this.$bvToast) {
-        this.$bvToast.toast(`${msg.from}: ${msg.text}`, {
+        this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
           title: "Pesan Realtime",
           variant: "success",
           solid: true,
         });
       }
+    };
+
+    socket.on("custom:event", onMessage);
+
+    // bersihkan listener saat komponen dilepas
+    this.$once("hook:beforeDestroy", () => {
+      socket.off("connect", onConnect);
+      socket.off("custom:event", onMessage);
     });
   },
   computed: {
@@ -316,11 +344,29 @@ export default {
   methods: {
     sendRealtimeMessage() {
       const socket = getSocket();
-      socket.emit("custom:event", {
-        from: "Electron/SprintRace.vue",
-        text: "Halo dari Electron!",
-        ts: new Date().toISOString(),
-      });
+
+      socket.emit(
+        "custom:event",
+        {
+          senderId: socket.id, // ⬅️ penanda pengirim
+          from: "Sustainable Timing System",
+          text: "Apakah valid penalty untuk Tim Budi Luhur ?",
+          ts: new Date().toISOString(),
+        },
+        // optional ack dari server: hanya beri notifikasi kalau GAGAL
+        (ok) => {
+          if (!ok) {
+            // contoh: pakai alert IPC milikmu
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal mengirim pesan realtime",
+              detail: "Silakan cek koneksi broker/socket.",
+            });
+          }
+        }
+      );
+
+      // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
     },
 
     // helper: ambil _id event (BSON / string aman)

@@ -45,11 +45,13 @@
       </b-container>
     </section>
 
-    <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
-      Kirim Pesan ke Judges
-    </b-button>
-
+    
     <b-container class="mt-4 mb-5">
+      <div class="mb-4"> 
+        <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
+          Kirim Pesan ke Judges
+        </b-button>
+      </div>
       <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR) -->
       <h5 class="font-weight-bold mb-3">Race Categories</h5>
       <b-row>

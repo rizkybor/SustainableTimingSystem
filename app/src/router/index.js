@@ -14,6 +14,7 @@ import HeadToHeadResult from "@/views/Result/HeadToHeadResult.vue";
 import SlalomResult from "@/views/Result/SlalomResult.vue";
 import DrrResult from "@/views/Result/DrrResult.vue";
 import OverallResult from "@/views/Result/OverallResult.vue";
+import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
 
 Vue.use(VueRouter);
 
@@ -23,6 +24,11 @@ const routes = [
     component: () => import("@/views/_errors/NotFound.vue"),
   },
   { path: "/", name: "home", component: Home },
+  {
+    path: "/admin/users",
+    name: "AdminUserManagement",
+    component: AdminUserManagement,
+  },
   { path: "/create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/slalom-race", component: SlalomRace },

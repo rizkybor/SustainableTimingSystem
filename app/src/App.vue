@@ -10,9 +10,9 @@
       <br />
       <br />
       <br />
-<main class="app-main">
-      <router-view />
-    </main>
+      <main class="app-main">
+        <router-view />
+      </main>
     </div>
     <FooterVue class="app-footer" />
   </div>

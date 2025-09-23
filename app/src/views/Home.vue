@@ -91,16 +91,16 @@
               >
                 <Icon icon="mdi:account" width="36" height="36" />
               </div>
-              <h5 class="mb-1 font-weight-bold">Create Jury's Account</h5>
+              <h5 class="mb-1 font-weight-bold">Jury's Account Management</h5>
               <small class="text-muted d-block mb-3">
-                  Register jury accounts and assign roles to manage evaluation efficiently.
+                  Management jury accounts and assign roles to manage evaluation efficiently.
               </small>
               <b-button
                 variant="secondary"
                 class="w-100 rounded-pill"
-                @click="goTo('jurys-account')"
+                @click="goTo('admin/users')"
               >
-                Create Account
+                Manage Account
               </b-button>
             </div>
           </b-card>

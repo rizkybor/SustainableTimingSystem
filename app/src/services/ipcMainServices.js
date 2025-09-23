@@ -48,6 +48,10 @@ const {
   upsertRaceSettingsByEventId,
 } = require("../controllers/UPDATE/editRaceSettings");
 
+const { getAllUsers } = require("../controllers/GET/getAllUsers");
+const { updateUser } = require("../controllers/UPDATE/editUser");
+const { deleteUser } = require("../controllers/DELETE/deleteUser");
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
   api_key: process.env.CLOUDINARY_API_KEY || "",
@@ -57,6 +61,43 @@ cloudinary.config({
 
 // communication with database
 function setupIPCMainHandlers() {
+  // Get all users
+  ipcMain.on("users:getAll", async (event) => {
+    try {
+      const users = await getAllUsers();
+      event.reply("users:getAll:reply", { ok: true, users });
+    } catch (err) {
+      event.reply("users:getAll:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Update user
+  ipcMain.on("users:update", async (event, { userId, payload }) => {
+    try {
+      const updated = await updateUser(userId, payload);
+      event.reply("users:update:reply", { ok: true, user: updated });
+    } catch (err) {
+      event.reply("users:update:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Delete user
+  ipcMain.on("users:delete", async (event, payload) => {
+    try {
+      const email = payload && payload.email;
+      if (!email || typeof email !== "string") {
+        throw new Error("Invalid email");
+      }
+      const result = await deleteUser(email.trim());
+      event.reply("users:delete:reply", { ok: true, result });
+    } catch (err) {
+      event.reply("users:delete:reply", {
+        ok: false,
+        error: err.message,
+      });
+    }
+  });
+
   // GET DB
   ipcMain.on("get-alert", async (event, options) => {
     try {

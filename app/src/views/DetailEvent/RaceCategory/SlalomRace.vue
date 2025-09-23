@@ -318,7 +318,6 @@
           </table>
         </div>
 
-        
         <b-button
           @click="goTo"
           variant="outline-info"
@@ -367,8 +366,12 @@ function hmsToMs(str) {
   return +h * 3600000 + +m * 60000 + +s * 1000 + +ms;
 }
 
-/** ===== Slalom specifics ===== */
-const SLALOM_GATES = Array.from({ length: 14 }, (_, i) => i + 1);
+/** ===== Slalom specifics (dinamis dari DB) ===== */
+const DEFAULT_S16 = 14;
+function buildGates(n) {
+  const total = Number.isFinite(+n) && +n > 0 ? +n : DEFAULT_S16;
+  return Array.from({ length: total }, (_, i) => i + 1);
+}
 const PENALTY_VALUE_TO_MS = { 0: 0, 5: 5000, 50: 50000 };
 
 /** ===== Payload baru: ambil bucket & teams (seperti Sprint Result) ===== */
@@ -392,9 +395,9 @@ function normalizeTeamFromBucketForSlalom(t = {}) {
   };
 
   // siapkan 2 sesi default, dan merge jika ada data existing
-  const emptySession = () => ({
+  const emptySession = (gateLen = DEFAULT_S16) => ({
     startPenalty: 0,
-    penalties: Array.from({ length: SLALOM_GATES.length }, () => 0),
+    penalties: Array.from({ length: gateLen }, () => 0),
     finishPenalty: 0,
     totalPenalty: 0,
     penaltyTime: "00:00:00.000",
@@ -408,8 +411,8 @@ function normalizeTeamFromBucketForSlalom(t = {}) {
 
   const sessions =
     Array.isArray(t.sessions) && t.sessions.length
-      ? t.sessions.map((s) => ({ ...emptySession(), ...(s || {}) }))
-      : [emptySession(), emptySession()];
+      ? t.sessions.map((s) => ({ ...emptySession(DEFAULT_S16), ...(s || {}) }))
+      : [emptySession(DEFAULT_S16), emptySession(DEFAULT_S16)];
 
   return { ...base, sessions };
 }
@@ -440,19 +443,16 @@ export default {
   data() {
     return {
       sortBest: { enabled: false, desc: false },
-      SLALOM_GATES,
-      // port/device
+      SLALOM_GATES: buildGates(DEFAULT_S16),
       port: null,
       isPortConnected: false,
       digitId: [],
       digitTime: [],
       digitTimeStart: null,
       digitTimeFinish: null,
-
       // event & category title
       dataEvent: {},
       titleCategories: "",
-
       // list result (tim)
       teams: [],
       selectedSession: {},
@@ -587,6 +587,7 @@ export default {
 
     // 1) payload baru (seperti Sprint Result)
     const { bucket, teams } = loadFromRaceStartPayloadForSlalom();
+    this._eventId = String(bucket.eventId || "");
     if (teams.length) {
       this.teams = teams;
       this.titleCategories =
@@ -610,9 +611,48 @@ export default {
 
     // default session index
     this.teams.forEach((t) => this.$set(this.selectedSession, t._id, 0));
+    this.fetchSlalomGateCountFromSettings();
   },
 
   methods: {
+    async fetchSlalomGateCountFromSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined" || !this._eventId) return;
+        ipcRenderer.send("race-settings:get", this._eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          const n =
+            res && res.ok && res.settings && res.settings.slalom
+              ? parseInt(res.settings.slalom.totalGate, 10)
+              : DEFAULT_S16;
+
+          // set array gates
+          this.SLALOM_GATES = buildGates(n);
+
+          // pastikan panjang penalties di tiap sesi = jumlah gate baru
+          this.syncAllTeamsPenaltiesLength();
+        });
+      } catch (err) {
+        // fallback: tetap pakai default
+        this.SLALOM_GATES = buildGates(DEFAULT_S16);
+        this.syncAllTeamsPenaltiesLength();
+      }
+    },
+
+    // Samakan panjang penalties setiap sesi tim dengan jumlah gate terbaru
+    syncAllTeamsPenaltiesLength() {
+      const need = this.SLALOM_GATES.length;
+      const fixLen = (arr) => {
+        const a = Array.isArray(arr) ? arr.slice() : [];
+        while (a.length < need) a.push(0);
+        if (a.length > need) a.length = need;
+        return a;
+      };
+      this.teams.forEach((t) => {
+        (t.sessions || []).forEach((s) => {
+          this.$set(s, "penalties", fixLen(s && s.penalties));
+        });
+      });
+    },
     rankOf(id) {
       const r = this.ranksMap && this.ranksMap[id];
       // jika tidak ada best time → '-'
@@ -634,13 +674,13 @@ export default {
       const s = team.sessions[idx] || {};
       if (
         !Array.isArray(s.penalties) ||
-        s.penalties.length !== SLALOM_GATES.length
+        s.penalties.length !== this.SLALOM_GATES.length
       ) {
-        this.$set(
-          s,
-          "penalties",
-          Array.from({ length: SLALOM_GATES.length }, () => 0)
-        );
+        const need = this.SLALOM_GATES.length;
+        const a = Array.isArray(s.penalties) ? s.penalties.slice() : [];
+        while (a.length < need) a.push(0);
+        if (a.length > need) a.length = need;
+        this.$set(s, "penalties", a);
       }
       if (s.startPenalty == null) this.$set(s, "startPenalty", 0);
       if (s.finishPenalty == null) this.$set(s, "finishPenalty", 0);

@@ -146,8 +146,8 @@
 
               <b-badge
                 :variant="
-                  String(ev.statusEvent).toLowerCase() === 'active'
-                    ? 'success'
+                  String(ev.statusEvent).toLowerCase() === 'activated'
+                    ? 'info'
                     : 'secondary'
                 "
                 pill
@@ -448,7 +448,11 @@ export default {
 }
 
 /* EVENT CARD */
+/* Pastikan semua card punya tinggi seragam */
 .event-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* penuh mengikuti kolom */
   border: 1px solid #dfe5f2;
   border-radius: 12px;
   background: #fff;
@@ -456,18 +460,34 @@ export default {
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
 .event-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(44, 92, 255, 0.1);
 }
+
+/* Bagian gambar tetap fix */
 .event-thumb {
-  height: 180px;
+  height: 160px; /* lebih kecil biar space text cukup */
   background: #e8edf6;
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
+  flex-shrink: 0;
 }
+
+/* Bagian body isi teks fleksibel */
 .event-body {
-  padding: 12px 14px 16px;
+  flex-grow: 1; /* isi text isi space sisa */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* biar badge tetap di bawah */
+  padding: 12px 18px 18px;
+}
+
+/* Pastikan teks rapi */
+.event-body small {
+  line-height: 1.5;
+  display: block;
 }
 
 /* TEAM CARD */

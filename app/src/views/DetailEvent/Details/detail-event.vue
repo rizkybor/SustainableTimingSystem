@@ -45,7 +45,13 @@
       </b-container>
     </section>
 
+    
     <b-container class="mt-4 mb-5">
+      <div class="mb-4"> 
+        <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
+          Kirim Pesan ke Judges
+        </b-button>
+      </div>
       <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR) -->
       <h5 class="font-weight-bold mb-3">Race Categories</h5>
       <b-row>
@@ -191,12 +197,14 @@ import h2hPng from "@/assets/images/Rectangle-4.png";
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import TeamPanel from "./../components/TeamPanel.vue";
+import { getSocket } from "@/services/socket";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
   components: { Icon, TeamPanel },
   data() {
     return {
+      selfSocketId: null,
       resultAvailMap: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -252,7 +260,47 @@ export default {
       draftMap: { R4_MEN: null, R4_WOMEN: null, R6_MEN: null, R6_WOMEN: null },
     };
   },
+  mounted() {
+    const socket = getSocket();
 
+    // simpan id saat connect (atau reconnect)
+    const onConnect = () => {
+      this.selfSocketId = socket.id || null;
+      console.log("[Electron] socket connected:", this.selfSocketId);
+    };
+    socket.on("connect", onConnect);
+
+    // terima pesan: tampilkan toast hanya jika BUKAN dari diri sendiri
+    const onMessage = (msg) => {
+      // safety: kalau server belum broadcast-only, tetap filter di client
+      if (
+        msg &&
+        msg.senderId &&
+        this.selfSocketId &&
+        msg.senderId === this.selfSocketId
+      ) {
+        // pesan pantulan dari diri sendiri → jangan tampilkan
+        return;
+      }
+      console.log("[Electron] terima:", msg);
+
+      if (this.$bvToast) {
+        this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
+          title: "Pesan Realtime",
+          variant: "success",
+          solid: true,
+        });
+      }
+    };
+
+    socket.on("custom:event", onMessage);
+
+    // bersihkan listener saat komponen dilepas
+    this.$once("hook:beforeDestroy", () => {
+      socket.off("connect", onConnect);
+      socket.off("custom:event", onMessage);
+    });
+  },
   computed: {
     // ambil rows berdasar kombinasi & initial aktif
     teamsMenR4() {
@@ -296,6 +344,33 @@ export default {
   },
 
   methods: {
+    sendRealtimeMessage() {
+      const socket = getSocket();
+
+      socket.emit(
+        "custom:event",
+        {
+          senderId: socket.id, // ⬅️ penanda pengirim
+          from: "Sustainable Timing System",
+          text: "Apakah valid penalty untuk Tim Budi Luhur ?",
+          ts: new Date().toISOString(),
+        },
+        // optional ack dari server: hanya beri notifikasi kalau GAGAL
+        (ok) => {
+          if (!ok) {
+            // contoh: pakai alert IPC milikmu
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal mengirim pesan realtime",
+              detail: "Silakan cek koneksi broker/socket.",
+            });
+          }
+        }
+      );
+
+      // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
+    },
+
     // helper: ambil _id event (BSON / string aman)
     _getEventId() {
       const ev = this.events || {};
@@ -337,7 +412,7 @@ export default {
       };
 
       let path = pathMap[idt.eventName] || "";
-      
+
       this.$router.push({
         path: `/event-detail/${this.$route.params.id}/${path}`,
         query: {

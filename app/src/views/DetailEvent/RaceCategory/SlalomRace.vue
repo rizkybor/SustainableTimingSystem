@@ -58,7 +58,7 @@
             <div style="display: flex; gap: 10px; justify-content: flex-end">
               <button
                 type="button"
-                class="btn btn-secondary"
+                class="btn-action btn-secondary"
                 @click="saveResult"
               >
                 <Icon icon="icon-park-outline:save" /> Save Result
@@ -66,7 +66,7 @@
 
               <button
                 type="button"
-                class="btn btn-info"
+                class="btn-action btn-info"
                 @click="toggleSortRanked"
               >
                 <Icon icon="icon-park-outline:ranking" /> Sort Ranked
@@ -78,7 +78,7 @@
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn"
+                class="btn-action"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
@@ -112,16 +112,34 @@
       <div class="card-body">
         <h4>List Result (Slalom)</h4>
         <div class="table-responsive">
+          <div class="d-flex justify-content-start mb-2">
+            <div class="btn-group" role="group" aria-label="Run Switch">
+              <button
+                type="button"
+                class="btn-custom mr-2 btn"
+                :class="activeRun === 0 ? 'btn-primary' : 'btn-outline-primary'"
+                @click="setRun(0)"
+              >
+                Run 1
+              </button>
+              <button
+                type="button"
+                class="btn-custom btn"
+                :class="activeRun === 1 ? 'btn-primary' : 'btn-outline-primary'"
+                @click="setRun(1)"
+              >
+                Run 2
+              </button>
+            </div>
+          </div>
+
           <table class="table table-bordered">
             <thead>
               <tr>
                 <th rowspan="2">No</th>
                 <th class="text-center" rowspan="2">Team Name</th>
                 <th class="text-center" rowspan="2">BIB</th>
-                <th rowspan="2">Run</th>
-
                 <!-- Judul grup penalties: S + 1..N + F -->
-                <!-- Klik untuk toggle -->
                 <th
                   v-if="!penaltiesWrapped"
                   class="text-center penalties-title is-clickable"
@@ -171,14 +189,6 @@
                 <td>{{ ti + 1 }}</td>
                 <td style="min-width: 150px">{{ team.nameTeam }}</td>
                 <td>{{ team.bibNumber }}</td>
-
-                <td style="min-width: 120px">
-                  <b-form-select
-                    v-model="selectedSession[team._id]"
-                    :options="sessionOptions(team)"
-                    @change="recalcTeam(team)"
-                  />
-                </td>
 
                 <!-- ========== PENALTIES ========== -->
                 <!-- Mode WRAPPED: 1 kolom berisi grid S,1..N,F -->
@@ -320,8 +330,8 @@
 
         <b-button
           @click="goTo"
-          variant="outline-info"
-          class="custom-button mt-2 ml-2"
+          variant="outline-secondary"
+          class="btn-action mt-2 ml-2"
         >
           <Icon icon="ic:baseline-keyboard-double-arrow-left" /> Back
         </b-button>
@@ -442,6 +452,7 @@ export default {
 
   data() {
     return {
+      activeRun: 0,
       sortBest: { enabled: false, desc: false },
       SLALOM_GATES: buildGates(DEFAULT_S16),
       port: null,
@@ -610,11 +621,18 @@ export default {
     }
 
     // default session index
-    this.teams.forEach((t) => this.$set(this.selectedSession, t._id, 0));
+    this.teams.forEach((t) =>
+      this.$set(this.selectedSession, t._id, this.activeRun)
+    );
     this.fetchSlalomGateCountFromSettings();
   },
 
   methods: {
+    setRun(idx) {
+      this.activeRun = idx;
+      // sinkronkan pilihan sesi untuk semua tim
+      this.teams.forEach((t) => this.$set(this.selectedSession, t._id, idx));
+    },
     async fetchSlalomGateCountFromSettings() {
       try {
         if (typeof ipcRenderer === "undefined" || !this._eventId) return;
@@ -936,6 +954,24 @@ export default {
 </script>
 
 <style scoped>
+.btn-custom {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;

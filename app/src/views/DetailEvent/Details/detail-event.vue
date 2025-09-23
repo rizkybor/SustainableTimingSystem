@@ -45,11 +45,17 @@
       </b-container>
     </section>
 
-    
     <b-container class="mt-4 mb-5">
-      <div class="mb-4"> 
-        <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
+      <div class="mb-2 d-flex justify-content-md-end">
+        <!-- <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
           Kirim Pesan ke Judges
+        </b-button> -->
+        <b-button
+          class="btn-race-settings"
+          variant="primary"
+          @click="openRaceSettings"
+        >
+          Race Settings
         </b-button>
       </div>
       <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR) -->
@@ -186,6 +192,16 @@
         Belum ada konfigurasi divisi/race untuk event ini.
       </div>
     </b-container>
+
+    <race-settings-modal
+      v-model="showRaceSettings"
+      :settings="raceSettings"
+      :max-gate="MAX_GATE"
+      :max-section="MAX_SECTION"
+      :event-id="_getEventId()"
+      :event-name="safeEventName"
+      @update-settings="onUpdateRaceSettings"
+    />
   </div>
 </template>
 
@@ -197,11 +213,12 @@ import h2hPng from "@/assets/images/Rectangle-4.png";
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import TeamPanel from "./../components/TeamPanel.vue";
+import RaceSettingsModal from "./../components/RaceSettings.vue";
 import { getSocket } from "@/services/socket";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { Icon, TeamPanel },
+  components: { Icon, TeamPanel, RaceSettingsModal },
   data() {
     return {
       selfSocketId: null,
@@ -212,6 +229,14 @@ export default {
         R6_WOMEN: false,
       },
       lastToken: "",
+      showRaceSettings: false,
+      MAX_GATE: 14,
+      MAX_SECTION: 6,
+      raceSettings: {
+        h2h: { R1: true, R2: true, L1: true, L2: true },
+        slalom: { totalGate: 14 },
+        drr: { totalSection: 5 },
+      },
       // kategori UI
       raceCategories: [
         {
@@ -302,6 +327,9 @@ export default {
     });
   },
   computed: {
+    safeEventName() {
+      return this.events && this.events.eventName ? this.events.eventName : "";
+    },
     // ambil rows berdasar kombinasi & initial aktif
     teamsMenR4() {
       return this.getTeamsBy("R4", "MEN", this.raceActive.selected.name);
@@ -344,6 +372,40 @@ export default {
   },
 
   methods: {
+    openRaceSettings() {
+      this.showRaceSettings = true;
+    },
+    onUpdateRaceSettings(payload) {
+      // simpan lokal dulu
+      if (payload && payload.settings) {
+        this.raceSettings = payload.settings;
+      }
+
+      console.log("parent got update-settings:", payload);
+
+      if (typeof window !== "undefined" && window.ipcRenderer) {
+        // kirim ke main process
+        window.ipcRenderer.send("race-settings:upsert", payload);
+
+        // sekali saja, tunggu reply lalu lepas listener
+        const handler = (_event, res) => {
+          if (res && res.ok) {
+            console.log("✅ Race settings updated in DB:", res);
+          } else {
+            console.error(
+              "❌ Failed to update race settings:",
+              res && res.error
+            );
+          }
+          window.ipcRenderer.removeListener(
+            "race-settings:upsert-reply",
+            handler
+          );
+        };
+
+        window.ipcRenderer.on("race-settings:upsert-reply", handler);
+      }
+    },
     sendRealtimeMessage() {
       const socket = getSocket();
 
@@ -882,7 +944,7 @@ export default {
           ranked: "",
           score: "",
           judgesBy: "",
-          judgesTime: ""
+          judgesTime: "",
         },
         otr: {
           startTime: "",
@@ -1474,5 +1536,14 @@ export default {
 
 .placeholder {
   color: #8793b5;
+}
+
+.btn-race-settings {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
 }
 </style>

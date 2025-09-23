@@ -1,0 +1,18 @@
+{
+  "_id": {
+    "$oid": "68d27bde04f0211b6fc0fe87"
+  },
+  "eventId": "68b5bf07a338efc467bf4850",
+  "downriverrace": {
+    "sectionTotal": "5"
+  },
+  "slalom": {
+    "gateTotal": "14"
+  },
+  "head2head": {
+    "R1bouyan": true,
+    "R2bouyan": true,
+    "L1bouyan": true,
+    "L2bouyan": true
+  }
+}

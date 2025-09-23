@@ -18,7 +18,7 @@ const {
 const {
   insertNewEvent,
   insertSprintResult,
-    insertSlalomResult,
+  insertSlalomResult,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -39,6 +39,14 @@ const {
   getSprintResult,
   existsSprintResult,
 } = require("../controllers/GET/getResult.js");
+
+const {
+  getRaceSettingsByEventId,
+} = require("../controllers/GET/getRaceSettings");
+
+const {
+  upsertRaceSettingsByEventId,
+} = require("../controllers/UPDATE/editRaceSettings");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
@@ -213,7 +221,7 @@ function setupIPCMainHandlers() {
     }
   });
 
-    // SAVE DRR RESULT
+  // SAVE DRR RESULT
   ipcMain.on("insert-drr-result", async (event, datas) => {
     try {
       const data = await insertDrrResult(datas);
@@ -404,7 +412,7 @@ function setupIPCMainHandlers() {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
-      console.log(identity,'<< identitas')
+      console.log(identity, "<< identitas");
       const res = await getTeamsRegistered(identity);
       console.log(res, "<<< CEK RES");
       event.reply("get-teams-registered-reply", res);
@@ -436,6 +444,54 @@ function setupIPCMainHandlers() {
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
+      });
+    }
+  });
+
+  // =========================
+  // Race Settings (GET/UPSERT)
+  // =========================
+  // =========================
+  // Race Settings (GET/UPSERT)
+  // =========================
+
+  // GET
+  ipcMain.on("race-settings:get", async (event, eventId) => {
+    try {
+      const id = (eventId || "").toString();
+      const doc = await getRaceSettingsByEventId(id);
+      const settings = doc && doc.settings ? doc.settings : null;
+
+      event.reply("race-settings:get-reply", {
+        ok: true,
+        settings: settings,
+      });
+    } catch (err) {
+      event.reply("race-settings:get-reply", {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+      });
+    }
+  });
+
+  // UPSERT
+  ipcMain.on("race-settings:upsert", async (event, payload) => {
+    try {
+      const p = payload || {};
+      const id = (p.eventId || "").toString();
+      const incoming = p.settings || {};
+
+      const updated = await upsertRaceSettingsByEventId(id, incoming);
+      const out = updated && updated.settings ? updated.settings : incoming;
+
+      event.reply("race-settings:upsert-reply", {
+        ok: true,
+        settings: out,
+      });
+    } catch (err) {
+      event.reply("race-settings:upsert-reply", {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
       });
     }
   });

@@ -64,7 +64,7 @@
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn"
+                class="btn-action"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
@@ -106,7 +106,7 @@
           <!-- Build / Edit -->
           <div class="btn-group mr-2" role="group" aria-label="Build actions">
             <button
-              class="btn"
+              class="btn-action"
               :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
               @click="editBracketTeams = !editBracketTeams"
               v-b-tooltip.hover="
@@ -119,14 +119,14 @@
               {{ editBracketTeams ? "Done" : "Edit Teams" }}
             </button>
             <button
-              class="btn btn-outline-danger"
+              class="btn-action btn-outline-danger mx-2"
               @click="clearFirstRoundAssignments"
               v-b-tooltip.hover="'Kosongkan ronde pertama'"
             >
               <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
             </button>
             <button
-              class="btn btn-secondary"
+              class="btn-action btn-secondary"
               @click="populateBronzeFromSemis"
               v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
             >
@@ -140,7 +140,7 @@
           <!-- Navigation -->
           <div class="round-nav ml-md-3">
             <button
-              class="btn btn-outline-secondary"
+              class="btn-action btn-outline-secondary"
               @click="prevRound"
               v-b-tooltip.hover="'Ronde sebelumnya'"
             >
@@ -155,7 +155,7 @@
             />
 
             <button
-              class="btn btn-outline-secondary"
+              class="btn-action btn-outline-secondary"
               @click="nextRound"
               v-b-tooltip.hover="'Ronde berikutnya'"
             >
@@ -277,7 +277,7 @@
                   v-if="m.team1.name && m.team2.name"
                 >
                   <button
-                    class="btn btn-xs btn-outline-success"
+                    class="btn-action btn-xs btn-outline-success"
                     @click="advanceWinner(rIdx, mIdx, 1)"
                     title="Set winner: top"
                     :disabled="editBracketTeams"
@@ -285,7 +285,7 @@
                     <Icon icon="mdi:crown-outline" /> Top Win
                   </button>
                   <button
-                    class="btn btn-xs btn-outline-primary"
+                    class="btn-action btn-xs btn-outline-primary"
                     @click="advanceWinner(rIdx, mIdx, 2)"
                     title="Set winner: bottom"
                     :disabled="editBracketTeams"
@@ -326,13 +326,13 @@
             </h4>
           </div>
           <div class="d-flex" style="gap: 8px">
-            <button class="btn btn-outline-success" @click="saveAllRoundsLocal">
+            <button class="btn-action btn-outline-success" @click="saveAllRoundsLocal">
               <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
             </button>
-            <button class="btn btn-outline-primary" @click="saveAllRoundsToDB">
+            <button class="btn-action btn-outline-primary" @click="saveAllRoundsToDB">
               <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
             </button>
-            <button class="btn btn-outline-dark" @click="exportAllRoundsJSON">
+            <button class="btn-action btn-outline-dark" @click="exportAllRoundsJSON">
               <Icon icon="mdi:download" /> Export JSON
             </button>
           </div>
@@ -524,7 +524,7 @@
                     <td v-if="editResult">
                       <button
                         type="button"
-                        class="btn btn-warning"
+                        class="btn-action btn-warning"
                         @click="openModal(item)"
                         :disabled="isByeTeam(item)"
                       >
@@ -552,7 +552,7 @@
     />
 
     <div class="ml-5">
-      <b-button @click="goTo" variant="outline-info" class="custom-button">
+      <b-button @click="goTo" variant="outline-info" class="btn-action">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
     </div>
@@ -2480,6 +2480,15 @@ export default {
 </script>
 
 <style scoped>
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
@@ -2613,18 +2622,6 @@ td {
 }
 .disconnected {
   background: red;
-}
-
-/* ===== BUTTONS ===== */
-.custom-button {
-  border-color: #1874a5;
-  color: #1874a5;
-  transition: all 0.3s ease;
-}
-.custom-button:hover {
-  background: #1874a5;
-  color: #fff;
-  border-color: #1874a5;
 }
 
 /* ===== BRACKET (refined) ===== */

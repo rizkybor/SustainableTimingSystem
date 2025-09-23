@@ -116,7 +116,7 @@
             <div class="btn-group" role="group" aria-label="Run Switch">
               <button
                 type="button"
-                class="btn-custom mr-2 btn"
+                class="btn-action mr-2 btn"
                 :class="activeRun === 0 ? 'btn-primary' : 'btn-outline-primary'"
                 @click="setRun(0)"
               >
@@ -124,7 +124,7 @@
               </button>
               <button
                 type="button"
-                class="btn-custom btn"
+                class="btn-action btn"
                 :class="activeRun === 1 ? 'btn-primary' : 'btn-outline-primary'"
                 @click="setRun(1)"
               >
@@ -954,15 +954,6 @@ export default {
 </script>
 
 <style scoped>
-.btn-custom {
-  background: #ffffff;
-  border: 1px solid #cfd8e6;
-  color: #1c4c7a;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 8px 14px;
-}
-
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -1068,18 +1059,6 @@ th,
 td {
   border: none;
   text-align: center;
-}
-
-/* ===== Buttons ===== */
-.custom-button {
-  border-color: #1874a5;
-  color: #1874a5;
-  transition: all 0.3s ease;
-}
-.custom-button:hover {
-  background: #1874a5;
-  color: #fff;
-  border-color: #1874a5;
 }
 
 /* Header clickable cue */

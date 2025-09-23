@@ -59,7 +59,7 @@
             <div style="display: flex; gap: 10px; justify-content: flex-end">
               <button
                 type="button"
-                class="btn btn-secondary"
+                class="btn-action btn-secondary"
                 @click="saveResult"
               >
                 <Icon icon="icon-park-outline:save" /> Save Result
@@ -67,7 +67,7 @@
 
               <button
                 type="button"
-                class="btn btn-info"
+                class="btn-action btn-info"
                 @click="toggleSortRanked"
               >
                 <Icon icon="icon-park-outline:ranking" /> Sort Ranked
@@ -79,7 +79,7 @@
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn"
+                class="btn-action"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
@@ -201,7 +201,7 @@
                   <td v-if="editResult">
                     <button
                       type="button"
-                      class="btn btn-warning"
+                      class="btn-action btn-warning"
                       @click="openModal(item, 'R4men')"
                     >
                       Edit
@@ -215,7 +215,7 @@
         </b-row>
       </div>
 
-      <b-button @click="goTo()" variant="outline-info" class="custom-button">
+      <b-button @click="goTo()" variant="outline-info" class="btn-action">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
     </div>
@@ -1009,14 +1009,12 @@ td {
 }
 
 /* ===== Buttons ===== */
-.custom-button {
-  border-color: #1874a5;
-  color: #1874a5;
-  transition: all 0.3s ease;
-}
-.custom-button:hover {
-  background: #1874a5;
-  color: #fff;
-  border-color: #1874a5;
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
 }
 </style>

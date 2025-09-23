@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 110vh" class="mt-4">
+  <div style="height: 117vh" class="mt-4">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
         <b-card
@@ -153,18 +153,18 @@
             />
           </div>
         </b-card>
+        <div class="mt-4">
+          <b-button
+            variant="outline-secondary"
+            class="btn-outline-pill"
+            @click="goTo()"
+          >
+            <Icon icon="ic:round-arrow-back" class="mr-2" />
+            Back
+          </b-button>
+        </div>
       </b-col>
     </b-row>
-    <div class="ml-5">
-      <b-button
-        variant="outline-secondary"
-        class="btn-outline-pill"
-        @click="goTo()"
-      >
-        <Icon icon="ic:round-arrow-back" class="mr-2" />
-        Back
-      </b-button>
-    </div>
 
     <!-- ✏️ Edit Team Modal -->
     <b-modal

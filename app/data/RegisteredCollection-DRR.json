@@ -1,0 +1,99 @@
+{
+  "_id": {
+    "$oid": "68bf98857c8aab14d674161d"
+  },
+  "eventId": "68b5bf07a338efc467bf4850",
+  "initialId": "6",
+  "raceId": "1",
+  "divisionId": "1",
+  "eventName": "DRR",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "divisionName": "R4",
+  "teams": [
+    {
+      "nameTeam": "MAKOPALA CLUB",
+      "bibTeam": "33",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    },
+    {
+      "nameTeam": "TIGARAKSA CLUB",
+      "bibTeam": "44",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    },
+    {
+      "nameTeam": "CILEDUG CLUB",
+      "bibTeam": "55",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    }
+  ]
+}

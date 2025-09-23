@@ -1,0 +1,147 @@
+{
+  "_id": {
+    "$oid": "68b9c0baba49fd2bcc3ff8ae"
+  },
+  "eventId": "68b5bf07a338efc467bf4850",
+  "initialId": "6",
+  "raceId": "1",
+  "divisionId": "1",
+  "eventName": "SPRINT",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "divisionName": "R4",
+  "teams": [
+    {
+      "teamId": "68b9e1a06cedfe55d3607fd1",
+      "nameTeam": "CILEDUG CLUB",
+      "bibTeam": "50",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "startPenalty": "50",
+        "finishPenalty": "",
+        "penalty": "",
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    },
+    {
+      "teamId": "68bfff5d2156dd45ca9d879d",
+      "nameTeam": "BALI CLUB",
+      "bibTeam": "30",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "startPenalty": "",
+        "finishPenalty": "",
+        "penalty": "",
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    },
+    {
+      "teamId": "68bfff542156dd45ca9d879c",
+      "nameTeam": "YOGYAKARTA CLUB",
+      "bibTeam": "40",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "startPenalty": "",
+        "finishPenalty": "",
+        "penalty": "",
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    },
+    {
+      "teamId": "68bfff3e2156dd45ca9d879a",
+      "nameTeam": "SEMARANG CLUB",
+      "bibTeam": "60",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "startPenalty": "",
+        "finishPenalty": "",
+        "penalty": "",
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyTime": "",
+        "penalty": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": ""
+      }
+    }
+  ]
+}

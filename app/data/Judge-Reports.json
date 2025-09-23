@@ -1,0 +1,24 @@
+{
+  "_id": {
+    "$oid": "68d120ba2cb2e8d8c84977d4"
+  },
+  "eventId": {
+    "$oid": "68b5bf07a338efc467bf4850"
+  },
+  "juryId": {
+    "$oid": "68c3c7c8bf7f036e62aa59d5"
+  },
+  "createdBy": "ariyandi subekti",
+  "reportSprint": [
+    {
+      "$oid": "68d120ba2cb2e8d8c84977d7"
+    }
+  ],
+  "reportHeadToHead": [],
+  "reportSlalom": [],
+  "reportDrr": [],
+  "createdAt": {
+    "$date": "2025-09-22T10:11:06.691Z"
+  },
+  "__v": 1
+}

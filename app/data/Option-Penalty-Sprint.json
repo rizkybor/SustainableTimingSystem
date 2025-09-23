@@ -1,0 +1,22 @@
+{
+  "_id": {
+    "$oid": "6629de4c3574ef27ab6811f9"
+  },
+  "data": [
+    {
+      "label": "clear",
+      "value": 0,
+      "timePen": "00:00:00.000"
+    },
+    {
+      "label": "penalties 1",
+      "value": 5,
+      "timePen": "00:00:05.000"
+    },
+    {
+      "label": "penalties 2",
+      "value": 50,
+      "timePen": "00:00:50.000"
+    }
+  ]
+}

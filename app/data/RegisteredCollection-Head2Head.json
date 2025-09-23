@@ -1,0 +1,103 @@
+{
+  "_id": {
+    "$oid": "68c2c68120f44b0f156a6457"
+  },
+  "eventId": "68b5bf07a338efc467bf4850",
+  "initialId": "6",
+  "raceId": "1",
+  "divisionId": "2",
+  "eventName": "HEAD2HEAD",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "divisionName": "R6",
+  "teams": [
+    {
+      "teamId": "68c2c65920f44b0f156a6456",
+      "nameTeam": "JAKTIM",
+      "bibTeam": "20",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": "",
+          "bracket": 16
+        }
+      ]
+    },
+    {
+      "teamId": "68c2c65320f44b0f156a6455",
+      "nameTeam": "JAKSEL",
+      "bibTeam": "19",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": "",
+          "bracket": 16
+        }
+      ]
+    },
+    {
+      "teamId": "68c2c64d20f44b0f156a6454",
+      "nameTeam": "JAKPUS",
+      "bibTeam": "18",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": "",
+          "bracket": 16
+        }
+      ]
+    },
+    {
+      "teamId": "68c2c64720f44b0f156a6453",
+      "nameTeam": "JAKBAR",
+      "bibTeam": "17",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": "",
+          "bracket": 16
+        }
+      ]
+    }
+  ]
+}

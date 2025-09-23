@@ -874,11 +874,15 @@ export default {
           startTime: "",
           finishTime: "",
           raceTime: "",
+          startPenalty: "",
+          finishPenalty: "",
           penaltyTime: "",
           penalty: "",
           totalTime: "",
           ranked: "",
           score: "",
+          judgesBy: "",
+          judgesTime: ""
         },
         otr: {
           startTime: "",

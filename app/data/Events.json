@@ -1,0 +1,73 @@
+{
+  "_id": {
+    "$oid": "68b5bf07a338efc467bf4850"
+  },
+  "levelName": "Classification - G",
+  "eventName": "WORLD RAFTING CHAMPIONSHIP",
+  "riverName": "sungai ciledug",
+  "addressDistrict": "Japan",
+  "addressSubDistrict": "Japan",
+  "addressVillage": "Japan",
+  "addressCity": "Japan",
+  "addressProvince": "Japan",
+  "addressZipCode": "15221",
+  "addressState": "Japan",
+  "startDateEvent": "2025-09-18",
+  "endDateEvent": "2025-09-28",
+  "categoriesEvent": [
+    {
+      "value": "1",
+      "name": "SPRINT"
+    },
+    {
+      "value": "4",
+      "name": "DRR"
+    }
+  ],
+  "categoriesDivision": [
+    {
+      "value": "1",
+      "name": "R4"
+    },
+    {
+      "value": "2",
+      "name": "R6"
+    }
+  ],
+  "categoriesRace": [
+    {
+      "value": "1",
+      "name": "MEN",
+      "keterangan": "LAKI-LAKI"
+    },
+    {
+      "value": "2",
+      "name": "WOMEN",
+      "keterangan": "PEREMPUAN"
+    }
+  ],
+  "categoriesInitial": [
+    {
+      "value": "6",
+      "name": "OPEN NATIONAL"
+    },
+    {
+      "value": "9",
+      "name": "OPEN RIVER BOARDING"
+    },
+    {
+      "value": "10",
+      "name": "OPEN KAYAK"
+    }
+  ],
+  "chiefJudge": "Test Aja",
+  "raceDirector": "Test Aja",
+  "safetyDirector": "Test Aja",
+  "eventDirector": "Test Aja",
+  "participant": [],
+  "statusEvent": "Activated",
+  "eventBanner": "",
+  "updatedAt": {
+    "$date": "2025-09-22T09:08:52.333Z"
+  }
+}

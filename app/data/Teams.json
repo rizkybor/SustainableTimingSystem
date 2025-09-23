@@ -1,0 +1,18 @@
+{
+  "_id": {
+    "$oid": "68b9d4190327dd3f866e0e43"
+  },
+  "typeTeam": "club",
+  "nameTeam": "TIGARAKSA CLUB",
+  "bibTeam": "",
+  "startOrder": "",
+  "praStart": "",
+  "intervalRace": "",
+  "statusId": 0,
+  "createdAt": {
+    "$date": "2025-09-04T18:02:01.034Z"
+  },
+  "updatedAt": {
+    "$date": "2025-09-04T18:02:01.034Z"
+  }
+}

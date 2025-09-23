@@ -26,10 +26,12 @@
                 {{ dataEventSafe.addressCity || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">River</strong> : {{ dataEventSafe.riverName || "-" }}</span
+                ><strong class="text-white">River</strong> :
+                {{ dataEventSafe.riverName || "-" }}</span
               >
               <span class="mr-3"
-                ><strong class="text-white">Level</strong> : {{ dataEventSafe.levelName || "-" }}</span
+                ><strong class="text-white">Level</strong> :
+                {{ dataEventSafe.levelName || "-" }}</span
               >
             </div>
           </b-col>
@@ -113,76 +115,50 @@
         <b-row>
           <b-col>
             <div class="table-wrapper">
-            <table
-              class="table"
-              aria-label="Scrollable results table"
-            >
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>Team Name</th>
-                  <th>BIB</th>
-                  <th>Start Time</th>
-                  <th>Finish Time</th>
-                  <th>Race Time</th>
-                  <th>Pen Start</th>
-                  <th>Pen Section</th>
-                  <th>Pen Finish</th>
-                  <th>Pen Total</th>
-                  <th>Result</th>
-                  <th>Ranked</th>
-                  <th>Score</th>
-                  <th v-if="editResult">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(item, index) in participantArr" :key="index">
-                  <td>{{ index + 1 }}</td>
-                  <td class="large-bold text-strong max-char">
-                    {{ item.nameTeam }}
-                  </td>
-                  <td class="large-bold">{{ item.bibTeam }}</td>
-                  <td class="text-monospace">{{ item.result.startTime }}</td>
-                  <td class="text-monospace">{{ item.result.finishTime }}</td>
-                  <td class="large-bold text-monospace">
-                    {{ item.result.raceTime }}
-                  </td>
+              <table class="table" aria-label="Scrollable results table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Team Name</th>
+                    <th>BIB</th>
+                    <th>Start Time</th>
+                    <th>Finish Time</th>
+                    <th>Race Time</th>
+                    <th>Pen Start</th>
+                    <th>Pen Section</th>
+                    <th>Pen Finish</th>
+                    <th>Pen Total</th>
+                    <th>Result</th>
+                    <th>Ranked</th>
+                    <th>Score</th>
+                    <th v-if="editResult">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in participantArr" :key="index">
+                    <td>{{ index + 1 }}</td>
+                    <td class="large-bold text-strong max-char">
+                      {{ item.nameTeam }}
+                    </td>
+                    <td class="large-bold">{{ item.bibTeam }}</td>
+                    <td class="text-monospace">{{ item.result.startTime }}</td>
+                    <td class="text-monospace">{{ item.result.finishTime }}</td>
+                    <td class="large-bold text-monospace">
+                      {{ item.result.raceTime }}
+                    </td>
 
-                  <!-- Pen Start -->
-                  <td>
-                    <b-select
-                      v-if="item.result.startTime"
-                      v-model="item.result.penaltyStartTime"
-                      :placeholder="'Penalty Start'"
-                      @change="updateTimePen($event, item, 'penaltyStartTime')"
-                    >
-                      <option disabled value="">
-                        Select Penalty Start Time
-                      </option>
-                      <option
-                        v-for="p in dataPenalties"
-                        :key="p.value"
-                        :value="p.timePen"
-                      >
-                        {{ p.label }}
-                      </option>
-                    </b-select>
-                  </td>
-
-                  <!-- Pen Section -->
-                  <td>
-                    <div class="d-flex flex-column">
+                    <!-- Pen Start -->
+                    <td>
                       <b-select
-                        v-for="(sec, sIdx) in item.result.penaltySection"
-                        :key="sIdx"
-                        class="small-select"
-                        v-model="item.result.penaltySection[sIdx]"
+                        v-if="item.result.startTime"
+                        v-model="item.result.penaltyStartTime"
+                        :placeholder="'Penalty Start'"
                         @change="
-                          updateTimePen($event, item, 'penaltySection', sIdx)
+                          updateTimePen($event, item, 'penaltyStartTime')
                         "
                       >
                         <option disabled value="">
-                          Section {{ sIdx + 1 }}
+                          Select Penalty Start Time
                         </option>
                         <option
                           v-for="p in dataPenalties"
@@ -192,56 +168,86 @@
                           {{ p.label }}
                         </option>
                       </b-select>
-                    </div>
-                  </td>
+                    </td>
 
-                  <!-- Pen Finish -->
-                  <td>
-                    <b-select
-                      v-if="item.result.startTime"
-                      v-model="item.result.penaltyFinishTime"
-                      :placeholder="'Penalty Finish'"
-                      @change="updateTimePen($event, item, 'penaltyFinishTime')"
-                    >
-                      <option disabled value="">
-                        Select Penalty Finish Time
-                      </option>
-                      <option
-                        v-for="p in dataPenalties"
-                        :key="p.value"
-                        :value="p.timePen"
+                    <!-- Pen Section -->
+                    <td>
+                      <div class="d-flex flex-column">
+                        <b-select
+                          v-for="sIdx in drrSectionsCount"
+                          :key="sIdx"
+                          class="small-select"
+                          v-model="item.result.penaltySection[sIdx - 1]"
+                          @change="
+                            updateTimePen(
+                              $event,
+                              item,
+                              'penaltySection',
+                              sIdx - 1
+                            )
+                          "
+                        >
+                          <option disabled value="">Section {{ sIdx }}</option>
+                          <option
+                            v-for="p in dataPenalties"
+                            :key="p.value"
+                            :value="p.timePen"
+                          >
+                            {{ p.label }}
+                          </option>
+                        </b-select>
+                      </div>
+                    </td>
+
+                    <!-- Pen Finish -->
+                    <td>
+                      <b-select
+                        v-if="item.result.startTime"
+                        v-model="item.result.penaltyFinishTime"
+                        :placeholder="'Penalty Finish'"
+                        @change="
+                          updateTimePen($event, item, 'penaltyFinishTime')
+                        "
                       >
-                        {{ p.label }}
-                      </option>
-                    </b-select>
-                  </td>
+                        <option disabled value="">
+                          Select Penalty Finish Time
+                        </option>
+                        <option
+                          v-for="p in dataPenalties"
+                          :key="p.value"
+                          :value="p.timePen"
+                        >
+                          {{ p.label }}
+                        </option>
+                      </b-select>
+                    </td>
 
-                  <td class="large-bold penalty-char text-monospace">
-                    {{ item.result.penaltyTime }}
-                  </td>
-                  <td class="large-bold result-char text-monospace">
-                    {{
-                      item.result.penaltyTime
-                        ? item.result.totalTime
-                        : item.result.raceTime
-                    }}
-                  </td>
-                  <td class="large-bold">{{ item.result.ranked }}</td>
-                  <td class="large-bold">
-                    {{ getScoreByRanked(item.result.ranked) }}
-                  </td>
+                    <td class="large-bold penalty-char text-monospace">
+                      {{ item.result.penaltyTime }}
+                    </td>
+                    <td class="large-bold result-char text-monospace">
+                      {{
+                        item.result.penaltyTime
+                          ? item.result.totalTime
+                          : item.result.raceTime
+                      }}
+                    </td>
+                    <td class="large-bold">{{ item.result.ranked }}</td>
+                    <td class="large-bold">
+                      {{ getScoreByRanked(item.result.ranked) }}
+                    </td>
 
-                  <td v-if="editResult">
-                    <b-button
-                      size="sm"
-                      variant="warning"
-                      @click="openModal(item)"
-                      >Edit</b-button
-                    >
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <td v-if="editResult">
+                      <b-button
+                        size="sm"
+                        variant="warning"
+                        @click="openModal(item)"
+                        >Edit</b-button
+                      >
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <br />
           </b-col>
@@ -411,6 +417,7 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      drrSectionsCount: 3,
       editForm: "",
       editResult: false,
       isScrolled: false,
@@ -483,11 +490,70 @@ export default {
     window.addEventListener("scroll", this.handleScroll);
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
+
+    this.fetchDrrSectionCountFromSettings();
   },
   beforeDestroy() {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    _resizePenaltySections(arr, targetLen) {
+      const out = Array.isArray(arr) ? arr.slice(0, targetLen) : [];
+      while (out.length < targetLen) out.push("");
+      return out;
+    },
+    async fetchDrrSectionCountFromSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        const bucket = getBucket(); // sudah ada di file-mu
+        const eventId = String(bucket.eventId || "");
+        if (!eventId) return;
+
+        // token untuk cegah balasan lama nindih
+        const token = Date.now();
+        this._lastRSFetchToken = token;
+
+        ipcRenderer.send("race-settings:get", eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          if (this._lastRSFetchToken !== token) return;
+
+          let count = 3;
+          if (res && res.ok && res.settings && res.settings.drr) {
+            const c = parseInt(res.settings.drr.totalSection, 10);
+            if (Number.isFinite(c) && c > 0) count = c;
+          }
+          this.applyDrrSectionCount(count);
+        });
+      } catch (err) {
+        // biarkan default 3
+      }
+    },
+
+    applyDrrSectionCount(count) {
+      const c = Number.isFinite(count) && count > 0 ? count : 3;
+      this.drrSectionsCount = c;
+
+      if (Array.isArray(this.participant)) {
+        this.participant = this.participant.map((t) => {
+          const nt = { ...t };
+          const r =
+            nt.result && typeof nt.result === "object" ? { ...nt.result } : {};
+          r.penaltySection = this._resizePenaltySections(r.penaltySection, c);
+          nt.result = r;
+
+          if (nt.otr && typeof nt.otr === "object") {
+            nt.otr = { ...nt.otr };
+            nt.otr.penaltySection = this._resizePenaltySections(
+              nt.otr.penaltySection,
+              c
+            );
+          }
+
+          return nt;
+        });
+      }
+    },
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForDRR();
       if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
@@ -962,17 +1028,17 @@ td {
 
 .table-wrapper {
   width: 100%;
-  overflow-x: auto;           /* enable horizontal scroll */
+  overflow-x: auto; /* enable horizontal scroll */
   -webkit-overflow-scrolling: touch; /* smooth on mobile */
 }
 
 .table-wrapper table {
-  min-width: 1200px;          /* adjust sesuai jumlah kolom */
+  min-width: 1200px; /* adjust sesuai jumlah kolom */
   border-collapse: collapse;
 }
 
 .table-wrapper th,
 .table-wrapper td {
-  white-space: nowrap;        /* prevent wrapping */
+  white-space: nowrap; /* prevent wrapping */
 }
 </style>

@@ -49,15 +49,18 @@
             <div class="h4 font-weight-bold mb-3">Slalom</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Gate</label>
-              <small class="text-danger">Max {{ maxGate }} Gate</small>
             </div>
             <b-form-spinbutton
               v-model="draft.slalom.totalGate"
-              min="1"
               :max="maxGate"
+              :min="minGate"
               step="1"
               class="w-100"
             />
+            <div class="d-flex justify-content-between">
+              <small class="text-danger">Min {{ minGate }} Gate</small>
+              <small class="text-danger">Max {{ maxGate }} Gate</small>
+            </div>
           </div>
         </div>
 
@@ -67,15 +70,18 @@
             <div class="h4 font-weight-bold mb-3">Down River Race</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Section</label>
-              <small class="text-danger">Max {{ maxSection }} Section</small>
             </div>
             <b-form-spinbutton
               v-model="draft.drr.totalSection"
-              min="1"
+              :min="minSection"
               :max="maxSection"
               step="1"
               class="w-100"
             />
+            <div class="d-flex justify-content-between">
+              <small class="text-danger">Min {{ minSection }} Section</small>
+              <small class="text-danger">Max {{ maxSection }} Section</small>
+            </div>
           </div>
         </div>
 
@@ -117,7 +123,9 @@ export default {
     id: { type: String, default: "race-settings-modal" },
     value: { type: Boolean, default: false },
     settings: { type: Object, default: () => ({ ...DEFAULT_SETTINGS }) },
+    minGate: { type: Number, default: 8 },
     maxGate: { type: Number, default: 14 },
+    minSection: { type: Number, default: 3 },
     maxSection: { type: Number, default: 6 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
@@ -126,7 +134,7 @@ export default {
     return {
       localShow: this.value,
       loading: false,
-      saving: false,              // <-- untuk disable tombol Update
+      saving: false, // <-- untuk disable tombol Update
       draft: this.mergeWithDefaults(this.settings),
     };
   },
@@ -155,8 +163,11 @@ export default {
   },
   methods: {
     _clone(obj) {
-      try { return JSON.parse(JSON.stringify(obj || {})); }
-      catch { return this.mergeWithDefaults({}); }
+      try {
+        return JSON.parse(JSON.stringify(obj || {}));
+      } catch {
+        return this.mergeWithDefaults({});
+      }
     },
 
     mergeWithDefaults(incoming) {
@@ -217,13 +228,22 @@ export default {
       }
 
       // 1) Clamp nilai lokal
-      const gRaw = this.draft && this.draft.slalom && this.draft.slalom.totalGate;
+      const gRaw =
+        this.draft && this.draft.slalom && this.draft.slalom.totalGate;
       const sRaw = this.draft && this.draft.drr && this.draft.drr.totalSection;
       const g = Number.isFinite(parseInt(gRaw, 10)) ? parseInt(gRaw, 10) : 14;
       const s = Number.isFinite(parseInt(sRaw, 10)) ? parseInt(sRaw, 10) : 5;
 
-      this.draft.slalom.totalGate   = Math.max(1, Math.min(this.maxGate, g));
-      this.draft.drr.totalSection   = Math.max(1, Math.min(this.maxSection, s));
+      // Clamp dengan minGate & maxGate
+      this.draft.slalom.totalGate = Math.max(
+        this.minGate,
+        Math.min(this.maxGate, g)
+      );
+
+      this.draft.drr.totalSection = Math.max(
+        this.minSection,
+        Math.min(this.maxSection, s)
+      );
 
       const payload = {
         eventId: String(this.eventId),
@@ -270,7 +290,7 @@ export default {
             // 4) Tutup modal
             this.localShow = false;
           } else {
-            const errMsg = (res && res.error) ? res.error : "Unknown error";
+            const errMsg = res && res.error ? res.error : "Unknown error";
             this.$bvToast &&
               this.$bvToast.toast(errMsg, {
                 title: "Update Failed",
@@ -314,10 +334,10 @@ export default {
 }
 
 .rs-switch {
-  cursor: pointer;             
-  user-select: none;           
-  font-weight: 500;            
-  margin-right: 12px;          
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  margin-right: 12px;
 }
 
 .rs-switch .custom-control-label {

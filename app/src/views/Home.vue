@@ -13,8 +13,8 @@
             </p>
             <b-button
               size="md"
-              variant="primary"
-              class="rounded-pill px-4"
+              variant="warning"
+              class="btn-action rounded-pill px-4"
               @click="goTo('events')"
             >
               Explore Event
@@ -582,7 +582,7 @@ export default {
 
 .event-thumb {
   width: 100%;
-  height: 180px; /* tinggi tetap biar grid rapi */
+  height: 180px;
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
@@ -594,7 +594,12 @@ export default {
 .event-img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* gambar cover penuh, crop bagian luar */
-  object-position: center; /* fokus ke tengah */
+  border-radius: 8%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.6s ease;
+}
+.event-img:hover {
+  transform: scale(1.2);
 }
 </style>

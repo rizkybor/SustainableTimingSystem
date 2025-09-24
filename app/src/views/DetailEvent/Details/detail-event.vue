@@ -84,7 +84,7 @@
           >
             <div class="race-icon">
               <!-- <Icon :icon="c.icon" width="28" height="28" /> -->
-              <img :src="c.icon" width="60" height="60" />
+              <img class="icon-event" :src="c.icon" width="60" height="60" />
             </div>
             <div class="h6 font-weight-bold mb-1 text-center">
               {{ c.title }}
@@ -2113,13 +2113,19 @@ export default {
   --blue: #1f6fa3;
 }
 
+.icon-event {
+ transition: transform 0.4s ease;
+}
+
+.icon-event:hover {
+  transform: scale(2.5);
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
   min-height: 200px;
-  /* tinggi hero */
   overflow: hidden;
-  /* biar radius rapi */
 }
 
 /* Foto background */
@@ -2207,6 +2213,12 @@ export default {
   box-shadow: 0 12px 26px rgba(31, 56, 104, 0.08);
   transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
   cursor: pointer;
+}
+
+.race-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 16px 32px rgba(31, 56, 104, 0.15);
+  border-color: #cdd9f0;
 }
 
 .race-card.active {
@@ -2399,4 +2411,5 @@ export default {
   border-radius: 10px;
   padding: 8px 14px;
 }
+
 </style>

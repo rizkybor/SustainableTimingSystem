@@ -47,6 +47,7 @@
         <div class="rs-card mb-3">
           <div class="px-3 py-3">
             <div class="h4 font-weight-bold mb-3">Slalom</div>
+            <div class="font-weight-bold mb-2">Gates Setting</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Gate</label>
             </div>
@@ -68,6 +69,7 @@
         <div class="rs-card mb-3">
           <div class="px-3 py-3">
             <div class="h4 font-weight-bold mb-3">Down River Race</div>
+            <div class="font-weight-bold mb-2">Section Setting</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Section</label>
             </div>

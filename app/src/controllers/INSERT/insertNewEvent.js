@@ -276,7 +276,10 @@ async function insertSlalomResult(payload) {
     }
 
     if (!Array.isArray(payload)) {
-      return { ok: false, error: "insertSlalomResult: payload must be an array" };
+      return {
+        ok: false,
+        error: "insertSlalomResult: payload must be an array",
+      };
     }
     if (payload.length === 0) {
       return { ok: true, upsertedCount: 0 };
@@ -301,18 +304,27 @@ async function insertSlalomResult(payload) {
       var rem2 = rem1 % 60000;
       var sec = Math.floor(rem2 / 1000);
       var mss = rem2 % 1000;
-      var pad = function (n, w) { return String(n).padStart(w, "0"); };
-      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
+      var pad = function (n, w) {
+        return String(n).padStart(w, "0");
+      };
+      return (
+        pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3)
+      );
     }
     var SCORE_TABLE = [
-      350, 322, 301, 287, 277, 266, 256, 245, 235, 224,
-      214, 203, 193, 182, 172, 161, 151, 140, 133, 126,
-      119, 112, 105,  98,  91,  84,  77,  70,  63,  56,
-       49,  42
+      350, 322, 301, 287, 277, 266, 256, 245, 235, 224, 214, 203, 193, 182, 172,
+      161, 151, 140, 133, 126, 119, 112, 105, 98, 91, 84, 77, 70, 63, 56, 49,
+      42,
     ];
-    function scoreForRank(rank) { return SCORE_TABLE[rank - 1] || 0; }
-    function toStr(v, d) { return String(v == null ? (d || "") : v); }
-    function toInt(v, d) { return Number.isFinite(v) ? Number(v) : (Number(v) || (d || 0)); }
+    function scoreForRank(rank) {
+      return SCORE_TABLE[rank - 1] || 0;
+    }
+    function toStr(v, d) {
+      return String(v == null ? d || "" : v);
+    }
+    function toInt(v, d) {
+      return Number.isFinite(v) ? Number(v) : Number(v) || d || 0;
+    }
 
     function normRun(r) {
       r = r || {};
@@ -321,10 +333,16 @@ async function insertSlalomResult(payload) {
         finishTime: r.finishTime ? String(r.finishTime) : "",
         raceTime: r.raceTime ? String(r.raceTime) : "",
         penaltyTime: r.penaltyTime ? String(r.penaltyTime) : "00:00:00.000",
-        penalty: Number.isFinite(r.penalty) ? r.penalty : (Number(r.penalty) || 0),
-        totalTime: r.totalTime ? String(r.totalTime) : (r.raceTime ? String(r.raceTime) : ""),
-        ranked: Number.isFinite(r.ranked) ? r.ranked : (Number(r.ranked) || 0),
-        score: Number.isFinite(r.score) ? r.score : (Number(r.score) || 0),
+        penalty: Number.isFinite(r.penalty)
+          ? r.penalty
+          : Number(r.penalty) || 0,
+        totalTime: r.totalTime
+          ? String(r.totalTime)
+          : r.raceTime
+          ? String(r.raceTime)
+          : "",
+        ranked: Number.isFinite(r.ranked) ? r.ranked : Number(r.ranked) || 0,
+        score: Number.isFinite(r.score) ? r.score : Number(r.score) || 0,
       };
     }
 
@@ -332,37 +350,58 @@ async function insertSlalomResult(payload) {
       var clean = JSON.parse(JSON.stringify(raw || {}));
       if (clean && clean._id) delete clean._id;
 
-      var resultArr = Array.isArray(clean.result) ? clean.result.map(normRun) : [];
+      var resultArr = Array.isArray(clean.result)
+        ? clean.result.map(normRun)
+        : [];
 
       // bestTime fallback dari result.totalTime
       var bestTime = clean.bestTime ? String(clean.bestTime) : "";
       if (!bestTime && resultArr.length) {
         var vals = resultArr
-          .map(function (x) { return x && x.totalTime ? hmsToMs(x.totalTime) : Infinity; })
-          .filter(function (ms) { return Number.isFinite(ms); });
+          .map(function (x) {
+            return x && x.totalTime ? hmsToMs(x.totalTime) : Infinity;
+          })
+          .filter(function (ms) {
+            return Number.isFinite(ms);
+          });
         if (vals.length) bestTime = msToHMSms(Math.min.apply(Math, vals));
       }
 
       // meta slalom (opsional)
       var penaltiesSrc =
-        clean && clean.meta && clean.meta.slalom && Array.isArray(clean.meta.slalom.penalties)
+        clean &&
+        clean.meta &&
+        clean.meta.slalom &&
+        Array.isArray(clean.meta.slalom.penalties)
           ? clean.meta.slalom.penalties
           : [];
       var mappedPenalties = penaltiesSrc.map(function (arr) {
         if (!Array.isArray(arr)) return [];
-        return arr.map(function (v) { return Number(v) || 0; });
+        return arr.map(function (v) {
+          return Number(v) || 0;
+        });
       });
       var gatesCount =
-        clean && clean.meta && clean.meta.slalom && Number.isFinite(clean.meta.slalom.gatesCount)
+        clean &&
+        clean.meta &&
+        clean.meta.slalom &&
+        Number.isFinite(clean.meta.slalom.gatesCount)
           ? Number(clean.meta.slalom.gatesCount)
           : undefined;
       var penaltyValueToMs =
-        clean && clean.meta && clean.meta.slalom && typeof clean.meta.slalom.penaltyValueToMs === "object"
+        clean &&
+        clean.meta &&
+        clean.meta.slalom &&
+        typeof clean.meta.slalom.penaltyValueToMs === "object"
           ? clean.meta.slalom.penaltyValueToMs
           : undefined;
 
       var metaObj = {};
-      if (penaltiesSrc.length || gatesCount !== undefined || penaltyValueToMs !== undefined) {
+      if (
+        penaltiesSrc.length ||
+        gatesCount !== undefined ||
+        penaltyValueToMs !== undefined
+      ) {
         metaObj.slalom = {
           penalties: mappedPenalties,
           gatesCount: gatesCount,
@@ -390,9 +429,14 @@ async function insertSlalomResult(payload) {
 
         // OTR fallback
         otr: clean.otr || {
-          startTime: "", finishTime: "", raceTime: "",
-          penaltyTime: "", penalty: "", totalTime: "",
-          ranked: "", score: ""
+          startTime: "",
+          finishTime: "",
+          raceTime: "",
+          penaltyTime: "",
+          penalty: "",
+          totalTime: "",
+          ranked: "",
+          score: "",
         },
       };
     }
@@ -414,12 +458,22 @@ async function insertSlalomResult(payload) {
         divisionName: toStr(it.divisionName, ""),
       };
 
-      if (!meta.eventId || !meta.initialId || !meta.raceId || !meta.divisionId) {
+      if (
+        !meta.eventId ||
+        !meta.initialId ||
+        !meta.raceId ||
+        !meta.divisionId
+      ) {
         console.warn("[DAO] Skip item karena meta tidak lengkap:", meta);
         continue;
       }
 
-      var key = [meta.eventId, meta.initialId, meta.raceId, meta.divisionId].join("|");
+      var key = [
+        meta.eventId,
+        meta.initialId,
+        meta.raceId,
+        meta.divisionId,
+      ].join("|");
       var teamEntry = normTeam(it);
 
       if (!groups.has(key)) groups.set(key, { meta: meta, teams: [teamEntry] });
@@ -427,7 +481,11 @@ async function insertSlalomResult(payload) {
     }
 
     if (groups.size === 0) {
-      return { ok: false, error: "Meta bucket kosong di payload: pastikan eventId, initialId, raceId, divisionId terisi" };
+      return {
+        ok: false,
+        error:
+          "Meta bucket kosong di payload: pastikan eventId, initialId, raceId, divisionId terisi",
+      };
     }
 
     var now = new Date();
@@ -460,7 +518,10 @@ async function insertSlalomResult(payload) {
         var exTeams = ex && Array.isArray(ex.teams) ? ex.teams : []; // <== teams di level doc
         for (var t of exTeams) {
           if (!t) continue;
-          var k = (toStr(t.bibTeam, "").trim() || "NO-BIB") + "|" + toStr(t.nameTeam, "").trim();
+          var k =
+            (toStr(t.bibTeam, "").trim() || "NO-BIB") +
+            "|" +
+            toStr(t.nameTeam, "").trim();
           if (!mergedByKey.has(k)) mergedByKey.set(k, t);
         }
       }
@@ -478,16 +539,22 @@ async function insertSlalomResult(payload) {
       mergedArray.forEach(function (tm) {
         if (!tm.bestTime) {
           var vals = (Array.isArray(tm.result) ? tm.result : [])
-            .map(function (x) { return x && x.totalTime ? hmsToMs(x.totalTime) : Infinity; })
-            .filter(function (ms) { return Number.isFinite(ms); });
+            .map(function (x) {
+              return x && x.totalTime ? hmsToMs(x.totalTime) : Infinity;
+            })
+            .filter(function (ms) {
+              return Number.isFinite(ms);
+            });
           if (vals.length) tm.bestTime = msToHMSms(Math.min.apply(Math, vals));
         }
       });
 
       // Sort berdasarkan bestTime ascending
       mergedArray.sort(function (a, b) {
-        var am = a && a.bestTime ? hmsToMs(a.bestTime) : Number.POSITIVE_INFINITY;
-        var bm = b && b.bestTime ? hmsToMs(b.bestTime) : Number.POSITIVE_INFINITY;
+        var am =
+          a && a.bestTime ? hmsToMs(a.bestTime) : Number.POSITIVE_INFINITY;
+        var bm =
+          b && b.bestTime ? hmsToMs(b.bestTime) : Number.POSITIVE_INFINITY;
         return am - bm;
       });
 
@@ -515,7 +582,7 @@ async function insertSlalomResult(payload) {
           initialName: meta.initialName,
           raceName: meta.raceName,
           divisionName: meta.divisionName,
-          teams: mergedArray,     // <== simpan di TEAMS
+          teams: mergedArray, // <== simpan di TEAMS
           updatedAt: now,
         },
         $setOnInsert: { createdAt: now },
@@ -523,13 +590,25 @@ async function insertSlalomResult(payload) {
 
       var res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
-      console.log("[DAO] upsert bucket:", filter, "-> matched:", res.matchedCount, "modified:", res.modifiedCount, "upserted:", res.upsertedCount || 0);
+      console.log(
+        "[DAO] upsert bucket:",
+        filter,
+        "-> matched:",
+        res.matchedCount,
+        "modified:",
+        res.modifiedCount,
+        "upserted:",
+        res.upsertedCount || 0
+      );
     }
 
     return { ok: true, upsertedCount: upsertedCount };
   } catch (err) {
-    console.error("Error insertSlalomResult:", err && err.stack ? err.stack : err);
-    return { ok: false, error: (err && err.message) ? err.message : String(err) };
+    console.error(
+      "Error insertSlalomResult:",
+      err && err.stack ? err.stack : err
+    );
+    return { ok: false, error: err && err.message ? err.message : String(err) };
   }
 }
 
@@ -576,11 +655,67 @@ async function insertDrrResult(payload) {
     console.error("Error inserting sprint result:", error);
     return { ok: false, error: error.message };
   }
+
 }
+
+async function updateEventPoster(payload) {
+  try {
+    if (!payload || !payload._id) {
+      return { ok: false, error: "updateEventPoster: _id is required" };
+    }
+    if (!payload.poster) {
+      return {
+        ok: false,
+        error: "updateEventPoster: poster object is required",
+      };
+    }
+
+    const database = await getDb();
+    const collection = database.collection("eventsCollection");
+
+    // opsional: whitelist field poster agar yang tersimpan hanya properti penting
+    const p = payload.poster;
+    const posterDoc = {
+      public_id: p && p.public_id ? String(p.public_id) : "",
+      secure_url: p && p.secure_url ? String(p.secure_url) : "",
+      url: p && p.url ? String(p.url) : "",
+      folder: p && p.folder ? String(p.folder) : "",
+      width: p && Number.isFinite(p.width) ? Number(p.width) : null,
+      height: p && Number.isFinite(p.height) ? Number(p.height) : null,
+      bytes: p && Number.isFinite(p.bytes) ? Number(p.bytes) : null,
+      format: p && p.format ? String(p.format) : "",
+      version: p && typeof p.version !== "undefined" ? p.version : null,
+      created_at: p && p.created_at ? String(p.created_at) : "",
+    };
+
+    const res = await collection.updateOne(
+      { _id: new ObjectId(String(payload._id)) },
+      {
+        $set: {
+          poster: posterDoc,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    return {
+      ok: true,
+      matchedCount: res.matchedCount,
+      modifiedCount: res.modifiedCount,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error),
+    };
+  }
+}
+
 
 module.exports = {
   insertNewEvent,
   insertSprintResult,
   insertSlalomResult,
   insertDrrResult,
+  updateEventPoster
 };

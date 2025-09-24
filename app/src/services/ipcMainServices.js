@@ -23,6 +23,7 @@ const {
   insertNewEvent,
   insertSprintResult,
   insertSlalomResult,
+  updateEventPoster
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -220,6 +221,18 @@ function setupIPCMainHandlers() {
       event.reply("insert-new-event-reply", []);
     }
   });
+
+ipcMain.on('update-event-poster', async function (e, payload) {
+  try {
+    const r = await updateEventPoster(payload);
+    e.reply('update-event-poster-reply', r);
+  } catch (err) {
+    e.reply('update-event-poster-reply', {
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+});
 
   // SAVE SPRINT RESULT
   ipcMain.on("insert-sprint-result", async (event, datas) => {

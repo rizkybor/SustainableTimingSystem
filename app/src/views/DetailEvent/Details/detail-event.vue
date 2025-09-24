@@ -327,7 +327,10 @@ export default {
   },
   computed: {
     eventId() {
-      const id = this.events && this.events._id;
+      let id = this.events && this.events._id;
+      if(!id){
+        id = this.$route.params.id;
+      }
       return typeof id === "string" ? id : "";
     },
 
@@ -381,7 +384,6 @@ export default {
     },
 
     onUpdateRaceSettings(payload) {
-      // simpan lokal dulu
       if (payload && payload.settings) this.raceSettings = payload.settings;
 
       if (typeof window !== "undefined" && window.ipcRenderer) {

@@ -1,4 +1,5 @@
 const { getDb } = require("../index");
+const { ObjectId } = require('mongodb');
 
 // Insert new event
 async function insertNewEvent(payload) {
@@ -660,54 +661,102 @@ async function insertDrrResult(payload) {
 
 async function updateEventPoster(payload) {
   try {
-    if (!payload || !payload._id) {
+    if (payload === null || payload === undefined) {
+      return { ok: false, error: "updateEventPoster: payload is required" };
+    }
+    if (payload._id === null || payload._id === undefined) {
       return { ok: false, error: "updateEventPoster: _id is required" };
     }
-    if (!payload.poster) {
-      return {
-        ok: false,
-        error: "updateEventPoster: poster object is required",
-      };
+    if (payload.poster === null || payload.poster === undefined) {
+      return { ok: false, error: "updateEventPoster: poster object is required" };
     }
 
-    const database = await getDb();
-    const collection = database.collection("eventsCollection");
+    var idStr = String(payload._id).trim();
+    var oidPattern = /^[a-f0-9]{24}$/i;
+    if (!oidPattern.test(idStr)) {
+      return { ok: false, error: "invalid ObjectId string: " + idStr };
+    }
+    var oid = new ObjectId(idStr);
 
-    // opsional: whitelist field poster agar yang tersimpan hanya properti penting
-    const p = payload.poster;
-    const posterDoc = {
-      public_id: p && p.public_id ? String(p.public_id) : "",
-      secure_url: p && p.secure_url ? String(p.secure_url) : "",
-      url: p && p.url ? String(p.url) : "",
-      folder: p && p.folder ? String(p.folder) : "",
-      width: p && Number.isFinite(p.width) ? Number(p.width) : null,
-      height: p && Number.isFinite(p.height) ? Number(p.height) : null,
-      bytes: p && Number.isFinite(p.bytes) ? Number(p.bytes) : null,
-      format: p && p.format ? String(p.format) : "",
-      version: p && typeof p.version !== "undefined" ? p.version : null,
-      created_at: p && p.created_at ? String(p.created_at) : "",
+    var p = payload.poster;
+    var posterDoc = {
+      public_id: "",
+      secure_url: "",
+      url: "",
+      folder: "",
+      width: null,
+      height: null,
+      bytes: null,
+      format: "",
+      version: null,
+      created_at: ""
     };
 
-    const res = await collection.updateOne(
-      { _id: new ObjectId(String(payload._id)) },
-      {
-        $set: {
-          poster: posterDoc,
-          updatedAt: new Date(),
-        },
+    if (p !== null && p !== undefined) {
+      if (p.public_id !== null && p.public_id !== undefined) {
+        posterDoc.public_id = String(p.public_id);
       }
-    );
+      if (p.secure_url !== null && p.secure_url !== undefined) {
+        posterDoc.secure_url = String(p.secure_url);
+      }
+      if (p.url !== null && p.url !== undefined) {
+        posterDoc.url = String(p.url);
+      }
+      if (p.folder !== null && p.folder !== undefined) {
+        posterDoc.folder = String(p.folder);
+      }
+      if (p.width !== null && p.width !== undefined && Number.isFinite(p.width)) {
+        posterDoc.width = Number(p.width);
+      }
+      if (p.height !== null && p.height !== undefined && Number.isFinite(p.height)) {
+        posterDoc.height = Number(p.height);
+      }
+      if (p.bytes !== null && p.bytes !== undefined && Number.isFinite(p.bytes)) {
+        posterDoc.bytes = Number(p.bytes);
+      }
+      if (p.format !== null && p.format !== undefined) {
+        posterDoc.format = String(p.format);
+      }
+      if (p.version !== null && p.version !== undefined) {
+        posterDoc.version = p.version;
+      }
+      if (p.created_at !== null && p.created_at !== undefined) {
+        posterDoc.created_at = String(p.created_at);
+      }
+    }
+
+    var db = await getDb();
+    var col = db.collection("eventsCollection");
+
+    var updateDoc = {
+      $set: {
+        poster: posterDoc,
+        poster_url: posterDoc.secure_url,   // URL siap pakai
+        updatedAt: new Date()
+      }
+    };
+
+    var res = await col.updateOne({ _id: oid }, updateDoc);
+
+    var matched = 0;
+    var modified = 0;
+    if (res !== null && res !== undefined) {
+      if (typeof res.matchedCount === 'number') matched = res.matchedCount;
+      if (typeof res.modifiedCount === 'number') modified = res.modifiedCount;
+    }
 
     return {
       ok: true,
-      matchedCount: res.matchedCount,
-      modifiedCount: res.modifiedCount,
+      matchedCount: matched,
+      modifiedCount: modified,
+      poster_url: posterDoc.secure_url
     };
   } catch (error) {
-    return {
-      ok: false,
-      error: error && error.message ? error.message : String(error),
-    };
+    var msg = 'Unknown error';
+    if (error !== null && error !== undefined) {
+      if (typeof error.message === 'string') msg = error.message;
+    }
+    return { ok: false, error: msg };
   }
 }
 

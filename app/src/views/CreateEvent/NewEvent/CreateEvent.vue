@@ -588,170 +588,211 @@ export default {
     //   }, 1500);
     // },
     // ===== helper upload khusus Cloudinary =====
-  async uploadPosterToCloudinary() {
-    if (!this.posterTempPath) {
-      ipcRenderer.send('get-alert', {
-        type: 'warning',
-        message: 'No File Selected',
-        detail: 'Pilih gambar dulu'
-      });
-      return { ok: false, error: 'no-local-file' };
-    }
-    if (!window.cloud) {
-      ipcRenderer.send('get-alert', {
-        type: 'warning',
-        message: 'Unavailable',
-        detail: 'Cloudinary bridge belum tersedia'
-      });
-      return { ok: false, error: 'no-bridge' };
-    }
+    async uploadPosterToCloudinary() {
+      if (!this.posterTempPath) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "No File Selected",
+          detail: "Pilih gambar dulu",
+        });
+        return { ok: false, error: "no-local-file" };
+      }
+      if (!window.cloud) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Unavailable",
+          detail: "Cloudinary bridge belum tersedia",
+        });
+        return { ok: false, error: "no-bridge" };
+      }
 
-    this.isUploadingPoster = true;
+      this.isUploadingPoster = true;
 
-    var up;
-    if (typeof window.cloud.uploadEventImage === 'function') {
-      up = await window.cloud.uploadEventImage(this.posterTempPath);
-    } else if (typeof window.cloud.uploadImage === 'function') {
-      up = await window.cloud.uploadImage(this.posterTempPath, {
-        folder: 'sustainable-js/event'
-      });
-    } else {
+      var up;
+      if (typeof window.cloud.uploadEventImage === "function") {
+        up = await window.cloud.uploadEventImage(this.posterTempPath);
+      } else if (typeof window.cloud.uploadImage === "function") {
+        up = await window.cloud.uploadImage(this.posterTempPath, {
+          folder: "sustainable-js/event",
+        });
+      } else {
+        this.isUploadingPoster = false;
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Unavailable",
+          detail: "Cloudinary API tidak ditemukan",
+        });
+        return { ok: false, error: "no-method" };
+      }
+
       this.isUploadingPoster = false;
-      ipcRenderer.send('get-alert', {
-        type: 'warning',
-        message: 'Unavailable',
-        detail: 'Cloudinary API tidak ditemukan'
+
+      if (!up || !up.ok || !up.result) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Upload failed",
+          detail: up && up.error ? up.error : "Unknown error",
+        });
+        return {
+          ok: false,
+          error: up && up.error ? up.error : "upload-failed",
+        };
+      }
+
+      // simpan metadata ke form & ganti preview
+      this.formEvent.poster = up.result; // { public_id, secure_url, ... }
+      this.posterPreview = up.result.secure_url;
+
+      return { ok: true, result: up.result };
+    },
+
+    // ===== SAVE: insert → (upload) → (update) → finish =====
+    save() {
+      const formValid = this.validateForm();
+      if (!formValid) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "To create an event, all fields must be filled in",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+
+      // Jangan paksa null; biarkan seperti di form.
+      const payload = Object.assign({}, this.formEvent, { participant: [] });
+
+      // 1) INSERT
+      ipcRenderer.send("insert-new-event", payload);
+
+      const self = this;
+      ipcRenderer.once("insert-new-event-reply", function (_e, data) {
+        self.handleAfterInsert(data);
       });
-      return { ok: false, error: 'no-method' };
-    }
+    },
 
-    this.isUploadingPoster = false;
+    _asIdString: function (x) {
+      if (!x) return null;
 
-    if (!up || !up.ok || !up.result) {
-      ipcRenderer.send('get-alert', {
-        type: 'error',
-        message: 'Upload failed',
-        detail: up && up.error ? up.error : 'Unknown error'
-      });
-      return { ok: false, error: up && up.error ? up.error : 'upload-failed' };
-    }
+      // jika sudah string
+      if (typeof x === "string") return x;
 
-    // simpan metadata ke form & ganti preview
-    this.formEvent.poster = up.result;        // { public_id, secure_url, ... }
-    this.posterPreview    = up.result.secure_url;
+      // jika bentuk { insertedId: ... } atau { _id: ... } → rekursif
+      if (typeof x === "object") {
+        if (x.insertedId) return this._asIdString(x.insertedId);
+        if (x._id) return this._asIdString(x._id);
+        if (x.$oid) return String(x.$oid);
 
-    return { ok: true, result: up.result };
-  },
-
-  // ===== SAVE: insert → (upload) → (update) → finish =====
-  save() {
-    const formValid = this.validateForm();
-    if (!formValid) {
-      ipcRenderer.send('get-alert', {
-        type: 'warning',
-        detail: 'To create an event, all fields must be filled in',
-        message: 'Ups Sorry'
-      });
-      return;
-    }
-
-    // Jangan paksa null; biarkan seperti di form.
-    const payload = Object.assign({}, this.formEvent, { participant: [] });
-
-    // 1) INSERT
-    ipcRenderer.send('insert-new-event', payload);
-
-    const self = this;
-    ipcRenderer.once('insert-new-event-reply', function (_e, data) {
-      self.handleAfterInsert(data);
-    });
-  },
-
-  _asIdString: function (x) {
-    if (!x) return null;
-
-    // jika sudah string
-    if (typeof x === 'string') return x;
-
-    // jika bentuk { insertedId: ... } atau { _id: ... } → rekursif
-    if (typeof x === 'object') {
-      if (x.insertedId) return this._asIdString(x.insertedId);
-      if (x._id)        return this._asIdString(x._id);
-      if (x.$oid)       return String(x.$oid);
-
-      // ObjectId mentah dari BSON: {_bsontype:"ObjectID", id: Uint8Array(12)}
-      if (x._bsontype === 'ObjectID' && x.id) {
-        try {
-          var arr = Array.prototype.slice.call(x.id); // Uint8Array → array
-          var hex = arr.map(function (b) {
-            var s = b.toString(16);
-            return s.length === 1 ? '0' + s : s;
-          }).join('');
-          return hex;
-        } catch (e) {
-          return null;
+        // ObjectId mentah dari BSON: {_bsontype:"ObjectID", id: Uint8Array(12)}
+        if (x._bsontype === "ObjectID" && x.id) {
+          try {
+            var arr = Array.prototype.slice.call(x.id); // Uint8Array → array
+            var hex = arr
+              .map(function (b) {
+                var s = b.toString(16);
+                return s.length === 1 ? "0" + s : s;
+              })
+              .join("");
+            return hex;
+          } catch (e) {
+            return null;
+          }
         }
       }
-    }
-    return null;
-  },
+      return null;
+    },
 
-  async handleAfterInsert(data) {
-    var insertedId = this._asIdString(data);
-    console.log(insertedId,'<< cek')
-    if (!insertedId) {
-      ipcRenderer.send('get-alert', {
-        type: 'error',
-        message: 'DB Save Failed',
-        detail: 'insertedId tidak ditemukan'
-      });
-      return;
-    }
-
-    // 2) Kalau user pilih gambar lokal, upload dulu ke Cloudinary
-    if (this.posterTempPath) {
-      const up = await this.uploadPosterToCloudinary();
-      if (up && up.ok && up.result) {
-        // 3) Update DB dengan metadata poster
-        const updatePayload = {
-          _id: data.insertedId,
-          poster: up.result
-        };
-        ipcRenderer.send('update-event-poster', updatePayload);
-        const self = this;
-        ipcRenderer.once('update-event-poster-reply', function (_e2, resp) {
-          // resp bisa dicek bila perlu
-          self.finishSave();
+    async handleAfterInsert(data) {
+      var insertedId = this._asIdString(data);
+      if (!insertedId) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "DB Save Failed",
+          detail: "insertedId tidak ditemukan",
         });
-        return;
-      } else {
-        // Upload gagal tapi event sudah tersimpan
-        ipcRenderer.send('get-alert', {
-          type: 'warning',
-          message: 'Saved without poster',
-          detail: 'Event tersimpan. Upload poster gagal.'
-        });
-        this.finishSave();
         return;
       }
-    }
 
-    // Tidak ada poster lokal → selesai
-    this.finishSave();
-  },
+      // 2) Kalau user pilih gambar lokal, upload dulu ke Cloudinary
+      if (this.posterTempPath) {
+        const up = await this.uploadPosterToCloudinary();
+        if (up && up.ok && up.result) {
+          // 3) Update DB dengan metadata poster
+          const updatePayload = {
+            _id: insertedId,
+            poster: up.result,
+          };
+          console.log(updatePayload, "<<< BODY REQ CLOUD");
+          ipcRenderer.send("update-event-poster", updatePayload);
+          const self = this;
+          ipcRenderer.once(
+            "update-event-poster-reply",
+            function (_e2, resp) {
+              console.log("update-event-poster-reply:", resp);
 
-  finishSave() {
-    ipcRenderer.send('get-alert-saved', {
-      type: 'question',
-      detail: 'Event data has been successfully saved',
-      message: 'Successfully'
-    });
-    const self = this;
-    setTimeout(function () {
-      localStorage.removeItem('formNewEvent');
-      self.$router.push('/');
-    }, 1500);
-  }
+              var ok = false;
+              if (resp !== null && resp !== undefined) {
+                if (resp.ok === true) ok = true;
+              }
+              if (!ok) {
+                var detail = "Unknown error";
+                if (resp !== null && resp !== undefined) {
+                  if (typeof resp.error === "string") detail = resp.error;
+                }
+                ipcRenderer.send("get-alert", {
+                  type: "error",
+                  message: "Update poster gagal",
+                  detail: detail,
+                });
+                return;
+              }
+
+              var matched = 0;
+              if (resp !== null && resp !== undefined) {
+                if (typeof resp.matchedCount === "number")
+                  matched = resp.matchedCount;
+              }
+              if (matched === 0) {
+                ipcRenderer.send("get-alert", {
+                  type: "error",
+                  message: "Update poster gagal",
+                  detail: "Document tidak ditemukan (matchedCount=0)",
+                });
+                return;
+              }
+
+              // sukses
+              this.finishSave();
+            }.bind(this)
+          );
+          return;
+        } else {
+          // Upload gagal tapi event sudah tersimpan
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "Saved without poster",
+            detail: "Event tersimpan. Upload poster gagal.",
+          });
+          this.finishSave();
+          return;
+        }
+      }
+
+      // Tidak ada poster lokal → selesai
+      this.finishSave();
+    },
+
+    finishSave() {
+      ipcRenderer.send("get-alert-saved", {
+        type: "question",
+        detail: "Event data has been successfully saved",
+        message: "Successfully",
+      });
+      const self = this;
+      setTimeout(function () {
+        localStorage.removeItem("formNewEvent");
+        self.$router.push("/");
+      }, 1500);
+    },
   },
 };
 </script>

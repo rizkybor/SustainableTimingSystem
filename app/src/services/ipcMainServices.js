@@ -222,15 +222,25 @@ function setupIPCMainHandlers() {
     }
   });
 
-ipcMain.on('update-event-poster', async function (e, payload) {
+ipcMain.on('update-event-poster', async function (evt, payload) {
   try {
     const r = await updateEventPoster(payload);
-    e.reply('update-event-poster-reply', r);
+
+    var idToLog = '';
+    if (payload !== null && payload !== undefined) {
+      if (payload._id !== null && payload._id !== undefined) {
+        idToLog = String(payload._id);
+      }
+    }
+    console.log('[update-event-poster]', idToLog, '=>', r);
+
+    evt.reply('update-event-poster-reply', r);
   } catch (err) {
-    e.reply('update-event-poster-reply', {
-      ok: false,
-      error: err && err.message ? err.message : String(err)
-    });
+    var msg = 'Unknown error';
+    if (err !== null && err !== undefined) {
+      if (typeof err.message === 'string') msg = err.message;
+    }
+    evt.reply('update-event-poster-reply', { ok: false, error: msg });
   }
 });
 
@@ -480,12 +490,9 @@ ipcMain.on('update-event-poster', async function (e, payload) {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
-      console.log(identity, "<< identitas");
       const res = await getTeamsRegistered(identity);
-      console.log(res, "<<< CEK RES");
       event.reply("get-teams-registered-reply", res);
     } catch (error) {
-      console.error("get-teams-registered error:", error);
       event.reply("get-teams-registered-reply", null);
     }
   });

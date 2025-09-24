@@ -198,7 +198,7 @@
       :settings="raceSettings"
       :max-gate="MAX_GATE"
       :max-section="MAX_SECTION"
-      :event-id="getEventId()"
+      :event-id="eventId"
       :event-name="safeEventName"
       @update-settings="onUpdateRaceSettings"
     />
@@ -360,7 +360,7 @@ export default {
 
   async created() {
     const idFromRoute = this.$route.params.id;
-    await this.loadEvent(idFromRoute); 
+    await this.loadEvent(idFromRoute);
     await this.loadAvailableTeams("C - D");
     if (
       (this.events.categoriesInitial || []).length &&
@@ -373,17 +373,18 @@ export default {
   },
 
   methods: {
+    /* =========================================================
+     * UI ACTIONS
+     * =======================================================*/
     openRaceSettings() {
       this.showRaceSettings = true;
     },
+
     onUpdateRaceSettings(payload) {
       // simpan lokal dulu
-      if (payload && payload.settings) {
-        this.raceSettings = payload.settings;
-      }
+      if (payload && payload.settings) this.raceSettings = payload.settings;
 
       if (typeof window !== "undefined" && window.ipcRenderer) {
-        // kirim ke main process
         window.ipcRenderer.send("race-settings:upsert", payload);
 
         // sekali saja, tunggu reply lalu lepas listener
@@ -401,25 +402,35 @@ export default {
             handler
           );
         };
-
         window.ipcRenderer.on("race-settings:upsert-reply", handler);
       }
     },
+
+    async selectCategory(c) {
+      this.raceActive.selected = { name: c.key };
+      await this.refreshVisibleBuckets();
+    },
+
+    async selectInitial(i) {
+      this.initialActive.selected = i;
+      await this.refreshVisibleBuckets();
+    },
+
+    /* =========================================================
+     * SOCKET / IPC (opsional)
+     * =======================================================*/
     sendRealtimeMessage() {
       const socket = getSocket();
-
       socket.emit(
         "custom:event",
         {
-          senderId: socket.id, // ⬅️ penanda pengirim
+          senderId: socket.id,
           from: "Sustainable Timing System",
           text: "Apakah valid penalty untuk Tim Budi Luhur ?",
           ts: new Date().toISOString(),
         },
-        // optional ack dari server: hanya beri notifikasi kalau GAGAL
         (ok) => {
           if (!ok) {
-            // contoh: pakai alert IPC milikmu
             ipcRenderer.send("get-alert", {
               type: "error",
               message: "Gagal mengirim pesan realtime",
@@ -428,15 +439,68 @@ export default {
           }
         }
       );
-
-      // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
     },
 
-    // helper: ambil _id event (BSON / string aman)
-    getEventId() {
-      var ev = this.events || {};
-      var id = ev._id;
-      return typeof id === "string" ? id : "";
+    /* =========================================================
+     * HELPERS: string/id normalizers, safe getters
+     * =======================================================*/
+    _safeSelectedName(obj) {
+      return obj && obj.selected && obj.selected.name
+        ? String(obj.selected.name)
+        : "";
+    },
+
+    _matchId(list, name) {
+      const n = String(name || "").toUpperCase();
+      const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
+      return f ? String(f.value) : "";
+    },
+
+    _idToString(raw) {
+      if (typeof raw === "string") return raw;
+      if (raw && typeof raw.$oid === "string") return raw.$oid; // { $oid: "..." }
+      if (raw && raw._bsontype === "ObjectID") {
+        if (typeof raw.toHexString === "function") return raw.toHexString();
+        if (raw.id)
+          return Array.from(raw.id)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+      }
+      return "";
+    },
+
+    _toUpperSafe(v) {
+      return String(v || "").toUpperCase();
+    },
+
+    _mapRaceToPath(evName) {
+      const e = this._toUpperSafe(evName);
+      if (e === "SPRINT") return "sprint-race";
+      if (e === "SLALOM") return "slalom-race";
+      if (e === "DRR") return "drr-race";
+      if (e === "HEAD2HEAD") return "head2head-race";
+      return e.toLowerCase(); // fallback
+    },
+
+    /* =========================================================
+     * IDENTITY BUILDERS (event/initial/division/race)
+     * =======================================================*/
+    _buildIdentity(div, race) {
+      // pakai computed eventId; fallback ke route param
+      const eventId = this.eventId || this.$route.params.id || "";
+      const eventName = this._safeSelectedName(this.raceActive);
+      const initialName = this._safeSelectedName(this.initialActive);
+
+      return {
+        eventId,
+        initialId: this._matchId(this.events.categoriesInitial, initialName),
+        raceId: this._matchId(this.events.categoriesRace, race),
+        divisionId: this._matchId(this.events.categoriesDivision, div),
+        eventName: String(eventName).toUpperCase(),
+        initialName: String(initialName).toUpperCase(),
+        raceName: String(race).toUpperCase(),
+        divisionName: String(div).toUpperCase(),
+      };
     },
 
     showResult(div, race) {
@@ -456,8 +520,7 @@ export default {
         SLALOM: "slalom-result",
         HEAD2HEAD: "headtohead-result",
       };
-
-      let path = pathMap[idt.eventName] || "";
+      const path = pathMap[idt.eventName] || "";
 
       this.$router.push({
         path: `/event-detail/${this.$route.params.id}/${path}`,
@@ -474,6 +537,9 @@ export default {
       });
     },
 
+    /* =========================================================
+     * BUCKET READ/WRITE (dataTeams) + VISIBILITY
+     * =======================================================*/
     _clearBucketInState(identity) {
       const ev = String(identity.eventName).toUpperCase();
       const ini = String(identity.initialName).toUpperCase();
@@ -489,49 +555,6 @@ export default {
             String(b.divisionName).toUpperCase() === div
           )
       );
-    },
-    // --- helpers aman (tanpa optional chaining) ---
-    _safeSelectedName(obj) {
-      return obj && obj.selected && obj.selected.name
-        ? String(obj.selected.name)
-        : "";
-    },
-    _matchId(list, name) {
-      const n = String(name || "").toUpperCase();
-      const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
-      return f ? String(f.value) : "";
-    },
-
-    // methods:
-    // taruh di methods (atau ganti yang existing)
-    _idToString(raw) {
-      if (typeof raw === "string") return raw;
-      if (raw && typeof raw.$oid === "string") return raw.$oid; // { $oid: "..." }
-      if (raw && raw._bsontype === "ObjectID") {
-        if (typeof raw.toHexString === "function") return raw.toHexString();
-        if (raw.id)
-          return Array.from(raw.id)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
-      }
-      return "";
-    },
-
-    // identity dinamis utk satu panel
-    _buildIdentity(div, race) {
-      const eventId = this.eventId || this.$route.params.id || "";
-      const eventName = this._safeSelectedName(this.raceActive);
-      const initialName = this._safeSelectedName(this.initialActive);
-      return {
-        eventId,
-        initialId: this._matchId(this.events.categoriesInitial, initialName),
-        raceId: this._matchId(this.events.categoriesRace, race),
-        divisionId: this._matchId(this.events.categoriesDivision, div),
-        eventName: String(eventName).toUpperCase(),
-        initialName: String(initialName).toUpperCase(),
-        raceName: String(race).toUpperCase(),
-        divisionName: String(div).toUpperCase(),
-      };
     },
 
     _mergeBucketIntoState(bucket) {
@@ -552,7 +575,22 @@ export default {
       else this.dataTeams.push(bucket);
     },
 
-    // === READ satu bucket (panel) ===
+    hasDivision(name) {
+      return (this.events.categoriesDivision || []).some(
+        (d) => String(d.name).toUpperCase() === String(name).toUpperCase()
+      );
+    },
+
+    hasRace(name) {
+      return (this.events.categoriesRace || []).some(
+        (r) => String(r.name).toUpperCase() === String(name).toUpperCase()
+      );
+    },
+
+    showPanel(div, race) {
+      return this.hasDivision(div) && this.hasRace(race);
+    },
+
     async loadTeamsRegistered(div, race) {
       const identity = this._buildIdentity(div, race);
 
@@ -577,12 +615,9 @@ export default {
       ].join("|");
       this.lastToken = token;
 
-      // Balut dalam Promise + timeout supaya handler pasti selesai
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
-          // Jika sudah ada request baru, abaikan balasan ini
-          if (this.lastToken !== token) return resolve();
-
+          if (this.lastToken !== token) return resolve(); // abaikan balasan usang
           if (bucket && Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
             resolve({ div, race, ok: true });
@@ -591,76 +626,41 @@ export default {
             resolve({ div, race, ok: false, reason: "empty" });
           }
         };
-        // kirim permintaan
+
         ipcRenderer.send("get-teams-registered", identity);
         ipcRenderer.once("get-teams-registered-reply", onReply);
 
-        // hard timeout (misal 3s) agar listener tidak “menggantung”
+        // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
           try {
             ipcRenderer.removeListener("get-teams-registered-reply", onReply);
-          } catch (e) {
-            // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
-            this.participant = Array.isArray(this.dataTeams)
-              ? this.dataTeams.slice()
-              : [];
-          }
+          } catch {}
           resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });
     },
 
-    // === READ semua panel yang terlihat ===
     async refreshVisibleBuckets() {
       await this.$nextTick();
       const jobs = [];
-      if (this.showPanel("R4", "MEN")) {
+      if (this.showPanel("R4", "MEN"))
         jobs.push(this.loadTeamsRegistered("R4", "MEN"));
-      }
-      if (this.showPanel("R4", "WOMEN")) {
+      if (this.showPanel("R4", "WOMEN"))
         jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
-      }
-      if (this.showPanel("R6", "MEN")) {
+      if (this.showPanel("R6", "MEN"))
         jobs.push(this.loadTeamsRegistered("R6", "MEN"));
-      }
-      if (this.showPanel("R6", "WOMEN")) {
+      if (this.showPanel("R6", "WOMEN"))
         jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
-      }
       await Promise.all(jobs);
     },
 
-    // === UI handlers (tetap panggil refresh) ===
-    async selectCategory(c) {
-      this.raceActive.selected = { name: c.key };
-      await this.refreshVisibleBuckets();
-    },
-    async selectInitial(i) {
-      this.initialActive.selected = i;
-      await this.refreshVisibleBuckets();
-    },
-
-    /* ------------ visibility panel ------------ */
-    hasDivision(name) {
-      return (this.events.categoriesDivision || []).some(
-        (d) => String(d.name).toUpperCase() === String(name).toUpperCase()
-      );
-    },
-    hasRace(name) {
-      return (this.events.categoriesRace || []).some(
-        (r) => String(r.name).toUpperCase() === String(name).toUpperCase()
-      );
-    },
-    showPanel(div, race) {
-      return this.hasDivision(div) && this.hasRace(race);
-    },
-
-    /* ------------ sumber dropdown ------------ */
-    // helper: tentukan type yang boleh berdasarkan levelName
+    /* =========================================================
+     * AVAILABLE TEAMS (dropdown sumber)
+     * =======================================================*/
     _allowedTypeForLevel(levelName) {
       const lv = String(levelName || "")
         .trim()
         .toUpperCase();
-
       if (lv.includes("CLASSIFICATION - G")) return "club";
       if (lv.includes("CLASSIFICATION - D")) return "club";
       if (lv.includes("CLASSIFICATION - C")) return "pengcab";
@@ -669,24 +669,18 @@ export default {
       return null;
     },
 
-    // sumber dropdown tim yang tersedia (ambil dari teamsCollection)
-    async loadAvailableTeams(/* eventId not needed now */) {
-      // fallback dummy bila pengembangan
+    async loadAvailableTeams() {
       if (this.useDummyTeams) {
         this.availableTeams = this.dummyTeams.slice();
         return;
       }
 
       try {
-        // minta semua teams dari main process
         ipcRenderer.send("teams:get-all");
-
         await new Promise((resolve) => {
           ipcRenderer.once("teams:get-all-reply", (_e, res) => {
             let items =
               res && res.ok && Array.isArray(res.items) ? res.items : [];
-
-            // filter by levelName → typeTeam
             const allow = this._allowedTypeForLevel(this.events.levelName);
             if (allow) {
               const allowLC = String(allow).toLowerCase();
@@ -694,26 +688,21 @@ export default {
                 (t) => String(t.typeTeam || "").toLowerCase() === allowLC
               );
             }
-
-            // map ke bentuk dropdown kamu: { id, nameTeam, bibTeam }
             this.availableTeams = items.map((t) => ({
               id: t._id && t._id.$oid ? t._id.$oid : String(t._id || ""),
               nameTeam: t.nameTeam,
-              bibTeam: t.bibTeam || "", // boleh kosong, nanti user isi saat add
+              bibTeam: t.bibTeam || "",
             }));
-
-            // jika kosong, tetap sediakan dummy agar UI tidak “blank” (opsional)
-            if (!this.availableTeams.length) {
+            if (!this.availableTeams.length)
               this.availableTeams = this.dummyTeams.slice();
-            }
-
             resolve();
           });
         });
-      } catch (err) {
+      } catch {
         this.availableTeams = this.dummyTeams.slice();
       }
     },
+
     availableFor(divisionName, raceName) {
       const ev = this.raceActive.selected.name.toUpperCase();
       const init = (
@@ -721,16 +710,8 @@ export default {
         ""
       ).toUpperCase();
       const bucket = this._getBucket(ev, divisionName, raceName, init);
-      // const usedBibs = new Set(
-      //   (bucket && bucket.teams ? bucket.teams : []).map((t) =>
-      //     String(t.bibTeam).trim()
-      //   )
-      // );
-      // return (this.availableTeams || []).filter(
-      //   (t) => !usedBibs.has(String(t.bibTeam).trim())
-      // );
+
       const teamsInBucket = bucket && bucket.teams ? bucket.teams : [];
-      // dukung data lama (mungkin belum ada teamId)
       const usedIds = new Set(
         teamsInBucket
           .map((t) => (t.teamId ? String(t.teamId) : ""))
@@ -747,10 +728,6 @@ export default {
         teamsInBucket.map((t) => String(t.bibTeam || "").trim())
       );
 
-      // Kembalikan semua opsi, tapi tandai disabled bila:
-      // - teamId sudah dipakai di panel ini ATAU
-      // - (fallback) nameTeam sudah dipakai di panel ini
-      // NOTE: kita tidak mem-filter keluar; biar terlihat tapi tidak bisa dipilih.
       return (this.availableTeams || []).map((t) => {
         const id = String(t.id || "");
         const nm = String(t.nameTeam || "")
@@ -760,14 +737,14 @@ export default {
         return {
           ...t,
           disabled: alreadyUsed,
-          // opsional: kalau BIB-nya sudah dipakai, juga disable untuk mencegah duplikat BIB
-          // (bisa kamu hilangkan kalau BIB mau boleh sama antar tim – biasanya tidak)
           bibConflict: usedBibs.has(String(t.bibTeam || "").trim()),
         };
       });
     },
 
-    /* ------------ akses data participant ------------ */
+    /* =========================================================
+     * ACCESSORS (membaca dataTeams)
+     * =======================================================*/
     getTeamsBy(divisionName, raceName, eventName) {
       if (!Array.isArray(this.dataTeams)) return [];
       const ev = String(eventName || "").toUpperCase();
@@ -777,6 +754,7 @@ export default {
         this.initialActive.selected && this.initialActive.selected.name
           ? String(this.initialActive.selected.name).toUpperCase()
           : "";
+
       const buckets = this.dataTeams.filter(
         (p) =>
           String(p.eventName).toUpperCase() === ev &&
@@ -784,6 +762,7 @@ export default {
           String(p.raceName).toUpperCase() === rac &&
           (!ini || String(p.initialName).toUpperCase() === ini)
       );
+
       const out = [];
       buckets.forEach((b) =>
         (b.teams || []).forEach((t) => out.push({ ...t }))
@@ -810,6 +789,7 @@ export default {
       }
       return null;
     },
+
     _ensureBucket(eventName, divisionName, raceName, initialName) {
       const exist = this._getBucket(
         eventName,
@@ -849,27 +829,46 @@ export default {
         teams: [],
       };
 
-      // 🔴 VALIDASI: initialId wajib ada
       if (!bucket.initialId) {
         ipcRenderer.send("get-alert", {
           type: "warning",
+          message: "Ups Sorry",
           detail:
             "Gagal Simpan, silakan pilih Initials Category terlebih dahulu.",
-          message: "Ups Sorry",
         });
         return null;
       }
 
       if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
       this.dataTeams.push(bucket);
-
       return bucket;
+    },
+
+    /* =========================================================
+     * DRAFT HANDLERS (panel add/edit)
+     * =======================================================*/
+    keyOf(div, race) {
+      return `${String(div).toUpperCase()}_${String(race).toUpperCase()}`;
+    },
+
+    addDraft(div, race) {
+      const k = this.keyOf(div, race);
+      if (!this.draftMap[k])
+        this.$set(this.draftMap, k, { teamId: "", bib: "" });
+    },
+
+    cancelDraft(div, race) {
+      this.$set(this.draftMap, this.keyOf(div, race), null);
+    },
+
+    onDraftChange(div, race, draft) {
+      this.$set(this.draftMap, this.keyOf(div, race), draft);
     },
 
     _buildTeamRecord(eventName, teamObj) {
       const ev = String(eventName || "").toUpperCase();
       const base = {
-        teamId: teamObj.id ? String(teamObj.id) : "", // simpan id sumber tim
+        teamId: teamObj.id ? String(teamObj.id) : "",
         nameTeam: teamObj.nameTeam,
         bibTeam: String(teamObj.bibTeam || "").trim(),
         startOrder: "",
@@ -952,22 +951,6 @@ export default {
       };
     },
 
-    /* ------------ Draft handlers ------------ */
-    keyOf(div, race) {
-      return `${String(div).toUpperCase()}_${String(race).toUpperCase()}`;
-    },
-    addDraft(div, race) {
-      const k = this.keyOf(div, race);
-      if (!this.draftMap[k])
-        this.$set(this.draftMap, k, { teamId: "", bib: "" });
-    },
-    cancelDraft(div, race) {
-      this.$set(this.draftMap, this.keyOf(div, race), null);
-    },
-    onDraftChange(div, race, draft) {
-      this.$set(this.draftMap, this.keyOf(div, race), draft);
-    },
-
     saveDraft(div, race) {
       const k = this.keyOf(div, race);
       const d = this.draftMap[k];
@@ -977,27 +960,14 @@ export default {
       const init =
         (this.initialActive.selected && this.initialActive.selected.name) || "";
       const bucket = this._ensureBucket(evName, div, race, init);
-
-      // Cek duplicate BIB
-      // if (
-      //   bucket.teams.some(
-      //     (t) => String(t.bibTeam).trim() === String(d.bib).trim()
-      //   )
-      // )
-      //   return;
-
-      // const srcTeam = (this.availableTeams || []).find(
-      //   (t) => String(t.id) === String(d.teamId)
-      // );
-      // if (!srcTeam) return;
-
-      // Cek duplicate TEAM di panel yang sama (pakai teamId; fallback nameTeam)
+      if (!bucket) return;
 
       const srcTeam = (this.availableTeams || []).find(
         (t) => String(t.id) === String(d.teamId)
       );
       if (!srcTeam) return;
 
+      // hindari duplikasi team & bib di panel yang sama
       const willDuplicateTeam =
         bucket.teams.some(
           (t) => t.teamId && String(t.teamId) === String(srcTeam.id)
@@ -1022,7 +992,6 @@ export default {
         return;
       }
 
-      // Cek duplicate BIB (di panel yang sama)
       if (
         bucket.teams.some(
           (t) => String(t.bibTeam).trim() === String(d.bib).trim()
@@ -1042,82 +1011,34 @@ export default {
       this.dataTeams = this.dataTeams.slice(); // trigger reactive update
       this.$set(this.draftMap, k, null);
       this.persistParticipants();
-      // 🔁 sinkronkan perubahan ke DB
-      this.syncBucketToDB(bucket);
+      this.syncBucketToDB(bucket); // sinkron ke DB
     },
 
+    /* =========================================================
+     * PERSISTENCE (DB & local state)
+     * =======================================================*/
     syncBucketToDB(bucket) {
-      // kirim satu dokumen bucket untuk di-upsert
       ipcRenderer.send("upsert-teams-registered", bucket);
       ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
         if (!res || !res.ok) {
           ipcRenderer.send("get-alert", {
             type: "error",
+            message: "Failed",
             detail:
               (res && res.error) ||
               "Gagal menyimpan perubahan tim ke database.",
-            message: "Failed",
           });
         }
       });
     },
 
-    deleteRow(div, race, row) {
-      const evName = this.raceActive.selected.name;
-      const init =
-        (this.initialActive.selected && this.initialActive.selected.name) || "";
-
-      // 1) Hapus dari state lokal
-      const bucket = this._getBucket(evName, div, race, init);
-      if (!bucket) return;
-      bucket.teams = (bucket.teams || []).filter(
-        (t) =>
-          String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
-          String(t.nameTeam).trim().toUpperCase() !==
-            String(row.nameTeam).trim().toUpperCase()
-      );
-      this.dataTeams = this.dataTeams.slice();
-      this.persistParticipants();
-
-      // 2) Hapus di DB
-      ipcRenderer.send("delete-team-in-bucket", {
-        identity: {
-          eventId: bucket.eventId,
-          initialId: bucket.initialId,
-          raceId: bucket.raceId,
-          divisionId: bucket.divisionId,
-          eventName: bucket.eventName,
-          initialName: bucket.initialName,
-          raceName: bucket.raceName,
-          divisionName: bucket.divisionName,
-        },
-        team: {
-          nameTeam: row.nameTeam,
-          bibTeam: row.bibTeam,
-        },
-      });
-
-      ipcRenderer.once("delete-team-in-bucket-reply", (_e, res) => {
-        if (res && res.ok) {
-          // optional toast
-        } else {
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            detail: (res && res.error) || "Gagal menghapus team di database.",
-            message: "Failed",
-          });
-        }
-      });
-    },
-
-    /* ------------ load & persist ------------ */
     async loadEvent(id) {
       try {
         ipcRenderer.send("get-events-byid", id);
         await new Promise((resolve) => {
           ipcRenderer.once("get-events-byid-reply", (_e, data) => {
             const ev = data || {};
-            ev._id = this._idToString(ev._id); // ⬅️ normalisasi di sini
+            ev._id = this._idToString(ev._id); // normalisasi id → string
             this.events = ev;
             this.dataTeams = Array.isArray(ev.participant)
               ? ev.participant
@@ -1131,46 +1052,23 @@ export default {
       }
     },
 
-    evIdToString(ev) {
-      if (ev && ev._id) {
-        if (typeof ev._id === "object" && ev._id.$oid) {
-          return String(ev._id.$oid);
-        }
-        return String(ev._id);
-      }
-      return "";
-    },
     persistParticipants() {
       try {
         ipcRenderer.send("events-update-participant", {
           eventId: this.$route.params.id,
           participant: this.dataTeams,
         });
-      } catch (e) {
-        // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
-        this.participant = Array.isArray(this.dataTeams)
-          ? this.dataTeams.slice()
-          : [];
+      } catch {
+        // no-op; state lokal tetap dipakai
       }
     },
-    _toUpperSafe(v) {
-      return String(v || "").toUpperCase();
-    },
 
-    _mapRaceToPath(evName) {
-      const e = this._toUpperSafe(evName);
-      if (e === "SPRINT") return "sprint-race";
-      if (e === "SLALOM") return "slalom-race";
-      if (e === "DRR") return "drr-race";
-      if (e === "HEAD2HEAD") return "head2head-race";
-      return e.toLowerCase(); // fallback
-    },
-
+    /* =========================================================
+     * START RACE / NAVIGATION
+     * =======================================================*/
     handleStartRace(payload) {
-      // payload dari TeamPanel
       const { division, race, eventName, initialName } = payload;
 
-      // Ambil bucket AKTUAL (supaya tersinkron dgn state & DB)
       const bucket = this._getBucket(
         this._toUpperSafe(eventName),
         this._toUpperSafe(division),
@@ -1188,29 +1086,23 @@ export default {
         teams: [],
       };
 
-      // Siapkan payload lengkap untuk halaman race
       const startData = {
-        // metadata event penuh (butuh categories untuk render berikutnya)
         event: this.events || {},
-        // konteks kategori yang dipilih user
         context: {
-          eventName: bucket.eventName, // SPRINT/SLALOM/DRR/HEAD2HEAD (UPPER)
+          eventName: bucket.eventName,
           initialName: bucket.initialName,
           divisionName: bucket.divisionName,
           raceName: bucket.raceName,
         },
-        // bucket aktif (teams kombinasi tsb)
         bucket,
-        // seluruh dataTeams untuk referensi (mis. cross-panel)
         allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
       };
 
-      // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
       try {
-        // 1) Selalu simpan payload start
+        // 1) simpan payload start
         localStorage.setItem("raceStartPayload", JSON.stringify(startData));
 
-        // 2) Siapkan objek event yang mau disimpan (sekalian pastikan participant terbaru)
+        // 2) bangun currentEvent (pastikan participant terbaru)
         const currentEvent = {
           ...(this.events || {}),
           participant: Array.isArray(this.dataTeams)
@@ -1218,33 +1110,30 @@ export default {
             : (this.events && this.events.participant) || [],
         };
 
-        // 3) Dapatkan ID event yang stabil (pakai helper kamu getEventId)
+        // 3) gunakan _id yang sudah dinormalisasi (string) atau fallback
         const eventId =
-          this.getEventId() ||
-          (currentEvent && currentEvent._id && currentEvent._id.$oid
-            ? String(currentEvent._id.$oid)
+          (currentEvent && currentEvent._id
+            ? String(
+                typeof currentEvent._id === "object" && currentEvent._id.$oid
+                  ? currentEvent._id.$oid
+                  : currentEvent._id
+              )
             : "") ||
           String(currentEvent.id || "") ||
           String(currentEvent.eventName || "default");
 
-        // 4) Baca yang lama dari localStorage
+        // 4) simpan eventDetails (mendukung single-object atau dictionary multi-event)
         const raw = localStorage.getItem("eventDetails");
         let payload;
-
         if (!raw) {
-          // Belum ada -> simpan langsung sebagai objek tunggal
           payload = currentEvent;
         } else {
           let prev;
           try {
             prev = JSON.parse(raw);
           } catch {
-            // Rusak / bukan JSON -> timpa dengan currentEvent
             prev = null;
           }
-
-          // Jika prev adalah DICTIONARY multi-event (bukan single object),
-          // kita upsert berdasarkan eventId
           const looksLikeDict =
             prev &&
             typeof prev === "object" &&
@@ -1254,20 +1143,15 @@ export default {
           if (looksLikeDict && eventId) {
             payload = { ...prev, [eventId]: currentEvent };
           } else {
-            // Mode single-object -> timpa langsung
-            payload = currentEvent;
+            payload = currentEvent; // timpa mode single-object
           }
         }
-
         localStorage.setItem("eventDetails", JSON.stringify(payload));
       } catch (e) {
-        // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
-        this.participant = Array.isArray(this.dataTeams)
-          ? this.dataTeams.slice()
-          : [];
+        // swallow error: tetap lanjut navigasi
       }
 
-      // Opsional: notifikasi
+      // notifikasi opsional
       ipcRenderer &&
         ipcRenderer.send &&
         ipcRenderer.send("get-alert-saved", {
@@ -1276,11 +1160,893 @@ export default {
           detail: `${bucket.eventName} – ${bucket.divisionName}/${bucket.raceName} (${bucket.initialName})`,
         });
 
-      // Arahkan ke halaman race yang sesuai
+      // navigasi ke halaman race
       const path = this._mapRaceToPath(eventName);
       this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
     },
   },
+
+  // methods: {
+  //   openRaceSettings() {
+  //     this.showRaceSettings = true;
+  //   },
+  //   onUpdateRaceSettings(payload) {
+  //     // simpan lokal dulu
+  //     if (payload && payload.settings) {
+  //       this.raceSettings = payload.settings;
+  //     }
+
+  //     if (typeof window !== "undefined" && window.ipcRenderer) {
+  //       // kirim ke main process
+  //       window.ipcRenderer.send("race-settings:upsert", payload);
+
+  //       // sekali saja, tunggu reply lalu lepas listener
+  //       const handler = (_event, res) => {
+  //         if (res && res.ok) {
+  //           console.log("✅ Race settings updated in DB:", res);
+  //         } else {
+  //           console.error(
+  //             "❌ Failed to update race settings:",
+  //             res && res.error
+  //           );
+  //         }
+  //         window.ipcRenderer.removeListener(
+  //           "race-settings:upsert-reply",
+  //           handler
+  //         );
+  //       };
+
+  //       window.ipcRenderer.on("race-settings:upsert-reply", handler);
+  //     }
+  //   },
+  //   sendRealtimeMessage() {
+  //     const socket = getSocket();
+
+  //     socket.emit(
+  //       "custom:event",
+  //       {
+  //         senderId: socket.id, // ⬅️ penanda pengirim
+  //         from: "Sustainable Timing System",
+  //         text: "Apakah valid penalty untuk Tim Budi Luhur ?",
+  //         ts: new Date().toISOString(),
+  //       },
+  //       // optional ack dari server: hanya beri notifikasi kalau GAGAL
+  //       (ok) => {
+  //         if (!ok) {
+  //           // contoh: pakai alert IPC milikmu
+  //           ipcRenderer.send("get-alert", {
+  //             type: "error",
+  //             message: "Gagal mengirim pesan realtime",
+  //             detail: "Silakan cek koneksi broker/socket.",
+  //           });
+  //         }
+  //       }
+  //     );
+
+  //     // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
+  //   },
+
+  //   // helper
+  //   getEventId() {
+  //     var ev = this.events || {};
+  //     var id = ev._id;
+  //     return typeof id === "string" ? id : "";
+  //   },
+
+  //   showResult(div, race) {
+  //     const idt = this._buildIdentity(div, race);
+  //     if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
+  //       ipcRenderer.send("get-alert", {
+  //         type: "warning",
+  //         message: "Data belum lengkap",
+  //         detail: "Pilih Initials Category / kategori yang valid.",
+  //       });
+  //       return;
+  //     }
+
+  //     const pathMap = {
+  //       SPRINT: "sprint-result",
+  //       DRR: "drr-result",
+  //       SLALOM: "slalom-result",
+  //       HEAD2HEAD: "headtohead-result",
+  //     };
+
+  //     let path = pathMap[idt.eventName] || "";
+
+  //     this.$router.push({
+  //       path: `/event-detail/${this.$route.params.id}/${path}`,
+  //       query: {
+  //         eventId: idt.eventId,
+  //         initialId: idt.initialId,
+  //         raceId: idt.raceId,
+  //         divisionId: idt.divisionId,
+  //         eventName: idt.eventName,
+  //         initialName: idt.initialName,
+  //         raceName: idt.raceName,
+  //         divisionName: idt.divisionName,
+  //       },
+  //     });
+  //   },
+
+  //   _clearBucketInState(identity) {
+  //     const ev = String(identity.eventName).toUpperCase();
+  //     const ini = String(identity.initialName).toUpperCase();
+  //     const rac = String(identity.raceName).toUpperCase();
+  //     const div = String(identity.divisionName).toUpperCase();
+
+  //     this.dataTeams = (this.dataTeams || []).filter(
+  //       (b) =>
+  //         !(
+  //           String(b.eventName).toUpperCase() === ev &&
+  //           String(b.initialName).toUpperCase() === ini &&
+  //           String(b.raceName).toUpperCase() === rac &&
+  //           String(b.divisionName).toUpperCase() === div
+  //         )
+  //     );
+  //   },
+  //   _safeSelectedName(obj) {
+  //     return obj && obj.selected && obj.selected.name
+  //       ? String(obj.selected.name)
+  //       : "";
+  //   },
+  //   _matchId(list, name) {
+  //     const n = String(name || "").toUpperCase();
+  //     const f = (list || []).find((x) => String(x.name).toUpperCase() === n);
+  //     return f ? String(f.value) : "";
+  //   },
+  //   _idToString(raw) {
+  //     if (typeof raw === "string") return raw;
+  //     if (raw && typeof raw.$oid === "string") return raw.$oid; // { $oid: "..." }
+  //     if (raw && raw._bsontype === "ObjectID") {
+  //       if (typeof raw.toHexString === "function") return raw.toHexString();
+  //       if (raw.id)
+  //         return Array.from(raw.id)
+  //           .map((b) => b.toString(16).padStart(2, "0"))
+  //           .join("");
+  //     }
+  //     return "";
+  //   },
+
+  //   // identity dinamis utk satu panel
+  //   _buildIdentity(div, race) {
+  //     const eventId = this.eventId || this.$route.params.id || "";
+  //     const eventName = this._safeSelectedName(this.raceActive);
+  //     const initialName = this._safeSelectedName(this.initialActive);
+  //     return {
+  //       eventId,
+  //       initialId: this._matchId(this.events.categoriesInitial, initialName),
+  //       raceId: this._matchId(this.events.categoriesRace, race),
+  //       divisionId: this._matchId(this.events.categoriesDivision, div),
+  //       eventName: String(eventName).toUpperCase(),
+  //       initialName: String(initialName).toUpperCase(),
+  //       raceName: String(race).toUpperCase(),
+  //       divisionName: String(div).toUpperCase(),
+  //     };
+  //   },
+
+  //   _mergeBucketIntoState(bucket) {
+  //     if (!bucket) return;
+  //     if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
+  //     const idx = this.dataTeams.findIndex(
+  //       (b) =>
+  //         String(b.eventName).toUpperCase() ===
+  //           String(bucket.eventName).toUpperCase() &&
+  //         String(b.initialName).toUpperCase() ===
+  //           String(bucket.initialName).toUpperCase() &&
+  //         String(b.raceName).toUpperCase() ===
+  //           String(bucket.raceName).toUpperCase() &&
+  //         String(b.divisionName).toUpperCase() ===
+  //           String(bucket.divisionName).toUpperCase()
+  //     );
+  //     if (idx >= 0) this.$set(this.dataTeams, idx, bucket);
+  //     else this.dataTeams.push(bucket);
+  //   },
+
+  //   // === READ satu bucket (panel) ===
+  //   async loadTeamsRegistered(div, race) {
+  //     const identity = this._buildIdentity(div, race);
+
+  //     // Jangan fetch kalau identity belum lengkap → kosongkan tabel kombinasi tsb
+  //     if (
+  //       !identity.eventId ||
+  //       !identity.initialId ||
+  //       !identity.raceId ||
+  //       !identity.divisionId
+  //     ) {
+  //       this._clearBucketInState(identity);
+  //       return { div, race, ok: false, reason: "identity-incomplete" };
+  //     }
+
+  //     // Token untuk menangkal balasan telat (race condition)
+  //     const token = [
+  //       identity.eventName,
+  //       identity.initialName,
+  //       identity.divisionName,
+  //       identity.raceName,
+  //       Date.now(),
+  //     ].join("|");
+  //     this.lastToken = token;
+
+  //     // Balut dalam Promise + timeout supaya handler pasti selesai
+  //     return await new Promise((resolve) => {
+  //       const onReply = (_e, bucket) => {
+  //         // Jika sudah ada request baru, abaikan balasan ini
+  //         if (this.lastToken !== token) return resolve();
+
+  //         if (bucket && Array.isArray(bucket.teams)) {
+  //           this._mergeBucketIntoState(bucket);
+  //           resolve({ div, race, ok: true });
+  //         } else {
+  //           this._clearBucketInState(identity);
+  //           resolve({ div, race, ok: false, reason: "empty" });
+  //         }
+  //       };
+  //       // kirim permintaan
+  //       ipcRenderer.send("get-teams-registered", identity);
+  //       ipcRenderer.once("get-teams-registered-reply", onReply);
+
+  //       // hard timeout (misal 3s) agar listener tidak “menggantung”
+  //       setTimeout(() => {
+  //         try {
+  //           ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+  //         } catch (e) {
+  //           // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+  //           this.participant = Array.isArray(this.dataTeams)
+  //             ? this.dataTeams.slice()
+  //             : [];
+  //         }
+  //         resolve({ div, race, ok: false, reason: "timeout" });
+  //       }, 3000);
+  //     });
+  //   },
+
+  //   // === READ semua panel yang terlihat ===
+  //   async refreshVisibleBuckets() {
+  //     await this.$nextTick();
+  //     const jobs = [];
+  //     if (this.showPanel("R4", "MEN")) {
+  //       jobs.push(this.loadTeamsRegistered("R4", "MEN"));
+  //     }
+  //     if (this.showPanel("R4", "WOMEN")) {
+  //       jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
+  //     }
+  //     if (this.showPanel("R6", "MEN")) {
+  //       jobs.push(this.loadTeamsRegistered("R6", "MEN"));
+  //     }
+  //     if (this.showPanel("R6", "WOMEN")) {
+  //       jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
+  //     }
+  //     await Promise.all(jobs);
+  //   },
+
+  //   // === UI handlers (tetap panggil refresh) ===
+  //   async selectCategory(c) {
+  //     this.raceActive.selected = { name: c.key };
+  //     await this.refreshVisibleBuckets();
+  //   },
+  //   async selectInitial(i) {
+  //     this.initialActive.selected = i;
+  //     await this.refreshVisibleBuckets();
+  //   },
+
+  //   /* ------------ visibility panel ------------ */
+  //   hasDivision(name) {
+  //     return (this.events.categoriesDivision || []).some(
+  //       (d) => String(d.name).toUpperCase() === String(name).toUpperCase()
+  //     );
+  //   },
+  //   hasRace(name) {
+  //     return (this.events.categoriesRace || []).some(
+  //       (r) => String(r.name).toUpperCase() === String(name).toUpperCase()
+  //     );
+  //   },
+  //   showPanel(div, race) {
+  //     return this.hasDivision(div) && this.hasRace(race);
+  //   },
+
+  //   /* ------------ sumber dropdown ------------ */
+  //   // helper: tentukan type yang boleh berdasarkan levelName
+  //   _allowedTypeForLevel(levelName) {
+  //     const lv = String(levelName || "")
+  //       .trim()
+  //       .toUpperCase();
+
+  //     if (lv.includes("CLASSIFICATION - G")) return "club";
+  //     if (lv.includes("CLASSIFICATION - D")) return "club";
+  //     if (lv.includes("CLASSIFICATION - C")) return "pengcab";
+  //     if (lv.includes("CLASSIFICATION - B")) return "pengprov";
+  //     if (lv.includes("CLASSIFICATION - A")) return "country";
+  //     return null;
+  //   },
+
+  //   // sumber dropdown tim yang tersedia (ambil dari teamsCollection)
+  //   async loadAvailableTeams(/* eventId not needed now */) {
+  //     // fallback dummy bila pengembangan
+  //     if (this.useDummyTeams) {
+  //       this.availableTeams = this.dummyTeams.slice();
+  //       return;
+  //     }
+
+  //     try {
+  //       // minta semua teams dari main process
+  //       ipcRenderer.send("teams:get-all");
+
+  //       await new Promise((resolve) => {
+  //         ipcRenderer.once("teams:get-all-reply", (_e, res) => {
+  //           let items =
+  //             res && res.ok && Array.isArray(res.items) ? res.items : [];
+
+  //           // filter by levelName → typeTeam
+  //           const allow = this._allowedTypeForLevel(this.events.levelName);
+  //           if (allow) {
+  //             const allowLC = String(allow).toLowerCase();
+  //             items = items.filter(
+  //               (t) => String(t.typeTeam || "").toLowerCase() === allowLC
+  //             );
+  //           }
+
+  //           // map ke bentuk dropdown kamu: { id, nameTeam, bibTeam }
+  //           this.availableTeams = items.map((t) => ({
+  //             id: t._id && t._id.$oid ? t._id.$oid : String(t._id || ""),
+  //             nameTeam: t.nameTeam,
+  //             bibTeam: t.bibTeam || "", // boleh kosong, nanti user isi saat add
+  //           }));
+
+  //           // jika kosong, tetap sediakan dummy agar UI tidak “blank” (opsional)
+  //           if (!this.availableTeams.length) {
+  //             this.availableTeams = this.dummyTeams.slice();
+  //           }
+
+  //           resolve();
+  //         });
+  //       });
+  //     } catch (err) {
+  //       this.availableTeams = this.dummyTeams.slice();
+  //     }
+  //   },
+  //   availableFor(divisionName, raceName) {
+  //     const ev = this.raceActive.selected.name.toUpperCase();
+  //     const init = (
+  //       (this.initialActive.selected && this.initialActive.selected.name) ||
+  //       ""
+  //     ).toUpperCase();
+  //     const bucket = this._getBucket(ev, divisionName, raceName, init);
+  //     const teamsInBucket = bucket && bucket.teams ? bucket.teams : [];
+  //     const usedIds = new Set(
+  //       teamsInBucket
+  //         .map((t) => (t.teamId ? String(t.teamId) : ""))
+  //         .filter(Boolean)
+  //     );
+  //     const usedNames = new Set(
+  //       teamsInBucket.map((t) =>
+  //         String(t.nameTeam || "")
+  //           .trim()
+  //           .toUpperCase()
+  //       )
+  //     );
+  //     const usedBibs = new Set(
+  //       teamsInBucket.map((t) => String(t.bibTeam || "").trim())
+  //     );
+
+  //     // Kembalikan semua opsi, tapi tandai disabled bila:
+  //     // - teamId sudah dipakai di panel ini ATAU
+  //     // - (fallback) nameTeam sudah dipakai di panel ini
+  //     // NOTE: kita tidak mem-filter keluar; biar terlihat tapi tidak bisa dipilih.
+  //     return (this.availableTeams || []).map((t) => {
+  //       const id = String(t.id || "");
+  //       const nm = String(t.nameTeam || "")
+  //         .trim()
+  //         .toUpperCase();
+  //       const alreadyUsed = (id && usedIds.has(id)) || usedNames.has(nm);
+  //       return {
+  //         ...t,
+  //         disabled: alreadyUsed,
+  //         // opsional: kalau BIB-nya sudah dipakai, juga disable untuk mencegah duplikat BIB
+  //         // (bisa kamu hilangkan kalau BIB mau boleh sama antar tim – biasanya tidak)
+  //         bibConflict: usedBibs.has(String(t.bibTeam || "").trim()),
+  //       };
+  //     });
+  //   },
+
+  //   /* ------------ akses data participant ------------ */
+  //   getTeamsBy(divisionName, raceName, eventName) {
+  //     if (!Array.isArray(this.dataTeams)) return [];
+  //     const ev = String(eventName || "").toUpperCase();
+  //     const div = String(divisionName || "").toUpperCase();
+  //     const rac = String(raceName || "").toUpperCase();
+  //     const ini =
+  //       this.initialActive.selected && this.initialActive.selected.name
+  //         ? String(this.initialActive.selected.name).toUpperCase()
+  //         : "";
+  //     const buckets = this.dataTeams.filter(
+  //       (p) =>
+  //         String(p.eventName).toUpperCase() === ev &&
+  //         String(p.divisionName).toUpperCase() === div &&
+  //         String(p.raceName).toUpperCase() === rac &&
+  //         (!ini || String(p.initialName).toUpperCase() === ini)
+  //     );
+  //     const out = [];
+  //     buckets.forEach((b) =>
+  //       (b.teams || []).forEach((t) => out.push({ ...t }))
+  //     );
+  //     return out;
+  //   },
+
+  //   _getBucket(eventName, divisionName, raceName, initialName) {
+  //     const ev = String(eventName || "").toUpperCase();
+  //     const div = String(divisionName || "").toUpperCase();
+  //     const rac = String(raceName || "").toUpperCase();
+  //     const ini = String(initialName || "").toUpperCase();
+  //     const arr = this.dataTeams || [];
+  //     const found = arr.find(
+  //       (p) =>
+  //         String(p.eventName).toUpperCase() === ev &&
+  //         String(p.divisionName).toUpperCase() === div &&
+  //         String(p.raceName).toUpperCase() === rac &&
+  //         String(p.initialName).toUpperCase() === ini
+  //     );
+  //     if (found) {
+  //       if (!Array.isArray(found.teams)) found.teams = [];
+  //       return found;
+  //     }
+  //     return null;
+  //   },
+  //   _ensureBucket(eventName, divisionName, raceName, initialName) {
+  //     const exist = this._getBucket(
+  //       eventName,
+  //       divisionName,
+  //       raceName,
+  //       initialName
+  //     );
+  //     if (exist) return exist;
+
+  //     const ev = String(eventName).toUpperCase();
+  //     const div = String(divisionName).toUpperCase();
+  //     const rac = String(raceName).toUpperCase();
+  //     const ini = String(initialName).toUpperCase();
+
+  //     const evCfg = (this.events.categoriesEvent || []).find(
+  //       (x) => String(x.name).toUpperCase() === ev
+  //     );
+  //     const iniCfg = (this.events.categoriesInitial || []).find(
+  //       (x) => String(x.name).toUpperCase() === ini
+  //     );
+  //     const racCfg = (this.events.categoriesRace || []).find(
+  //       (x) => String(x.name).toUpperCase() === rac
+  //     );
+  //     const divCfg = (this.events.categoriesDivision || []).find(
+  //       (x) => String(x.name).toUpperCase() === div
+  //     );
+
+  //     const bucket = {
+  //       eventId: evCfg ? String(evCfg.value) : "",
+  //       initialId: iniCfg ? String(iniCfg.value) : "",
+  //       raceId: racCfg ? String(racCfg.value) : "",
+  //       divisionId: divCfg ? String(divCfg.value) : "",
+  //       eventName: ev,
+  //       initialName: ini,
+  //       raceName: rac,
+  //       divisionName: div,
+  //       teams: [],
+  //     };
+
+  //     // 🔴 VALIDASI: initialId wajib ada
+  //     if (!bucket.initialId) {
+  //       ipcRenderer.send("get-alert", {
+  //         type: "warning",
+  //         detail:
+  //           "Gagal Simpan, silakan pilih Initials Category terlebih dahulu.",
+  //         message: "Ups Sorry",
+  //       });
+  //       return null;
+  //     }
+
+  //     if (!Array.isArray(this.dataTeams)) this.dataTeams = [];
+  //     this.dataTeams.push(bucket);
+
+  //     return bucket;
+  //   },
+
+  //   _buildTeamRecord(eventName, teamObj) {
+  //     const ev = String(eventName || "").toUpperCase();
+  //     const base = {
+  //       teamId: teamObj.id ? String(teamObj.id) : "", // simpan id sumber tim
+  //       nameTeam: teamObj.nameTeam,
+  //       bibTeam: String(teamObj.bibTeam || "").trim(),
+  //       startOrder: "",
+  //       praStart: "",
+  //       intervalRace: "",
+  //       statusId: 0,
+  //     };
+  //     if (ev === "HEAD2HEAD") {
+  //       return {
+  //         ...base,
+  //         result: [
+  //           {
+  //             startTime: "",
+  //             finishTime: "",
+  //             raceTime: "",
+  //             penaltyTime: "",
+  //             penalty: "",
+  //             totalTime: "",
+  //             ranked: "",
+  //             score: "",
+  //             bracket: 16,
+  //           },
+  //         ],
+  //       };
+  //     }
+  //     if (ev === "SLALOM") {
+  //       return {
+  //         ...base,
+  //         result: [
+  //           {
+  //             startTime: "",
+  //             finishTime: "",
+  //             raceTime: "",
+  //             penaltyTime: "",
+  //             penalty: "",
+  //             totalTime: "",
+  //             ranked: "",
+  //             score: "",
+  //           },
+  //           {
+  //             startTime: "",
+  //             finishTime: "",
+  //             raceTime: "",
+  //             penaltyTime: "",
+  //             penalty: "",
+  //             totalTime: "",
+  //             ranked: "",
+  //             score: "",
+  //           },
+  //         ],
+  //       };
+  //     }
+  //     // SPRINT / DRR
+  //     return {
+  //       ...base,
+  //       result: {
+  //         startTime: "",
+  //         finishTime: "",
+  //         raceTime: "",
+  //         startPenalty: "",
+  //         finishPenalty: "",
+  //         penaltyTime: "",
+  //         penalty: "",
+  //         totalTime: "",
+  //         ranked: "",
+  //         score: "",
+  //         judgesBy: "",
+  //         judgesTime: "",
+  //       },
+  //       otr: {
+  //         startTime: "",
+  //         finishTime: "",
+  //         raceTime: "",
+  //         penaltyTime: "",
+  //         penalty: "",
+  //         totalTime: "",
+  //         ranked: "",
+  //         score: "",
+  //       },
+  //     };
+  //   },
+
+  //   /* ------------ Draft handlers ------------ */
+  //   keyOf(div, race) {
+  //     return `${String(div).toUpperCase()}_${String(race).toUpperCase()}`;
+  //   },
+  //   addDraft(div, race) {
+  //     const k = this.keyOf(div, race);
+  //     if (!this.draftMap[k])
+  //       this.$set(this.draftMap, k, { teamId: "", bib: "" });
+  //   },
+  //   cancelDraft(div, race) {
+  //     this.$set(this.draftMap, this.keyOf(div, race), null);
+  //   },
+  //   onDraftChange(div, race, draft) {
+  //     this.$set(this.draftMap, this.keyOf(div, race), draft);
+  //   },
+  //   saveDraft(div, race) {
+  //     const k = this.keyOf(div, race);
+  //     const d = this.draftMap[k];
+  //     if (!d || !d.teamId || !d.bib) return;
+
+  //     const evName = this.raceActive.selected.name;
+  //     const init =
+  //       (this.initialActive.selected && this.initialActive.selected.name) || "";
+  //     const bucket = this._ensureBucket(evName, div, race, init);
+
+  //     // Cek duplicate BIB
+  //     // if (
+  //     //   bucket.teams.some(
+  //     //     (t) => String(t.bibTeam).trim() === String(d.bib).trim()
+  //     //   )
+  //     // )
+  //     //   return;
+
+  //     // const srcTeam = (this.availableTeams || []).find(
+  //     //   (t) => String(t.id) === String(d.teamId)
+  //     // );
+  //     // if (!srcTeam) return;
+
+  //     // Cek duplicate TEAM di panel yang sama (pakai teamId; fallback nameTeam)
+
+  //     const srcTeam = (this.availableTeams || []).find(
+  //       (t) => String(t.id) === String(d.teamId)
+  //     );
+  //     if (!srcTeam) return;
+
+  //     const willDuplicateTeam =
+  //       bucket.teams.some(
+  //         (t) => t.teamId && String(t.teamId) === String(srcTeam.id)
+  //       ) ||
+  //       bucket.teams.some(
+  //         (t) =>
+  //           String(t.nameTeam || "")
+  //             .trim()
+  //             .toUpperCase() ===
+  //           String(srcTeam.nameTeam || "")
+  //             .trim()
+  //             .toUpperCase()
+  //       );
+  //     if (willDuplicateTeam) {
+  //       ipcRenderer.send("get-alert", {
+  //         type: "warning",
+  //         message: "Tim sudah terdaftar di panel ini",
+  //         detail: `${srcTeam.nameTeam} sudah ada pada ${div}/${race} – ${
+  //           this.raceActive.selected.name
+  //         } (${init || "-"})`,
+  //       });
+  //       return;
+  //     }
+
+  //     // Cek duplicate BIB (di panel yang sama)
+  //     if (
+  //       bucket.teams.some(
+  //         (t) => String(t.bibTeam).trim() === String(d.bib).trim()
+  //       )
+  //     ) {
+  //       ipcRenderer.send("get-alert", {
+  //         type: "warning",
+  //         message: "BIB sudah dipakai",
+  //         detail: `Nomor BIB ${d.bib} sudah digunakan di panel ini.`,
+  //       });
+  //       return;
+  //     }
+
+  //     bucket.teams.push(
+  //       this._buildTeamRecord(evName, { ...srcTeam, bibTeam: d.bib })
+  //     );
+  //     this.dataTeams = this.dataTeams.slice(); // trigger reactive update
+  //     this.$set(this.draftMap, k, null);
+  //     this.persistParticipants();
+  //     // 🔁 sinkronkan perubahan ke DB
+  //     this.syncBucketToDB(bucket);
+  //   },
+  //   syncBucketToDB(bucket) {
+  //     // kirim satu dokumen bucket untuk di-upsert
+  //     ipcRenderer.send("upsert-teams-registered", bucket);
+  //     ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
+  //       if (!res || !res.ok) {
+  //         ipcRenderer.send("get-alert", {
+  //           type: "error",
+  //           detail:
+  //             (res && res.error) ||
+  //             "Gagal menyimpan perubahan tim ke database.",
+  //           message: "Failed",
+  //         });
+  //       }
+  //     });
+  //   },
+  //   deleteRow(div, race, row) {
+  //     const evName = this.raceActive.selected.name;
+  //     const init =
+  //       (this.initialActive.selected && this.initialActive.selected.name) || "";
+
+  //     // 1) Hapus dari state lokal
+  //     const bucket = this._getBucket(evName, div, race, init);
+  //     if (!bucket) return;
+  //     bucket.teams = (bucket.teams || []).filter(
+  //       (t) =>
+  //         String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
+  //         String(t.nameTeam).trim().toUpperCase() !==
+  //           String(row.nameTeam).trim().toUpperCase()
+  //     );
+  //     this.dataTeams = this.dataTeams.slice();
+  //     this.persistParticipants();
+
+  //     // 2) Hapus di DB
+  //     ipcRenderer.send("delete-team-in-bucket", {
+  //       identity: {
+  //         eventId: bucket.eventId,
+  //         initialId: bucket.initialId,
+  //         raceId: bucket.raceId,
+  //         divisionId: bucket.divisionId,
+  //         eventName: bucket.eventName,
+  //         initialName: bucket.initialName,
+  //         raceName: bucket.raceName,
+  //         divisionName: bucket.divisionName,
+  //       },
+  //       team: {
+  //         nameTeam: row.nameTeam,
+  //         bibTeam: row.bibTeam,
+  //       },
+  //     });
+
+  //     ipcRenderer.once("delete-team-in-bucket-reply", (_e, res) => {
+  //       if (res && res.ok) {
+  //         // optional toast
+  //       } else {
+  //         ipcRenderer.send("get-alert", {
+  //           type: "error",
+  //           detail: (res && res.error) || "Gagal menghapus team di database.",
+  //           message: "Failed",
+  //         });
+  //       }
+  //     });
+  //   },
+  //   /* ------------ load & persist ------------ */
+  //   async loadEvent(id) {
+  //     try {
+  //       ipcRenderer.send("get-events-byid", id);
+  //       await new Promise((resolve) => {
+  //         ipcRenderer.once("get-events-byid-reply", (_e, data) => {
+  //           const ev = data || {};
+  //           ev._id = this._idToString(ev._id); // ⬅️ normalisasi di sini
+  //           this.events = ev;
+  //           this.dataTeams = Array.isArray(ev.participant)
+  //             ? ev.participant
+  //             : [];
+  //           resolve();
+  //         });
+  //       });
+  //     } catch {
+  //       this.events = {};
+  //       this.dataTeams = [];
+  //     }
+  //   },
+  //   persistParticipants() {
+  //     try {
+  //       ipcRenderer.send("events-update-participant", {
+  //         eventId: this.$route.params.id,
+  //         participant: this.dataTeams,
+  //       });
+  //     } catch (e) {
+  //       // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+  //       this.participant = Array.isArray(this.dataTeams)
+  //         ? this.dataTeams.slice()
+  //         : [];
+  //     }
+  //   },
+  //   _toUpperSafe(v) {
+  //     return String(v || "").toUpperCase();
+  //   },
+
+  //   _mapRaceToPath(evName) {
+  //     const e = this._toUpperSafe(evName);
+  //     if (e === "SPRINT") return "sprint-race";
+  //     if (e === "SLALOM") return "slalom-race";
+  //     if (e === "DRR") return "drr-race";
+  //     if (e === "HEAD2HEAD") return "head2head-race";
+  //     return e.toLowerCase(); // fallback
+  //   },
+
+  //   handleStartRace(payload) {
+  //     // payload dari TeamPanel
+  //     const { division, race, eventName, initialName } = payload;
+
+  //     // Ambil bucket AKTUAL (supaya tersinkron dgn state & DB)
+  //     const bucket = this._getBucket(
+  //       this._toUpperSafe(eventName),
+  //       this._toUpperSafe(division),
+  //       this._toUpperSafe(race),
+  //       this._toUpperSafe(initialName)
+  //     ) || {
+  //       eventId: "",
+  //       initialId: "",
+  //       raceId: "",
+  //       divisionId: "",
+  //       eventName: this._toUpperSafe(eventName),
+  //       initialName: this._toUpperSafe(initialName),
+  //       raceName: this._toUpperSafe(race),
+  //       divisionName: this._toUpperSafe(division),
+  //       teams: [],
+  //     };
+
+  //     // Siapkan payload lengkap untuk halaman race
+  //     const startData = {
+  //       // metadata event penuh (butuh categories untuk render berikutnya)
+  //       event: this.events || {},
+  //       // konteks kategori yang dipilih user
+  //       context: {
+  //         eventName: bucket.eventName, // SPRINT/SLALOM/DRR/HEAD2HEAD (UPPER)
+  //         initialName: bucket.initialName,
+  //         divisionName: bucket.divisionName,
+  //         raceName: bucket.raceName,
+  //       },
+  //       // bucket aktif (teams kombinasi tsb)
+  //       bucket,
+  //       // seluruh dataTeams untuk referensi (mis. cross-panel)
+  //       allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+  //     };
+
+  //     // Simpan ke localStorage (atau kirim via IPC bila mau buka window baru)
+  //     try {
+  //       // 1) Selalu simpan payload start
+  //       localStorage.setItem("raceStartPayload", JSON.stringify(startData));
+
+  //       // 2) Siapkan objek event yang mau disimpan (sekalian pastikan participant terbaru)
+  //       const currentEvent = {
+  //         ...(this.events || {}),
+  //         participant: Array.isArray(this.dataTeams)
+  //           ? this.dataTeams
+  //           : (this.events && this.events.participant) || [],
+  //       };
+
+  //       // 3) Dapatkan ID event yang stabil (pakai helper kamu getEventId)
+  //       const eventId =
+  //         (currentEvent && currentEvent._id
+  //           ? String(
+  //               typeof currentEvent._id === "object" && currentEvent._id.$oid
+  //                 ? currentEvent._id.$oid
+  //                 : currentEvent._id
+  //             )
+  //           : "") ||
+  //         String(currentEvent.id || "") ||
+  //         String(currentEvent.eventName || "default");
+
+  //       if (!raw) {
+  //         // Belum ada -> simpan langsung sebagai objek tunggal
+  //         payload = currentEvent;
+  //       } else {
+  //         let prev;
+  //         try {
+  //           prev = JSON.parse(raw);
+  //         } catch {
+  //           // Rusak / bukan JSON -> timpa dengan currentEvent
+  //           prev = null;
+  //         }
+
+  //         // Jika prev adalah DICTIONARY multi-event (bukan single object),
+  //         // kita upsert berdasarkan eventId
+  //         const looksLikeDict =
+  //           prev &&
+  //           typeof prev === "object" &&
+  //           !Array.isArray(prev) &&
+  //           !(prev._id || prev.eventName || prev.categoriesInitial);
+
+  //         if (looksLikeDict && eventId) {
+  //           payload = { ...prev, [eventId]: currentEvent };
+  //         } else {
+  //           // Mode single-object -> timpa langsung
+  //           payload = currentEvent;
+  //         }
+  //       }
+
+  //       localStorage.setItem("eventDetails", JSON.stringify(payload));
+  //     } catch (e) {
+  //       // fallback: jika proses mapping gagal, gunakan dataTeams apa adanya
+  //       this.participant = Array.isArray(this.dataTeams)
+  //         ? this.dataTeams.slice()
+  //         : [];
+  //     }
+
+  //     // Opsional: notifikasi
+  //     ipcRenderer &&
+  //       ipcRenderer.send &&
+  //       ipcRenderer.send("get-alert-saved", {
+  //         type: "info",
+  //         message: "Start Race",
+  //         detail: `${bucket.eventName} – ${bucket.divisionName}/${bucket.raceName} (${bucket.initialName})`,
+  //       });
+
+  //     // Arahkan ke halaman race yang sesuai
+  //     const path = this._mapRaceToPath(eventName);
+  //     this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+  //   },
+  // },
 };
 </script>
 

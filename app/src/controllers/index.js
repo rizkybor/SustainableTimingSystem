@@ -10,7 +10,7 @@ const SEED_URI="mongodb://rizkyak:Mongos-Jeko-STS2025@" +
   "?tls=true&replicaSet=atlas-13yy7d-shard-0&authSource=admin" +
   "&retryWrites=true&w=majority";
 
-const uri = process.env.MONGO_URI || SEED_URI;
+const uri = SEED_URI;
 
 let client;
 let db;
@@ -26,7 +26,7 @@ async function getDb() {
       maxIdleTimeMS: 10000,
       serverSelectionTimeoutMS: 8000,
       connectTimeoutMS: 8000,
-      // family: 4, // uncomment jika jaringanmu bermasalah IPv6
+      family: 4,
     });
   }
 

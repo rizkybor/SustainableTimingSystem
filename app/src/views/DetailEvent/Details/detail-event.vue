@@ -198,7 +198,7 @@
       :settings="raceSettings"
       :max-gate="MAX_GATE"
       :max-section="MAX_SECTION"
-      :event-id="_getEventId()"
+      :event-id="getEventId()"
       :event-name="safeEventName"
       @update-settings="onUpdateRaceSettings"
     />
@@ -291,6 +291,7 @@ export default {
     // simpan id saat connect (atau reconnect)
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
+      console.log("[Electron] socket connected:", this.selfSocketId);
     };
     socket.on("connect", onConnect);
 
@@ -325,6 +326,11 @@ export default {
     });
   },
   computed: {
+    eventId() {
+      const id = this.events && this.events._id;
+      return typeof id === "string" ? id : "";
+    },
+
     safeEventName() {
       return this.events && this.events.eventName ? this.events.eventName : "";
     },
@@ -353,18 +359,15 @@ export default {
   },
 
   async created() {
-    const id = this.$route.params.id;
-    await this.loadEvent(id);
+    const idFromRoute = this.$route.params.id;
+    await this.loadEvent(idFromRoute); 
     await this.loadAvailableTeams("C - D");
-
-    // set initial pertama bila belum
     if (
       (this.events.categoriesInitial || []).length &&
       !this.initialActive.selected.name
     ) {
       this.initialActive.selected = this.events.categoriesInitial[0];
     }
-
     await this.$nextTick();
     this.refreshVisibleBuckets();
   },
@@ -386,22 +389,11 @@ export default {
         // sekali saja, tunggu reply lalu lepas listener
         const handler = (_event, res) => {
           if (res && res.ok) {
-            this.$bvToast.toast(
-              "Race settings berhasil diperbarui di database.",
-              {
-                title: "Success",
-                variant: "success",
-                solid: true,
-              }
-            );
+            console.log("✅ Race settings updated in DB:", res);
           } else {
-            this.$bvToast.toast(
-              res && res.error ? res.error : "Gagal memperbarui race settings.",
-              {
-                title: "Error",
-                variant: "danger",
-                solid: true,
-              }
+            console.error(
+              "❌ Failed to update race settings:",
+              res && res.error
             );
           }
           window.ipcRenderer.removeListener(
@@ -440,10 +432,11 @@ export default {
       // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
     },
 
-    _getEventId() {
-      const ev = this.events || {};
-      const idObj = ev._id;
-      return idObj;
+    // helper: ambil _id event (BSON / string aman)
+    getEventId() {
+      var ev = this.events || {};
+      var id = ev._id;
+      return typeof id === "string" ? id : "";
     },
 
     showResult(div, race) {
@@ -509,21 +502,31 @@ export default {
       return f ? String(f.value) : "";
     },
 
+    // methods:
+    // taruh di methods (atau ganti yang existing)
+    _idToString(raw) {
+      if (typeof raw === "string") return raw;
+      if (raw && typeof raw.$oid === "string") return raw.$oid; // { $oid: "..." }
+      if (raw && raw._bsontype === "ObjectID") {
+        if (typeof raw.toHexString === "function") return raw.toHexString();
+        if (raw.id)
+          return Array.from(raw.id)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+      }
+      return "";
+    },
+
     // identity dinamis utk satu panel
     _buildIdentity(div, race) {
+      const eventId = this.eventId || this.$route.params.id || "";
       const eventName = this._safeSelectedName(this.raceActive);
       const initialName = this._safeSelectedName(this.initialActive);
-
-      // kalau placeholder, kosongkan id supaya guard memblok
-      const isPlaceholder = initialName === "Silakan Pilih Initial";
       return {
-        eventId: this._getEventId(),
-        initialId: isPlaceholder
-          ? ""
-          : this._matchId(this.events.categoriesInitial, initialName),
+        eventId,
+        initialId: this._matchId(this.events.categoriesInitial, initialName),
         raceId: this._matchId(this.events.categoriesRace, race),
         divisionId: this._matchId(this.events.categoriesDivision, div),
-
         eventName: String(eventName).toUpperCase(),
         initialName: String(initialName).toUpperCase(),
         raceName: String(race).toUpperCase(),
@@ -573,6 +576,7 @@ export default {
         Date.now(),
       ].join("|");
       this.lastToken = token;
+
       // Balut dalam Promise + timeout supaya handler pasti selesai
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
@@ -587,7 +591,6 @@ export default {
             resolve({ div, race, ok: false, reason: "empty" });
           }
         };
-
         // kirim permintaan
         ipcRenderer.send("get-teams-registered", identity);
         ipcRenderer.once("get-teams-registered-reply", onReply);
@@ -1109,19 +1112,33 @@ export default {
 
     /* ------------ load & persist ------------ */
     async loadEvent(id) {
-      // Ambil event + participant dari IPC (atau fallback localStorage)
       try {
         ipcRenderer.send("get-events-byid", id);
         await new Promise((resolve) => {
           ipcRenderer.once("get-events-byid-reply", (_e, data) => {
-            this.events = data || {};
-
+            const ev = data || {};
+            ev._id = this._idToString(ev._id); // ⬅️ normalisasi di sini
+            this.events = ev;
+            this.dataTeams = Array.isArray(ev.participant)
+              ? ev.participant
+              : [];
             resolve();
           });
         });
       } catch {
         this.events = {};
+        this.dataTeams = [];
       }
+    },
+
+    evIdToString(ev) {
+      if (ev && ev._id) {
+        if (typeof ev._id === "object" && ev._id.$oid) {
+          return String(ev._id.$oid);
+        }
+        return String(ev._id);
+      }
+      return "";
     },
     persistParticipants() {
       try {
@@ -1201,9 +1218,9 @@ export default {
             : (this.events && this.events.participant) || [],
         };
 
-        // 3) Dapatkan ID event yang stabil (pakai helper kamu _getEventId)
+        // 3) Dapatkan ID event yang stabil (pakai helper kamu getEventId)
         const eventId =
-          this._getEventId() ||
+          this.getEventId() ||
           (currentEvent && currentEvent._id && currentEvent._id.$oid
             ? String(currentEvent._id.$oid)
             : "") ||
@@ -1275,8 +1292,10 @@ export default {
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
-  min-height: 200px; /* tinggi hero */
-  overflow: hidden; /* biar radius rapi */
+  min-height: 200px;
+  /* tinggi hero */
+  overflow: hidden;
+  /* biar radius rapi */
 }
 
 /* Foto background */
@@ -1287,6 +1306,7 @@ export default {
   background-size: cover;
   background-position: center;
 }
+
 /* Overlay gelap halus (ganti brightness filter) */
 .detail-hero .hero-bg::after {
   content: "";
@@ -1299,7 +1319,8 @@ export default {
 .detail-hero .hero-inner {
   position: relative;
   z-index: 1;
-  padding: 22px 22px; /* beri ruang kiri-kanan */
+  padding: 22px 22px;
+  /* beri ruang kiri-kanan */
 }
 
 /* Judul besar putih + shadow kuat */
@@ -1331,7 +1352,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: inherit; /* ikon ikut warna default */
+  color: inherit;
+  /* ikon ikut warna default */
 }
 
 .hero-logo img {
@@ -1345,6 +1367,7 @@ export default {
   .detail-hero .hero-inner {
     padding: 18px 14px;
   }
+
   .hero-logo {
     margin-bottom: 12px;
   }
@@ -1361,10 +1384,12 @@ export default {
   transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
   cursor: pointer;
 }
+
 .race-card.active {
   border-color: var(--blue);
   box-shadow: 0 14px 30px rgba(31, 111, 163, 0.16);
 }
+
 .race-icon {
   width: 56px;
   height: 56px;
@@ -1385,6 +1410,7 @@ export default {
   padding: 6px;
   border-radius: 10px;
 }
+
 .init-tab {
   border: 0;
   background: transparent;
@@ -1393,6 +1419,7 @@ export default {
   padding: 10px 18px;
   border-radius: 8px;
 }
+
 .init-tab.active {
   background: var(--blue);
   color: #fff;
@@ -1406,6 +1433,7 @@ export default {
   background: #fff;
   box-shadow: 0 12px 26px rgba(31, 56, 104, 0.08);
 }
+
 .panel-head {
   display: flex;
   align-items: center;
@@ -1416,6 +1444,7 @@ export default {
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
 }
+
 .btn-start {
   border: 1px solid #d0d9e8 !important;
   background: #f4f7fb !important;
@@ -1424,13 +1453,16 @@ export default {
   padding: 6px 12px;
   font-weight: 700;
 }
+
 .panel-body {
   padding: 10px 16px 4px;
 }
+
 .panel-footer {
   padding: 8px 16px 14px;
   border-top: 1px solid #f0f3f9;
 }
+
 .btn-add {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -1445,6 +1477,7 @@ export default {
   border-collapse: separate;
   border-spacing: 0 10px;
 }
+
 .team-table thead th {
   background: #eef1f6;
   color: #1f2940;
@@ -1455,16 +1488,19 @@ export default {
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
 }
+
 .team-table tbody .row-card {
   background: #fff;
   border: 1px solid #e7ecf6;
   border-radius: 10px;
   box-shadow: 0 6px 18px rgba(31, 56, 104, 0.06);
 }
+
 .team-table tbody td {
   padding: 10px 12px;
   vertical-align: middle;
 }
+
 .team-table tbody td.muted {
   color: #73809a;
   width: 64px;
@@ -1473,6 +1509,7 @@ export default {
 .field {
   position: relative;
 }
+
 .input {
   width: 100%;
   height: 38px;
@@ -1482,11 +1519,13 @@ export default {
   padding: 6px 34px 6px 10px;
   outline: none;
 }
+
 .input:focus {
   background: #fff;
   border-color: #9ec5ff;
   box-shadow: 0 0 0 4px rgba(42, 104, 196, 0.15);
 }
+
 .suffix {
   position: absolute;
   right: 10px;
@@ -1507,16 +1546,19 @@ export default {
   align-items: center;
   justify-content: center;
 }
+
 .btn-ghost.ok {
   background: #e6f7ff;
   border-color: #c6e9ff;
   color: #0d789d;
 }
+
 .btn-ghost.danger {
   background: #fef2f2;
   color: #a11d1d;
   border-color: #f1d1d1;
 }
+
 .ml-2 {
   margin-left: 8px;
 }

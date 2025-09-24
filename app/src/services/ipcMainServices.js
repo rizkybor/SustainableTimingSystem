@@ -164,6 +164,7 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-events-byid", async (event, datas) => {
     try {
       const data = await getEventById(datas);
+      event.reply("get-events-byid-reply", data);
     } catch (error) {
       event.reply("get-events-byid-reply", []);
     }
@@ -493,7 +494,7 @@ function setupIPCMainHandlers() {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
-      console.log(event, identity, "<<< tes");
+      console.log(event, identity, "<<< get registered");
       const res = await getTeamsRegistered(identity);
       event.reply("get-teams-registered-reply", res);
     } catch (error) {

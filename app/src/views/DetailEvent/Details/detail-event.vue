@@ -50,6 +50,15 @@
         <!-- <b-button variant="primary" class="mt-3" @click="sendRealtimeMessage">
           Kirim Pesan ke Judges
         </b-button> -->
+
+        <b-button
+          class="btn-race-settings mr-2"
+          variant="primary"
+          @click="openJudgeSettings"
+        >
+          Judges Settings
+        </b-button>
+
         <b-button
           class="btn-race-settings"
           variant="primary"
@@ -202,6 +211,15 @@
       :event-name="safeEventName"
       @update-settings="onUpdateRaceSettings"
     />
+
+    <judge-settings-modal
+      v-model="showJudgeSettings"
+      :id="'judge-settings-modal'"
+      :settings="judgeSettings"
+      :event-id="eventId"
+      :event-name="safeEventName"
+      @update-judges="onUpdateJudgeSettings"
+    />
   </div>
 </template>
 
@@ -214,11 +232,12 @@ import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import TeamPanel from "./../components/TeamPanel.vue";
 import RaceSettingsModal from "./../components/RaceSettings.vue";
+import JudgeSettingsModal from "./../components/JudgesSettings.vue";
 import { getSocket } from "@/services/socket";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { Icon, TeamPanel, RaceSettingsModal },
+  components: { Icon, TeamPanel, RaceSettingsModal, JudgeSettingsModal },
   data() {
     return {
       selfSocketId: null,
@@ -233,6 +252,13 @@ export default {
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
+        h2h: { R1: true, R2: true, L1: true, L2: true },
+        slalom: { totalGate: 14 },
+        drr: { totalSection: 5 },
+      },
+      showJudgeSettings: false, // ← kontrol buka/tutup modal
+      judgeSettings: {
+        // ← nilai awal (boleh kosong; modal akan merge default)
         h2h: { R1: true, R2: true, L1: true, L2: true },
         slalom: { totalGate: 14 },
         drr: { totalSection: 5 },
@@ -328,7 +354,7 @@ export default {
   computed: {
     eventId() {
       let id = this.events && this.events._id;
-      if(!id){
+      if (!id) {
         id = this.$route.params.id;
       }
       return typeof id === "string" ? id : "";
@@ -383,6 +409,10 @@ export default {
       this.showRaceSettings = true;
     },
 
+    openJudgeSettings() {
+      this.showJudgeSettings = true;
+    },
+
     onUpdateRaceSettings(payload) {
       if (payload && payload.settings) this.raceSettings = payload.settings;
 
@@ -406,6 +436,32 @@ export default {
         };
         window.ipcRenderer.on("race-settings:upsert-reply", handler);
       }
+    },
+
+    onUpdateJudgeSettings(payload) {
+      console.log(payload)
+      // if (payload && payload.settings) this.raceSettings = payload.settings;
+
+      // if (typeof window !== "undefined" && window.ipcRenderer) {
+      //   window.ipcRenderer.send("race-settings:upsert", payload);
+
+      //   // sekali saja, tunggu reply lalu lepas listener
+      //   const handler = (_event, res) => {
+      //     if (res && res.ok) {
+      //       console.log("✅ Race settings updated in DB:", res);
+      //     } else {
+      //       console.error(
+      //         "❌ Failed to update race settings:",
+      //         res && res.error
+      //       );
+      //     }
+      //     window.ipcRenderer.removeListener(
+      //       "race-settings:upsert-reply",
+      //       handler
+      //     );
+      //   };
+      //   window.ipcRenderer.on("race-settings:upsert-reply", handler);
+      // }
     },
 
     async selectCategory(c) {

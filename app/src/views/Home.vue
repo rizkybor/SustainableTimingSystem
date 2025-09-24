@@ -204,7 +204,7 @@
             <b-button
               size="sm"
               variant="secondary"
-              class="rounded-pill w-100"
+              class="btn-action rounded-pill w-100"
               @click.stop="viewTeam(t)"
             >
               View Details

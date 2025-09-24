@@ -1,99 +1,98 @@
-'use strict'
+"use strict";
 
-import { app, protocol, BrowserWindow, ipcMain } from 'electron'
-import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
-import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
-const isDevelopment = process.env.NODE_ENV !== 'production'
-const { setupIPCMainHandlers } = require('./services/ipcMainServices');
-import path from 'path';
+import { app, protocol, BrowserWindow, ipcMain } from "electron";
+import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
+import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
+const isDevelopment = process.env.NODE_ENV !== "production";
+const { setupIPCMainHandlers } = require("./services/ipcMainServices");
+import path from "path";
 
 // Function to Services Communication to Database
-setupIPCMainHandlers()
+setupIPCMainHandlers();
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { secure: true, standard: true } }
-])
+  { scheme: "app", privileges: { secure: true, standard: true } },
+]);
 
 async function createWindow() {
-  const win = new BrowserWindow({ 
+  const win = new BrowserWindow({
     width: 1000,
     height: 800,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, '../src/preload.js'),
-      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
-      contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
-    }
-  })
-
-  win.loadFile('index.html')
-  var splash = new BrowserWindow({ 
-    width: 500, 
-    height: 200, 
-    transparent: true, 
-    frame: false, 
-    alwaysOnTop: false ,
-    webPreferences: {
-      preload: path.join(__dirname, '../src/preload.js'),
-      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
-      contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
-    }
+      preload: path.join(__dirname, "../src/preload.js"),
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
   });
-  splash.loadFile(path.join(__dirname, '../public/splash.html'));
+
+  win.loadFile("index.html");
+  var splash = new BrowserWindow({
+    width: 500,
+    height: 200,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: false,
+    webPreferences: {
+      preload: path.join(__dirname, "../src/preload.js"),
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  splash.loadFile(path.join(__dirname, "../public/splash.html"));
   setTimeout(function () {
     splash.close();
     win.center();
     win.show();
   }, 7000);
 
-
   if (process.env.WEBPACK_DEV_SERVER_URL) {
-    await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL)
-    if (!process.env.IS_TEST) win.webContents.openDevTools()
+    await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
+    if (!process.env.IS_TEST) win.webContents.openDevTools();
   } else {
-    createProtocol('app')
-    win.loadURL('app://./index.html')
+    createProtocol("app");
+    win.loadURL("app://./index.html");
   }
 }
 
-ipcMain.handle('app:exit', () => {
+ipcMain.handle("app:exit", () => {
   app.quit();
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
   }
-})
+});
 
-app.on('activate', () => {
+app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-})
+});
 
-app.on('ready', async () => {
+app.on("ready", async () => {
   if (isDevelopment && !process.env.IS_TEST) {
     // Install Vue Devtools
     try {
-      await installExtension(VUEJS_DEVTOOLS)
+      await installExtension(VUEJS_DEVTOOLS);
     } catch (e) {
-      console.error('Vue Devtools failed to install:', e.toString())
+      console.error("Vue Devtools failed to install:", e.toString());
     }
   }
-  createWindow()
-})
+  createWindow();
+});
 
 if (isDevelopment) {
-  if (process.platform === 'win32') {
-    process.on('message', (data) => {
-      if (data === 'graceful-exit') {
-        app.quit()
+  if (process.platform === "win32") {
+    process.on("message", (data) => {
+      if (data === "graceful-exit") {
+        app.quit();
       }
-    })
+    });
   } else {
-    process.on('SIGTERM', () => {
-      app.quit()
-    })
+    process.on("SIGTERM", () => {
+      app.quit();
+    });
   }
 }

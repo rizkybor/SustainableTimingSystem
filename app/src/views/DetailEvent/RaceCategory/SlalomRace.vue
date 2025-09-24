@@ -774,9 +774,9 @@ export default {
     goTo() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-    openEdit(_team) {
-      /* TODO: modal edit */
-    },
+    // openEdit(_team) {
+    //   /* TODO: modal edit */
+    // },
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
@@ -818,10 +818,21 @@ export default {
     },
     async disconnected() {
       try {
-        if (this.port && this.port.isOpen) this.port.close();
-      } catch {}
-      this.isPortConnected = false;
-      alert("Disconnected");
+        if (this.port && this.port.isOpen) {
+          this.port.close();
+        }
+      } catch (e) {
+        // Tulis pesan error agar tidak silent
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error when closing port:", e);
+        }
+        // simpan pesan terakhir ke state kalau perlu
+        this.lastError = e && e.message ? e.message : String(e);
+      } finally {
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
     },
 
     /** === Save: dokumen Slalom (multi-run + penalty dinamis) === */

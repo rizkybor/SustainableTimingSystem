@@ -11,9 +11,6 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function expose(key, api) {
-  // aman untuk dua mode:
-  // - contextIsolation: true  -> lewat contextBridge
-  // - contextIsolation: false -> assign langsung ke window
   if (process.contextIsolated) {
     try {
       contextBridge.exposeInMainWorld(key, api);

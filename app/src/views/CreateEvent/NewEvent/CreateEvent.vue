@@ -556,7 +556,13 @@ export default {
           await window.cloud.deleteImage(pub);
         }
       } catch (e) {
-        console.warn("Failed to delete from Cloudinary:", e);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("Failed to delete from Cloudinary:", e);
+        }
+
+        this.lastError = e && e.message ? e.message : String(e);
+        this.$emit("cloudinary-delete-error", this.lastError);
       } finally {
         this.formEvent.poster = null;
         this.posterPreview = "";
@@ -721,14 +727,10 @@ export default {
             _id: insertedId,
             poster: up.result,
           };
-          console.log(updatePayload, "<<< BODY REQ CLOUD");
           ipcRenderer.send("update-event-poster", updatePayload);
-          const self = this;
           ipcRenderer.once(
             "update-event-poster-reply",
             function (_e2, resp) {
-              console.log("update-event-poster-reply:", resp);
-
               var ok = false;
               if (resp !== null && resp !== undefined) {
                 if (resp.ok === true) ok = true;

@@ -1,37 +1,28 @@
 const { MongoClient } = require("mongodb");
 
-async function main() {
-  // URI MongoDB Anda
-  const uri = "mongodb://localhost:27017";
-  const dbName = "sustainabledb";
+const uri =
+  "mongodb://rizkyak:Mongos-Jeko-STS2025@" +
+  "mongo-jeko-shard-00-00.qdk8a.mongodb.net:27017," +
+  "mongo-jeko-shard-00-01.qdk8a.mongodb.net:27017," +
+  "mongo-jeko-shard-00-02.qdk8a.mongodb.net:27017/" +
+  "sustainabledb_atlas" +
+  "?tls=true&replicaSet=atlas-13yy7d-shard-0&authSource=admin" +
+  "&retryWrites=true&w=majority";
 
-  // Buat koneksi MongoClient
-  const client = new MongoClient(uri, { useUnifiedTopology: true });
+const client = new MongoClient(uri, {
+  serverSelectionTimeoutMS: 8000,
+  connectTimeoutMS: 8000,
+  // family: 4, // aktifkan jika jaringanmu “alergi” IPv6
+});
 
+(async () => {
   try {
-    // Tunggu hingga koneksi berhasil
     await client.connect();
-    console.log("Connected to MongoDB");
-
-    // Dapatkan referensi ke database sustainabledb
-    const db = client.db(dbName);
-
-    // Dapatkan referensi ke koleksi stscollection
-    const collection = db.collection("stscollection");
-
-    // Dapatkan data dari koleksi
-    const data = await collection.find({}).toArray();
-
-    console.log("Data from stscollection:");
-    console.log(data);
-  } catch (error) {
-    console.error("Error:", error);
+    await client.db("admin").command({ ping: 1 });
+    console.log("✅ Connected (non-SRV) & ping OK");
+  } catch (err) {
+    console.error("❌ Failed:", err.name, err.code, err.message);
   } finally {
-    // Tutup koneksi
-    await client.close();
-    console.log("Closed MongoDB connection");
+    await client.close().catch(()=>{});
   }
-}
-
-// Panggil fungsi utama
-main();
+})();

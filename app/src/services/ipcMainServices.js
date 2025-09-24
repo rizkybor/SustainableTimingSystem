@@ -23,7 +23,7 @@ const {
   insertNewEvent,
   insertSprintResult,
   insertSlalomResult,
-  updateEventPoster
+  updateEventPoster,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -151,7 +151,11 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-events", async (event) => {
     try {
       const data = await getAllEvents();
-      event.reply("get-events-reply", data);
+      const safe = (Array.isArray(data) ? data : []).map((d) => ({
+        ...d,
+        _id: d && d._id ? String(d._id) : "", // <-- stringify
+      }));
+      event.reply("get-events-reply", safe);
     } catch (error) {
       event.reply("get-events-reply", []);
     }
@@ -160,7 +164,6 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-events-byid", async (event, datas) => {
     try {
       const data = await getEventById(datas);
-      event.reply("get-events-byid-reply", data);
     } catch (error) {
       event.reply("get-events-byid-reply", []);
     }
@@ -222,27 +225,27 @@ function setupIPCMainHandlers() {
     }
   });
 
-ipcMain.on('update-event-poster', async function (evt, payload) {
-  try {
-    const r = await updateEventPoster(payload);
+  ipcMain.on("update-event-poster", async function (evt, payload) {
+    try {
+      const r = await updateEventPoster(payload);
 
-    var idToLog = '';
-    if (payload !== null && payload !== undefined) {
-      if (payload._id !== null && payload._id !== undefined) {
-        idToLog = String(payload._id);
+      var idToLog = "";
+      if (payload !== null && payload !== undefined) {
+        if (payload._id !== null && payload._id !== undefined) {
+          idToLog = String(payload._id);
+        }
       }
-    }
-    console.log('[update-event-poster]', idToLog, '=>', r);
+      console.log("[update-event-poster]", idToLog, "=>", r);
 
-    evt.reply('update-event-poster-reply', r);
-  } catch (err) {
-    var msg = 'Unknown error';
-    if (err !== null && err !== undefined) {
-      if (typeof err.message === 'string') msg = err.message;
+      evt.reply("update-event-poster-reply", r);
+    } catch (err) {
+      var msg = "Unknown error";
+      if (err !== null && err !== undefined) {
+        if (typeof err.message === "string") msg = err.message;
+      }
+      evt.reply("update-event-poster-reply", { ok: false, error: msg });
     }
-    evt.reply('update-event-poster-reply', { ok: false, error: msg });
-  }
-});
+  });
 
   // SAVE SPRINT RESULT
   ipcMain.on("insert-sprint-result", async (event, datas) => {
@@ -490,6 +493,7 @@ ipcMain.on('update-event-poster', async function (evt, payload) {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
+      console.log(event, identity, "<<< tes");
       const res = await getTeamsRegistered(identity);
       event.reply("get-teams-registered-reply", res);
     } catch (error) {

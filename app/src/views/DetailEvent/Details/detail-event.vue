@@ -291,7 +291,6 @@ export default {
     // simpan id saat connect (atau reconnect)
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
-      console.log("[Electron] socket connected:", this.selfSocketId);
     };
     socket.on("connect", onConnect);
 
@@ -307,7 +306,6 @@ export default {
         // pesan pantulan dari diri sendiri → jangan tampilkan
         return;
       }
-      console.log("[Electron] terima:", msg);
 
       if (this.$bvToast) {
         this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
@@ -381,8 +379,6 @@ export default {
         this.raceSettings = payload.settings;
       }
 
-      console.log("parent got update-settings:", payload);
-
       if (typeof window !== "undefined" && window.ipcRenderer) {
         // kirim ke main process
         window.ipcRenderer.send("race-settings:upsert", payload);
@@ -390,11 +386,22 @@ export default {
         // sekali saja, tunggu reply lalu lepas listener
         const handler = (_event, res) => {
           if (res && res.ok) {
-            console.log("✅ Race settings updated in DB:", res);
+            this.$bvToast.toast(
+              "Race settings berhasil diperbarui di database.",
+              {
+                title: "Success",
+                variant: "success",
+                solid: true,
+              }
+            );
           } else {
-            console.error(
-              "❌ Failed to update race settings:",
-              res && res.error
+            this.$bvToast.toast(
+              res && res.error ? res.error : "Gagal memperbarui race settings.",
+              {
+                title: "Error",
+                variant: "danger",
+                solid: true,
+              }
             );
           }
           window.ipcRenderer.removeListener(
@@ -433,26 +440,10 @@ export default {
       // ❌ tidak ada toast lokal di sini (pengirim tidak perlu melihat)
     },
 
-    // helper: ambil _id event (BSON / string aman)
     _getEventId() {
       const ev = this.events || {};
       const idObj = ev._id;
-
-      // Kalau datang sebagai { $oid: "..." }
-      if (idObj && idObj.$oid) {
-        return String(idObj.$oid);
-      }
-
-      // Kalau datang sebagai ObjectID dari BSON (seperti di screenshot)
-      if (idObj && idObj._bsontype === "ObjectID" && idObj.id) {
-        // konversi Uint8Array ke hex string
-        return Array.from(idObj.id)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-      }
-
-      // fallback
-      return "";
+      return idObj;
     },
 
     showResult(div, race) {
@@ -582,7 +573,6 @@ export default {
         Date.now(),
       ].join("|");
       this.lastToken = token;
-
       // Balut dalam Promise + timeout supaya handler pasti selesai
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
@@ -1125,15 +1115,12 @@ export default {
         await new Promise((resolve) => {
           ipcRenderer.once("get-events-byid-reply", (_e, data) => {
             this.events = data || {};
-            this.dataTeams = Array.isArray(this.events.participant)
-              ? this.events.participant
-              : [];
+
             resolve();
           });
         });
       } catch {
         this.events = {};
-        this.dataTeams = [];
       }
     },
     persistParticipants() {

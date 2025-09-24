@@ -3,12 +3,16 @@ const { ObjectId } = require('mongodb');
 
 
 // get All Events
+// get All Events
 async function getAllEvents() {
   try {
     const database = await getDb();
     const collection = database.collection("eventsCollection");
     const data = await collection.find({}).toArray();
-    return data;
+    return data.map(d => ({
+      ...d,
+      _id: d._id.toString(),
+    }));
   } catch (error) {
     console.error("Error fetching data:", error);
     return [];
@@ -20,11 +24,11 @@ async function getEventById(payload) {
   try {
     const database = await getDb();
     const collection = database.collection("eventsCollection");
-    const result = await collection.findOne({ _id: ObjectId(payload) });
+        const result = await collection.findOne({ _id: ObjectId(payload) });
     return result;
   } catch (error) {
     console.error("Error fetching data:", error);
-    return [];
+    return null;
   }
 }
 

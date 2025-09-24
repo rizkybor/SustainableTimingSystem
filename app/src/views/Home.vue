@@ -121,7 +121,7 @@
         <div v-if="!loading && events.length" class="slider-track">
           <article
             v-for="(ev, idx) in events"
-            :key="_idToHex(ev._id, idx)"
+            :key="_idToHex(ev._id) || idx"
             class="event-card"
             @click="clickRow(ev)"
           >
@@ -129,11 +129,11 @@
               class="event-thumb d-flex align-items-center justify-content-center"
             >
               <img
-    :src="posterSrc(ev) || defaultImg"
-    alt="Poster"
-    class="event-img"
-    @error="onPosterError"
-  />
+                :src="posterSrc(ev) || defaultImg"
+                alt="Poster"
+                class="event-img"
+                @error="onPosterError"
+              />
             </div>
 
             <div class="event-body">
@@ -286,26 +286,8 @@ export default {
         e.target.src = this.defaultImg;
       }
     },
-    _idToHex(_id, fallback = "") {
-      // case: { $oid: "..." }
-      if (_id && _id.$oid) return String(_id.$oid);
-
-      if (_id && _id.id) {
-        try {
-          return Array.from(_id.id)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
-        } catch (e) {
-          // gagal konversi → pakai fallback
-          return fallback;
-        }
-      }
-
-      // case: string langsung
-      if (typeof _id === "string") return _id;
-
-      // fallback ke index atau string kosong
-      return String(fallback);
+    _idToHex(_id) {
+      return typeof _id === "string" ? _id : "";
     },
     formatDate(inputDate) {
       if (!inputDate) return "-";
@@ -373,7 +355,11 @@ export default {
       this.$router.push("/" + path);
     },
     clickRow(item) {
-      const idHex = this._idToHex(item._id, 0);
+      const idHex = this._idToHex(item._id);
+      // if (!idHex) {
+      //   console.warn("Invalid _id:", JSON.parse(JSON.stringify(item._id)));
+      //   return;
+      // }
       this.$router.push("/event-detail/" + idHex);
     },
     viewTeam(team) {
@@ -596,7 +582,7 @@ export default {
 
 .event-thumb {
   width: 100%;
-  height: 180px;              /* tinggi tetap biar grid rapi */
+  height: 180px; /* tinggi tetap biar grid rapi */
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
@@ -608,7 +594,7 @@ export default {
 .event-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;          /* gambar cover penuh, crop bagian luar */
-  object-position: center;    /* fokus ke tengah */
+  object-fit: cover; /* gambar cover penuh, crop bagian luar */
+  object-position: center; /* fokus ke tengah */
 }
 </style>

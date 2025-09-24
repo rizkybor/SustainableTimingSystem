@@ -126,9 +126,14 @@
             @click="clickRow(ev)"
           >
             <div
-              class="event-thumb placeholder d-flex align-items-center justify-content-center"
+              class="event-thumb d-flex align-items-center justify-content-center"
             >
-              <Icon icon="mdi:image" width="40" height="40" />
+              <img
+    :src="posterSrc(ev) || defaultImg"
+    alt="Poster"
+    class="event-img"
+    @error="onPosterError"
+  />
             </div>
 
             <div class="event-body">
@@ -222,6 +227,7 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
+import defaultImg from "@/assets/images/default-first.jpeg";
 
 export default {
   name: "SustainableTimingSystemHome",
@@ -230,8 +236,8 @@ export default {
     return {
       events: [],
       loading: false,
-      // contoh data untuk slider Teams; sambungkan ke sumber aslimu bila sudah ada
       teams: [],
+      defaultImg,
     };
   },
   mounted() {
@@ -239,6 +245,47 @@ export default {
     this.loadTeamsRegistered();
   },
   methods: {
+    posterSrc: function (ev) {
+      if (!ev) return "";
+
+      // prioritas 1: field yang sudah kamu simpan
+      if (
+        ev.poster &&
+        ev.poster.secure_url &&
+        String(ev.poster.secure_url) !== ""
+      )
+        return String(ev.poster.secure_url);
+
+      // prioritas 2: poster_url langsung (kalau kamu simpan juga)
+      if (ev.poster_url && String(ev.poster_url) !== "")
+        return String(ev.poster_url);
+
+      // prioritas 3: bangun dari metadata (jaga-jaga)
+      var p = ev.poster || {};
+      var cloud = "kikiaka"; // ganti sesuai CLOUDINARY_CLOUD_NAME kamu
+      var pub = p.public_id ? String(p.public_id) : "";
+      if (pub === "") return "";
+      var ver =
+        p.version !== undefined && p.version !== null
+          ? "v" + p.version + "/"
+          : "";
+      var ext = p.format ? "." + String(p.format) : "";
+      return (
+        "https://res.cloudinary.com/" +
+        cloud +
+        "/image/upload/" +
+        ver +
+        pub +
+        ext
+      );
+    },
+
+    onPosterError: function (e) {
+      if (e && e.target) {
+        e.target.onerror = null;
+        e.target.src = this.defaultImg;
+      }
+    },
     _idToHex(_id, fallback = "") {
       // case: { $oid: "..." }
       if (_id && _id.$oid) return String(_id.$oid);
@@ -364,6 +411,7 @@ export default {
   z-index: 100;
   background: #fff;
 }
+
 .brand-box {
   height: 28px;
   width: 28px;
@@ -379,20 +427,23 @@ export default {
   background-size: cover;
   background-position: center;
   border-bottom: 1px solid #e9edf5;
-  color: #fff; /* agar teks tetap terlihat */
+  color: #fff;
+  /* agar teks tetap terlihat */
 }
 
 .sts-jumbotron::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4); /* overlay hitam transparan */
+  background: rgba(0, 0, 0, 0.4);
+  /* overlay hitam transparan */
   z-index: 1;
 }
 
 .sts-jumbotron > * {
   position: relative;
-  z-index: 2; /* konten tetap di atas overlay */
+  z-index: 2;
+  /* konten tetap di atas overlay */
 }
 
 .sts-jumbotron .hero-image {
@@ -410,6 +461,7 @@ export default {
   border-radius: 20px;
   border: 1px solid #eef0f6;
 }
+
 .action-icon {
   color: #2c5cff;
   background: #eff3ff;
@@ -417,14 +469,17 @@ export default {
   width: 56px;
   height: 56px;
 }
+
 .btn.rounded-pill {
   border-radius: 999px;
 }
+
 .btn-secondary {
   background: #cfd6e6;
   border-color: #cfd6e6;
   color: #2b3450;
 }
+
 .btn-primary {
   background: var(--sts-blue);
   border-color: var(--sts-blue);
@@ -434,6 +489,7 @@ export default {
 .cards-slider {
   overflow: hidden;
 }
+
 .slider-track {
   display: grid;
   grid-auto-flow: column;
@@ -443,19 +499,23 @@ export default {
   padding-bottom: 4px;
   scroll-snap-type: x mandatory;
 }
+
 .slider-track > * {
   scroll-snap-align: start;
 }
+
 @media (min-width: 1200px) {
   .slider-track {
     grid-auto-columns: calc(25% - 12px);
   }
 }
+
 @media (max-width: 991.98px) {
   .slider-track {
     grid-auto-columns: calc(50% - 10px);
   }
 }
+
 @media (max-width: 575.98px) {
   .slider-track {
     grid-auto-columns: 85%;
@@ -467,7 +527,8 @@ export default {
 .event-card {
   display: flex;
   flex-direction: column;
-  height: 100%; /* penuh mengikuti kolom */
+  height: 100%;
+  /* penuh mengikuti kolom */
   border: 1px solid #dfe5f2;
   border-radius: 12px;
   background: #fff;
@@ -483,7 +544,8 @@ export default {
 
 /* Bagian gambar tetap fix */
 .event-thumb {
-  height: 160px; /* lebih kecil biar space text cukup */
+  height: 160px;
+  /* lebih kecil biar space text cukup */
   background: #e8edf6;
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
@@ -492,10 +554,12 @@ export default {
 
 /* Bagian body isi teks fleksibel */
 .event-body {
-  flex-grow: 1; /* isi text isi space sisa */
+  flex-grow: 1;
+  /* isi text isi space sisa */
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* biar badge tetap di bawah */
+  justify-content: space-between;
+  /* biar badge tetap di bawah */
   padding: 12px 18px 18px;
 }
 
@@ -513,6 +577,7 @@ export default {
   padding: 14px;
   box-shadow: 0 6px 18px rgba(44, 92, 255, 0.06);
 }
+
 .team-avatar {
   height: 40px;
   width: 40px;
@@ -527,5 +592,23 @@ export default {
 /* MISC */
 .placeholder {
   color: #8793b5;
+}
+
+.event-thumb {
+  width: 100%;
+  height: 180px;              /* tinggi tetap biar grid rapi */
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.event-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;          /* gambar cover penuh, crop bagian luar */
+  object-position: center;    /* fokus ke tengah */
 }
 </style>

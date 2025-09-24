@@ -522,51 +522,57 @@ export default {
         settings: this._clone(this.draft),
       };
 
-      try {
-        if (typeof ipcRenderer === "undefined") return;
+      // 👉 sementara hanya logging JSON payload
+      console.log("=== PAYLOAD UPDATE JUDGES ===");
+      console.log(JSON.stringify(payload, null, 2));
 
-        this.saving = true;
-        ipcRenderer.removeAllListeners("race-settings:upsert-reply");
-        ipcRenderer.send("race-settings:upsert", {
-          eventId: payload.eventId,
-          settings: payload.settings,
-        });
+      /* 
+        try {
+            if (typeof ipcRenderer === "undefined") return;
 
-        ipcRenderer.once("race-settings:upsert-reply", (_e, res) => {
-          this.saving = false;
-          if (res && res.ok) {
-            var saved = res.settings ? res.settings : payload.settings;
-            this.draft = this.mergeWithDefaults(saved);
-
-            this.$emit("update-judges", {
-              eventId: payload.eventId,
-              eventName: payload.eventName,
-              settings: saved,
+            this.saving = true;
+            ipcRenderer.removeAllListeners("race-settings:upsert-reply");
+            ipcRenderer.send("race-settings:upsert", {
+            eventId: payload.eventId,
+            settings: payload.settings,
             });
 
-            if (this.$bvToast) {
-              this.$bvToast.toast("Judges settings updated", {
-                title: "Success",
-                variant: "success",
-                solid: true,
-              });
+            ipcRenderer.once("race-settings:upsert-reply", (_e, res) => {
+            this.saving = false;
+            if (res && res.ok) {
+                var saved = res.settings ? res.settings : payload.settings;
+                this.draft = this.mergeWithDefaults(saved);
+
+                this.$emit("update-judges", {
+                eventId: payload.eventId,
+                eventName: payload.eventName,
+                settings: saved,
+                });
+
+                if (this.$bvToast) {
+                this.$bvToast.toast("Judges settings updated", {
+                    title: "Success",
+                    variant: "success",
+                    solid: true,
+                });
+                }
+                this.localShow = false;
+            } else {
+                var errMsg =
+                res && res.error ? res.error : "Failed to update settings";
+                if (this.$bvToast) {
+                this.$bvToast.toast(errMsg, {
+                    title: "Update Failed",
+                    variant: "danger",
+                    solid: true,
+                });
+                }
             }
-            this.localShow = false;
-          } else {
-            var errMsg =
-              res && res.error ? res.error : "Failed to update settings";
-            if (this.$bvToast) {
-              this.$bvToast.toast(errMsg, {
-                title: "Update Failed",
-                variant: "danger",
-                solid: true,
-              });
-            }
-          }
-        });
-      } catch (err) {
-        this.saving = false;
-      }
+            });
+        } catch (err) {
+            this.saving = false;
+        }
+        */
     },
   },
 };

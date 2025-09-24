@@ -9,15 +9,15 @@
 
           <b-card
             title="Create New Event"
-            sub-title="Added Information Event Details"
+            sub-title="Added Information Event Information, Schedule & Race Details"
             class="m-3 shadow px-3 py-4"
-            style="border-radius: 25px"
+            style="border-radius: 25px;"
           >
             <form ref="form-newEvent">
               <br />
               <div>
                 <!-- ===== Event Information ===== -->
-                <p class="h5 my-2">Event Information</p>
+                <p style="font-weight: 700;" class="h4 my-2 mb-3">Event Information</p>
 
                 <b-row>
                   <!-- KIRI: field level, event name, river name -->
@@ -30,6 +30,7 @@
                         :options="optionLevels"
                         value-field="name"
                         text-field="name"
+                        class="br-15"
                       />
                     </b-form-group>
 
@@ -39,6 +40,7 @@
                         size="sm"
                         v-model="formEvent.eventName"
                         placeholder="Enter your event name"
+                        class="br-15"
                       />
                     </b-form-group>
 
@@ -48,13 +50,14 @@
                         size="sm"
                         v-model="formEvent.riverName"
                         placeholder="Enter river name"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
 
-                  <!-- KANAN: upload (Event Logo) -->
+                  <!-- KANAN: upload (Event Poster) -->
                   <b-col md="4">
-                    <b-form-group label="Event Logo">
+                    <b-form-group label="Event Poster">
                       <div class="d-flex flex-column align-items-stretch">
                         <div class="mb-2">
                           <img
@@ -88,6 +91,7 @@
                         <b-button
                           size="sm"
                           variant="primary"
+                          class="btn-action"
                           :disabled="isUploadingPoster"
                           @click="pickAndUploadPoster"
                         >
@@ -114,8 +118,8 @@
                   </b-col>
                 </b-row>
 
-                <br />
-                <p class="h5 my-2">Date & Location</p>
+                <hr />
+                <p style="font-weight: 700;" class="h4 my-2 mb-3">Schedule & Venue Details</p>
 
                 <!-- DISTRICT  -->
                 <b-form-group label="District">
@@ -123,6 +127,7 @@
                     size="sm"
                     v-model="formEvent.addressDistrict"
                     placeholder="Enter District"
+                    class="br-15"
                   />
                 </b-form-group>
 
@@ -134,6 +139,7 @@
                         size="sm"
                         v-model="formEvent.addressSubDistrict"
                         placeholder="Enter Sub District"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -145,6 +151,7 @@
                         size="sm"
                         v-model="formEvent.addressVillage"
                         placeholder="Enter Village"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -158,6 +165,7 @@
                         size="sm"
                         v-model="formEvent.addressCity"
                         placeholder="Enter City"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -169,6 +177,7 @@
                         size="sm"
                         v-model="formEvent.addressProvince"
                         placeholder="Enter Province"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -182,6 +191,7 @@
                         size="sm"
                         v-model="formEvent.addressZipCode"
                         placeholder="Enter ZIP Code"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -193,6 +203,7 @@
                         size="sm"
                         v-model="formEvent.addressState"
                         placeholder="Enter State"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -206,7 +217,7 @@
                         size="sm"
                         v-model="formEvent.startDateEvent"
                         placeholder="Select start date"
-                        class="mb-2"
+                        class="mb-2 br-15"
                         :min="minDate"
                       />
                     </b-form-group>
@@ -219,15 +230,15 @@
                         size="sm"
                         v-model="formEvent.endDateEvent"
                         placeholder="Select end date"
-                        class="mb-2"
+                        class="mb-2 br-15"
                         :min="formEvent.startDateEvent"
                       />
                     </b-form-group>
                   </b-col>
                 </b-row>
 
-                <br />
-                <p class="h5 my-2">Race Details</p>
+                <hr />
+                <p style="font-weight: 700;" class="h4 my-2 mb-3">Race Details</p>
 
                 <!-- EVENT CATEGORIES -->
                 <b-form-group label="Event Categories" label-cols="3">
@@ -277,7 +288,9 @@
                   />
                 </b-form-group>
 
-                <br />
+                <br/>
+                <hr />
+                <p style="font-weight: 700;" class="h4 my-2 mb-3">Comitte</p>
 
                 <b-row>
                   <b-col cols="6">
@@ -286,6 +299,7 @@
                         size="sm"
                         v-model="formEvent.chiefJudge"
                         placeholder="Enter chief judge name"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -295,6 +309,7 @@
                         size="sm"
                         v-model="formEvent.raceDirector"
                         placeholder="Enter race director name"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -307,6 +322,7 @@
                         size="sm"
                         v-model="formEvent.safetyDirector"
                         placeholder="Enter safety director name"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -316,6 +332,7 @@
                         size="sm"
                         v-model="formEvent.eventDirector"
                         placeholder="Enter event director name"
+                        class="br-15"
                       />
                     </b-form-group>
                   </b-col>
@@ -339,7 +356,7 @@
               </div>
               <div>
                 <b-button
-                  class="btn-md"
+                  class="btn-action"
                   style="border-radius: 10px"
                   @click="save()"
                   type="input"
@@ -799,4 +816,31 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style scoped>
+.btn-action {
+  background: #d7eafb;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+.btn-action:hover {
+  background-color: #1f6fa3 !important;
+  border: none;
+}
+
+.br-15 {
+  border-radius: 10px;
+}
+
+hr {
+  border: none; /* hilangkan default border */
+  height: 1px; /* ketebalan garis */
+  background-color: #a1a1a1; /* warna garis */
+  border-radius: 2px; /* opsional: biar sudutnya halus */
+  width: 100%;
+  margin-bottom: 30px;
+}
+</style>

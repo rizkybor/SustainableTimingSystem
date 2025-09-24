@@ -11,13 +11,13 @@
     <section class="detail-hero">
       <div class="hero-bg"></div>
       <b-container class="hero-inner">
-        <b-row class="align-items-center">
+        <b-row class="align-items-center mt-3">
           <!-- logo -->
           <b-col cols="auto" class="pr-0">
             <div
-              class="hero-logo d-flex align-items-center justify-content-center"
+              class="hero-logo mr-2 d-flex align-items-center justify-content-center"
             >
-              <Icon icon="mdi:shield-crown" width="56" height="56" />
+              <img :src="defaultImg" alt="Logo" class="event-img" />
             </div>
           </b-col>
 
@@ -26,18 +26,22 @@
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{ events.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025" }}
             </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ events.location || events.addressCity || "-" }}</span
-              >
-              <span class="mr-3"
+            <div class="meta">
+              <span class="mr-3" style="font-size: 18px"
                 ><strong class="text-white">River</strong> :
                 {{ events.riverName || "-" }}</span
               >
-              <span class="mr-3"
+              <span class="mr-3" style="font-size: 18px"
                 ><strong class="text-white">Level</strong> :
                 {{ events.levelName || "-" }}</span
+              >
+            </div>
+            <div class="meta">
+              <span class="mr-3" style="font-size: 18px"
+                ><strong class="text-white">Location</strong> :
+                {{ events.addressCity || "-" }},
+                {{ events.addressProvince || "-" }} -
+                {{ events.addressState || "-" }}</span
               >
             </div>
           </b-col>
@@ -228,18 +232,19 @@ import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
-import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import TeamPanel from "./../components/TeamPanel.vue";
 import RaceSettingsModal from "./../components/RaceSettings.vue";
 import JudgeSettingsModal from "./../components/JudgesSettings.vue";
 import { getSocket } from "@/services/socket";
+import defaultImg from "@/assets/images/default-second.jpeg";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { Icon, TeamPanel, RaceSettingsModal, JudgeSettingsModal },
+  components: { defaultImg, TeamPanel, RaceSettingsModal, JudgeSettingsModal },
   data() {
     return {
+      defaultImg,
       selfSocketId: null,
       resultAvailMap: {
         R4_MEN: false,
@@ -439,7 +444,7 @@ export default {
     },
 
     onUpdateJudgeSettings(payload) {
-      console.log(payload)
+      console.log(payload);
       // if (payload && payload.settings) this.raceSettings = payload.settings;
 
       // if (typeof window !== "undefined" && window.ipcRenderer) {
@@ -2114,7 +2119,7 @@ export default {
 }
 
 .icon-event {
- transition: transform 0.4s ease;
+  transition: transform 0.4s ease;
 }
 
 .icon-event:hover {
@@ -2172,8 +2177,8 @@ export default {
 
 /* Kotak logo putih membulat dengan bayangan */
 .hero-logo {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 20px;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -2182,8 +2187,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: inherit;
-  /* ikon ikut warna default */
 }
 
 .hero-logo img {
@@ -2254,6 +2257,12 @@ export default {
   font-weight: 700;
   padding: 10px 18px;
   border-radius: 8px;
+}
+
+.init-tab:hover {
+  border: 2;
+  background: #cccccc;
+  color: white;
 }
 
 .init-tab.active {
@@ -2411,5 +2420,4 @@ export default {
   border-radius: 10px;
   padding: 8px 14px;
 }
-
 </style>

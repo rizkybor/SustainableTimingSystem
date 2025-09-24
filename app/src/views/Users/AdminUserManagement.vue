@@ -142,148 +142,108 @@
     <!-- MODAL EDIT -->
     <b-modal
       v-model="showEdit"
-      size="lg"
-      :title="`Edit User: ${editForm.username || ''}`"
+      size="xl"
+      hide-header
+      hide-footer
       :no-close-on-esc="true"
       :no-close-on-backdrop="true"
-      ok-only
-      ok-title="Close"
-      hide-header-close
-      body-class="pt-0"
+      body-class="p-0"
+      content-class="custom-modal"
     >
-      <b-card class="um-card mb-3 px-3 py-3">
-        <b-form @submit.prevent="saveUser">
-          <!-- User info -->
-          <div class="text-center mb-4">
-            <img
-              :src="editForm.image || fallbackAvatar"
-              class="avatar xl mb-3"
-            />
-            <b-form-group label="Fullname" label-class="label-strong mb-1">
-              <h2>
-                {{ editForm.username }}
-              </h2>
-            </b-form-group>
-          </div>
+      <!-- Header -->
+      <div class="modal-header-custom">
+        <h5 class="mb-0">Judges Profil Configuration</h5>
+        <button
+          type="button"
+          class="btn-close-x"
+          aria-label="Close"
+          @click="showEdit = false"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
 
-          <!-- Main Events -->
-          <b-form-group label="Main Events" label-class="label-strong">
-            <b-form-select
-              v-model="editForm.mainEvents"
-              :options="eventOptions"
-              class="input-soft"
-              multiple
-            />
-            <small class="text-muted d-block mt-1">
-              Pilih beberapa event yang menjadi akses utama user.
-            </small>
-          </b-form-group>
-        </b-form>
-      </b-card>
-
-      <!-- Judges -->
-      <b-card class="um-card px-3 py-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <div class="label-strong mb-0">Judges per Event</div>
-          <b-button
-            size="sm"
-            variant="outline-secondary"
-            class="btn-outline-pill"
-            @click="addJudge"
-          >
-            + Add Judge Entry
-          </b-button>
+      <!-- Body -->
+      <div class="modal-body-custom">
+        <!-- User Detail -->
+        <div class="text-center py-4">
+          <img
+            :src="editForm.image || fallbackAvatar"
+            alt="Avatar"
+            class="avatar-xl mb-3"
+          />
+          <h4 class="fw-bold mb-1">{{ editForm.username }}</h4>
+          <div class="text-muted">{{ editForm.email }}</div>
         </div>
 
-        <div
-          v-if="!editForm.judges || !editForm.judges.length"
-          class="text-muted"
-        >
-          Belum ada entri judges. Tambahkan dengan tombol di atas.
-        </div>
+        <!-- Main Events -->
+        <div class="section-box">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">Main Events</h5>
 
-        <div
-          v-for="(j, idx) in editForm.judges"
-          :key="`judge-${idx}`"
-          class="judge-row"
-        >
-          <div class="row">
-            <div class="col-md-4">
-              <b-form-group label="Event" label-class="label-strong mb-1">
-                <b-form-select
-                  v-model="j.eventId"
-                  :options="eventOptions"
-                  class="input-soft"
-                />
-              </b-form-group>
-            </div>
-            <div class="col-md-8">
-              <div class="row">
-                <div class="col-6 col-md-3">
-                  <b-form-group label="Sprint" label-class="label-strong mb-1">
-                    <b-form-input
-                      v-model="j.judgesSprint"
-                      class="input-soft"
-                      placeholder="e.g. 1"
-                    />
-                  </b-form-group>
-                </div>
-                <div class="col-6 col-md-3">
-                  <b-form-group
-                    label="Head to Head"
-                    label-class="label-strong mb-1"
-                  >
-                    <b-form-input
-                      v-model="j.judgesHeadtoHead"
-                      class="input-soft"
-                      placeholder="e.g. 1"
-                    />
-                  </b-form-group>
-                </div>
-                <div class="col-6 col-md-3">
-                  <b-form-group label="Slalom" label-class="label-strong mb-1">
-                    <b-form-input
-                      v-model="j.judgesSlalom"
-                      class="input-soft"
-                      placeholder="e.g. 1"
-                    />
-                  </b-form-group>
-                </div>
-                <div class="col-6 col-md-3">
-                  <b-form-group label="DRR" label-class="label-strong mb-1">
-                    <b-form-input
-                      v-model="j.judgesDRR"
-                      class="input-soft"
-                      placeholder="e.g. 1"
-                    />
-                  </b-form-group>
-                </div>
-              </div>
+            <!-- Picker + Add -->
+            <div class="d-flex align-items-center" style="gap: 8px">
+              <b-form-select
+                v-model="selectedEventId"
+                :options="eventOptions"
+                class="input-soft"
+                :disabled="!eventOptions.length"
+                style="min-width: 250px"
+              />
+              <b-button
+                size="md"
+                style="min-width: 150px"
+                class="btn-add"
+                @click="addMainEvent"
+              >
+                + Add Event
+              </b-button>
             </div>
           </div>
 
-          <div class="d-flex justify-content-end">
-            <b-button
-              size="sm"
-              variant="outline-danger"
-              class="btn-outline-pill"
-              @click="removeJudge(idx)"
-            >
-              Remove
-            </b-button>
-          </div>
-        </div>
-
-        <div class="d-flex justify-content-end mt-3">
-          <b-button
-            variant="primary"
-            class="btn-primary-pill"
-            @click="saveUser"
+          <!-- Tabel render dari computed rows -->
+          <b-table
+            :items="mainEventRows"
+            :fields="mainEventFields"
+            responsive
+            bordered
+            class="event-table"
+            show-empty
+            empty-text="Belum ada Main Event"
           >
-            Save Changes
-          </b-button>
+            <!-- kolom No -->
+            <template #cell(no)="row">
+              <span class="text-muted">{{ row.index + 1 }}</span>
+            </template>
+
+            <template #cell(action)="{ item }">
+              <b-button
+                size="sm"
+                variant="outline-danger"
+                class="btn-icon"
+                @click="removeEventById(item.id)"
+                title="Remove"
+              >
+                <Icon icon="mdi:trash-can-outline" width="18" height="18" />
+              </b-button>
+            </template>
+          </b-table>
         </div>
-      </b-card>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer-custom">
+        <b-button
+          variant="outline-danger"
+          class="btn-pill"
+          @click="showEdit = false"
+        >
+          Cancel
+        </b-button>
+        <b-button variant="primary" class="btn-pill" @click="/* saveUser() */">
+          Update
+        </b-button>
+      </div>
     </b-modal>
   </div>
 </template>
@@ -327,12 +287,52 @@ export default {
         judges: [],
         email: "",
       },
-      eventOptions: [], // { value: <24hex>, text: <name> }
+      selectedEventId: "",
+      eventDict: {},
+      eventOptions: [],
       fallbackAvatar:
         "https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&bold=true",
     };
   },
   computed: {
+    // field untuk table main events di modal
+    mainEventFields() {
+      return [
+        {
+          key: "no",
+          label: "No",
+          thStyle: { width: "56px" },
+          class: "text-center align-middle",
+        },
+        { key: "eventName", label: "Event Name" },
+        { key: "levelName", label: "Event Level", class: "text-nowrap" },
+        { key: "startDateEvent", label: "Event Date", class: "text-nowrap" },
+        {
+          key: "action",
+          label: "Action",
+          class: "text-center",
+          thStyle: { width: "90px" },
+        },
+      ];
+    },
+
+    // baris tabel yang dibentuk dari array of IDs di editForm.mainEvents
+    mainEventRows() {
+      const ids = Array.isArray(this.editForm.mainEvents)
+        ? this.editForm.mainEvents
+        : [];
+      return ids.map((id) => {
+        const key = this._toStringId(id);
+        const meta = this.eventDict[key] || {};
+        console.log(meta, "<<");
+        return {
+          id: key,
+          eventName: meta.name || this.eventName(key) || key || "-",
+          levelName: meta.level || "-",
+          startDateEvent: this._formatDateRange(meta.start, meta.end) || "-",
+        };
+      });
+    },
     eventMap() {
       const map = {};
       const opts = Array.isArray(this.eventOptions) ? this.eventOptions : [];
@@ -347,6 +347,66 @@ export default {
     this.fetchEvents();
   },
   methods: {
+    // ====== MAIN EVENTS (Modal) ======
+    addMainEvent() {
+      const id = this._toStringId(this.selectedEventId);
+      if (!id) {
+        this._toast("Pilih event terlebih dahulu", "warning");
+        return;
+      }
+      if (!Array.isArray(this.editForm.mainEvents))
+        this.editForm.mainEvents = [];
+      if (this.editForm.mainEvents.some((e) => this._toStringId(e) === id)) {
+        this._toast("Event sudah ada di daftar", "info");
+        return;
+      }
+      this.editForm.mainEvents.push(id);
+      this.selectedEventId = "";
+    },
+
+    removeEventById(id) {
+      const key = this._toStringId(id);
+      if (!Array.isArray(this.editForm.mainEvents)) return;
+      this.editForm.mainEvents = this.editForm.mainEvents.filter(
+        (e) => this._toStringId(e) !== key
+      );
+    },
+
+    _formatDateRange(start, end) {
+      // toleran dengan berbagai nama properti tanggal (string/timestamp)
+      const fmt = (v) => {
+        if (!v) return "";
+        try {
+          const d = new Date(v);
+          if (isNaN(d.getTime())) return String(v);
+          // contoh output: 25 Sep 2025
+          return d.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+        } catch {
+          return String(v);
+        }
+      };
+      const s = fmt(start),
+        e = fmt(end);
+      if (s && e) return `${s} - ${e}`;
+      return s || e || "";
+    },
+    addEvent() {
+      this.editForm.mainEvents.push({
+        name: "New Event",
+        level: "Level X",
+        date: "TBD",
+      });
+    },
+    removeEvent(idx) {
+      this.editForm.mainEvents.splice(idx, 1);
+    },
+    // saveUser() {
+    //   // TODO: implement update logic here
+    // }
     _toast(msg, variant = "info") {
       if (this.$bvToast) {
         this.$bvToast.toast(msg, { variant, solid: true });
@@ -423,19 +483,12 @@ export default {
       });
     },
 
+    // ====== EVENTS LOADER (edit agar simpan meta lengkap) ======
     fetchEvents() {
-      // optional: show loading state if you use it
       if (typeof this.loading !== "undefined") this.loading = true;
-
-      // pastikan tidak numpuk listener lama
       ipcRenderer.removeAllListeners("get-events-reply");
-
-      // kirim request
       ipcRenderer.send("get-events");
-
-      // terima sekali (hindari leak saat HMR)
       ipcRenderer.once("get-events-reply", (_e, payload) => {
-        // payload bisa Array langsung, atau { ok, events }
         const eventsArray = Array.isArray(payload)
           ? payload
           : payload && Array.isArray(payload.events)
@@ -443,17 +496,38 @@ export default {
           : [];
 
         const opts = [];
+        const dict = {};
+
         for (let i = 0; i < eventsArray.length; i++) {
-          const ev = eventsArray[i];
-          const id = this._toStringId(ev && ev._id); // 🔑 stringkan di sini
-          const name = ev && ev.eventName ? String(ev.eventName) : "(untitled)";
-          if (id) opts.push({ value: id, text: name });
+          const ev = eventsArray[i] || {};
+          const id = this._toStringId(ev._id);
+          const name = ev.eventName || ev.name || "(untitled)";
+
+          // fleksibel ke berbagai skema field:
+          const level = ev.eventLevel || ev.levelName || ev.category || "";
+          const start =
+            ev.startDateEvent ||
+            ev.start ||
+            ev.eventStart ||
+            ev.dateStart ||
+            ev.beginDate;
+          const end =
+            ev.endDateEvent ||
+            ev.end ||
+            ev.eventEnd ||
+            ev.dateEnd ||
+            ev.finishDate;
+
+          if (id) {
+            opts.push({ value: id, text: name });
+            dict[id] = { name, level, start, end };
+          }
         }
+
         this.eventOptions = opts;
+        this.eventDict = dict;
 
-        // lanjut: load users setelah event map siap
         this.fetchUsers();
-
         if (typeof this.loading !== "undefined") this.loading = false;
       });
     },
@@ -753,68 +827,70 @@ export default {
 }
 
 /* ===== Modal Styling ===== */
-.modal-content {
-  border-radius: 20px !important;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+.custom-modal {
+  border-radius: 16px;
   overflow: hidden;
 }
 
-.modal-header {
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1rem 1.5rem;
+.modal-header-custom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e6ebf4;
+  background: #f9fafb;
 }
 
-.modal-title {
-  font-weight: 800;
-  font-size: 1.2rem;
-  color: #0f172a;
+.modal-body-custom {
+  padding: 20px 24px;
+  background: #fff;
 }
 
-.modal-body {
-  padding: 1.25rem 1.5rem;
-  background: #ffffff;
+.modal-footer-custom {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-top: 1px solid #e6ebf4;
+  background: #f9fafb;
 }
 
-.modal-footer {
-  background: #f8fafc;
-  border-top: 1px solid #e5e7eb;
-  padding: 0.75rem 1.5rem;
-}
-
-/* OK button jadi pill */
-.modal-footer .btn-primary,
-.modal-footer .btn-primary-pill {
-  border-radius: 12px;
-  padding: 0.55rem 1.4rem;
-  font-weight: 700;
-  background: #2563eb;
-  border-color: #2563eb;
-  transition: all 0.2s ease-in-out;
-}
-.modal-footer .btn-primary:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-}
-
-/* Avatar besar di modal */
-.avatar.xl {
+.avatar-xl {
   width: 96px;
   height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e5e7eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Input rounded lebih lembut */
-.rounded-input {
-  border-radius: 14px !important;
+.section-box {
+  border: 1px solid #e6ebf4;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 24px;
+  background: #fafafa;
 }
 
-/* Centered label & form */
-.b-form-group {
-  text-align: left;
+.btn-add {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+  color: #fff;
+  font-weight: 500;
+  padding: 6px 14px;
+}
+
+.btn-pill {
+  border-radius: 24px;
+  padding: 6px 20px;
+  font-weight: 500;
+}
+
+.btn-icon {
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.event-table {
+  font-size: 0.9rem;
 }
 </style>

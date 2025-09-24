@@ -4,7 +4,7 @@
     <section class="sts-jumbotron p-5">
       <b-container>
         <b-row>
-          <b-col cols="12" md="7" class="py-4 ">
+          <b-col cols="12" md="7" class="py-4">
             <h1 class="display-5 font-weight-bold mb-3">
               Sustainable Timing System
             </h1>
@@ -51,7 +51,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="w-100 rounded-pill"
+                class="btn-action w-100 rounded-pill"
                 @click="goTo('create-new')"
               >
                 Create Event
@@ -74,7 +74,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100 rounded-pill"
                 @click="goTo('team-create')"
               >
                 Create Team
@@ -93,11 +93,12 @@
               </div>
               <h5 class="mb-1 font-weight-bold">Jury's Account Management</h5>
               <small class="text-muted d-block mb-3">
-                  Management jury accounts and assign roles to manage evaluation efficiently.
+                Management jury accounts and assign roles to manage evaluation
+                efficiently.
               </small>
               <b-button
                 variant="secondary"
-                class="w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100 rounded-pill"
                 @click="goTo('admin/users')"
               >
                 Manage Account
@@ -241,17 +242,17 @@ export default {
     _idToHex(_id, fallback = "") {
       // case: { $oid: "..." }
       if (_id && _id.$oid) return String(_id.$oid);
-       
-  if (_id && _id.id) {
-    try {
-      return Array.from(_id.id)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-    } catch (e) {
-      // gagal konversi → pakai fallback
-      return fallback;
-    }
-  }
+
+      if (_id && _id.id) {
+        try {
+          return Array.from(_id.id)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        } catch (e) {
+          // gagal konversi → pakai fallback
+          return fallback;
+        }
+      }
 
       // case: string langsung
       if (typeof _id === "string") return _id;
@@ -338,8 +339,22 @@ export default {
 <!-- PLAIN CSS (NO SCSS) -->
 <style scoped>
 :root {
-  --sts-blue: #2c5cff;
+  --sts-blue: red;
   --sts-muted: #8793b5;
+}
+
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+.btn-action:hover {
+  background-color: #1f6fa3 !important;
+  border: none;
 }
 
 /* NAVBAR */
@@ -371,7 +386,7 @@ export default {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.4); /* overlay hitam transparan */
+  background: rgba(0, 0, 0, 0.4); /* overlay hitam transparan */
   z-index: 1;
 }
 

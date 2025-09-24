@@ -348,6 +348,16 @@
                   Submit
                   <Icon icon="ic:baseline-check-circle" />
                 </b-button>
+
+                <b-button
+                  class="btn-md ml-2"
+                  style="border-radius: 10px"
+                  @click="testUpload"
+                  variant="success"
+                >
+                  Test Upload
+                  <Icon icon="ic:baseline-cloud-upload" />
+                </b-button>
               </div>
             </div>
           </b-card>
@@ -372,10 +382,10 @@ export default {
     return {
       posterPreview: "",
       isUploadingPoster: false,
-
+      // path / sumber file lokal yang dipilih (belum diupload)
+      posterTempPath: null,
       text: "",
       name: "",
-
       formEvent: {
         levelName: null,
         eventName: "",
@@ -427,6 +437,108 @@ export default {
   },
 
   methods: {
+    async pickAndUploadPoster() {
+      try {
+        if (!window.fileAPI || typeof window.fileAPI.pickImage !== "function") {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "Unavailable",
+            detail: "File picker belum tersedia",
+          });
+          return;
+        }
+        const pick = await window.fileAPI.pickImage();
+        if (!pick || !pick.ok || pick.canceled) return;
+
+        this.posterTempPath = pick.path;
+
+        if (window.fileAPI && typeof window.fileAPI.toDataURL === "function") {
+          this.posterPreview = await window.fileAPI.toDataURL(pick.path);
+        } else if (pick.path) {
+          this.posterPreview = "file://" + pick.path;
+        }
+
+        this.formEvent.poster = null; // belum upload
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Picker error",
+          detail: err && err.message ? err.message : String(err),
+        });
+      }
+    },
+    async testUpload() {
+      try {
+        if (!this.posterTempPath) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "No File Selected",
+            detail: "Pilih gambar dulu",
+          });
+          return;
+        }
+        if (
+          !window.cloud ||
+          typeof window.cloud.uploadEventImage !== "function"
+        ) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "Unavailable",
+            detail: "Cloudinary bridge belum tersedia",
+          });
+          return;
+        }
+
+        this.isUploadingPoster = true;
+
+        const up = await window.cloud.uploadEventImage(this.posterTempPath);
+        if (!up || !up.ok || !up.result) {
+          this.isUploadingPoster = false;
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upload failed",
+            detail: up && up.error ? up.error : "Unknown error",
+          });
+          return;
+        }
+
+        // simpan metadata cloud + pakai secure_url untuk preview
+        this.formEvent.poster = up.result;
+        this.posterPreview = up.result.secure_url;
+
+        // kirim ke DB (sesuaikan channelmu)
+        const payload = Object.assign({}, this.formEvent, {
+          participant: [],
+          __testUpload: true,
+        });
+        ipcRenderer.send("insert-new-event", payload);
+
+        const self = this;
+        ipcRenderer.once("insert-new-event-reply", function (_e, data) {
+          self.isUploadingPoster = false;
+          if (data && data.insertedId) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "success",
+              message: "Test Upload Success",
+              detail: "ID: " + data.insertedId,
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "DB Save Failed",
+              detail: "No insertedId",
+            });
+          }
+        });
+      } catch (err) {
+        this.isUploadingPoster = false;
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Test Upload Error",
+          detail: err && err.message ? err.message : String(err),
+        });
+      }
+    },
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("formNewEvent");
       const datas = dataStorage ? JSON.parse(dataStorage) : null;
@@ -511,69 +623,6 @@ export default {
       return true;
     },
 
-    async pickAndUploadPoster() {
-      try {
-        // cek preload file picker
-        if (!window.fileAPI || typeof window.fileAPI.pickImage !== "function") {
-          ipcRenderer.send("get-alert", {
-            type: "warning",
-            message: "Unavailable",
-            detail: "File picker belum diexpose dari preload.",
-          });
-          return;
-        }
-
-        // pilih file
-        const pick = await window.fileAPI.pickImage();
-        if (!pick || !pick.ok || pick.canceled) return;
-
-        // cek cloudinary bridge
-        if (!window.cloud || typeof window.cloud.uploadImage !== "function") {
-          ipcRenderer.send("get-alert", {
-            type: "warning",
-            message: "Unavailable",
-            detail: "Cloudinary API belum diexpose dari preload.",
-          });
-          return;
-        }
-
-        this.isUploadingPoster = true;
-
-        // upload ke cloudinary
-        const up = await window.cloud.uploadImage(pick.path, {
-          folder: "sts-rafter/events",
-        });
-
-        this.isUploadingPoster = false;
-
-        if (!up || !up.ok || !up.result) {
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            message: "Upload failed",
-            detail: (up && up.error) || "Unknown error",
-          });
-          return;
-        }
-
-        // simpan metadata & preview
-        this.formEvent.poster = up.result; // { public_id, secure_url, ... }
-        this.posterPreview = up.result.secure_url || "";
-
-        ipcRenderer.send("get-alert-saved", {
-          type: "info",
-          message: "Upload success",
-          detail: "Poster berhasil diupload ke Cloudinary.",
-        });
-      } catch (err) {
-        this.isUploadingPoster = false;
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          message: "Upload error",
-          detail: (err && err.message) || String(err),
-        });
-      }
-    },
-
     async clearPoster() {
       try {
         const pub =
@@ -597,31 +646,28 @@ export default {
     },
 
     save() {
-      const formValid = this.validateForm();
-      if (!formValid) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "To create an event, all fields must be filled in",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-
-      const payload = { ...this.formEvent, participant: [] }; // participant selalu kosong saat create
-      ipcRenderer.send("insert-new-event", payload);
-
-      ipcRenderer.once("insert-new-event-reply", (_e, _data) => {
-        ipcRenderer.send("get-alert-saved", {
-          type: "question",
-          detail: "Event data has been successfully saved",
-          message: "Successfully",
-        });
-      });
-
-      setTimeout(() => {
-        localStorage.removeItem("formNewEvent");
-        this.$router.push("/");
-      }, 1500);
+      // const formValid = this.validateForm();
+      // if (!formValid) {
+      //   ipcRenderer.send("get-alert", {
+      //     type: "warning",
+      //     detail: "To create an event, all fields must be filled in",
+      //     message: "Ups Sorry",
+      //   });
+      //   return;
+      // }
+      // const payload = { ...this.formEvent, participant: [] }; // participant selalu kosong saat create
+      // ipcRenderer.send("insert-new-event", payload);
+      // ipcRenderer.once("insert-new-event-reply", (_e, _data) => {
+      //   ipcRenderer.send("get-alert-saved", {
+      //     type: "question",
+      //     detail: "Event data has been successfully saved",
+      //     message: "Successfully",
+      //   });
+      // });
+      // setTimeout(() => {
+      //   localStorage.removeItem("formNewEvent");
+      //   this.$router.push("/");
+      // }, 1500);
     },
   },
 };

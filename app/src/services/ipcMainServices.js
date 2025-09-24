@@ -1,5 +1,9 @@
 const { ipcMain, dialog } = require("electron");
 const fs = require("fs");
+const path = require("path");
+
+// === Cloudinary config (hanya di file ini) ===
+require("dotenv").config();
 const cloudinary = require("cloudinary").v2;
 
 const {
@@ -53,11 +57,18 @@ const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
-  api_key: process.env.CLOUDINARY_API_KEY || "",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
+
+function assertCloudinaryConfig() {
+  const cfg = cloudinary.config();
+  if (!cfg.cloud_name) throw new Error("Cloudinary cloud_name missing");
+  if (!cfg.api_key) throw new Error("Cloudinary api_key missing");
+  if (!cfg.api_secret) throw new Error("Cloudinary api_secret missing");
+}
 
 // communication with database
 function setupIPCMainHandlers() {
@@ -289,35 +300,37 @@ function setupIPCMainHandlers() {
   // ========================================================================
   // File picker & Cloudinary (TIDAK ADA optional chaining)
   // ========================================================================
-  ipcMain.handle("file:pick-image", async () => {
-    const dlg = await dialog.showOpenDialog({
-      title: "Select image",
+  // (opsional) file picker untuk preload → window.fileAPI.pickImage()
+  ipcMain.handle("file:pick-image", async function () {
+    const r = await dialog.showOpenDialog({
       properties: ["openFile"],
-      filters: [
-        { name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] },
-      ],
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp"] }],
     });
-
-    const canceled = !!dlg.canceled;
-    const filePaths = dlg.filePaths || [];
-
-    if (canceled || !filePaths.length) {
+    if (r.canceled || !r.filePaths || r.filePaths.length === 0) {
       return { ok: false, canceled: true };
     }
-    return { ok: true, path: filePaths[0] };
+    return { ok: true, path: r.filePaths[0] };
   });
 
-  ipcMain.handle("cloud:upload-image", async (_e, absPath, options) => {
-    const opts = options || {};
+  // Upload ke Cloudinary
+  ipcMain.handle("cloud:upload-image", async function (_e, absPath, options) {
     try {
+      assertCloudinaryConfig();
+
       if (!absPath) throw new Error("Missing file path");
       if (!fs.existsSync(absPath)) throw new Error("File not found");
 
+      var opts = options || {};
+      const folder = opts.folder ? String(opts.folder) : "sustainable-js/event";
+      const publicId = opts.publicId
+        ? String(opts.publicId)
+        : path.parse(absPath).name;
+
       const res = await cloudinary.uploader.upload(absPath, {
-        folder: opts.folder || "sts-rafter/events",
+        folder: folder,
+        public_id: publicId,
         resource_type: "image",
         overwrite: true,
-        public_id: opts.publicId ? String(opts.publicId) : undefined,
       });
 
       return {
@@ -343,7 +356,8 @@ function setupIPCMainHandlers() {
     }
   });
 
-  ipcMain.handle("cloud:delete-image", async (_e, publicId) => {
+  // Hapus di Cloudinary
+  ipcMain.handle("cloud:delete-image", async function (_e, publicId) {
     try {
       if (!publicId) throw new Error("Missing public_id");
       const r = await cloudinary.uploader.destroy(String(publicId), {

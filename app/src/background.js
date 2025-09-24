@@ -21,8 +21,8 @@ async function createWindow() {
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../src/preload.js'),
-      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
-      contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION
+      nodeIntegration: true,
+contextIsolation: false,
     }
   })
 

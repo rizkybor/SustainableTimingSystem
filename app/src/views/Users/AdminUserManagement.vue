@@ -159,19 +159,10 @@
               :src="editForm.image || fallbackAvatar"
               class="avatar xl mb-3"
             />
-            <b-form-group label="Username" label-class="label-strong mb-1">
-              <b-form-input
-                v-model="editForm.username"
-                class="input-soft rounded-input"
-                placeholder="Enter username"
-              />
-            </b-form-group>
-            <b-form-group label="Image URL" label-class="label-strong mb-1">
-              <b-form-input
-                v-model="editForm.image"
-                class="input-soft rounded-input"
-                placeholder="Paste image URL"
-              />
+            <b-form-group label="Fullname" label-class="label-strong mb-1">
+              <h2>
+                {{ editForm.username }}
+              </h2>
             </b-form-group>
           </div>
 

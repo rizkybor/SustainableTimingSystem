@@ -494,7 +494,6 @@ function setupIPCMainHandlers() {
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
-      console.log(event, identity, "<<< get registered");
       const res = await getTeamsRegistered(identity);
       event.reply("get-teams-registered-reply", res);
     } catch (error) {

@@ -4,14 +4,14 @@
     v-model="localShow"
     hide-footer
     centered
-    size="lg"
+    size="xl"
     body-class="p-0"
     content-class="rounded-20 overflow-hidden"
   >
     <!-- Header -->
     <template #modal-header>
       <div class="d-flex justify-content-between align-items-center w-100">
-        <h5 class="mb-0 font-weight-bold">Judges Setting</h5>
+        <h5 class="mb-0 font-weight-bold">Judges Configuration</h5>
         <b-button size="sm" class="btn-close-red" @click="close">✕</b-button>
       </div>
     </template>
@@ -21,24 +21,28 @@
       <div class="p-2 p-md-3">
         <!-- SPRINT -->
         <section class="rs-card mb-3">
-          <div class="rs-section-title">Sprint</div>
+          <div class="rs-section-title">Sprint Judges</div>
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.sprint.juryStart"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Finish</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.sprint.juryFinish"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -46,24 +50,28 @@
 
         <!-- HEAD TO HEAD -->
         <section class="rs-card mb-3">
-          <div class="rs-section-title">Head to Head</div>
+          <div class="rs-section-title">Head to Head Judges</div>
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.h2h.juryStart"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Finish</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.h2h.juryFinish"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -76,11 +84,13 @@
               :key="key"
             >
               <label class="form-label">Bouyan {{ key }}</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.h2hValues[key]"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -88,24 +98,28 @@
 
         <!-- SLALOM -->
         <section class="rs-card mb-3">
-          <div class="rs-section-title">Slalom</div>
+          <div class="rs-section-title">Slalom Judges</div>
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.slalom.juryStart"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Finish</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.slalom.juryFinish"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -118,11 +132,13 @@
               :key="'gate-' + n"
             >
               <label class="form-label">Gate {{ n }}</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.slalom.gates[n]"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -130,7 +146,7 @@
 
         <!-- DOWN RIVER RACE -->
         <section class="rs-card mb-3">
-          <div class="rs-section-title">Down River Race</div>
+          <div class="rs-section-title">Down River Race Judges</div>
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
@@ -160,11 +176,13 @@
               :key="'section-' + n"
             >
               <label class="form-label">Section {{ n }}</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
+              <SearchableSelect
                 v-model="draft.drr.sections[n]"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="true"
               />
             </b-col>
           </b-row>
@@ -198,17 +216,37 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import SearchableSelect from "@/components/SearchableSelect.vue";
 
-function makeIndexedMap(n, fill) {
-  const obj = {};
-  for (let i = 1; i <= n; i++) {
-    obj[i] = fill;
+/* ========= helpers ========= */
+function pickId(u) {
+  if (!u) return "";
+  // urutan prioritas id yang mungkin
+  if (typeof u.id !== "undefined" && u.id !== null && u.id !== "") return u.id;
+  if (u._id && typeof u._id === "string") return u._id;
+  if (u._id && typeof u._id === "object" && u._id.$oid) return u._id.$oid;
+  if (u.email) return u.email;
+  return "";
+}
+
+function normalizeUsersToOptions(arr) {
+  var out = [];
+  if (!Array.isArray(arr)) return out;
+  for (var i = 0; i < arr.length; i++) {
+    var u = arr[i];
+    out.push({
+      value: pickId(u), // yang disimpan di v-model
+      text: u && u.username ? u.username : u && u.email ? u.email : "Unknown",
+      email: u && u.email ? u.email : "",
+      username: u && u.username ? u.username : "",
+    });
   }
-  return obj;
+  return out;
 }
 
 export default {
   name: "JudgesSettings",
+  components: { SearchableSelect },
   props: {
     id: { type: String, default: "judges-settings-modal" },
     value: { type: Boolean, default: false },
@@ -222,12 +260,6 @@ export default {
     maxSection: { type: Number, default: 4 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
-    juryOptions: {
-      type: Array,
-      default: function () {
-        return [];
-      },
-    },
   },
 
   data: function () {
@@ -237,11 +269,58 @@ export default {
       saving: false,
       internalJuryOptions: [],
       draft: this.mergeWithDefaults(this.settings),
+      juryOptions: {
+        type: Array,
+        default: function () {
+          return [];
+        },
+      },
+      usersRaw: [],
     };
   },
 
   computed: {
-    enabledBouyanKeys() {
+    // opsi untuk semua dropdown juri
+    selectOptions: function () {
+      var arr = [];
+      if (Array.isArray(this.usersRaw)) {
+        arr = this.usersRaw;
+      }
+
+      var out = [];
+      for (var i = 0; i < arr.length; i++) {
+        var u = arr[i];
+        var id = "";
+
+        if (u && typeof u.id !== "undefined" && u.id !== null && u.id !== "") {
+          id = u.id;
+        } else if (u && typeof u._id === "string") {
+          id = u._id;
+        } else if (u && typeof u._id === "object" && u._id.$oid) {
+          id = u._id.$oid;
+        } else if (u && u.email) {
+          id = u.email;
+        }
+
+        var text = "Unknown";
+        if (u && u.username) {
+          text = u.username;
+        } else if (u && u.email) {
+          text = u.email;
+        }
+
+        var opt = {
+          value: id,
+          text: text,
+          disabled: false,
+        };
+        out.push(opt);
+      }
+
+      return out;
+    },
+    // tampilkan hanya bouyan yang enabled (true) dari race-settings
+    enabledBouyanKeys: function () {
       var out = [];
       var flags = this.draft && this.draft.h2hFlags ? this.draft.h2hFlags : {};
       var keys = ["R1", "R2", "L1", "L2"];
@@ -251,45 +330,31 @@ export default {
       }
       return out;
     },
-    gatesCount() {
-      var n = this.draft && this.draft.slalom ? this.draft.slalom.totalGate : 0;
-      return n && n > 0 ? n : 1;
+    // jumlah gate/section mengikuti angka dari draft (fallback 1)
+    gatesCount: function () {
+      var n =
+        this.draft && this.draft.slalom && this.draft.slalom.totalGate
+          ? this.draft.slalom.totalGate
+          : 0;
+      return n > 0 ? n : 1;
     },
-    sectionsCount() {
-      var n = this.draft && this.draft.drr ? this.draft.drr.totalSection : 0;
-      return n && n > 0 ? n : 1;
+    sectionsCount: function () {
+      var n =
+        this.draft && this.draft.drr && this.draft.drr.totalSection
+          ? this.draft.drr.totalSection
+          : 0;
+      return n > 0 ? n : 1;
     },
+    // opsi akhir untuk select
     resolvedJuryOptions: function () {
-      let base = [];
       if (
         Array.isArray(this.internalJuryOptions) &&
         this.internalJuryOptions.length > 0
       ) {
-        base = this.internalJuryOptions;
-      } else if (Array.isArray(this.juryOptions)) {
-        base = this.juryOptions;
+        var base = [{ value: "", text: "Select jury name" }];
+        return base.concat(this.internalJuryOptions);
       }
-
-      let normalized = [];
-      if (Array.isArray(base)) {
-        normalized = base.map(function (x) {
-          if (typeof x === "string") {
-            return { value: x, text: x };
-          }
-          const val =
-            x &&
-            (x.value !== undefined ? x.value : x.id !== undefined ? x.id : "");
-          const txt =
-            x &&
-            (x.text !== undefined
-              ? x.text
-              : x.name !== undefined
-              ? x.name
-              : "");
-          return { value: val, text: txt };
-        });
-      }
-      return [{ value: "", text: "Select jury name" }].concat(normalized);
+      return [{ value: "", text: "Select jury name" }];
     },
   },
 
@@ -299,7 +364,7 @@ export default {
       if (v) {
         this.loading = true;
         this.fetchSettingsIPC();
-        this.fetchJuryOptionsIPC();
+        this.fetchUsers();
       }
     },
     localShow: function (v) {
@@ -308,80 +373,84 @@ export default {
     settings: {
       deep: true,
       handler: function (newVal) {
-        if (!this.localShow) {
-          this.draft = this.mergeWithDefaults(newVal);
-        }
+        if (!this.localShow) this.draft = this.mergeWithDefaults(newVal);
       },
-    },
-    // bila angka gate yang dipakai berubah, rebuild map gates
-    "draft.slalom.totalGate": function (val) {
-      var total = clampInt(val, 1, this.maxGate, this.maxGate);
-      this.draft.slalom.totalGate = total;
-      this.draft.slalom.gates = trimIndexedMap(
-        Object.assign({}, makeIndexedMap(total, ""), this.draft.slalom.gates),
-        total
-      );
-    },
-
-    // bila angka section berubah, rebuild map sections (opsional, simetri)
-    "draft.drr.totalSection": function (val) {
-      var total = clampInt(val, 1, this.maxSection, this.maxSection);
-      this.draft.drr.totalSection = total;
-      this.draft.drr.sections = trimIndexedMap(
-        Object.assign({}, makeIndexedMap(total, ""), this.draft.drr.sections),
-        total
-      );
-    },
-
-    // kalau kamu masih ingin mempertahankan watcher pada prop maxGate/maxSection dari parent:
-    maxGate: function () {
-      var total = clampInt(
-        this.draft.slalom.totalGate,
-        1,
-        this.maxGate,
-        this.maxGate
-      );
-      this.draft.slalom.totalGate = total;
-      this.draft.slalom.gates = trimIndexedMap(
-        Object.assign({}, makeIndexedMap(total, ""), this.draft.slalom.gates),
-        total
-      );
-    },
-    maxSection: function () {
-      var total = clampInt(
-        this.draft.drr.totalSection,
-        1,
-        this.maxSection,
-        this.maxSection
-      );
-      this.draft.drr.totalSection = total;
-      this.draft.drr.sections = trimIndexedMap(
-        Object.assign({}, makeIndexedMap(total, ""), this.draft.drr.sections),
-        total
-      );
     },
   },
 
   mounted: function () {
-    if (this.eventId) {
-      this.fetchSettingsIPC();
-    }
+    if (this.eventId) this.fetchSettingsIPC();
     if (!(Array.isArray(this.juryOptions) && this.juryOptions.length > 0)) {
-      this.fetchJuryOptionsIPC();
+      this.fetchUsers();
+    } else {
+      // kalau parent sudah kirim list user, normalisasi juga
+      this.internalJuryOptions = normalizeUsersToOptions(this.juryOptions);
     }
   },
 
   methods: {
-    drrExists: function () {
-      return !!(this.draft && this.draft.drr && this.draft.drr.sections);
+    /* ========== LOAD USERS FOR OPTIONS ========== */
+    fetchUsers: function () {
+      try {
+        if (typeof ipcRenderer === "undefined") {
+          return;
+        }
+
+        ipcRenderer.removeAllListeners("users:getAll:reply");
+        ipcRenderer.send("users:getAll");
+
+        ipcRenderer.once("users:getAll:reply", (_e, res) => {
+          var list = [];
+
+          if (res && Array.isArray(res.items)) {
+            list = res.items;
+          } else if (res && Array.isArray(res.users)) {
+            list = res.users;
+          } else if (res && res.data && Array.isArray(res.data.users)) {
+            list = res.data.users;
+          }
+
+          this.usersRaw = list;
+        });
+      } catch (err) {
+        console.error("fetchUsers error:", err);
+        this.usersRaw = [];
+      }
     },
+
+    /* ========== LOAD SETTINGS ========== */
+    fetchSettingsIPC: function () {
+      try {
+        if (!this.eventId || typeof ipcRenderer === "undefined") {
+          this.loading = false;
+          return;
+        }
+        ipcRenderer.removeAllListeners("race-settings:get-reply");
+        ipcRenderer.send("race-settings:get", this.eventId);
+
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          if (res && res.ok && res.settings) {
+            this.draft = this.mergeWithDefaults(res.settings);
+          } else {
+            this.draft = this.mergeWithDefaults({});
+          }
+          this.loading = false;
+        });
+      } catch (err) {
+        this.draft = this.mergeWithDefaults({});
+        this.loading = false;
+      }
+    },
+
+    /* ========== HELPERS ========== */
     _clone: function (obj) {
       return JSON.parse(JSON.stringify(obj || {}));
     },
-    mergeWithDefaults(incoming) {
+
+    mergeWithDefaults: function (incoming) {
       var src = incoming && typeof incoming === "object" ? incoming : {};
 
-      // ---- H2H flags dari Race Settings (true/false)
+      // flags bouyan dari race-setting (true/false)
       var fR1 =
         src.h2h && typeof src.h2h.R1 !== "undefined" ? !!src.h2h.R1 : false;
       var fR2 =
@@ -391,123 +460,90 @@ export default {
       var fL2 =
         src.h2h && typeof src.h2h.L2 !== "undefined" ? !!src.h2h.L2 : false;
 
-      // ---- Nilai jurinya (kalau sudah pernah disimpan)
+      // nilai juri yang mungkin sudah pernah disimpan
       var hv =
         src.h2hValues && typeof src.h2hValues === "object" ? src.h2hValues : {};
 
-      // ---- Slalom & DRR counts dari Race Settings
+      // jumlah gate/section dari race-setting
       var totalGate =
         src.slalom && src.slalom.totalGate ? src.slalom.totalGate : 1;
       var totalSection =
         src.drr && src.drr.totalSection ? src.drr.totalSection : 1;
 
-      // ---- Build
       return {
         sprint: {
-          juryStart: (src.sprint && src.sprint.juryStart) || "",
-          juryFinish: (src.sprint && src.sprint.juryFinish) || "",
+          juryStart:
+            src.sprint && src.sprint.juryStart ? src.sprint.juryStart : "",
+          juryFinish:
+            src.sprint && src.sprint.juryFinish ? src.sprint.juryFinish : "",
         },
         h2h: {
-          juryStart: (src.h2h && src.h2h.juryStart) || "",
-          juryFinish: (src.h2h && src.h2h.juryFinish) || "",
+          juryStart: src.h2h && src.h2h.juryStart ? src.h2h.juryStart : "",
+          juryFinish: src.h2h && src.h2h.juryFinish ? src.h2h.juryFinish : "",
         },
         h2hFlags: { R1: fR1, R2: fR2, L1: fL1, L2: fL2 },
         h2hValues: {
-          R1: hv.R1 || "",
-          R2: hv.R2 || "",
-          L1: hv.L1 || "",
-          L2: hv.L2 || "",
+          R1: hv.R1 ? hv.R1 : "",
+          R2: hv.R2 ? hv.R2 : "",
+          L1: hv.L1 ? hv.L1 : "",
+          L2: hv.L2 ? hv.L2 : "",
         },
         slalom: {
-          juryStart: (src.slalom && src.slalom.juryStart) || "",
-          juryFinish: (src.slalom && src.slalom.juryFinish) || "",
+          juryStart:
+            src.slalom && src.slalom.juryStart ? src.slalom.juryStart : "",
+          juryFinish:
+            src.slalom && src.slalom.juryFinish ? src.slalom.juryFinish : "",
           totalGate: totalGate,
-          gates: src.slalom && src.slalom.gates ? src.slalom.gates : {}, // optional: kalau kamu juga simpan juri per gate
+          // jika Anda juga simpan judge per-gate, ambil; kalau tidak, pakai objek kosong
+          gates: src.slalom && src.slalom.gates ? src.slalom.gates : {},
         },
         drr: {
-          juryStart: (src.drr && src.drr.juryStart) || "",
-          juryFinish: (src.drr && src.drr.juryFinish) || "",
+          juryStart: src.drr && src.drr.juryStart ? src.drr.juryStart : "",
+          juryFinish: src.drr && src.drr.juryFinish ? src.drr.juryFinish : "",
           totalSection: totalSection,
-          sections: src.drr && src.drr.sections ? src.drr.sections : {}, // optional: kalau kamu juga simpan juri per section
+          // jika Anda juga simpan judge per-section, ambil; kalau tidak, pakai objek kosong
+          sections: src.drr && src.drr.sections ? src.drr.sections : {},
         },
       };
     },
-    fetchSettingsIPC: function () {
-      try {
-        if (!this.eventId || typeof ipcRenderer === "undefined") {
-          this.loading = false;
-          return;
-        }
-        const token = Date.now();
-        this._lastFetchToken = token;
 
-        ipcRenderer.send("race-settings:get", this.eventId);
-        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
-          console.log(res, "<< cek res");
-          if (this._lastFetchToken !== token) return;
-          if (res && res.ok && res.settings) {
-            this.draft = this.mergeWithDefaults(res.settings);
-          } else {
-            this.draft = this.mergeWithDefaults({});
-          }
-
-          console.log(this.draft, "<< cek draft");
-          this.loading = false;
-        });
-      } catch (err) {
-        this.draft = this.mergeWithDefaults({});
-        this.loading = false;
-      }
-    },
-    fetchJuryOptionsIPC: function () {
-      try {
-        if (typeof ipcRenderer === "undefined") return;
-        ipcRenderer.send("jury:list");
-        ipcRenderer.once("jury:list-reply", (_e, res) => {
-          if (res && res.ok && Array.isArray(res.items)) {
-            this.internalJuryOptions = res.items.map(function (u) {
-              return {
-                value:
-                  u.id || (u._id && u._id.$oid) || u._id || u.email || u.name,
-                text: u.name || u.fullName || u.email || String(u.id || ""),
-              };
-            });
-          } else {
-            this.internalJuryOptions = [];
-          }
-        });
-      } catch {
-        this.internalJuryOptions = [];
-      }
-    },
+    /* ========== ACTIONS ========== */
     close: function () {
       if (this.saving) return;
       this.localShow = false;
     },
+
     confirm: function () {
       if (!this.eventId || this.saving) return;
-      const payload = {
+
+      var payload = {
         eventId: String(this.eventId),
         eventName: String(this.eventName || ""),
         settings: this._clone(this.draft),
       };
+
       try {
         if (typeof ipcRenderer === "undefined") return;
+
         this.saving = true;
+        ipcRenderer.removeAllListeners("race-settings:upsert-reply");
         ipcRenderer.send("race-settings:upsert", {
           eventId: payload.eventId,
           settings: payload.settings,
         });
+
         ipcRenderer.once("race-settings:upsert-reply", (_e, res) => {
           this.saving = false;
           if (res && res.ok) {
-            const saved = res.settings || payload.settings;
+            var saved = res.settings ? res.settings : payload.settings;
             this.draft = this.mergeWithDefaults(saved);
+
             this.$emit("update-judges", {
               eventId: payload.eventId,
               eventName: payload.eventName,
               settings: saved,
             });
+
             if (this.$bvToast) {
               this.$bvToast.toast("Judges settings updated", {
                 title: "Success",
@@ -517,7 +553,8 @@ export default {
             }
             this.localShow = false;
           } else {
-            const errMsg = (res && res.error) || "Failed to update settings";
+            var errMsg =
+              res && res.error ? res.error : "Failed to update settings";
             if (this.$bvToast) {
               this.$bvToast.toast(errMsg, {
                 title: "Update Failed",
@@ -527,7 +564,7 @@ export default {
             }
           }
         });
-      } catch {
+      } catch (err) {
         this.saving = false;
       }
     },
@@ -559,6 +596,7 @@ export default {
 .rounded-12 {
   border-radius: 12px;
 }
+
 .rs-card {
   border: 1px solid #e6ebf4;
   border-radius: 16px;

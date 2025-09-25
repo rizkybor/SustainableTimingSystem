@@ -2,7 +2,7 @@
 module.exports = {
   pluginOptions: {
     electronBuilder: {
-      // opsi yang sudah kamu punya
+      preload: "src/preload.js",
       nodeIntegration: true,
       externals: [
         "serialport",
@@ -13,32 +13,23 @@ module.exports = {
         "@smithy/property-provider",
         "@smithy/credential-provider-imds",
       ],
-
-      // >>> pindahan dari "build" di package.json
       builderOptions: {
         appId: "com.kpu.sustainabletimingsystem",
-        productName: "Sustainable-Timing-System",
-
-        // lokasi ikon di ROOT project (bukan di src)
+        productName: "STiming System 424",
         directories: { buildResources: "assets/icons" },
-
-        // pastikan folder icons ikut ke resources saat runtime packaged
         extraResources: [{ from: "assets/icons", to: "assets/icons" }],
 
         mac: {
-          icon: "assets/icons/icon.icns",
+          icon: "src/assets/icons/icon.png",
           category: "public.app-category.utilities",
         },
         win: {
-          icon: "assets/icons/icon.ico",
+          icon: "src/assets/icons/icon.ico",
         },
         linux: {
-          icon: "assets/icons/icon.png",
+          icon: "src/assets/icons/icon.png",
           target: ["AppImage", "deb", "rpm"],
         },
-
-        // (opsional) kalau punya native module lain
-        // asarUnpack: ["**/node_modules/@serialport/**"]
       },
     },
   },

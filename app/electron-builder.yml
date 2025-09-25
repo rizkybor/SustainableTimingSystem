@@ -1,20 +1,20 @@
 appId: com.kpu.sustainabletimingsystem
-productName: sustainable-timing-system
+productName: STiming System 424
 directories:
-  buildResources: assets/icons
+  buildResources: src/assets/icons
 asarUnpack:
   - "**/node_modules/serialport/**"
 mac:
   target:
     - dmg
     - zip
-  icon: assets/icons/icon.icns
+  icon: src/assets/icons/icon.png
   category: public.app-category.utilities
-  identity: null   # biar unsigned untuk testing lokal
+  identity: null
 win:
-  icon: assets/icons/icon.ico
+  icon: src/assets/icons/icon.ico
 linux:
-  icon: assets/icons/icon.png
+  icon: src/assets/icons/icon.png
   target:
     - AppImage
     - deb

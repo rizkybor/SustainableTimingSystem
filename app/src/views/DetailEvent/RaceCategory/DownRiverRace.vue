@@ -394,9 +394,9 @@ function normalizeTeamForDRR(t = {}) {
 
 function loadRaceStartPayloadForDRR() {
   let obj = {};
-  try {
-    obj = JSON.parse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}");
-  } catch {}
+
+  obj = JSON.parse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}");
+
   const b = obj.bucket || {};
   const bucket = {
     eventId: String(b.eventId || ""),
@@ -411,6 +411,8 @@ function loadRaceStartPayloadForDRR() {
   };
   return { bucket };
 }
+
+import { logger } from "@/utils/logger";
 
 export default {
   name: "SustainableTimingSystemDRRRace",
@@ -573,10 +575,10 @@ export default {
     async checkValueStorage() {
       let dataStorage = null,
         events = null;
-      try {
-        dataStorage = localStorage.getItem("participantByCategories");
-        events = localStorage.getItem("eventDetails");
-      } catch {}
+
+      dataStorage = localStorage.getItem("participantByCategories");
+      events = localStorage.getItem("eventDetails");
+
       this.dataEvent = events ? JSON.parse(events) : {};
       const raw = dataStorage ? JSON.parse(dataStorage) : [];
       const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
@@ -746,7 +748,7 @@ export default {
         });
         return true;
       } catch (e) {
-        console.error("Serial error:", e && e.message);
+        logger.warn("❌ Failed to update race settings:", e && e.message);
         return false;
       }
     },
@@ -874,11 +876,9 @@ export default {
     },
 
     goTo() {
-      try {
-        localStorage.removeItem("raceStartPayload");
-        localStorage.removeItem("participantByCategories");
-        localStorage.removeItem("currentCategories");
-      } catch {}
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
       this.participant = [];
       this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);

@@ -3,49 +3,57 @@
 import { app, protocol, BrowserWindow, ipcMain, nativeImage } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
+import path from "path";
+
 const isDevelopment = process.env.NODE_ENV !== "production";
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
-import path from "path";
 
 // Function to Services Communication to Database
 setupIPCMainHandlers();
 
+// wajib utk app:// protocol saat production
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { secure: true, standard: true } },
 ]);
 
+/** Tentukan path icon sesuai platform & mode (dev vs build) */
 function resolveIcon() {
-  const file =
-    process.platform === "win32"
-      ? "icon.ico"
-      : process.platform === "darwin"
-      ? "icon.icns"
-      : "icon.png";
+  const file = process.platform === "win32" ? "icon.ico" : "icon.png";
 
+  // production: electron-builder menaruh di resources/assets/icons
   if (app.isPackaged) {
-    // ketika sudah di-build, electron-builder akan taruh di resources/assets/icons
-    return path.join(process.resourcesPath, "assets/icons", file);
-  } else {
-    // saat development
-    return path.join(process.cwd(), "assets/icons", file);
+    return path.join(process.resourcesPath, "assets", "icons", file);
   }
+  // development: kamu menaruh di src/assets/icons
+  return path.join(__dirname, "../src/assets/icons", file);
+}
+
+/** Set Dock icon khusus macOS (BrowserWindow.icon diabaikan oleh Dock) */
+function setDockIconIfMac() {
+  if (process.platform !== "darwin") return;
+  // const iconPath = resolveIcon();
+  // const img = nativeImage.createFromPath(iconPath);
+  const pngPath = path.join(__dirname, "../src/assets/icons/icon.png");
+  const img = nativeImage.createFromPath(pngPath);
+  if (!img.isEmpty()) app.dock.setIcon(img);
 }
 
 async function createWindow() {
+  const preloadPath = path.join(__dirname, "preload.js");
+
   const win = new BrowserWindow({
     width: 1000,
     height: 800,
     show: false,
-    icon: resolveIcon(),
+    icon: resolveIcon(), // dipakai Win/Linux; di mac untuk window bukan Dock
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       nodeIntegration: true,
       contextIsolation: false,
     },
   });
 
-  win.loadFile("index.html");
-  var splash = new BrowserWindow({
+  const splash = new BrowserWindow({
     width: 500,
     height: 200,
     transparent: true,
@@ -53,14 +61,17 @@ async function createWindow() {
     alwaysOnTop: false,
     icon: resolveIcon(),
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       nodeIntegration: true,
       contextIsolation: false,
     },
   });
+
   splash.loadFile(path.join(__dirname, "../public/splash.html"));
-  setTimeout(function () {
-    splash.close();
+  setTimeout(() => {
+    try {
+      splash.close();
+    } catch {}
     win.center();
     win.show();
   }, 7000);
@@ -70,57 +81,46 @@ async function createWindow() {
     if (!process.env.IS_TEST) win.webContents.openDevTools();
   } else {
     createProtocol("app");
-    win.loadURL("app://./index.html");
+    await win.loadURL("app://./index.html");
   }
 }
 
-ipcMain.handle("app:exit", () => {
-  app.quit();
-});
+// IPC
+ipcMain.handle("app:exit", () => app.quit());
 
+// Lifecycle
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
 app.on("ready", async () => {
   if (isDevelopment && !process.env.IS_TEST) {
-    // Install Vue Devtools
     try {
       await installExtension(VUEJS_DEVTOOLS);
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.error("Vue Devtools failed to install:", e.toString());
     }
   }
-  console.log(__dirname,"<<<")
-  if (process.platform === "darwin") {
-    const base = app.isPackaged
-      ? path.join(process.resourcesPath, "assets/icons")
-      : path.join(process.cwd(), "assets/icons");
-    const img = nativeImage.createFromPath(path.join(base, "icon.icns"));
-    if (!img.isEmpty()) app.dock.setIcon(img);
-  }
 
+  // set Dock icon untuk macOS (dev & build)
+  setDockIconIfMac();
+
+  // buat window utama
   createWindow();
 });
 
+// graceful-exit dev
 if (isDevelopment) {
   if (process.platform === "win32") {
     process.on("message", (data) => {
-      if (data === "graceful-exit") {
-        app.quit();
-      }
+      if (data === "graceful-exit") app.quit();
     });
   } else {
-    process.on("SIGTERM", () => {
-      app.quit();
-    });
+    process.on("SIGTERM", () => app.quit());
   }
 }

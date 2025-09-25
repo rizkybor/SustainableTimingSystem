@@ -239,9 +239,11 @@ import JudgeSettingsModal from "./../components/JudgesSettings.vue";
 import { getSocket } from "@/services/socket";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
+import { logger } from "@/utils/logger";
+
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { defaultImg, TeamPanel, RaceSettingsModal, JudgeSettingsModal },
+  components: { TeamPanel, RaceSettingsModal, JudgeSettingsModal },
   data() {
     return {
       defaultImg,
@@ -322,7 +324,6 @@ export default {
     // simpan id saat connect (atau reconnect)
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
-      console.log("[Electron] socket connected:", this.selfSocketId);
     };
     socket.on("connect", onConnect);
 
@@ -427,12 +428,9 @@ export default {
         // sekali saja, tunggu reply lalu lepas listener
         const handler = (_event, res) => {
           if (res && res.ok) {
-            console.log("✅ Race settings updated in DB:", res);
+            logger.info("✅ Race settings updated in DB:", res);
           } else {
-            console.error(
-              "❌ Failed to update race settings:",
-              res && res.error
-            );
+            logger.warn("❌ Failed to update race settings:", res && res.error);
           }
           window.ipcRenderer.removeListener(
             "race-settings:upsert-reply",
@@ -444,7 +442,7 @@ export default {
     },
 
     onUpdateJudgeSettings(payload) {
-      console.log(payload);
+      logger.info("✅ Data payload:", payload);
       // if (payload && payload.settings) this.raceSettings = payload.settings;
 
       // if (typeof window !== "undefined" && window.ipcRenderer) {
@@ -695,9 +693,7 @@ export default {
 
         // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
-          try {
-            ipcRenderer.removeListener("get-teams-registered-reply", onReply);
-          } catch {}
+          ipcRenderer.off("get-teams-registered-reply", onReply);
           resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });

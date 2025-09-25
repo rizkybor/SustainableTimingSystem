@@ -15,6 +15,7 @@ import SlalomResult from "@/views/Result/SlalomResult.vue";
 import DrrResult from "@/views/Result/DrrResult.vue";
 import OverallResult from "@/views/Result/OverallResult.vue";
 import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
+import AllEvent from "../views/Event/AllEvent.vue";
 
 Vue.use(VueRouter);
 
@@ -29,6 +30,7 @@ const routes = [
     name: "AdminUserManagement",
     component: AdminUserManagement,
   },
+  { path: "/events", component: AllEvent },
   { path: "/create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/slalom-race", component: SlalomRace },

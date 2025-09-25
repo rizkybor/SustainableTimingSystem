@@ -30,8 +30,8 @@ const routes = [
     name: "AdminUserManagement",
     component: AdminUserManagement,
   },
-  { path: "/events", component: AllEvent },
-  { path: "/create-new", component: CreateEvent },
+  { path: "/events", name: "events", component: AllEvent },
+  { path: "/create-new", name: "create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/slalom-race", component: SlalomRace },
   {

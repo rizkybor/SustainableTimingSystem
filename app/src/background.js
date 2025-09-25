@@ -1,6 +1,6 @@
 "use strict";
 
-import { app, protocol, BrowserWindow, ipcMain } from "electron";
+import { app, protocol, BrowserWindow, ipcMain, nativeImage } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 const isDevelopment = process.env.NODE_ENV !== "production";
@@ -14,13 +14,31 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { secure: true, standard: true } },
 ]);
 
+function resolveIcon() {
+  const file =
+    process.platform === "win32"
+      ? "icon.ico"
+      : process.platform === "darwin"
+      ? "icon.icns"
+      : "icon.png";
+
+  if (app.isPackaged) {
+    // ketika sudah di-build, electron-builder akan taruh di resources/assets/icons
+    return path.join(process.resourcesPath, "assets/icons", file);
+  } else {
+    // saat development
+    return path.join(process.cwd(), "assets/icons", file);
+  }
+}
+
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1000,
     height: 800,
     show: false,
+    icon: resolveIcon(),
     webPreferences: {
-      preload: path.join(__dirname, "../src/preload.js"),
+      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
       contextIsolation: false,
     },
@@ -33,8 +51,9 @@ async function createWindow() {
     transparent: true,
     frame: false,
     alwaysOnTop: false,
+    icon: resolveIcon(),
     webPreferences: {
-      preload: path.join(__dirname, "../src/preload.js"),
+      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
       contextIsolation: false,
     },
@@ -80,6 +99,15 @@ app.on("ready", async () => {
       console.error("Vue Devtools failed to install:", e.toString());
     }
   }
+  console.log(__dirname,"<<<")
+  if (process.platform === "darwin") {
+    const base = app.isPackaged
+      ? path.join(process.resourcesPath, "assets/icons")
+      : path.join(process.cwd(), "assets/icons");
+    const img = nativeImage.createFromPath(path.join(base, "icon.icns"));
+    if (!img.isEmpty()) app.dock.setIcon(img);
+  }
+
   createWindow();
 });
 

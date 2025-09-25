@@ -99,7 +99,7 @@
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
                  <img
-                  src="@/assets/images/ico-create-new-teams.png"
+                  src="@/assets/images/ico-jury-accounts.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />

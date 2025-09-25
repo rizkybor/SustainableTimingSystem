@@ -18,9 +18,19 @@
         <b-navbar-toggle target="main-nav"></b-navbar-toggle>
         <b-collapse id="main-nav" is-nav>
           <b-navbar-nav class="ml-3">
-            <b-nav-item @click="goTo('')" active>Home</b-nav-item>
-            <b-nav-item @click="goTo('events')">All Events</b-nav-item>
-            <b-nav-item @click="goTo('team-create')">All Teams</b-nav-item>
+            <b-nav-item :active="$route.name === 'home'" @click="goTo('')"
+              >Home</b-nav-item
+            >
+            <b-nav-item
+              :active="$route.name === 'events'"
+              @click="goTo('events')"
+              >All Events
+            </b-nav-item>
+            <b-nav-item
+              :active="$route.name === 'create-team'"
+              @click="goTo('team-create')"
+              >All Teams
+            </b-nav-item>
           </b-navbar-nav>
 
           <b-navbar-nav class="ml-auto">
@@ -45,10 +55,6 @@ export default {
 
   methods: {
     goTo(path) {
-      // if (payload == "home") {
-      //   localStorage.removeItem("formNewEvent");
-      //   this.$router.push({ name: payload });
-      // }
       if (!path) return this.$router.push("/");
       this.$router.push("/" + path);
     },
@@ -58,3 +64,14 @@ export default {
   },
 };
 </script>
+
+<style>
+.navbar-nav .nav-item .nav-link.active {
+  background: linear-gradient(90deg, #1874a5, #1d8fbb);
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: 8px;
+  padding-right: 10px;
+    padding-left: 10px;
+}
+</style>

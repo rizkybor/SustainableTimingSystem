@@ -4,6 +4,8 @@ import router from './router';
 
 import { Icon } from '@iconify/vue2';
 
+import 'regenerator-runtime/runtime'
+
 Vue.component('Icon', Icon); 
 
 

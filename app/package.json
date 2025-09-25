@@ -3,8 +3,10 @@
   "author": {
     "name": "Rizky Ajie Kurniawan"
   },
+  "description": "Sustainable Timing System ",
   "productName": "Sustainable-Timing-System",
-  "version": "0.1.0",
+  "version": "2.0.0",
+  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -18,7 +20,7 @@
   "main": "background.js",
   "build": {
     "appId": "com.kpu.sustainabletimingsystem",
-    "productName": "Sustainable-Timing-System",
+    "productName": "sustainable-timing-system",
     "directories": {
       "buildResources": "assets/icons"
     },
@@ -47,6 +49,7 @@
     "core-js": "^2.6.5",
     "dotenv": "^17.2.2",
     "mongodb": "^4",
+    "regenerator-runtime": "^0.13",
     "serialport": "^12.0.0",
     "socket.io-client": "^4.8.1",
     "vue": "^2.6.10",
@@ -69,6 +72,9 @@
     "eslint-plugin-vue": "^5.0.0",
     "vue-cli-plugin-electron-builder": "^2.1.1",
     "vue-template-compiler": "^2.6.10"
+  },
+  "resolutions": {
+    "@achrinza/node-ipc": "^11.0.0"
   },
   "eslintConfig": {
     "root": true,

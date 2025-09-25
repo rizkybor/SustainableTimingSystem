@@ -295,7 +295,6 @@ export default {
       };
 
       return (this.events || []).map((ev) => {
-        console.log(ev, "<<");
         // dukung berbagai skema field
         const name = ev.eventName || ev.name || ev.title || "(untitled)";
         const level =

@@ -120,11 +120,23 @@
       <div class="cards-slider">
         <div v-if="!loading && events.length" class="slider-track">
           <article
-            v-for="(ev, idx) in events"
+            v-for="(ev, idx) in sortedEvents"
             :key="_idToHex(ev._id) || idx"
             class="event-card"
-            @click="clickRow(ev)"
+            :class="{ 'is-inactive': isInactive(ev) }"
+            :aria-disabled="isInactive(ev)"
+            :tabindex="isInactive(ev) ? -1 : 0"
+            @click="onClickEvent(ev)"
           >
+            <div v-if="isInactive(ev)" class="expired-overlay">
+              <div class="expired-text">
+                <div class="expired-title">Expired Date</div>
+                <small class="expired-sub"
+                  >change activated event on your database</small
+                >
+              </div>
+            </div>
+
             <div
               class="event-thumb d-flex align-items-center justify-content-center"
             >
@@ -150,16 +162,7 @@
                 {{ ev.addressCity || "USA" }}
               </small>
 
-              <b-badge
-                :variant="
-                  String(ev.statusEvent).toLowerCase() === 'activated'
-                    ? 'info'
-                    : 'secondary'
-                "
-                pill
-              >
-                {{ ev.statusEvent || "Active" }}
-              </b-badge>
+              <!-- BADGE STATUS DIHAPUS -->
             </div>
           </article>
         </div>
@@ -244,7 +247,79 @@ export default {
     this.getEvents();
     this.loadTeamsRegistered();
   },
+  computed: {
+    sortedEvents() {
+      var now = new Date();
+
+      function parseDate(v) {
+        if (!v) return null;
+        var d = new Date(v);
+        if (isNaN(d)) return null;
+        return d;
+      }
+
+      function isActivated(ev) {
+        var st = ev && ev.statusEvent ? String(ev.statusEvent) : "";
+        return st.toLowerCase() === "activated";
+      }
+
+      function startAt(ev) {
+        return parseDate(ev && ev.startDateEvent ? ev.startDateEvent : null);
+      }
+
+      // clone array
+      var arr = Array.isArray(this.events) ? this.events.slice() : [];
+
+      arr.sort(function (a, b) {
+        var aActivated = isActivated(a);
+        var bActivated = isActivated(b);
+
+        // Activated di depan, Inactive di belakang
+        if (aActivated && !bActivated) return -1;
+        if (!aActivated && bActivated) return 1;
+
+        // Keduanya Activated → urut berdasarkan kedekatan ke hari ini
+        if (aActivated && bActivated) {
+          var sa = startAt(a);
+          var sb = startAt(b);
+
+          var saDiff = sa
+            ? Math.abs(sa.getTime() - now.getTime())
+            : Number.POSITIVE_INFINITY;
+          var sbDiff = sb
+            ? Math.abs(sb.getTime() - now.getTime())
+            : Number.POSITIVE_INFINITY;
+
+          if (saDiff !== sbDiff) return saDiff - sbDiff;
+
+          // tie-breaker 1: prioritaskan future (>= today)
+          var saFuture = sa ? (sa.getTime() >= now.getTime() ? 0 : 1) : 1;
+          var sbFuture = sb ? (sb.getTime() >= now.getTime() ? 0 : 1) : 1;
+          if (saFuture !== sbFuture) return saFuture - sbFuture;
+
+          // tie-breaker 2: startDate ASC
+          var saNum = sa ? sa.getTime() : Number.POSITIVE_INFINITY;
+          var sbNum = sb ? sb.getTime() : Number.POSITIVE_INFINITY;
+          return saNum - sbNum;
+        }
+
+        // Keduanya Inactive → pertahankan urutan asli
+        return 0;
+      });
+
+      return arr;
+    },
+  },
   methods: {
+    isInactive(ev) {
+      var st = ev && ev.statusEvent ? String(ev.statusEvent) : "";
+      return st.toLowerCase() !== "activated";
+    },
+
+    onClickEvent(ev) {
+      if (this.isInactive(ev)) return; // blok klik utk Inactive
+      this.clickRow(ev);
+    },
     posterSrc: function (ev) {
       if (!ev) return "";
 
@@ -356,10 +431,6 @@ export default {
     },
     clickRow(item) {
       const idHex = this._idToHex(item._id);
-      // if (!idHex) {
-      //   console.warn("Invalid _id:", JSON.parse(JSON.stringify(item._id)));
-      //   return;
-      // }
       this.$router.push("/event-detail/" + idHex);
     },
     viewTeam(team) {
@@ -511,16 +582,62 @@ export default {
 /* EVENT CARD */
 /* Pastikan semua card punya tinggi seragam */
 .event-card {
+  position: relative; /* ADD */
   display: flex;
   flex-direction: column;
   height: 100%;
-  /* penuh mengikuti kolom */
   border: 1px solid #dfe5f2;
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 6px 18px rgba(44, 92, 255, 0.06);
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease,
+    filter 0.12s ease;
+}
+
+/* state Inactive: gelap, tidak bisa di-hover/klik */
+.event-card.is-inactive {
+  filter: grayscale(1);
+  opacity: 0.55;
+  pointer-events: none; /* disable klik & hover */
+  cursor: not-allowed;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* overlay tulisan Expired di tengah card */
+.expired-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column; /* biar stacked */
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 12px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.38);
+  z-index: 3;
+}
+
+.expired-text .expired-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.expired-text .expired-sub {
+  font-size: 0.8rem;
+  font-weight: 400;
+  text-transform: none;
+  opacity: 0.9;
+}
+
+/* optional: matikan efek zoom gambar ketika inactive */
+.event-card.is-inactive .event-img:hover {
+  transform: none;
 }
 
 .event-card:hover {

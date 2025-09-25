@@ -324,7 +324,6 @@ export default {
       return ids.map((id) => {
         const key = this._toStringId(id);
         const meta = this.eventDict[key] || {};
-        console.log(meta, "<<");
         return {
           id: key,
           eventName: meta.name || this.eventName(key) || key || "-",

@@ -1,0 +1,102 @@
+{
+  "name": "app",
+  "author": {
+    "name": "Rizky Ajie Kurniawan"
+  },
+  "description": "Sustainable Timing System ",
+  "productName": "Sustainable-Timing-System",
+  "version": "2.0.0",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "electron:build": "vue-cli-service electron:build",
+    "electron:serve": "vue-cli-service electron:serve",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps"
+  },
+  "main": "background.js",
+  "build": {
+    "appId": "com.kpu.sustainabletimingsystem",
+    "productName": "sustainable-timing-system",
+    "directories": {
+      "buildResources": "assets/icons"
+    },
+    "mac": {
+      "icon": "assets/icons/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "icon": "assets/icons/icon.ico"
+    },
+    "linux": {
+      "icon": "assets/icons/icon.png",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
+    }
+  },
+  "dependencies": {
+    "@iconify/iconify": "^3.1.1",
+    "@serialport/parser-delimiter": "^12.0.0",
+    "@serialport/parser-readline": "^12.0.0",
+    "bootstrap-vue": "^2.23.1",
+    "cloudinary": "^2.7.0",
+    "core-js": "^2.6.5",
+    "dotenv": "^17.2.2",
+    "mongodb": "^4",
+    "regenerator-runtime": "^0.13",
+    "serialport": "^12.0.0",
+    "socket.io-client": "^4.8.1",
+    "vue": "^2.6.10",
+    "vue-html2pdf": "^1.8.0",
+    "vue-multiselect": "^2.1.9",
+    "vue-router": "2"
+  },
+  "devDependencies": {
+    "@iconify/icons-ic": "^1.2.13",
+    "@iconify/vue2": "^2.1.0",
+    "@vue/cli-plugin-babel": "^3.12.0",
+    "@vue/cli-plugin-eslint": "^3.12.0",
+    "@vue/cli-service": "^3.12.0",
+    "babel-eslint": "^10.0.1",
+    "electron": "^13.0.0",
+    "electron-builder": "^24.6.4",
+    "electron-devtools-installer": "^3.1.0",
+    "electron-rebuild": "^3.2.9",
+    "eslint": "^5.16.0",
+    "eslint-plugin-vue": "^5.0.0",
+    "vue-cli-plugin-electron-builder": "^2.1.1",
+    "vue-template-compiler": "^2.6.10"
+  },
+  "resolutions": {
+    "@achrinza/node-ipc": "^11.0.0"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "rules": {},
+    "parserOptions": {
+      "parser": "babel-eslint"
+    }
+  },
+  "postcss": {
+    "plugins": {
+      "autoprefixer": {}
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions"
+  ]
+}

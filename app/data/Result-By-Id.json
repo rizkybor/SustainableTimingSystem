@@ -1,0 +1,28 @@
+{
+  "_id": {
+    "$oid": "675195d8341222366a31d5f8"
+  },
+  "value": "1",
+  "eventId": "",
+  "teamValue": "",
+  "categoryValue": "",
+  "initialValue": "",
+  "divisionValue": "",
+  "startOrder": "",
+  "praStart": "",
+  "interval": "",
+  "statusId": 0,
+  "result": [
+    {
+      "startTime": "",
+      "finishTime": "",
+      "raceTime": "",
+      "penaltyTime": "",
+      "penalty": "",
+      "totalTime": "",
+      "ranked": "",
+      "score": ""
+    }
+  ],
+  "otrValue": "1"
+}

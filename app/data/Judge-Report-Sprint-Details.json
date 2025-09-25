@@ -1,0 +1,12 @@
+{
+  "_id": {
+    "$oid": "68d120ba2cb2e8d8c84977d7"
+  },
+  "position": "Start",
+  "team": "CILEDUG CLUB",
+  "penalty": 5,
+  "createdAt": {
+    "$date": "2025-09-22T10:11:06.805Z"
+  },
+  "__v": 0
+}

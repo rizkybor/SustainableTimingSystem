@@ -1,0 +1,75 @@
+{
+  "_id": {
+    "$oid": "68be92c68d100468196bc3bd"
+  },
+  "eventId": "68b5bf07a338efc467bf4850",
+  "initialId": "6",
+  "raceId": "1",
+  "divisionId": "1",
+  "eventName": "SLALOM",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "divisionName": "R4",
+  "teams": [
+    {
+      "nameTeam": "MAKOPALA CLUB",
+      "bibTeam": "20",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": ""
+        },
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": ""
+        }
+      ]
+    },
+    {
+      "nameTeam": "BLDC CLUB",
+      "bibTeam": "30",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": [
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": ""
+        },
+        {
+          "startTime": "",
+          "finishTime": "",
+          "raceTime": "",
+          "penaltyTime": "",
+          "penalty": "",
+          "totalTime": "",
+          "ranked": "",
+          "score": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "_id": {
+    "$oid": "68d0612953519b38313f2079"
+  },
+  "email": "rizkyak994@gmail.com",
+  "username": "Rizky Ajie Kurniawan",
+  "image": "https://lh3.googleusercontent.com/a/ACg8ocLjUvE3pQB7cyMJNpseDaBKiz0s0Um_dmQY21d59ZhZPCTKIphG=s96-c",
+  "bookmarks": [],
+  "judges": [
+    {
+      "eventId": "68b5bf07a338efc467bf4850",
+      "judgesSprint": "2",
+      "judgesHeadtoHead": "1",
+      "judgesSlalom": "1",
+      "judgesDRR": "1"
+    },
+    {
+      "eventId": "68ab0bc0f7c3332455591249",
+      "judgesSprint": "1",
+      "judgesHeadtoHead": "",
+      "judgesSlalom": "",
+      "judgesDRR": ""
+    }
+  ],
+  "judgesSprint": "2",
+  "judgesHeadtoHead": "",
+  "judgesSlalom": "",
+  "judgesDRR": "",
+  "mainEvents": [
+    "68b5bf07a338efc467bf4850",
+    "68ab0bc0f7c3332455591249"
+  ],
+  "createdAt": {
+    "$date": "2025-09-21T20:33:45.178Z"
+  },
+  "updatedAt": {
+    "$date": "2025-09-21T20:33:45.178Z"
+  },
+  "__v": 0
+}

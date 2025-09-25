@@ -39,7 +39,7 @@
           </div>
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
-              <h2 class="page-title mb-1">List Event</h2>
+              <h2 class="page-title mb-1">All Events</h2>
               <p class="page-subtitle mb-0">
                 Kelola daftar event, level, tanggal, status, dan aksi
               </p>

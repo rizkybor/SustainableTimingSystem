@@ -413,7 +413,7 @@ export default {
           this.usersRaw = list;
         });
       } catch (err) {
-        console.error("fetchUsers error:", err);
+        console.warn("removeListener gagal:", err);
         this.usersRaw = [];
       }
     },

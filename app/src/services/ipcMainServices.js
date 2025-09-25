@@ -1,6 +1,7 @@
 const { ipcMain, dialog } = require("electron");
-const fs = require("fs");
+const { EJSON } = require("bson");
 const path = require("path");
+const fs = require("fs");
 
 // === Cloudinary config (hanya di file ini) ===
 require("dotenv").config();
@@ -219,8 +220,9 @@ function setupIPCMainHandlers() {
   // INSERT DB
   ipcMain.on("insert-new-event", async (event, datas) => {
     try {
-      const data = await insertNewEvent(datas);
-      event.reply("insert-new-event-reply", data);
+      const result = await insertNewEvent(datas);
+      const serialized = EJSON.serialize(result);
+      event.reply("insert-new-event-reply", serialized);
     } catch (error) {
       event.reply("insert-new-event-reply", []);
     }

@@ -4,6 +4,7 @@ import { app, protocol, BrowserWindow, ipcMain, nativeImage } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 import path from "path";
+import { pathToFileURL } from "url";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
@@ -56,6 +57,7 @@ async function createWindow() {
   const splash = new BrowserWindow({
     width: 500,
     height: 200,
+    show: false, // tampil setelah ready-to-show
     transparent: true,
     frame: false,
     alwaysOnTop: false,
@@ -67,7 +69,23 @@ async function createWindow() {
     },
   });
 
-  splash.loadFile(path.join(__dirname, "../public/splash.html"));
+  // DEV: ../public  |  PROD: __static
+  const isDev = !!process.env.WEBPACK_DEV_SERVER_URL;
+  // Path ABSOLUT ke file splash.html
+  const splashHtmlPath = isDev
+    ? path.join(__dirname, "../public/splash.html") // dev
+    : path.join(__static, "splash.html"); // build
+
+  // Debug cepat (cek apakah file ada)
+  console.log("splashHtmlPath:", splashHtmlPath);
+
+  // Ubah ke file:// URL secara aman lintas OS
+  const splashFileURL = pathToFileURL(splashHtmlPath).toString();
+
+  // Muat via file:// ke FILE langsung
+  splash.loadURL(splashFileURL);
+  splash.once("ready-to-show", () => splash.show());
+
   setTimeout(() => {
     try {
       splash.close();

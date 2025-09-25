@@ -46,7 +46,7 @@
             </div>
             <div class="d-flex align-items-center">
               <b-button
-                variant="secondary"
+                variant="outline-info"
                 class="btn-action w-100 rounded-pill"
                 @click="goTo('create-new')"
               >

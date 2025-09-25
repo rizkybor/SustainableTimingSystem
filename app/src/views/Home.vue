@@ -132,7 +132,7 @@
               <div class="expired-text">
                 <div class="expired-title">Expired Date</div>
                 <small class="expired-sub"
-                  >change activated event on your database</small
+                  >change activated event on backdoors</small
                 >
               </div>
             </div>
@@ -147,22 +147,20 @@
                 @error="onPosterError"
               />
             </div>
-
             <div class="event-body">
               <div class="font-weight-bold mb-1 text-truncate">
                 {{ ev.eventName || "Event Name" }}
               </div>
-              <small class="text-muted d-block">
-                {{ formatDate(ev.startDateEvent) }} –
-                {{ formatDate(ev.endDateEvent) }}
-              </small>
               <small class="text-muted d-block mb-2">
                 {{ ev.riverName || "Undefined" }} -
                 {{ ev.addressState || "Colorado" }},
                 {{ ev.addressCity || "USA" }}
               </small>
-
-              <!-- BADGE STATUS DIHAPUS -->
+              <div class="event-separator"></div>
+              <small class="text-muted d-block">
+                Date : {{ formatDateShort(ev.startDateEvent) }} –
+                {{ formatDateShort(ev.endDateEvent) }}
+              </small>
             </div>
           </article>
         </div>
@@ -311,6 +309,33 @@ export default {
     },
   },
   methods: {
+    formatDateShort(inputDate) {
+      if (!inputDate) return "-";
+
+      var dt = new Date(inputDate);
+      if (isNaN(dt)) return "-";
+
+      var monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "Mei",
+        "Jun",
+        "Jul",
+        "Agu",
+        "Sep",
+        "Okt",
+        "Nov",
+        "Des",
+      ];
+
+      var day = String(dt.getDate()).padStart(2, "0");
+      var month = monthNames[dt.getMonth()];
+      var year = dt.getFullYear();
+
+      return day + " " + month + " " + year;
+    },
     isInactive(ev) {
       var st = ev && ev.statusEvent ? String(ev.statusEvent) : "";
       return st.toLowerCase() !== "activated";
@@ -718,5 +743,10 @@ export default {
 }
 .event-img:hover {
   transform: scale(1.2);
+}
+
+.event-separator {
+  border-top: 1px solid #e0e6f0;
+  margin: 6px 0;
 }
 </style>

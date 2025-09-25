@@ -45,7 +45,7 @@
               >
                 <!-- <Icon icon="ic:baseline-add-circle" width="36" height="36" /> -->
                 <img
-                  src="@/assets/icons/ico-create-new-events.png"
+                  src="@/assets/images/ico-create-new-events.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />
@@ -72,7 +72,7 @@
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
                 <img
-                  src="@/assets/icons/ico-create-new-teams.png"
+                  src="@/assets/images/ico-create-new-teams.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />
@@ -99,7 +99,7 @@
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
                  <img
-                  src="@/assets/icons/ico-create-new-teams.png"
+                  src="@/assets/images/ico-create-new-teams.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />

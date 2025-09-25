@@ -18,28 +18,6 @@
     "postuninstall": "electron-builder install-app-deps"
   },
   "main": "background.js",
-  "build": {
-    "appId": "com.kpu.sustainabletimingsystem",
-    "productName": "sustainable-timing-system",
-    "directories": {
-      "buildResources": "assets/icons"
-    },
-    "mac": {
-      "icon": "assets/icons/icon.icns",
-      "category": "public.app-category.utilities"
-    },
-    "win": {
-      "icon": "assets/icons/icon.ico"
-    },
-    "linux": {
-      "icon": "assets/icons/icon.png",
-      "target": [
-        "AppImage",
-        "deb",
-        "rpm"
-      ]
-    }
-  },
   "dependencies": {
     "@iconify/iconify": "^3.1.1",
     "@serialport/parser-delimiter": "^12.0.0",

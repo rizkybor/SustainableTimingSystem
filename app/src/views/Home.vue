@@ -39,13 +39,18 @@
       <b-row>
         <b-col cols="12" md="4" class="mb-4">
           <b-card class="action-card shadow-sm">
-            <div class="d-flex flex-column align-items-center text-center">
+            <div class="d-flex flex-column align-items-center text-center p-2">
               <div
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
-                <Icon icon="ic:baseline-add-circle" width="36" height="36" />
+                <!-- <Icon icon="ic:baseline-add-circle" width="36" height="36" /> -->
+                <img
+                  src="@/assets/icons/ico-create-new-events.png"
+                  alt="See all"
+                  class="ml-1 icon-see-all"
+                />
               </div>
-              <h5 class="mb-1 font-weight-bold">Create a new Event</h5>
+              <h5 class="mb-1 mt-3 font-weight-bold">Create a new Events</h5>
               <small class="text-muted d-block mb-3">
                 Define event details and set up everything competition.
               </small>
@@ -62,13 +67,17 @@
 
         <b-col cols="12" md="4" class="mb-4">
           <b-card class="action-card shadow-sm">
-            <div class="d-flex flex-column align-items-center text-center">
+            <div class="d-flex flex-column align-items-center text-center p-2">
               <div
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
-                <Icon icon="mdi:account-group" width="36" height="36" />
+                <img
+                  src="@/assets/icons/ico-create-new-teams.png"
+                  alt="See all"
+                  class="ml-1 icon-see-all"
+                />
               </div>
-              <h5 class="mb-1 font-weight-bold">Create a new Teams</h5>
+              <h5 class="mb-1 mt-3 font-weight-bold">Create a new Teams</h5>
               <small class="text-muted d-block mb-3">
                 Add team names, members, and their roles for easy organization.
               </small>
@@ -77,7 +86,7 @@
                 class="btn-action btn-outline-info w-100 rounded-pill"
                 @click="goTo('team-create')"
               >
-                Create Team
+                Manage All Teams
               </b-button>
             </div>
           </b-card>
@@ -85,13 +94,17 @@
 
         <b-col cols="12" md="4" class="mb-4">
           <b-card class="action-card shadow-sm">
-            <div class="d-flex flex-column align-items-center text-center">
+            <div class="d-flex flex-column align-items-center text-center p-2">
               <div
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
-                <Icon icon="mdi:account" width="36" height="36" />
+                 <img
+                  src="@/assets/icons/ico-create-new-teams.png"
+                  alt="See all"
+                  class="ml-1 icon-see-all"
+                />
               </div>
-              <h5 class="mb-1 font-weight-bold">Jury's Account Management</h5>
+              <h5 class="mb-1 mt-3 font-weight-bold">Jury's Account Management</h5>
               <small class="text-muted d-block mb-3">
                 Management jury accounts and assign roles to manage evaluation
                 efficiently.
@@ -101,7 +114,7 @@
                 class="btn-action btn-outline-info w-100 rounded-pill"
                 @click="goTo('admin/users')"
               >
-                Manage Account
+                Manage Accounts
               </b-button>
             </div>
           </b-card>

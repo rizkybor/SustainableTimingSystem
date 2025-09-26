@@ -175,7 +175,7 @@
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
           <!-- <div > -->
-            <h4>Output Racetime :</h4>
+          <h4>Output Racetime :</h4>
           <!-- </div> -->
           <div>
             <button
@@ -217,7 +217,7 @@
                   <th>Result</th>
                   <th>Ranked</th>
                   <th>Score</th>
-                  <th v-if="editResult">Action</th>
+                  <th v-if="endGame">Action</th>
                 </tr>
               </thead>
 
@@ -236,6 +236,7 @@
                       v-if="item.result.startTime"
                       v-model.number="item.result.startPenalty"
                       @change="updateStartPenalty(item)"
+                      style="border-radius: 12px;"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -255,6 +256,7 @@
                       v-if="item.result.finishTime"
                       v-model.number="item.result.finishPenalty"
                       @change="updateFinishPenalty(item)"
+                      style="border-radius: 12px;"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -281,13 +283,21 @@
                   </td>
                   <td>{{ item.result.ranked }}</td>
                   <td>{{ getScoreByRanked(item.result.ranked) }}</td>
-                  <td v-if="editResult">
-                    <button
+                  <td v-if="endGame">
+                    <!-- <button
                       type="button"
                       class="btn-action btn-warning"
                       @click="openModal(item, 'R4men')"
                     >
                       Edit
+                    </button> -->
+
+                    <button
+                      type="button"
+                      class="btn-action btn-danger"
+                      @click="resetRow(item)"
+                    >
+                      Reset
                     </button>
                   </td>
                 </tr>
@@ -296,11 +306,14 @@
             <br />
           </b-col>
         </b-row>
-        <b-button @click="goTo()" variant="outline-secondary" class="btn-action">
+        <b-button
+          @click="goTo()"
+          variant="outline-secondary"
+          class="btn-action"
+        >
           <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
         </b-button>
       </div>
-
     </div>
   </div>
 </template>
@@ -503,8 +516,7 @@ export default {
       baudRate: 9600,
       baudOptions: [1200, 2400, 9600],
       serialCtrl: null,
-      editForm: "",
-      editResult: false,
+      endGame: false,
       isScrolled: false,
       port: null,
       isPortConnected: false,
@@ -740,15 +752,25 @@ export default {
     },
     // ======
 
+    resetRow(item) {
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+      item.result.startPenalty = 0;
+      item.result.finishPenalty = 0;
+      item.result.totalPenalty = 0;
+      item.result.penaltyTime = "";
+      item.result.totalTime = "";
+      item.result.ranked = "";
+      item.result.score = "";
+
+      // optional: langsung re-assign ranking lagi
+      this.assignRanks(this.participantArr);
+
+      this.$forceUpdate(); // paksa refresh kalau kadang Vue reactivity lambat
+    },
     setBaud(br) {
       this.baudRate = br;
-    },
-
-    openModal(datas) {
-      this.editForm = datas;
-      this.$bvModal &&
-        this.$bvModal.show &&
-        this.$bvModal.show("bv-modal-edit-team");
     },
 
     async calculateScore(ranked) {
@@ -796,7 +818,7 @@ export default {
         );
       }
 
-      this.editResult = true;
+      this.endGame = true;
       await this.assignRanks(this.participant);
     },
 
@@ -818,14 +840,14 @@ export default {
     },
 
     async resetRace() {
-      this.editResult = false;
+      this.endGame = false;
     },
 
     async checkingPenalties() {
       for (let i = 0; i < this.participant.length; i++) {
         await this.recalcPenalties(this.participant[i]);
       }
-      this.editResult = true;
+      this.endGame = true;
       await this.assignRanks(this.participant);
     },
 

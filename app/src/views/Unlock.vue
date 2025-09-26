@@ -83,8 +83,6 @@ export default {
       this.error = "";
       if (this.key !== this.expectedKey) {
         this.error = "Key salah.";
-
-        // reset error otomatis setelah 3 detik
         setTimeout(() => {
           this.error = "";
         }, 3000);

@@ -2,13 +2,13 @@
   <div class="sts-page">
     <!-- INTRO OVERLAY: muncul hanya sekali per sesi -->
     <div
-       v-if="showIntro"
-  class="intro-overlay"
-  :class="{ 'intro-hide': introHiding }"
-  role="dialog"
-  aria-modal="true"
-  aria-label="Opening"
-  @animationend.self="onIntroAnimEnd"  
+      v-if="showIntro"
+      class="intro-overlay"
+      :class="{ 'intro-hide': introHiding }"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Opening"
+      @animationend.self="onIntroAnimEnd"
     >
       <div class="intro-glow-bg"></div>
 
@@ -24,11 +24,6 @@
         <button class="intro-skip" @click="hideIntro()">Skip</button>
       </div>
     </div>
-
-    <!-- Ringtone (dipakai hanya saat first visit di sesi ini) -->
-    <audio ref="ringtone" preload="auto">
-      <source src="@/assets/sounds/opening-tone.mp3" type="audio/mpeg" />
-    </audio>
 
     <!-- 2) JUMBOTRON -->
     <section class="sts-jumbotron">
@@ -290,15 +285,6 @@ export default {
     if (firstVisitThisSession) {
       this.showIntro = true;
       sessionStorage.setItem(KEY, "1");
-
-      // (opsional) putar ringtone bila ada
-      const audio = this.$refs.ringtone;
-      if (audio) {
-        audio.volume = 0.4;
-        audio.play().catch(() => {});
-      }
-
-      // auto-dismiss setelah 1.6s
       setTimeout(() => this.hideIntro(), 5000);
     }
     this.getEvents();
@@ -368,21 +354,21 @@ export default {
     },
   },
   methods: {
-   hideIntro() {
-    // mulai animasi keluar + nonaktifkan interaksi
-    this.introHiding = true;
+    hideIntro() {
+      // mulai animasi keluar + nonaktifkan interaksi
+      this.introHiding = true;
 
-    // fallback: kalau animationend tidak datang, force remove
-    clearTimeout(this._introKillTimer);
-    this._introKillTimer = setTimeout(() => {
-      this.showIntro = false;
-    }, 600); // > durasi introFadeOut (400ms)
-  },
-  onIntroAnimEnd() {
-    if (this.introHiding) {
-      this.showIntro = false;
-    }
-  },
+      // fallback: kalau animationend tidak datang, force remove
+      clearTimeout(this._introKillTimer);
+      this._introKillTimer = setTimeout(() => {
+        this.showIntro = false;
+      }, 600); // > durasi introFadeOut (400ms)
+    },
+    onIntroAnimEnd() {
+      if (this.introHiding) {
+        this.showIntro = false;
+      }
+    },
     formatDateShort(inputDate) {
       if (!inputDate) return "-";
 
@@ -828,12 +814,12 @@ export default {
   place-items: center;
   overflow: hidden;
   animation: introFadeIn 300ms ease-out both;
-  pointer-events: auto;             /* visible => tangkap klik */
+  pointer-events: auto; /* visible => tangkap klik */
 }
 
 .intro-overlay.intro-hide {
   animation: introFadeOut 400ms ease-in forwards;
-  pointer-events: none;             /* ⬅️ klik langsung tembus saat hide */
+  pointer-events: none; /* ⬅️ klik langsung tembus saat hide */
 }
 
 /* latar glowing lembut */

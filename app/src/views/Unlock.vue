@@ -76,9 +76,7 @@ export default {
     };
   },
   mounted() {
-    try {
-      sessionStorage.removeItem("sts_home_visited_session");
-    } catch (e) {}
+    sessionStorage.removeItem("sts_home_visited_session");
   },
   methods: {
     submit() {

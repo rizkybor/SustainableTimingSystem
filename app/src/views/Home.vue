@@ -378,8 +378,7 @@ export default {
       this.showIntro = false;
     }, 600); // > durasi introFadeOut (400ms)
   },
-  onIntroAnimEnd(e) {
-    // dengan .self, ini hanya dipicu untuk overlay-nya sendiri
+  onIntroAnimEnd() {
     if (this.introHiding) {
       this.showIntro = false;
     }

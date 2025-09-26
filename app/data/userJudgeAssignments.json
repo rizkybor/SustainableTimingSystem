@@ -1,0 +1,42 @@
+{
+  "_id": {
+    "$oid": "68d63833dc78dee642a1bf7d"
+  },
+  "email": "rizkyak994@gmail.com",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2025-09-26T06:52:35.043Z"
+  },
+  "id": "68b5bf07a338efc467bf4850",
+  "updatedAt": {
+    "$date": "2025-09-26T07:03:08.880Z"
+  },
+  "username": "Rizky Ajie Kurniawan",
+  "judges": [
+    {
+      "eventId": "68b5bf07a338efc467bf4850",
+      "sprint": {
+        "start": true,
+        "finish": false
+      },
+      "h2h": {
+        "start": false,
+        "finish": true,
+        "R1": false,
+        "R2": false,
+        "L1": false,
+        "L2": false
+      },
+      "slalom": {
+        "start": false,
+        "finish": false,
+        "gates": []
+      },
+      "drr": {
+        "start": false,
+        "finish": false,
+        "sections": []
+      }
+    }
+  ]
+}

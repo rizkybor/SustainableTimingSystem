@@ -294,6 +294,29 @@ function mergeWithDefaults(incoming) {
   };
 }
 
+function toStrId(v) {
+  // normalisasi id jadi string aman
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  if (typeof v === "object") {
+    if (v.$oid) return String(v.$oid);
+    if (v.oid) return String(v.oid);
+    if (v._id && v._id.$oid) return String(v._id.$oid);
+  }
+  return String(v);
+}
+
+function userHasEvent(user, eventId) {
+  if (!user || !Array.isArray(user.mainEvents) || !eventId) return false;
+  const target = toStrId(eventId);
+  for (let i = 0; i < user.mainEvents.length; i++) {
+    const ev = toStrId(user.mainEvents[i]);
+    if (ev && ev === target) return true;
+  }
+  return false;
+}
+
 export default {
   name: "JudgesSettings",
   components: { SearchableSelect },
@@ -917,8 +940,13 @@ export default {
           else if (res && res.data && Array.isArray(res.data.users))
             list = res.data.users;
 
-          this.usersRaw = list;
-          this.internalJuryOptions = normalizeUsersToOptions(list);
+          const evId = toStrId(this.eventId);
+          const filtered = evId
+            ? list.filter((u) => userHasEvent(u, evId))
+            : list;
+
+          this.usersRaw = filtered;
+          this.internalJuryOptions = normalizeUsersToOptions(filtered)
         });
       } catch (err) {
         console.warn("removeListener gagal:", err);

@@ -84,7 +84,11 @@ function setupIPCMainHandlers() {
   ipcMain.on("users:getAll", async (event) => {
     try {
       const users = await getAllUsers();
-      event.reply("users:getAll:reply", { ok: true, users });
+      const normalized = users.map((u) => ({
+        ...u,
+        _id: String(u._id),
+      }));
+      event.reply("users:getAll:reply", { ok: true, users: normalized });
     } catch (err) {
       event.reply("users:getAll:reply", { ok: false, error: err.message });
     }
@@ -93,6 +97,7 @@ function setupIPCMainHandlers() {
   // Update user
   ipcMain.on("users:update", async (event, { userId, payload }) => {
     try {
+      console.log(userId, payload,'<<< UPDATE IPC USER')
       const updated = await updateUser(userId, payload);
       event.reply("users:update:reply", { ok: true, user: updated });
     } catch (err) {
@@ -587,11 +592,11 @@ function setupIPCMainHandlers() {
 ipcMain.on("users-judges-assignment:upsertMany", async (event, payload) => {
   try {
     var arr = [];
-    console.log(event,payload,'<<< READ IPC MAIN')
+    console.log(event, payload, "<<< READ IPC MAIN");
     if (payload && Array.isArray(payload.docs)) arr = payload.docs;
 
     var result = await upsertManyUserJudgeAssignments(arr);
-        console.log(result,'<<< RESULT IPC MAIN')
+    console.log(result, "<<< RESULT IPC MAIN");
     event.sender.send("users-judges-assignment:upsertMany:reply", {
       ok: true,
       result: result,

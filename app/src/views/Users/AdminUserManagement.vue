@@ -240,7 +240,7 @@
         >
           Cancel
         </b-button>
-        <b-button variant="primary" class="btn-pill" @click="/* saveUser() */">
+        <b-button variant="primary" class="btn-pill" @click="saveUser">
           Update
         </b-button>
       </div>
@@ -260,6 +260,7 @@ export default {
       perPage: 10,
       currentPage: 1,
       users: [],
+      editingUserId: "",
       fields: [
         {
           key: "index",
@@ -284,7 +285,6 @@ export default {
         username: "",
         image: "",
         mainEvents: [],
-        judges: [],
         email: "",
       },
       selectedEventId: "",
@@ -403,9 +403,6 @@ export default {
     removeEvent(idx) {
       this.editForm.mainEvents.splice(idx, 1);
     },
-    // saveUser() {
-    //   // TODO: implement update logic here
-    // }
     _toast(msg, variant = "info") {
       if (this.$bvToast) {
         this.$bvToast.toast(msg, { variant, solid: true });
@@ -456,29 +453,27 @@ export default {
       ipcRenderer.removeAllListeners("users:getAll:reply");
       ipcRenderer.send("users:getAll");
       ipcRenderer.once("users:getAll:reply", (_e, res) => {
-        if (res && res.ok) {
-          this.users = (res.users || []).map((u) => {
-            return {
-              ...u,
-              _id: this._toStringId(u._id), // 🔑 pastikan string
-              mainEvents: Array.isArray(u.mainEvents)
-                ? u.mainEvents.map(this._toStringId).filter(Boolean)
-                : [],
-              judges: Array.isArray(u.judges)
-                ? u.judges.map((j) => ({
-                    eventId: this._toStringId(j.eventId),
-                    judgesSprint: String(j.judgesSprint || ""),
-                    judgesHeadtoHead: String(j.judgesHeadtoHead || ""),
-                    judgesSlalom: String(j.judgesSlalom || ""),
-                    judgesDRR: String(j.judgesDRR || ""),
-                  }))
-                : [],
-            };
-          });
-          this.currentPage = 1;
-        } else {
-          this._toast((res && res.error) || "Failed to load users", "danger");
-        }
+        let raw = [];
+        if (res && Array.isArray(res.users)) raw = res.users;
+        else if (res && Array.isArray(res.items)) raw = res.items;
+        else if (res && res.data && Array.isArray(res.data.users))
+          raw = res.data.users;
+        else if (Array.isArray(res)) raw = res;
+
+        // Normalisasi setiap user
+        this.users = raw.map((u) => {
+          const id = this._toStringId(u && u._id);
+          return {
+            ...u,
+            _id: id,
+            email: typeof u.email === "string" ? u.email.trim() : "",
+            mainEvents: Array.isArray(u.mainEvents)
+              ? u.mainEvents.map(this._toStringId).filter(Boolean)
+              : [],
+          };
+        });
+
+        this.currentPage = 1;
       });
     },
 
@@ -544,38 +539,52 @@ export default {
 
     openEdit(user) {
       // user dari table sudah dinormalisasi → tinggal clone
+      this.editingUserId = this._toStringId(user && user._id);
       this.editForm = JSON.parse(JSON.stringify(user || {}));
       this.showEdit = true;
     },
 
     saveUser() {
-      const payload = JSON.parse(JSON.stringify(this.editForm));
-      // jaga-jaga: normalisasi lagi sebelum kirim
-      payload._id = this._toStringId(payload._id);
-      payload.mainEvents = Array.isArray(payload.mainEvents)
-        ? payload.mainEvents.map(this._toStringId).filter(Boolean)
-        : [];
-      payload.judges = Array.isArray(payload.judges)
-        ? payload.judges.map((j) => ({
-            eventId: this._toStringId(j.eventId),
-            judgesSprint: String(j.judgesSprint || ""),
-            judgesHeadtoHead: String(j.judgesHeadtoHead || ""),
-            judgesSlalom: String(j.judgesSlalom || ""),
-            judgesDRR: String(j.judgesDRR || ""),
-          }))
-        : [];
+      try {
+        const form = JSON.parse(JSON.stringify(this.editForm));
 
-      ipcRenderer.removeAllListeners("users:update:reply");
-      ipcRenderer.send("users:update", { userId: payload._id, payload });
-      ipcRenderer.once("users:update:reply", (_e, res) => {
-        if (res && res.ok) {
-          this._toast("User updated", "success");
-          this.showEdit = false;
-          this.fetchUsers();
-        } else {
-          this._toast((res && res.error) || "Failed to update", "danger");
+        // pastikan id user valid
+        const userId = this._toStringId(form._id);
+        if (!userId) {
+          this._toast("User ID tidak valid", "danger");
+          return;
         }
-      });
+
+        // normalisasi mainEvents + tambahkan selectedEventId (unik)
+        const set = new Set(
+          (Array.isArray(form.mainEvents) ? form.mainEvents : [])
+            .map(this._toStringId)
+            .filter(Boolean)
+        );
+        const selectedId = this._toStringId(this.selectedEventId || "");
+        if (selectedId) set.add(selectedId);
+
+        // ⚠️ KIRIM CUMA INI
+        const payload = {
+          mainEvents: Array.from(set),
+          // optional kalau mau: updatedAt: new Date().toISOString()
+        };
+
+        ipcRenderer.removeAllListeners("users:update:reply");
+        ipcRenderer.send("users:update", { userId, payload });
+        ipcRenderer.once("users:update:reply", (_e, res) => {
+          if (res && res.ok) {
+            this._toast("User updated", "success");
+            this.showEdit = false;
+            this.fetchUsers();
+          } else {
+            this._toast((res && res.error) || "Failed to update", "danger");
+          }
+        });
+      } catch (err) {
+        console.error("saveUser error:", err);
+        this._toast("Unexpected error while updating user", "danger");
+      }
     },
 
     deleteUser(email) {
@@ -596,21 +605,6 @@ export default {
           this._toast((res && res.error) || "Failed to delete", "danger");
         }
       });
-    },
-
-    addJudge() {
-      if (!Array.isArray(this.editForm.judges)) this.editForm.judges = [];
-      this.editForm.judges.push({
-        eventId: "",
-        judgesSprint: "",
-        judgesHeadtoHead: "",
-        judgesSlalom: "",
-        judgesDRR: "",
-      });
-    },
-    removeJudge(idx) {
-      if (!Array.isArray(this.editForm.judges)) return;
-      this.editForm.judges.splice(idx, 1);
     },
     goTo() {
       this.$router.push(`/`);
@@ -814,15 +808,6 @@ export default {
   color: #9ca3af;
   border-color: #e5e7eb;
   cursor: not-allowed;
-}
-
-/* ===== Judge row box ===== */
-.judge-row {
-  border: 1px solid #eef2f7;
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 12px;
-  background: #ffffff;
 }
 
 /* ===== Modal Styling ===== */

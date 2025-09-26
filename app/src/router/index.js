@@ -3,7 +3,7 @@ import VueRouter from "vue-router";
 import Home from "../views/Home.vue";
 import CreateEvent from "../views/CreateEvent/index.vue";
 import DetailEvent from "../views/DetailEvent/index.vue";
-import DetailsEventId from "../views/DetailEvent/Details/detail-event.vue";
+import DetailsEventId from "../views/DetailEvent/Details/index.vue";
 import SprintRace from "../views/DetailEvent/RaceCategory/SprintRace.vue";
 import SlalomRace from "../views/DetailEvent/RaceCategory/SlalomRace.vue";
 import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";

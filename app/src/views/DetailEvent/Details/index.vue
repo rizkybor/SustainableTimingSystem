@@ -233,9 +233,9 @@ import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
 import { ipcRenderer } from "electron";
-import TeamPanel from "./../components/TeamPanel.vue";
-import RaceSettingsModal from "./../components/RaceSettings.vue";
-import JudgeSettingsModal from "./../components/JudgesSettings.vue";
+import TeamPanel from "@/components/race/TeamPanel.vue";
+import RaceSettingsModal from "@/components/race/RaceSettings.vue";
+import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import { getSocket } from "@/services/socket";
 import defaultImg from "@/assets/images/default-second.jpeg";
 

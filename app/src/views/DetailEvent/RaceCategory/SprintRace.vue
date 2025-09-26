@@ -227,7 +227,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import { SerialPort } from "serialport";
-import OperationTimePanel from "../components/OperationTeamPanel.vue";
+import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */

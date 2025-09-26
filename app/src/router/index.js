@@ -37,7 +37,6 @@ const routes = [
 
   {
     path: "/event-detail/:id",
-    name: "event",
     component: DetailEvent,
     props: true,
     children: [

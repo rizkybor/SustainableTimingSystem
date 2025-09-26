@@ -1,5 +1,5 @@
 <template>
-  <div id="app" class="app-shell" :class="{ 'has-navbar': showNavbar }">
+  <div id="app" class="app-shell">
     <!-- Header / Navbar -->
     <!-- <header v-if="showNavbar" class="app-header" role="banner"> -->
     <header class="app-header" role="banner">

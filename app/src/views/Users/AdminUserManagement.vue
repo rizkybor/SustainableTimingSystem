@@ -582,7 +582,6 @@ export default {
           }
         });
       } catch (err) {
-        console.error("saveUser error:", err);
         this._toast("Unexpected error while updating user", "danger");
       }
     },

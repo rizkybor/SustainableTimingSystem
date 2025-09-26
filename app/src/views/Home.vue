@@ -14,7 +14,7 @@
             <b-button
               size="md"
               variant="warning"
-              class="btn-action rounded-pill px-4"
+              class="btn-action px-4"
               @click="goTo('events')"
             >
               Explore Event
@@ -56,7 +56,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action w-100 rounded-pill"
+                class="btn-action w-100"
                 @click="goTo('create-new')"
               >
                 Create Event
@@ -83,7 +83,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action btn-outline-info w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100"
                 @click="goTo('team-create')"
               >
                 Manage All Teams
@@ -111,7 +111,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action btn-outline-info w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100"
                 @click="goTo('admin/users')"
               >
                 Manage Accounts
@@ -218,7 +218,7 @@
             <b-button
               size="sm"
               variant="secondary"
-              class="btn-action rounded-pill w-100"
+              class="btn-action w-100"
               @click.stop="viewTeam(t)"
             >
               View Details
@@ -485,8 +485,8 @@ export default {
   border: 1px solid #cfd8e6;
   color: #1c4c7a;
   font-weight: 700;
-  border-radius: 10px;
   padding: 8px 14px;
+  border-radius: 12px;
 }
 
 .btn-action:hover {
@@ -557,10 +557,6 @@ export default {
   border-radius: 12px;
   width: 56px;
   height: 56px;
-}
-
-.btn.rounded-pill {
-  border-radius: 999px;
 }
 
 .btn-secondary {
@@ -718,7 +714,7 @@ export default {
   width: 40px;
   border-radius: 999px;
   background: #eff3ff;
-  color: #2c5cff;
+  color: #5da0da;
 }
 
 /* FOOTER */

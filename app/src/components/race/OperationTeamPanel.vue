@@ -4,24 +4,31 @@
       <div>
         <b-row>
           <!-- LEFT: Live Feed -->
-          <b-col class="col-3">
-            <div class="card-time" style="height:auto; min-height:500px; border:1px solid #e6ebf4;">
-              <table class="table table-sm table-rounded">
-                <thead style="background-color:white; color:#4A4A4A; padding: 10px;" >
-                  <tr>
-                    <th scope="col" style="padding: 15px;">Id Registrasi</th>
-                    <th scope="col" style="padding: 15px;">Racetime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(id, index) in digitId" :key="'feed-'+index">
-                    <td style="color:black">{{ id }}</td>
-                    <td style="color:black">{{ digitTime[index] }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </b-col>
+        <b-col class="col-4">
+  <div class="feed-panel">
+    <div class="feed-scroll"> <!-- tinggi tetap & scroll -->
+      <table class="table table-sm table-rounded mb-0 w-100">
+        <thead>
+          <tr>
+            <th scope="col">Id Registrasi</th>
+            <th scope="col">Racetime</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="!digitId || !digitId.length">
+            <td colspan="2" class="text-center text-muted py-4">
+              No data yet
+            </td>
+          </tr>
+          <tr v-else v-for="(id, index) in digitId" :key="'feed-'+index">
+            <td>{{ id }}</td>
+            <td>{{ digitTime[index] }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</b-col>
 
           <!-- RIGHT: Start / Finish Buffer & Buttons -->
           <b-col class="col">
@@ -146,27 +153,48 @@ export default {
 <style scoped>
 .card-time { border-radius: 20px; }
 .custom-btn { margin: 5px; width: 120px; }
+
+/* Panel putih, ukuran tetap */
+.feed-panel {
+  background: #fff;
+  border: 1px solid #e6ebf4;
+  border-radius: 20px;
+  overflow: hidden;              /* jaga radius */
+}
+
+/* Tinggi SELALU tetap; scroll jika konten lebih */
+.feed-scroll {
+  height: 500px;                 /* <- atur tinggi tetap di sini */
+  overflow: auto;
+}
+
+/* Tabel rapi + header lengket (opsional) */
 .table-rounded {
-  border-collapse: separate;   /* penting untuk radius */
-  border-spacing: 0;           /* biar rapat seperti collapse */
+  border-collapse: separate;
+  border-spacing: 0;
 }
-
 .table-rounded thead th {
-  background-color: #fff;
+  background: #fff;
   color: #4A4A4A;
+  font-weight: 700;
+  padding: 12px 15px;
+  position: sticky;              /* header tetap terlihat saat scroll */
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid #e6ebf4;
 }
+.table-rounded thead th:first-child { border-top-left-radius: 18px; }
+.table-rounded thead th:last-child  { border-top-right-radius: 18px; }
 
-/* sudut kiri & kanan atas */
-.table-rounded thead th:first-child {
-  border-top-left-radius: 18px;
+.table-rounded tbody td {
+  background: #fff;
+  color: #111827;
+  padding: 10px 15px;
+  border-bottom: 1px solid #f3f4f6;
 }
-.table-rounded thead th:last-child {
-  border-top-right-radius: 18px;
-}
+.table-rounded tbody tr:nth-child(odd) td { background: #fafafa; }
 
-/* opsional: hilangkan garis */
-.table-rounded th,
-.table-rounded td {
-  border: none;
-}
+.table-rounded th, .table-rounded td { border: none; }
+
+
 </style>

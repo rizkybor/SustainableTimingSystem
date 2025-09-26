@@ -1,5 +1,28 @@
 <template>
   <div>
+    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
+      <!-- TOP BAR (breadcrumb + datetime) -->
+      <div
+        class="d-flex align-items-center justify-content-between text-muted small"
+      >
+        <b-breadcrumb class="mb-0">
+          <b-breadcrumb-item to="/">
+            <Icon icon="mdi:home-outline" class="mr-1" />
+            Dashboard
+          </b-breadcrumb-item>
+          <b-breadcrumb-item
+            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          >
+            {{ dataEventSafe.eventName }}
+          </b-breadcrumb-item>
+          <b-breadcrumb-item active>
+            {{ "Sprint Race" }}
+          </b-breadcrumb-item>
+        </b-breadcrumb>
+        <div>{{ currentDateTime }}</div>
+      </div>
+    </div>
+
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
@@ -57,21 +80,26 @@
 
           <b-col>
             <div style="display: flex; gap: 10px; justify-content: flex-end">
-              <button
-                type="button"
-                class="btn-action btn-secondary"
-                @click="saveResult"
-              >
-                <Icon icon="icon-park-outline:save" /> Save Result
-              </button>
-
-              <button
-                type="button"
-                class="btn-action btn-info"
-                @click="toggleSortRanked"
-              >
-                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-              </button>
+              <!-- selector baud -->
+              <div class="btn-baud-group">
+                <span class="mr-2 text-muted">Baud</span>
+                <div class="d-inline-flex">
+                  <button
+                    v-for="br in baudOptions"
+                    :key="'baud-' + br"
+                    type="button"
+                    class="btn-action"
+                    :class="
+                      baudRate === br ? 'btn-success' : 'btn-outline-secondary'
+                    "
+                    @click="setBaud(br)"
+                    :disabled="isPortConnected"
+                    style="margin-right: 6px"
+                  >
+                    {{ br }}
+                  </button>
+                </div>
+              </div>
 
               <button
                 type="button"
@@ -111,7 +139,28 @@
     <!-- LIST RESULT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>List Result</h4>
+        <div class="d-flex justify-content-between mb-2">
+          <div>
+            <h4>List Result</h4>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="btn-action btn-secondary mr-2"
+              @click="saveResult"
+            >
+              <Icon icon="icon-park-outline:save" /> Save Result
+            </button>
+
+            <button
+              type="button"
+              class="btn-action btn-info"
+              @click="toggleSortRanked"
+            >
+              <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+            </button>
+          </div>
+        </div>
         <b-row>
           <b-col>
             <table class="table">
@@ -226,7 +275,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { SerialPort } from "serialport";
+import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
@@ -418,6 +467,9 @@ export default {
 
   data() {
     return {
+      baudRate: 9600,
+      baudOptions: [1200, 2400, 9600],
+      serialCtrl: null,
       editForm: "",
       editResult: false,
       isScrolled: false,
@@ -478,6 +530,19 @@ export default {
   },
 
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
     participantArr() {
       return Array.isArray(this.participant)
         ? this.participant
@@ -510,6 +575,76 @@ export default {
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+       const PREFERRED_PATH = "/dev/tty.usbserial-120";
+
+// ambil daftar port
+const ports = await listPorts();
+this.currentPort = ports; // kalau mau ditampilkan/log
+
+// cari index dari port dengan path sesuai (exact match)
+const portIndex = ports.findIndex(p => String(p.path) === PREFERRED_PATH);
+
+if (portIndex === -1) {
+  this.notify(
+    "warning",
+    `Preferred port not found: ${PREFERRED_PATH}`,
+    "Device"
+  );
+  alert("Preferred port not found");
+  return;
+}
+
+console.log("Picked port index:", portIndex, "path:", ports[portIndex].path);
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex ,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        console.log(this.serialCtrl, "<<<< cek");
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+      }
+    },
+    // === END CONNECTION ===
+
+    // === NOTIFY ===
     notify(type, detail, message = "Info") {
       if (this.$ipc || (window && window.ipcRenderer)) {
         const ir = this.$ipc || window.ipcRenderer;
@@ -518,12 +653,15 @@ export default {
       // bisa juga set state:
       this.lastErrorMessage = `${message}: ${detail}`;
     },
+
     notifyError(err, message = "Error") {
       const detail =
         (err && (err.message || err.toString())) || "Unknown error";
       this.notify("error", detail, message);
     },
-    /** load dari payload baru */
+    // ======
+
+    // === LOAD PAYLOAD ===
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForSprint();
       if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
@@ -542,7 +680,6 @@ export default {
       return true;
     },
 
-    /** fallback format lama */
     async checkValueStorage() {
       let dataStorage = null,
         events = null;
@@ -568,6 +705,11 @@ export default {
         localStorage.getItem("currentCategories") || ""
       ).trim();
     },
+    // ======
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
 
     openModal(datas) {
       this.editForm = datas;
@@ -576,16 +718,9 @@ export default {
         this.$bvModal.show("bv-modal-edit-team");
     },
 
-    async assignRanks(items) {
-      const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
-      itemsWithTimeResult.sort(
-        (a, b) =>
-          this.parsesTime(a.result.totalTime) -
-          this.parsesTime(b.result.totalTime)
-      );
-      itemsWithTimeResult.forEach((item, index) => {
-        item.result.ranked = index + 1;
-      });
+    async calculateScore(ranked) {
+      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
+      return scoreData ? scoreData.score : 0;
     },
 
     parsesTime(timeStr) {
@@ -593,11 +728,6 @@ export default {
         .split(":")
         .map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
-    },
-
-    async calculateScore(ranked) {
-      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
-      return scoreData ? scoreData.score : 0;
     },
 
     async parseTimeResult(timeResult) {
@@ -608,9 +738,6 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    /**
-     * Hitung total penalti dari dua sumber (start & finish) + update totalTime
-     */
     async recalcPenalties(item) {
       const sp = this.findPenalty(item.result.startPenalty);
       const fp = this.findPenalty(item.result.finishPenalty);
@@ -669,6 +796,18 @@ export default {
       await this.assignRanks(this.participant);
     },
 
+    async assignRanks(items) {
+      const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
+      itemsWithTimeResult.sort(
+        (a, b) =>
+          this.parsesTime(a.result.totalTime) -
+          this.parsesTime(b.result.totalTime)
+      );
+      itemsWithTimeResult.forEach((item, index) => {
+        item.result.ranked = index + 1;
+      });
+    },
+
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
@@ -683,91 +822,6 @@ export default {
           : a.result.ranked - b.result.ranked
       );
       this.participant = arr;
-    },
-
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ok = await this.setupSerialListener();
-        if (ok) {
-          this.isPortConnected = true;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      if (this.port && this.port.isOpen) this.port.close();
-      this.isPortConnected = false;
-    },
-
-    async setupSerialListener() {
-      let receivedData = "";
-      let a = "",
-        b = "";
-      try {
-        SerialPort.list()
-          .then((ports) => {
-            if (ports && ports.length > 0) {
-              this.currentPort = ports;
-              const selectedPort = ports[6];
-              if (selectedPort && selectedPort.path) {
-                this.port = new SerialPort({
-                  path: selectedPort.path,
-                  baudRate: 9600,
-                });
-                this.port.on("data", (data) => {
-                  const newData = data.toString();
-                  receivedData += newData;
-                  for (let i = 0; i < receivedData.length; i++) {
-                    const char = receivedData[i];
-                    if (char === "M" || char === "R") {
-                      a = receivedData.slice(0, i + 1);
-                      b = receivedData.slice(i + 1);
-                      receivedData = "";
-                      break;
-                    }
-                  }
-                  this.digitId.unshift(a);
-                  this.digitTime.unshift(b);
-                  if (a[11] == "0") {
-                    this.digitTimeStart = b.replace(
-                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
-                      "$1:$2:$3.$4"
-                    );
-                  } else if (a[11] == "2") {
-                    this.digitTimeFinish = b.replace(
-                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
-                      "$1:$2:$3.$4"
-                    );
-                  }
-                  return true;
-                });
-              } else {
-                this.notify(
-                  "warning",
-                  "Selected serial port path is undefined.",
-                  "Device"
-                );
-                this.isPortConnected = false;
-              }
-            } else {
-              this.notify("warning", "No serial ports available.", "Device");
-              this.isPortConnected = false;
-            }
-          })
-          .catch((err) =>
-            this.notifyError(err, "Serial port enumeration failed")
-          );
-      } catch (err) {
-        this.notifyError(err, "Serial setup failed");
-      }
     },
 
     formatTime(inputTime) {

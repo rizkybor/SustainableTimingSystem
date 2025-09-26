@@ -12,6 +12,7 @@
               <Icon icon="mdi:shield-crown" width="56" height="56" />
             </div>
           </b-col>
+          
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{

@@ -1,7 +1,7 @@
 <template>
   <div class="sts-page">
     <!-- 2) JUMBOTRON -->
-    <section class="sts-jumbotron p-5">
+    <section class="sts-jumbotron">
       <b-container>
         <b-row>
           <b-col cols="12" md="7" class="py-4">
@@ -517,6 +517,7 @@ export default {
 
 /* JUMBOTRON */
 .sts-jumbotron {
+  padding: 120px;
   position: relative;
   background-image: url("https://images.unsplash.com/uploads/141327328038701afeede/eda0fb7c?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   background-size: cover;
@@ -542,9 +543,7 @@ export default {
 }
 
 .sts-jumbotron .hero-image {
-  width: 320px;
   max-width: 100%;
-  height: 220px;
   border-radius: 20px;
   /* background: #dfe7f7; */
   background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=40&w=400&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");

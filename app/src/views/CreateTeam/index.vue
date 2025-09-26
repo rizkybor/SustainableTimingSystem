@@ -20,17 +20,27 @@
           </div>
         </div>
 
-        <b-card
-          title="Create New Team"
-          sub-title="Create your main team and add sub-teams to represent different categories"
-          class="team-card m-3 px-4 py-4"
+        <div
+          class="card-wrapper mt-1"
+          style="
+            padding-left: 45px;
+            padding-right: 45px;
+            padding-bottom: 45px;
+            padding-top: 25px;
+          "
         >
+         <div
+            @click="goTo"
+            class="btn-custom d-flex align-items-center mb-3"
+          >
+            <Icon icon="mdi:chevron-left" class="mr-1" />
+            <span>Back</span>
+          </div>
+          <div>
+            <h2 class="page-title mb-1">Create New Team</h2>
+            <p class="page-subtitle mb-3">Create new team data</p>
+          </div>
           <form ref="form-newTeam">
-            <!-- Section Title -->
-            <p class="h6 font-weight-bold text-dark mb-3">
-              Main Team Information
-            </p>
-
             <!-- TEAM TYPE -->
             <b-form-group label="Team Type" label-class="label-strong">
               <b-form-select
@@ -73,10 +83,19 @@
               </b-button>
             </div>
           </form>
-        </b-card>
 
-        <!-- ✅ LIST TEAM -->
-        <b-card title="Teams List" class="team-card m-3 px-4 py-4 mt-4">
+          <!-- Divider -->
+          <div class="section-divider my-5">
+            <span>Teams Overview</span>
+          </div>
+
+          <div>
+            <h2 class="page-title mb-1">List All Teams</h2>
+            <p class="page-subtitle mb-3">
+              View, edit, and delete all teams that have been created.
+            </p>
+          </div>
+          <!-- ✅ LIST TEAM -->
           <div class="d-flex align-items-center mb-3">
             <label class="mb-0 mr-2 font-weight-bold">Filter:</label>
             <b-form-select
@@ -126,23 +145,23 @@
               </template>
 
               <!-- Team Name -->
-<template #cell(nameTeam)="row">
-  <span class="font-weight-bold text-dark">
-    {{ row.item.nameTeam || '-' }}
-  </span>
-</template>
+              <template #cell(nameTeam)="row">
+                <span class="font-weight-bold text-dark">
+                  {{ row.item.nameTeam || "-" }}
+                </span>
+              </template>
 
-<!-- BIB -->
-<template #cell(bibTeam)="row">
-  <span
-    v-if="row.item.bibTeam"
-    class="status-pill status-neutral"
-    title="BIB"
-  >
-    <span class="dot"></span> {{ row.item.bibTeam }}
-  </span>
-  <span v-else class="text-muted">—</span>
-</template>
+              <!-- BIB -->
+              <template #cell(bibTeam)="row">
+                <span
+                  v-if="row.item.bibTeam"
+                  class="status-pill status-neutral"
+                  title="BIB"
+                >
+                  <span class="dot"></span> {{ row.item.bibTeam }}
+                </span>
+                <span v-else class="text-muted">—</span>
+              </template>
 
               <!-- Type -->
               <template #cell(typeTeam)="row">
@@ -222,36 +241,26 @@
               </div>
             </div>
           </div>
-        </b-card>
-        <div class="mt-4">
-          <b-button
-            variant="outline-secondary"
-            class="btn-outline-pill"
-            @click="goTo()"
-          >
-            <Icon icon="ic:round-arrow-back" class="mr-2" />
-            Back
-          </b-button>
         </div>
       </b-col>
     </b-row>
 
     <!-- ✏️ Edit Team Modal -->
     <b-modal
-  id="modal-edit-team"
-  :title="`Edit Team: ${editForm.nameTeam || ''}`"
-  ok-title="Save"
-  cancel-title="Cancel"
-  @ok="submitEdit"
-  :no-close-on-esc="true"
-  :no-close-on-backdrop="true"
-  modal-class="um-modal"          
-  content-class="um-modal-content"
-  header-class="um-modal-header"  
-  body-class="um-modal-body"      
-  footer-class="um-modal-footer"  
-  centered
->
+      id="modal-edit-team"
+      :title="`Edit Team: ${editForm.nameTeam || ''}`"
+      ok-title="Save"
+      cancel-title="Cancel"
+      @ok="submitEdit"
+      :no-close-on-esc="true"
+      :no-close-on-backdrop="true"
+      modal-class="um-modal"
+      content-class="um-modal-content"
+      header-class="um-modal-header"
+      body-class="um-modal-body"
+      footer-class="um-modal-footer"
+      centered
+    >
       <b-form @submit.stop.prevent>
         <b-form-group label="Team Type" label-class="label-strong">
           <b-form-select
@@ -349,6 +358,20 @@ export default {
     };
   },
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
+    
     totalRows() {
       return (this.filteredTeams || []).length;
     },
@@ -772,5 +795,37 @@ export default {
 }
 .modal-footer .btn-secondary:hover {
   background: #e5e7eb;
+}
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #6b7280; /* abu teks */
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section-divider:not(:empty)::before {
+  margin-right: 1rem;
+}
+.section-divider:not(:empty)::after {
+  margin-left: 1rem;
+}
+
+/* Optional: buat teks divider lebih lembut */
+.section-divider span {
+  background: #fff;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: #9ca3af;
 }
 </style>

@@ -11,11 +11,15 @@ export function isUnlocked() {
 export function unlock() {
   try {
     localStorage.setItem(KEY, '1');
-  } catch (_) {}
+  } catch (_) {
+    return false;
+  }
 }
 
 export function lock() {
   try {
     localStorage.removeItem(KEY);
-  } catch (_) {}
+  } catch (_) {
+    return false;
+  }
 }

@@ -42,6 +42,12 @@ const {
 } = require("../controllers/INSERT/insertTeams");
 
 const {
+  upsertManyUserJudgeAssignments,
+  listUserJudgeAssignmentsByEvent,
+  getUserJudgeAssignmentByEmail,
+} = require("../controllers/INSERT/insertJudgeAssignments");
+
+const {
   getSprintResult,
   existsSprintResult,
 } = require("../controllers/GET/getResult.js");
@@ -78,7 +84,11 @@ function setupIPCMainHandlers() {
   ipcMain.on("users:getAll", async (event) => {
     try {
       const users = await getAllUsers();
-      event.reply("users:getAll:reply", { ok: true, users });
+      const normalized = users.map((u) => ({
+        ...u,
+        _id: String(u._id),
+      }));
+      event.reply("users:getAll:reply", { ok: true, users: normalized });
     } catch (err) {
       event.reply("users:getAll:reply", { ok: false, error: err.message });
     }
@@ -87,6 +97,7 @@ function setupIPCMainHandlers() {
   // Update user
   ipcMain.on("users:update", async (event, { userId, payload }) => {
     try {
+      console.log(userId, payload,'<<< UPDATE IPC USER')
       const updated = await updateUser(userId, payload);
       event.reply("users:update:reply", { ok: true, user: updated });
     } catch (err) {
@@ -532,10 +543,6 @@ function setupIPCMainHandlers() {
   // =========================
   // Race Settings (GET/UPSERT)
   // =========================
-  // =========================
-  // Race Settings (GET/UPSERT)
-  // =========================
-
   // GET
   ipcMain.on("race-settings:get", async (event, eventId) => {
     try {
@@ -577,6 +584,72 @@ function setupIPCMainHandlers() {
     }
   });
 }
+
+// =========================
+// Judges Settings (GET/UPSERT)
+// =========================
+// CREATE/UPDATE (bulk)
+ipcMain.on("users-judges-assignment:upsertMany", async (event, payload) => {
+  try {
+    var arr = [];
+    console.log(event, payload, "<<< READ IPC MAIN");
+    if (payload && Array.isArray(payload.docs)) arr = payload.docs;
+
+    var result = await upsertManyUserJudgeAssignments(arr);
+    console.log(result, "<<< RESULT IPC MAIN");
+    event.sender.send("users-judges-assignment:upsertMany:reply", {
+      ok: true,
+      result: result,
+    });
+  } catch (err) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    event.sender.send("users-judges-assignment:upsertMany:reply", {
+      ok: false,
+      error: msg,
+    });
+  }
+});
+
+// GET: list semua assignment untuk 1 event (hanya entry judges pada event tsb)
+ipcMain.on("users-judges-assignment:listByEvent", async (event, payload) => {
+  try {
+    var eventId = payload && payload.eventId ? String(payload.eventId) : "";
+    if (eventId === "") throw new Error("eventId is required");
+
+    var items = await listUserJudgeAssignmentsByEvent(eventId);
+    event.sender.send("users-judges-assignment:listByEvent:reply", {
+      ok: true,
+      items: items,
+    });
+  } catch (err) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    event.sender.send("users-judges-assignment:listByEvent:reply", {
+      ok: false,
+      error: msg,
+      items: [],
+    });
+  }
+});
+
+// GET: satu user by email (jika perlu prefill individual)
+ipcMain.on("users-judges-assignment:getByEmail", async (event, payload) => {
+  try {
+    var email = payload && payload.email ? String(payload.email) : "";
+    if (email === "") throw new Error("email is required");
+
+    var doc = await getUserJudgeAssignmentByEmail(email);
+    event.sender.send("users-judges-assignment:getByEmail:reply", {
+      ok: true,
+      data: doc,
+    });
+  } catch (err) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    event.sender.send("users-judges-assignment:getByEmail:reply", {
+      ok: false,
+      error: msg,
+    });
+  }
+});
 
 module.exports = {
   setupIPCMainHandlers,

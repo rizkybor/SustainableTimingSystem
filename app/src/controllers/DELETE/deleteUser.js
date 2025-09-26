@@ -12,7 +12,6 @@ async function deleteUser(email) {
   const db = await getDb();
   const col = db.collection("users");
 
-  // Hapus SEMUA user dengan email yang sama (jika ada duplikat)
   const result = await col.deleteMany({ email: norm });
   return { deletedCount: result.deletedCount || 0 };
 }

@@ -75,13 +75,14 @@ export default {
           : "DEMO_KEY",
     };
   },
+  mounted() {
+    sessionStorage.removeItem("sts_home_visited_session");
+  },
   methods: {
     submit() {
       this.error = "";
       if (this.key !== this.expectedKey) {
         this.error = "Key salah.";
-
-        // reset error otomatis setelah 3 detik
         setTimeout(() => {
           this.error = "";
         }, 3000);
@@ -98,7 +99,7 @@ export default {
           } catch (_) {
             this.error = "Terjadi masalah saat membuka akses.";
             this.loading = false;
-            setTimeout(() => (this.error = ""), 3000); 
+            setTimeout(() => (this.error = ""), 3000);
           }
         }, 200);
       } catch (_) {

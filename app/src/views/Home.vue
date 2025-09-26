@@ -1,5 +1,30 @@
 <template>
   <div class="sts-page">
+    <!-- INTRO OVERLAY: muncul hanya sekali per sesi -->
+    <div
+      v-if="showIntro"
+      class="intro-overlay"
+      :class="{ 'intro-hide': introHiding }"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Opening"
+      @animationend.self="onIntroAnimEnd"
+    >
+      <div class="intro-glow-bg"></div>
+
+      <div class="intro-box">
+        <img src="@/assets/icons/icon.png" alt="App Logo" class="intro-logo" />
+        <h2 class="intro-title">Sustainable Timing System</h2>
+        <p class="intro-sub">Preparing your workspace…</p>
+
+        <div class="intro-progress">
+          <div class="bar"></div>
+        </div>
+
+        <button class="intro-skip" @click="hideIntro()">Skip</button>
+      </div>
+    </div>
+
     <!-- 2) JUMBOTRON -->
     <section class="sts-jumbotron">
       <b-container>
@@ -98,13 +123,15 @@
               <div
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
-                 <img
+                <img
                   src="@/assets/images/ico-jury-accounts.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />
               </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">Jury's Account Management</h5>
+              <h5 class="mb-1 mt-3 font-weight-bold">
+                Jury's Account Management
+              </h5>
               <small class="text-muted d-block mb-3">
                 Management jury accounts and assign roles to manage evaluation
                 efficiently.
@@ -243,6 +270,8 @@ export default {
   components: { Icon },
   data() {
     return {
+      showIntro: false,
+      introHiding: false,
       events: [],
       loading: false,
       teams: [],
@@ -250,6 +279,14 @@ export default {
     };
   },
   mounted() {
+    const KEY = "sts_home_visited_session";
+    const firstVisitThisSession = !sessionStorage.getItem(KEY);
+
+    if (firstVisitThisSession) {
+      this.showIntro = true;
+      sessionStorage.setItem(KEY, "1");
+      setTimeout(() => this.hideIntro(), 5000);
+    }
     this.getEvents();
     this.loadTeamsRegistered();
   },
@@ -317,6 +354,21 @@ export default {
     },
   },
   methods: {
+    hideIntro() {
+      // mulai animasi keluar + nonaktifkan interaksi
+      this.introHiding = true;
+
+      // fallback: kalau animationend tidak datang, force remove
+      clearTimeout(this._introKillTimer);
+      this._introKillTimer = setTimeout(() => {
+        this.showIntro = false;
+      }, 600); // > durasi introFadeOut (400ms)
+    },
+    onIntroAnimEnd() {
+      if (this.introHiding) {
+        this.showIntro = false;
+      }
+    },
     formatDateShort(inputDate) {
       if (!inputDate) return "-";
 
@@ -751,5 +803,172 @@ export default {
 .event-separator {
   border-top: 1px solid #e0e6f0;
   margin: 6px 0;
+}
+
+/* ===== Intro fullscreen ===== */
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  animation: introFadeIn 300ms ease-out both;
+  pointer-events: auto; /* visible => tangkap klik */
+}
+
+.intro-overlay.intro-hide {
+  animation: introFadeOut 400ms ease-in forwards;
+  pointer-events: none; /* ⬅️ klik langsung tembus saat hide */
+}
+
+/* latar glowing lembut */
+.intro-glow-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      1200px 600px at 20% 30%,
+      rgba(66, 153, 225, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 80% 70%,
+      rgba(99, 102, 241, 0.2),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #0f172a, #0b1220 40%, #0b1220);
+  filter: blur(0.2px);
+}
+
+/* kartu intro */
+.intro-box {
+  position: relative;
+  width: min(680px, 92vw);
+  padding: 28px 28px 22px;
+  text-align: center;
+  border-radius: 22px;
+  background: rgba(16, 24, 40, 0.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 10px 40px rgba(2, 8, 23, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #e5e7eb;
+  animation: introLift 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.intro-logo {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 6px 18px rgba(59, 130, 246, 0.35));
+}
+
+.intro-title {
+  margin: 0 0 6px;
+  font-size: clamp(18px, 3.3vw, 26px);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.intro-sub {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #cbd5e1;
+  opacity: 0.9;
+}
+
+/* progress bar anim */
+.intro-progress {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+  margin: 0 auto 14px;
+  width: min(460px, 86%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.intro-progress .bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: linear-gradient(90deg, #60a5fa, #22d3ee, #a78bfa);
+  animation: introBar 5s ease-in-out forwards; /* sebelumnya 1.4s */
+  border-radius: 999px;
+  box-shadow: 0 0 14px rgba(96, 165, 250, 0.55),
+    0 0 22px rgba(34, 211, 238, 0.35);
+}
+
+/* tombol skip */
+.intro-skip {
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.18s ease;
+}
+.intro-skip:hover {
+  border-color: transparent;
+  color: #0b1220;
+  background: #e2e8f0;
+}
+
+/* ===== Keyframes ===== */
+@keyframes introFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes introFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes introLift {
+  from {
+    transform: translateY(10px) scale(0.985);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes introBar {
+  0% {
+    width: 0%;
+  }
+  60% {
+    width: 86%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+/* responsive kecil */
+@media (max-width: 480px) {
+  .intro-box {
+    padding: 22px 18px 18px;
+  }
+  .intro-logo {
+    width: 68px;
+    height: 68px;
+  }
 }
 </style>

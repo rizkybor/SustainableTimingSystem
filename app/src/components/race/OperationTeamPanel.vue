@@ -1,5 +1,5 @@
 <template>
-  <div class="px-5 mb-2">
+  <div class="px-5 py-2">
     <div class="card p-3 race-window">
       <div class="mb-3 text-center">
         <h5 class="section-title">STiming System 424 v2.0.0</h5>
@@ -202,8 +202,18 @@ export default {
 }
 
 .race-window {
-  background-color: #383838;
-  border-radius: 20px;
+  background: #2f2f2f; /* dark base biar glowing keliatan */
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  
+  transition: all 0.3s ease;
+}
+
+.race-window:hover {
+  box-shadow:
+    0 0 15px rgba(0, 180, 255, 0.6),
+    0 0 30px rgba(0, 180, 255, 0.5),
+    0 0 60px rgba(0, 180, 255, 0.4);
 }
 
 .section-title {

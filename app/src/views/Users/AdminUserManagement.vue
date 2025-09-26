@@ -29,7 +29,7 @@
             padding-top: 25px;
           "
         >
-        <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
+          <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
             <Icon icon="mdi:chevron-left" class="mr-1" />
             <span>Back</span>
           </div>
@@ -43,17 +43,21 @@
             </div>
             <div class="d-flex align-items-center">
               <b-button
+                style="border-radius: 12px"
                 variant="outline-secondary"
-                class="btn-outline-pill mr-2"
                 @click="fetchEvents"
               >
+                <Icon icon="mdi:refresh" width="18" height="18" />
                 Refresh Events
               </b-button>
+
               <b-button
-                variant="primary"
-                class="btn-primary-pill"
+                class="ml-2"
+                style="border-radius: 12px"
+                variant="outline-info"
                 @click="fetchUsers"
               >
+                <Icon icon="mdi:refresh" width="18" height="18" />
                 Refresh Users
               </b-button>
             </div>

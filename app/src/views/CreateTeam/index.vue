@@ -29,10 +29,7 @@
             padding-top: 25px;
           "
         >
-         <div
-            @click="goTo"
-            class="btn-custom d-flex align-items-center mb-3"
-          >
+          <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
             <Icon icon="mdi:chevron-left" class="mr-1" />
             <span>Back</span>
           </div>
@@ -51,6 +48,7 @@
                 text-field="name"
                 class="input-soft"
                 required
+                style="border-radius: 12px"
               >
                 <template #first>
                   <b-form-select-option :value="null" disabled
@@ -67,6 +65,7 @@
                 v-model="formTeam.teamName"
                 placeholder="Enter team name"
                 class="input-soft"
+                style="border-radius: 12px"
                 required
               />
             </b-form-group>
@@ -74,12 +73,12 @@
             <!-- Actions -->
             <div class="d-flex mt-4 justify-content-end">
               <b-button
-                variant="primary"
-                class="btn-primary-pill"
+                style="border-radius: 12px"
+                variant="outline-info"
                 @click="save()"
-                type="button"
               >
-                Submit
+                <Icon icon="mdi:plus" width="18" height="18" />
+                Save New Team
               </b-button>
             </div>
           </form>
@@ -99,6 +98,7 @@
           <div class="d-flex align-items-center mb-3">
             <label class="mb-0 mr-2 font-weight-bold">Filter:</label>
             <b-form-select
+              style="border-radius: 12px"
               v-model="filterType"
               :options="filterTypeOptions"
               class="input-soft w-auto"
@@ -109,6 +109,7 @@
               class="ml-2 btn-outline-pill"
               variant="outline-secondary"
               @click="filterType = 'ALL'"
+              style="border-radius: 12px"
             >
               Reset
             </b-button>
@@ -233,10 +234,10 @@
               <div class="d-flex align-items-center">
                 <span class="mr-2 text-muted">Rows per page</span>
                 <b-form-select
+                  style="width: 110px; border-radius: 12px"
                   v-model.number="perPage"
                   :options="[10, 20, 50]"
                   class="input-soft no-border-select"
-                  style="width: 110px"
                 />
               </div>
             </div>
@@ -371,7 +372,7 @@ export default {
         d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       );
     },
-    
+
     totalRows() {
       return (this.filteredTeams || []).length;
     },

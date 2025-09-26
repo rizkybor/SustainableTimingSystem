@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 70vh" class="mt-4">
+  <div class="mt-5">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
         <div class="card-wrapper p-3 mb-2">
@@ -46,8 +46,9 @@
             </div>
             <div class="d-flex align-items-center">
               <b-button
+                style="border-radius: 12px"
                 variant="outline-info"
-                class="btn-action w-100 rounded-pill"
+                class="w-100"
                 @click="goTo('create-new')"
               >
                 <Icon icon="mdi:plus" width="18" height="18" />
@@ -163,14 +164,6 @@
 
               <!-- Actions -->
               <template #cell(actions)="row">
-                <!-- <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  @click="$emit('edit', row.item)"
-                >
-                  <Icon icon="mdi:pencil" width="16" height="16" />
-                </b-button> -->
                 <b-button
                   size="sm"
                   variant="outline-danger"
@@ -207,7 +200,7 @@
                   v-model.number="perPage"
                   :options="[10, 20, 50]"
                   class="input-soft no-border-select"
-                  style="width: 110px"
+                  style="width: 110px; border-radius: 12px"
                 />
               </div>
             </div>

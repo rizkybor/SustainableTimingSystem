@@ -1,141 +1,173 @@
 <template>
-  <div style="height: 70vh" class="mt-5">
+  <div class="mt-5">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
-        <!-- HEADER -->
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <div>
-            <h2 class="page-title mb-1">User Management</h2>
-            <p class="page-subtitle mb-0">
-              Kelola akun, main events, dan role judges
-            </p>
-          </div>
-          <div class="d-flex align-items-center">
-            <b-button
-              variant="outline-secondary"
-              class="btn-outline-pill mr-2"
-              @click="fetchEvents"
-            >
-              Refresh Events
-            </b-button>
-            <b-button
-              variant="primary"
-              class="btn-primary-pill"
-              @click="fetchUsers"
-            >
-              Refresh Users
-            </b-button>
+        <div class="card-wrapper p-3 mb-2">
+          <!-- TOP BAR (breadcrumb + datetime) -->
+          <div
+            class="d-flex align-items-center justify-content-between text-muted small"
+          >
+            <b-breadcrumb class="mb-0">
+              <b-breadcrumb-item to="/">
+                <Icon icon="mdi:home-outline" class="mr-1" />
+                Dashboard
+              </b-breadcrumb-item>
+              <b-breadcrumb-item active>
+                {{ $route.params.pageTitle || "User Management" }}
+              </b-breadcrumb-item>
+            </b-breadcrumb>
+            <div>{{ currentDateTime }}</div>
           </div>
         </div>
-
-        <!-- LIST USERS -->
 
         <div
-          class="d-flex align-items-center justify-content-between px-3 pt-3"
+          class="card-wrapper mt-1"
+          style="
+            padding-left: 45px;
+            padding-right: 45px;
+            padding-bottom: 45px;
+            padding-top: 25px;
+          "
         >
-          <div class="d-flex align-items-center">
-            <span class="label-strong mr-2 mb-0">Total Users:</span>
-            <b-badge variant="primary" pill>{{ users.length }}</b-badge>
+          <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
+            <Icon icon="mdi:chevron-left" class="mr-1" />
+            <span>Back</span>
+          </div>
+          <!-- HEADER -->
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h2 class="page-title mb-1">User Management</h2>
+              <p class="page-subtitle mb-0">
+                Manage accounts, main events, and role judges
+              </p>
+            </div>
+            <div class="d-flex align-items-center">
+              <b-button
+                style="border-radius: 12px"
+                variant="outline-secondary"
+                @click="fetchEvents"
+              >
+                <Icon icon="mdi:refresh" width="18" height="18" />
+                Refresh Events
+              </b-button>
+
+              <b-button
+                class="ml-2"
+                style="border-radius: 12px"
+                variant="outline-info"
+                @click="fetchUsers"
+              >
+                <Icon icon="mdi:refresh" width="18" height="18" />
+                Refresh Users
+              </b-button>
+            </div>
+          </div>
+
+          <!-- LIST USERS -->
+
+          <div
+            class="d-flex align-items-center justify-content-between px-3 pt-3"
+          >
+            <div class="d-flex align-items-center">
+              <span class="label-strong mr-2 mb-0">Total Users:</span>
+              <b-badge variant="primary" pill>{{ users.length }}</b-badge>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
+            <b-table
+              striped
+              hover
+              small
+              head-variant="light"
+              :items="users"
+              :fields="fields"
+              responsive="md"
+              class="um-table mt-3"
+              :per-page="perPage"
+              :current-page="currentPage"
+            >
+              <template #cell(index)="row">
+                <span class="text-muted">
+                  {{ (currentPage - 1) * perPage + row.index + 1 }}
+                </span>
+              </template>
+
+              <!-- Username w/ avatar -->
+              <template #cell(username)="row">
+                <div class="d-flex align-items-center">
+                  <img
+                    :src="row.item.image || fallbackAvatar"
+                    alt="avatar"
+                    class="avatar mr-2"
+                  />
+                  <div class="text-left">
+                    <div class="font-weight-bold text-dark">
+                      {{ row.item.username || "-" }}
+                    </div>
+                    <small class="text-muted">{{ row.item.email }}</small>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Email column -->
+              <template #cell(email)="row">
+                <div class="text-dark font-weight-medium">
+                  {{ row.item.email || "-" }}
+                </div>
+              </template>
+
+              <!-- Main Events (chips) -->
+              <template #cell(mainEvents)="row">
+                <div class="event-list">
+                  <div
+                    v-for="eid in row.item.mainEvents || []"
+                    :key="eid"
+                    class="event-item"
+                    :title="eventName(eid)"
+                  >
+                    • {{ shortEventName(eid) }}
+                  </div>
+                  <div
+                    v-if="!row.item.mainEvents || !row.item.mainEvents.length"
+                    class="text-muted"
+                  >
+                    -
+                  </div>
+                </div>
+              </template>
+
+              <!-- Actions -->
+              <template #cell(actions)="row">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  class="btn-icon mr-2"
+                  @click="openEdit(row.item)"
+                >
+                  <Icon icon="mdi:pencil" width="16" height="16" />
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  class="btn-icon"
+                  @click="deleteUser(row.item.email)"
+                >
+                  <Icon icon="mdi:delete" width="16" height="16" />
+                </b-button>
+              </template>
+            </b-table>
+
+            <b-pagination
+              v-model="currentPage"
+              :total-rows="users.length"
+              :per-page="perPage"
+              align="center"
+              size="md"
+              class="mt-3 custom-pagination"
+            />
           </div>
         </div>
-
-        <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
-          <b-table
-            striped
-            hover
-            small
-            head-variant="light"
-            :items="users"
-            :fields="fields"
-            responsive="md"
-            class="um-table mt-3"
-            :per-page="perPage"
-            :current-page="currentPage"
-          >
-            <template #cell(index)="row">
-              <span class="text-muted">
-                {{ (currentPage - 1) * perPage + row.index + 1 }}
-              </span>
-            </template>
-
-            <!-- Username w/ avatar -->
-            <template #cell(username)="row">
-              <div class="d-flex align-items-center">
-                <img
-                  :src="row.item.image || fallbackAvatar"
-                  alt="avatar"
-                  class="avatar mr-2"
-                />
-                <div class="text-left">
-                  <div class="font-weight-bold text-dark">
-                    {{ row.item.username || "-" }}
-                  </div>
-                  <small class="text-muted">{{ row.item.email }}</small>
-                </div>
-              </div>
-            </template>
-
-            <!-- Email column -->
-            <template #cell(email)="row">
-              <div class="text-dark font-weight-medium">
-                {{ row.item.email || "-" }}
-              </div>
-            </template>
-
-            <!-- Main Events (chips) -->
-            <template #cell(mainEvents)="row">
-              <div class="event-list">
-                <div
-                  v-for="eid in row.item.mainEvents || []"
-                  :key="eid"
-                  class="event-item"
-                  :title="eventName(eid)"
-                >
-                  • {{ shortEventName(eid) }}
-                </div>
-                <div
-                  v-if="!row.item.mainEvents || !row.item.mainEvents.length"
-                  class="text-muted"
-                >
-                  -
-                </div>
-              </div>
-            </template>
-
-            <!-- Actions -->
-            <template #cell(actions)="row">
-              <b-button
-                size="sm"
-                variant="outline-secondary"
-                class="btn-icon mr-2"
-                @click="openEdit(row.item)"
-              >
-                <Icon icon="mdi:pencil" width="16" height="16" />
-              </b-button>
-              <b-button
-                size="sm"
-                variant="outline-danger"
-                class="btn-icon"
-                @click="deleteUser(row.item.email)"
-              >
-                <Icon icon="mdi:delete" width="16" height="16" />
-              </b-button>
-            </template>
-          </b-table>
-
-          <b-pagination
-            v-model="currentPage"
-            :total-rows="users.length"
-            :per-page="perPage"
-            align="center"
-            size="md"
-            class="mt-3 custom-pagination"
-          />
-        </div>
-
-        <b-button @click="goTo()" variant="outline-info" class="btn-action">
-          <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-        </b-button>
       </b-col>
     </b-row>
 
@@ -149,6 +181,7 @@
       :no-close-on-backdrop="true"
       body-class="p-0"
       content-class="custom-modal"
+      centered
     >
       <!-- Header -->
       <div class="modal-header-custom">
@@ -295,6 +328,19 @@ export default {
     };
   },
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
     // field untuk table main events di modal
     mainEventFields() {
       return [

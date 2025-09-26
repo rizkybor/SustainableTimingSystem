@@ -1,5 +1,28 @@
 <template>
   <div>
+    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
+      <!-- TOP BAR (breadcrumb + datetime) -->
+      <div
+        class="d-flex align-items-center justify-content-between text-muted small"
+      >
+        <b-breadcrumb class="mb-0">
+          <b-breadcrumb-item to="/">
+            <Icon icon="mdi:home-outline" class="mr-1" />
+            Dashboard
+          </b-breadcrumb-item>
+          <b-breadcrumb-item
+            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          >
+            {{ dataEventSafe.eventName }}
+          </b-breadcrumb-item>
+          <b-breadcrumb-item active>
+            {{ "Sprint Race" }}
+          </b-breadcrumb-item>
+        </b-breadcrumb>
+        <div>{{ currentDateTime }}</div>
+      </div>
+    </div>
+
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
@@ -43,55 +66,94 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : Sprint
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Categories : {{ titleCategories || "-" }}
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
-              {{ dataEventSafe.endDateEvent || "-" }}
-            </h6>
+            <div class="meta-panel">
+              <div class="meta-row">
+                <span class="meta-label">Nomor Lomba</span>
+                <span class="meta-value">
+                  <span class="badge-chip badge-chip--blue">Sprint</span>
+                </span>
+              </div>
+
+              <div class="meta-row">
+                <span class="meta-label">Categories</span>
+                <span
+                  class="meta-value badge-chip badge-chip--blue"
+                  :title="titleCategories || '-'"
+                >
+                  {{ titleCategories || "-" }}
+                </span>
+              </div>
+            </div>
           </b-col>
 
           <b-col>
-            <div style="display: flex; gap: 10px; justify-content: flex-end">
-              <button
-                type="button"
-                class="btn-action btn-secondary"
-                @click="saveResult"
-              >
-                <Icon icon="icon-park-outline:save" /> Save Result
-              </button>
+            <div
+              class="d-flex flex-wrap justify-content-end align-items-center controls-bar"
+            >
+              <!-- selector baud -->
+              <div class="btn-baud-group mr-2 mb-2">
+                <span class="mr-2 text-muted">Baud Rate :</span>
+                <div class="d-inline-flex">
+                  <button
+                    v-for="br in baudOptions"
+                    :key="'baud-' + br"
+                    type="button"
+                    class="btn-action"
+                    :class="
+                      baudRate === br ? 'btn-success' : 'btn-outline-secondary'
+                    "
+                    @click="setBaud(br)"
+                    :disabled="isPortConnected"
+                    style="margin-right: 6px"
+                  >
+                    {{ br }}
+                  </button>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                class="btn-action btn-info"
-                @click="toggleSortRanked"
-              >
-                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-              </button>
-
+              <!-- connect -->
               <button
                 type="button"
                 :class="{
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn-action"
+                class="btn-action mb-2"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
-                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
+                {{ isPortConnected ? "Disconnect" : "Connect Racetime" }}
               </button>
+
               <span
-                class="status-indicator"
+                class="status-indicator mb-2 ml-2"
                 :class="{
                   connected: isPortConnected,
                   disconnected: !isPortConnected,
                 }"
               ></span>
+
+              <!-- break line -->
+              <div class="w-100"></div>
+
+              <!-- path pill -->
+              <div class="mb-1">
+                <span
+                  class="path-pill"
+                  :class="{ 'path-pill--empty': !selectPath }"
+                  :title="selectPath || 'No device selected'"
+                >
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
+                  <span class="truncate">{{
+                    selectPath || "No device selected"
+                  }}</span>
+                </span>
+              </div>
             </div>
           </b-col>
         </b-row>
@@ -109,9 +171,30 @@
     />
 
     <!-- LIST RESULT -->
-    <div class="px-4 mt-4">
+    <div class="px-4 mt-2">
       <div class="card-body">
-        <h4>List Result</h4>
+        <div class="d-flex justify-content-between mb-2">
+          <!-- <div > -->
+            <h4>Output Racetime :</h4>
+          <!-- </div> -->
+          <div>
+            <button
+              type="button"
+              class="btn-action btn-secondary mr-2"
+              @click="saveResult"
+            >
+              <Icon icon="icon-park-outline:save" /> Save Result
+            </button>
+
+            <button
+              type="button"
+              class="btn-action btn-info"
+              @click="toggleSortRanked"
+            >
+              <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+            </button>
+          </div>
+        </div>
         <b-row>
           <b-col>
             <table class="table">
@@ -213,21 +296,19 @@
             <br />
           </b-col>
         </b-row>
+        <b-button @click="goTo()" variant="outline-secondary" class="btn-action">
+          <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
+        </b-button>
       </div>
 
-      <b-button @click="goTo()" variant="outline-info" class="btn-action">
-        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-      </b-button>
     </div>
-
-    <br /><br />
   </div>
 </template>
 
 <script>
 import { ipcRenderer } from "electron";
-import { SerialPort } from "serialport";
-import OperationTimePanel from "../components/OperationTeamPanel.vue";
+import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
+import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
@@ -418,6 +499,10 @@ export default {
 
   data() {
     return {
+      selectPath: "",
+      baudRate: 9600,
+      baudOptions: [1200, 2400, 9600],
+      serialCtrl: null,
       editForm: "",
       editResult: false,
       isScrolled: false,
@@ -478,6 +563,19 @@ export default {
   },
 
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
     participantArr() {
       return Array.isArray(this.participant)
         ? this.participant
@@ -510,6 +608,76 @@ export default {
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        console.log(this.serialCtrl, "<<<< cek");
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+    // === END CONNECTION ===
+
+    // === NOTIFY ===
     notify(type, detail, message = "Info") {
       if (this.$ipc || (window && window.ipcRenderer)) {
         const ir = this.$ipc || window.ipcRenderer;
@@ -518,12 +686,15 @@ export default {
       // bisa juga set state:
       this.lastErrorMessage = `${message}: ${detail}`;
     },
+
     notifyError(err, message = "Error") {
       const detail =
         (err && (err.message || err.toString())) || "Unknown error";
       this.notify("error", detail, message);
     },
-    /** load dari payload baru */
+    // ======
+
+    // === LOAD PAYLOAD ===
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForSprint();
       if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
@@ -542,7 +713,6 @@ export default {
       return true;
     },
 
-    /** fallback format lama */
     async checkValueStorage() {
       let dataStorage = null,
         events = null;
@@ -568,6 +738,11 @@ export default {
         localStorage.getItem("currentCategories") || ""
       ).trim();
     },
+    // ======
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
 
     openModal(datas) {
       this.editForm = datas;
@@ -576,16 +751,9 @@ export default {
         this.$bvModal.show("bv-modal-edit-team");
     },
 
-    async assignRanks(items) {
-      const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
-      itemsWithTimeResult.sort(
-        (a, b) =>
-          this.parsesTime(a.result.totalTime) -
-          this.parsesTime(b.result.totalTime)
-      );
-      itemsWithTimeResult.forEach((item, index) => {
-        item.result.ranked = index + 1;
-      });
+    async calculateScore(ranked) {
+      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
+      return scoreData ? scoreData.score : 0;
     },
 
     parsesTime(timeStr) {
@@ -593,11 +761,6 @@ export default {
         .split(":")
         .map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
-    },
-
-    async calculateScore(ranked) {
-      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
-      return scoreData ? scoreData.score : 0;
     },
 
     async parseTimeResult(timeResult) {
@@ -608,9 +771,6 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    /**
-     * Hitung total penalti dari dua sumber (start & finish) + update totalTime
-     */
     async recalcPenalties(item) {
       const sp = this.findPenalty(item.result.startPenalty);
       const fp = this.findPenalty(item.result.finishPenalty);
@@ -669,6 +829,18 @@ export default {
       await this.assignRanks(this.participant);
     },
 
+    async assignRanks(items) {
+      const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
+      itemsWithTimeResult.sort(
+        (a, b) =>
+          this.parsesTime(a.result.totalTime) -
+          this.parsesTime(b.result.totalTime)
+      );
+      itemsWithTimeResult.forEach((item, index) => {
+        item.result.ranked = index + 1;
+      });
+    },
+
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
@@ -683,91 +855,6 @@ export default {
           : a.result.ranked - b.result.ranked
       );
       this.participant = arr;
-    },
-
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ok = await this.setupSerialListener();
-        if (ok) {
-          this.isPortConnected = true;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      if (this.port && this.port.isOpen) this.port.close();
-      this.isPortConnected = false;
-    },
-
-    async setupSerialListener() {
-      let receivedData = "";
-      let a = "",
-        b = "";
-      try {
-        SerialPort.list()
-          .then((ports) => {
-            if (ports && ports.length > 0) {
-              this.currentPort = ports;
-              const selectedPort = ports[6];
-              if (selectedPort && selectedPort.path) {
-                this.port = new SerialPort({
-                  path: selectedPort.path,
-                  baudRate: 9600,
-                });
-                this.port.on("data", (data) => {
-                  const newData = data.toString();
-                  receivedData += newData;
-                  for (let i = 0; i < receivedData.length; i++) {
-                    const char = receivedData[i];
-                    if (char === "M" || char === "R") {
-                      a = receivedData.slice(0, i + 1);
-                      b = receivedData.slice(i + 1);
-                      receivedData = "";
-                      break;
-                    }
-                  }
-                  this.digitId.unshift(a);
-                  this.digitTime.unshift(b);
-                  if (a[11] == "0") {
-                    this.digitTimeStart = b.replace(
-                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
-                      "$1:$2:$3.$4"
-                    );
-                  } else if (a[11] == "2") {
-                    this.digitTimeFinish = b.replace(
-                      /(\d{2})(\d{2})(\d{2})(\d{3})/,
-                      "$1:$2:$3.$4"
-                    );
-                  }
-                  return true;
-                });
-              } else {
-                this.notify(
-                  "warning",
-                  "Selected serial port path is undefined.",
-                  "Device"
-                );
-                this.isPortConnected = false;
-              }
-            } else {
-              this.notify("warning", "No serial ports available.", "Device");
-              this.isPortConnected = false;
-            }
-          })
-          .catch((err) =>
-            this.notifyError(err, "Serial port enumeration failed")
-          );
-      } catch (err) {
-        this.notifyError(err, "Serial setup failed");
-      }
     },
 
     formatTime(inputTime) {
@@ -971,7 +1058,7 @@ table {
   overflow: hidden;
 }
 thead {
-  background: #4a4a4a;
+  background: #383838;
   color: #fff;
   font-weight: 600;
 }
@@ -1016,5 +1103,96 @@ td {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* PATH  */
+.controls-bar {
+  gap: 10px;
+}
+
+/* Pill path */
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 520px; /* sesuaikan */
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.path-pill--empty {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+.path-pill .truncate {
+  display: inline-block;
+  max-width: 460px; /* = max-width pill - padding + ikon */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Meta Panel  */
+.meta-panel {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eef2f7;
+}
+.meta-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.meta-label {
+  min-width: 120px; /* lebar label tetap */
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.meta-value {
+  font-weight: 600;
+  color: #0f172a; /* slate-900 */
+}
+.badge-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.badge-chip--blue {
+  background: #eef6ff;
+  color: #1d4ed8;
+  border-color: #dbeafe;
+}
+
+/* Responsif: di layar kecil, label di atas value */
+@media (max-width: 575.98px) {
+  .meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+  .meta-label {
+    min-width: auto;
+  }
+  .meta-panel {
+    padding: 12px;
+  }
 }
 </style>

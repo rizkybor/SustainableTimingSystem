@@ -12,6 +12,7 @@
               <Icon icon="mdi:shield-crown" width="56" height="56" />
             </div>
           </b-col>
+          
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{
@@ -343,7 +344,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import { SerialPort } from "serialport";
-import OperationTimePanel from "../components/OperationTeamPanel.vue";
+import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */

@@ -2,22 +2,38 @@
   <div>
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
-        <div>
-          <div class="mx-5 mt-5">
-            <p class="h6 text-muted">Home / Create New Event</p>
+        <div style="margin-top: 48px">
+          <div class="card-wrapper p-3 mb-2">
+            <!-- TOP BAR (breadcrumb + datetime) -->
+            <div
+              class="d-flex align-items-center justify-content-between text-muted small"
+            >
+              <b-breadcrumb class="mb-0">
+                <b-breadcrumb-item to="/">
+                  <Icon icon="mdi:home-outline" class="mr-1" />
+                  Dashboard
+                </b-breadcrumb-item>
+                <b-breadcrumb-item active>
+                  {{ $route.params.pageTitle || "Create New Event" }}
+                </b-breadcrumb-item>
+              </b-breadcrumb>
+              <div>{{ currentDateTime }}</div>
+            </div>
           </div>
 
           <b-card
             title="Create New Event"
             sub-title="Added Information Event Information, Schedule & Race Details"
-            class="m-3 shadow px-3 py-4"
-            style="border-radius: 25px;"
+            class="m-3 shadow px-3 py-2"
+            style="border-radius: 25px"
           >
             <form ref="form-newEvent">
               <br />
               <div>
                 <!-- ===== Event Information ===== -->
-                <p style="font-weight: 700;" class="h4 my-2 mb-3">Event Information</p>
+                <p style="font-weight: 700" class="h4 my-2 mb-3">
+                  Event Information
+                </p>
 
                 <b-row>
                   <!-- KIRI: field level, event name, river name -->
@@ -119,7 +135,9 @@
                 </b-row>
 
                 <hr />
-                <p style="font-weight: 700;" class="h4 my-2 mb-3">Schedule & Venue Details</p>
+                <p style="font-weight: 700" class="h4 my-2 mb-3">
+                  Schedule & Venue Details
+                </p>
 
                 <!-- DISTRICT  -->
                 <b-form-group label="District">
@@ -238,7 +256,9 @@
                 </b-row>
 
                 <hr />
-                <p style="font-weight: 700;" class="h4 my-2 mb-3">Race Details</p>
+                <p style="font-weight: 700" class="h4 my-2 mb-3">
+                  Race Details
+                </p>
 
                 <!-- EVENT CATEGORIES -->
                 <b-form-group label="Event Categories" label-cols="3">
@@ -288,9 +308,9 @@
                   />
                 </b-form-group>
 
-                <br/>
+                <br />
                 <hr />
-                <p style="font-weight: 700;" class="h4 my-2 mb-3">Comitte</p>
+                <p style="font-weight: 700" class="h4 my-2 mb-3">Comitte</p>
 
                 <b-row>
                   <b-col cols="6">
@@ -342,37 +362,22 @@
 
             <br />
 
-            <div class="d-flex mt-5" style="justify-content: space-between">
-              <div>
-                <b-button
-                  class="btn-md"
-                  style="border-radius: 10px"
-                  @click="goTo()"
-                  variant="secondary"
-                >
-                  <Icon icon="ic:baseline-keyboard-double-arrow-left" />
-                  Back
-                </b-button>
-              </div>
-              <div>
-                <b-button
-                  class="btn-action"
-                  style="border-radius: 10px"
-                  @click="save()"
-                  type="input"
-                  variant="primary"
-                >
-                  Submit
-                  <Icon icon="ic:baseline-check-circle" />
-                </b-button>
-              </div>
+            <div class="d-flex justify-content-end mt-5">
+              <b-button
+                class="btn-action"
+                style="border-radius: 10px"
+                @click="save()"
+                type="input"
+                variant="primary"
+              >
+                Submit
+                <Icon icon="ic:baseline-check-circle" />
+              </b-button>
             </div>
           </b-card>
         </div>
       </b-col>
     </b-row>
-
-    <br /><br /><br />
   </div>
 </template>
 
@@ -434,6 +439,19 @@ export default {
   },
 
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
     state() {
       return this.name.length >= 4;
     },

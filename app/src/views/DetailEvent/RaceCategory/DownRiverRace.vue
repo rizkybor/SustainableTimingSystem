@@ -266,7 +266,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import { SerialPort } from "serialport";
-import OperationTimePanel from "../components/OperationTeamPanel.vue";
+import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";

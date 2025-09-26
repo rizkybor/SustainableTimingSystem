@@ -1,7 +1,7 @@
 <template>
   <div class="sts-page">
     <!-- 2) JUMBOTRON -->
-    <section class="sts-jumbotron p-5">
+    <section class="sts-jumbotron">
       <b-container>
         <b-row>
           <b-col cols="12" md="7" class="py-4">
@@ -14,7 +14,7 @@
             <b-button
               size="md"
               variant="warning"
-              class="btn-action rounded-pill px-4"
+              class="btn-action px-4"
               @click="goTo('events')"
             >
               Explore Event
@@ -56,7 +56,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action w-100 rounded-pill"
+                class="btn-action w-100"
                 @click="goTo('create-new')"
               >
                 Create Event
@@ -83,7 +83,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action btn-outline-info w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100"
                 @click="goTo('team-create')"
               >
                 Manage All Teams
@@ -111,7 +111,7 @@
               </small>
               <b-button
                 variant="secondary"
-                class="btn-action btn-outline-info w-100 rounded-pill"
+                class="btn-action btn-outline-info w-100"
                 @click="goTo('admin/users')"
               >
                 Manage Accounts
@@ -218,7 +218,7 @@
             <b-button
               size="sm"
               variant="secondary"
-              class="btn-action rounded-pill w-100"
+              class="btn-action w-100"
               @click.stop="viewTeam(t)"
             >
               View Details
@@ -230,11 +230,6 @@
         </div>
       </div>
     </b-container>
-
-    <!-- 6) FOOTER -->
-    <!-- <footer class="sts-footer text-center text-muted py-4">
-      © {{ new Date().getFullYear() }} Sustainable Timing System. All rights reserved.
-    </footer> -->
   </div>
 </template>
 
@@ -490,8 +485,8 @@ export default {
   border: 1px solid #cfd8e6;
   color: #1c4c7a;
   font-weight: 700;
-  border-radius: 10px;
   padding: 8px 14px;
+  border-radius: 12px;
 }
 
 .btn-action:hover {
@@ -517,6 +512,7 @@ export default {
 
 /* JUMBOTRON */
 .sts-jumbotron {
+  padding: 120px;
   position: relative;
   background-image: url("https://images.unsplash.com/uploads/141327328038701afeede/eda0fb7c?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   background-size: cover;
@@ -542,9 +538,7 @@ export default {
 }
 
 .sts-jumbotron .hero-image {
-  width: 320px;
   max-width: 100%;
-  height: 220px;
   border-radius: 20px;
   /* background: #dfe7f7; */
   background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=40&w=400&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
@@ -563,10 +557,6 @@ export default {
   border-radius: 12px;
   width: 56px;
   height: 56px;
-}
-
-.btn.rounded-pill {
-  border-radius: 999px;
 }
 
 .btn-secondary {
@@ -724,7 +714,7 @@ export default {
   width: 40px;
   border-radius: 999px;
   background: #eff3ff;
-  color: #2c5cff;
+  color: #5da0da;
 }
 
 /* FOOTER */

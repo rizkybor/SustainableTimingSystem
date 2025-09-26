@@ -349,6 +349,8 @@ export default {
         },
       },
       usersRaw: [],
+      previousAssignedEmails: [],
+      assignedInfoMap: {},
     };
   },
 
@@ -356,19 +358,15 @@ export default {
     // opsi untuk semua dropdown juri
     selectOptions: function () {
       var arr = Array.isArray(this.usersRaw) ? this.usersRaw : [];
-      var out = [];
+      var out = [{ value: "", text: "— Kosong —" }]; // opsi kosong
       for (var i = 0; i < arr.length; i++) {
         var u = arr[i];
-        var id = pickId(u); // value = email (atau fallback dari pickId)
+        var id = pickId(u);
         var text = "Unknown";
         if (u && u.username) text = u.username;
         else if (u && u.email) text = u.email;
 
-        out.push({
-          value: id,
-          text: text,
-          disabled: false,
-        });
+        out.push({ value: id, text: text, disabled: false });
       }
       return out;
     },
@@ -445,6 +443,30 @@ export default {
 
   methods: {
     /* ===== utils dasar ===== */
+    getAllEmailsForUpsert: function () {
+      var curr = this.collectAllEmailsForUpdate(); // dari draft saat ini
+      var prev = Array.isArray(this.previousAssignedEmails)
+        ? this.previousAssignedEmails
+        : [];
+      var set = {};
+      var out = [];
+      for (var i = 0; i < curr.length; i++) {
+        var e1 = String(curr[i]).toLowerCase();
+        if (!set[e1]) {
+          set[e1] = true;
+          out.push(curr[i]);
+        }
+      }
+      for (var j = 0; j < prev.length; j++) {
+        var e2 = String(prev[j]).toLowerCase();
+        if (!set[e2]) {
+          set[e2] = true;
+          out.push(prev[j]);
+        }
+      }
+      return out;
+    },
+
     getUserInfoByEmail: function (email) {
       var out = { username: "", email: "" };
       if (!email) return out;
@@ -452,6 +474,7 @@ export default {
       var target = String(email);
       var targetLower = target.toLowerCase();
 
+      // cari di usersRaw dulu
       var arr = Array.isArray(this.usersRaw) ? this.usersRaw : [];
       for (var i = 0; i < arr.length; i++) {
         var u = arr[i] || {};
@@ -462,6 +485,15 @@ export default {
           return out;
         }
       }
+
+      // fallback: pakai nama yang tersimpan sebelumnya (kalau ada)
+      if (this.assignedInfoMap && this.assignedInfoMap[targetLower]) {
+        out.email = target;
+        out.username = this.assignedInfoMap[targetLower].username || target;
+        return out;
+      }
+
+      // terakhir: pakai email sebagai nama
       out.email = target;
       out.username = target;
       return out;
@@ -475,6 +507,69 @@ export default {
       if (a === null || a === undefined || b === null || b === undefined)
         return false;
       return String(a).toLowerCase() === String(b).toLowerCase();
+    },
+
+    collectAllEmailsForUpdate: function () {
+      var emails = [];
+
+      function pushValue(v) {
+        if (v && String(v).trim() !== "") {
+          emails.push(String(v).trim());
+        }
+      }
+
+      // Sprint
+      if (this.draft && this.draft.sprint) {
+        pushValue(this.draft.sprint.juryStart);
+        pushValue(this.draft.sprint.juryFinish);
+      }
+
+      // H2H
+      if (this.draft && this.draft.h2h) {
+        pushValue(this.draft.h2h.juryStart);
+        pushValue(this.draft.h2h.juryFinish);
+      }
+      if (this.draft && this.draft.h2hValues) {
+        var keys = ["R1", "R2", "L1", "L2"];
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          pushValue(this.draft.h2hValues[k]);
+        }
+      }
+
+      // Slalom
+      if (this.draft && this.draft.slalom) {
+        pushValue(this.draft.slalom.juryStart);
+        pushValue(this.draft.slalom.juryFinish);
+        if (this.draft.slalom.gates) {
+          for (var g = 1; g <= this.gatesCount; g++) {
+            pushValue(this.draft.slalom.gates[g]);
+          }
+        }
+      }
+
+      // DRR
+      if (this.draft && this.draft.drr) {
+        pushValue(this.draft.drr.juryStart);
+        pushValue(this.draft.drr.juryFinish);
+        if (this.draft.drr.sections) {
+          for (var s = 1; s <= this.sectionsCount; s++) {
+            pushValue(this.draft.drr.sections[s]);
+          }
+        }
+      }
+
+      // Unik
+      var uniq = [];
+      var seen = {};
+      for (var j = 0; j < emails.length; j++) {
+        var e = emails[j].toLowerCase();
+        if (!seen[e]) {
+          seen[e] = true;
+          uniq.push(emails[j]);
+        }
+      }
+      return uniq;
     },
 
     collectAllSelectedEmails: function () {
@@ -760,111 +855,114 @@ export default {
         ipcRenderer.once(
           "users-judges-assignment:listByEvent:reply",
           (_e, res) => {
-            // ekspektasi res: { ok: true, items: [ { email, username, judges: [ {eventId, sprint, h2h, slalom, drr} ] } ] }
             if (!(res && res.ok && Array.isArray(res.items))) return;
 
-            var list = []; // assignments flat
-            var evId = String(this.eventId);
-
+            // simpan daftar email yg sudah pernah tersimpan untuk event ini
+            var prev = [];
+            var infoMap = {};
             for (var i = 0; i < res.items.length; i++) {
               var doc = res.items[i] || {};
               var email = doc && doc.email ? String(doc.email) : "";
-              if (email === "") continue;
+              if (!email) continue;
+              prev.push(email);
+              infoMap[email.toLowerCase()] = {
+                username: doc && doc.username ? String(doc.username) : email,
+              };
+            }
+            this.previousAssignedEmails = Array.from(new Set(prev));
+            this.assignedInfoMap = infoMap;
 
-              var judgesArr = [];
-              if (doc && doc.judges && Array.isArray(doc.judges))
-                judgesArr = doc.judges;
-
+            // bangun list flat -> isi draft (spt semula)
+            var list = [];
+            var evId = String(this.eventId);
+            for (var i2 = 0; i2 < res.items.length; i2++) {
+              var d = res.items[i2] || {};
+              var email2 = d.email ? String(d.email) : "";
+              if (!email2) continue;
+              var judgesArr = Array.isArray(d.judges) ? d.judges : [];
               for (var j = 0; j < judgesArr.length; j++) {
                 var jg = judgesArr[j] || {};
-                var jEvId = jg && jg.eventId ? String(jg.eventId) : "";
-                if (jEvId !== evId) continue;
+                if ((jg.eventId ? String(jg.eventId) : "") !== evId) continue;
 
-                // === Sprint ===
-                var sp = jg && jg.sprint ? jg.sprint : null;
-                if (sp && sp.start === true) {
+                var sp = jg.sprint || null;
+                if (sp && sp.start === true)
                   list.push({
                     discipline: "sprint",
                     position: "start",
-                    userId: email,
+                    userId: email2,
                     name: "",
                   });
-                }
-                if (sp && sp.finish === true) {
+                if (sp && sp.finish === true)
                   list.push({
                     discipline: "sprint",
                     position: "finish",
-                    userId: email,
+                    userId: email2,
                     name: "",
                   });
-                }
 
-                // === H2H ===
-                var h = jg && jg.h2h ? jg.h2h : null;
+                var h = jg.h2h || null;
                 if (h) {
                   if (h.start === true)
                     list.push({
                       discipline: "h2h",
                       position: "start",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (h.finish === true)
                     list.push({
                       discipline: "h2h",
                       position: "finish",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (h.R1 === true)
                     list.push({
                       discipline: "h2h",
                       position: "R1",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (h.R2 === true)
                     list.push({
                       discipline: "h2h",
                       position: "R2",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (h.L1 === true)
                     list.push({
                       discipline: "h2h",
                       position: "L1",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (h.L2 === true)
                     list.push({
                       discipline: "h2h",
                       position: "L2",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                 }
 
-                // === Slalom ===
-                var sl = jg && jg.slalom ? jg.slalom : null;
+                var sl = jg.slalom || null;
                 if (sl) {
                   if (sl.start === true)
                     list.push({
                       discipline: "slalom",
                       position: "start",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (sl.finish === true)
                     list.push({
                       discipline: "slalom",
                       position: "finish",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
-                  var gates =
-                    sl.gates && Array.isArray(sl.gates) ? sl.gates : [];
+                  var gates = Array.isArray(sl.gates) ? sl.gates : [];
                   for (var g = 0; g < gates.length; g++) {
                     var gateIndex = gates[g];
                     if (typeof gateIndex === "number") {
@@ -872,34 +970,30 @@ export default {
                         discipline: "slalom",
                         position: "gate",
                         index: gateIndex,
-                        userId: email,
+                        userId: email2,
                         name: "",
                       });
                     }
                   }
                 }
 
-                // === DRR ===
-                var dr = jg && jg.drr ? jg.drr : null;
+                var dr = jg.drr || null;
                 if (dr) {
                   if (dr.start === true)
                     list.push({
                       discipline: "drr",
                       position: "start",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
                   if (dr.finish === true)
                     list.push({
                       discipline: "drr",
                       position: "finish",
-                      userId: email,
+                      userId: email2,
                       name: "",
                     });
-                  var secs =
-                    dr.sections && Array.isArray(dr.sections)
-                      ? dr.sections
-                      : [];
+                  var secs = Array.isArray(dr.sections) ? dr.sections : [];
                   for (var s = 0; s < secs.length; s++) {
                     var secIndex = secs[s];
                     if (typeof secIndex === "number") {
@@ -907,7 +1001,7 @@ export default {
                         discipline: "drr",
                         position: "section",
                         index: secIndex,
-                        userId: email,
+                        userId: email2,
                         name: "",
                       });
                     }
@@ -915,8 +1009,6 @@ export default {
                 }
               }
             }
-
-            // gunakan pipeline prefill yang sudah ada
             this.applyAssignmentsToDraft({ eventId: evId, assignments: list });
           }
         );
@@ -946,7 +1038,7 @@ export default {
             : list;
 
           this.usersRaw = filtered;
-          this.internalJuryOptions = normalizeUsersToOptions(filtered)
+          this.internalJuryOptions = normalizeUsersToOptions(filtered);
         });
       } catch (err) {
         console.warn("removeListener gagal:", err);
@@ -987,8 +1079,7 @@ export default {
     confirm: function () {
       if (!this.eventId || this.saving) return;
 
-      // susun payload "docs" seperti sebelumnya
-      var emails = this.collectAllSelectedEmails();
+      var emails = this.getAllEmailsForUpsert(); // ⬅️ PENTING
       var nowIso = new Date().toISOString();
       var docs = [];
 
@@ -997,7 +1088,7 @@ export default {
         var info = this.getUserInfoByEmail(em);
         var positionsForThisUser = this.buildEventPositionsPayloadForEmail(em);
 
-        var doc = {
+        docs.push({
           id: String(this.eventId),
           username: info.username || em,
           email: info.email || em,
@@ -1005,100 +1096,57 @@ export default {
           createdAt: { $date: nowIso },
           updatedAt: { $date: nowIso },
           __v: 0,
-        };
-
-        docs.push(doc);
+        });
       }
 
-      // kalau tidak ada assignment terpilih
-      if (!Array.isArray(docs) || docs.length === 0) {
-        if (this.$bvToast) {
-          this.$bvToast.toast("Tidak ada assignment yang dipilih.", {
-            title: "Info",
-            variant: "warning",
-            solid: true,
-          });
-        }
+      console.log("=== USERS JUDGES ASSIGNMENT (FINAL) ===");
+      console.log(JSON.stringify(docs, null, 2));
+
+      if (typeof ipcRenderer === "undefined") {
+        console.warn("ipcRenderer tidak tersedia");
         return;
       }
 
-      // log untuk debug
-      console.log(
-        "=== USERS JUDGES ASSIGNMENT (BY USER, PER-EMAIL POSITIONS) ==="
+      this.saving = true;
+      ipcRenderer.removeAllListeners(
+        "users-judges-assignment:upsertMany:reply"
       );
-      console.log(JSON.stringify(docs, null, 2));
+      ipcRenderer.send("users-judges-assignment:upsertMany", { docs: docs });
 
-      // kirim ke IPC main
-      try {
-        if (typeof ipcRenderer === "undefined") {
-          console.warn("ipcRenderer tidak tersedia");
-          return;
-        }
-
-        this.saving = true;
-
-        // amankan listener reply
-        ipcRenderer.removeAllListeners(
-          "users-judges-assignment:upsertMany:reply"
-        );
-
-        ipcRenderer.send("users-judges-assignment:upsertMany", { docs: docs });
-
-        ipcRenderer.once(
-          "users-judges-assignment:upsertMany:reply",
-          (/* _e */ _e, res) => {
-            this.saving = false;
-
-            var ok = res && res.ok === true;
-            var errMsg =
+      ipcRenderer.once(
+        "users-judges-assignment:upsertMany:reply",
+        (_e, res) => {
+          this.saving = false;
+          var ok = res && res.ok === true;
+          if (ok) {
+            if (this.$bvToast) {
+              this.$bvToast.toast("Assignments berhasil disimpan.", {
+                title: "Success",
+                variant: "success",
+                solid: true,
+              });
+            }
+            this.fetchAssignmentsByUserIPC();
+            this.localShow = false;
+            this.$emit("assignments-updated", {
+              eventId: String(this.eventId),
+              count: docs.length,
+            });
+          } else {
+            var msg =
               res && res.error
                 ? String(res.error)
                 : "Gagal menyimpan assignment";
-
-            if (ok) {
-              if (this.$bvToast) {
-                this.$bvToast.toast("Assignments berhasil disimpan.", {
-                  title: "Success",
-                  variant: "success",
-                  solid: true,
-                });
-              }
-
-              // refresh data yang tersimpan agar form ter-prefill akurat
-              // (baca kembali dari koleksi by-event)
-              this.fetchAssignmentsByUserIPC();
-
-              // opsional: tutup modal
-              this.localShow = false;
-
-              // beri tahu parent kalau perlu
-              this.$emit("assignments-updated", {
-                eventId: String(this.eventId),
-                count: docs.length,
+            if (this.$bvToast) {
+              this.$bvToast.toast(msg, {
+                title: "Error",
+                variant: "danger",
+                solid: true,
               });
-            } else {
-              if (this.$bvToast) {
-                this.$bvToast.toast(errMsg, {
-                  title: "Error",
-                  variant: "danger",
-                  solid: true,
-                });
-              }
             }
           }
-        );
-      } catch (err) {
-        this.saving = false;
-        var msg = err && err.message ? String(err.message) : String(err);
-        console.error("IPC upsertMany error:", msg);
-        if (this.$bvToast) {
-          this.$bvToast.toast(msg, {
-            title: "Error",
-            variant: "danger",
-            solid: true,
-          });
         }
-      }
+      );
     },
   },
 };

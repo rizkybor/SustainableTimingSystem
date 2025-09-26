@@ -230,11 +230,6 @@
         </div>
       </div>
     </b-container>
-
-    <!-- 6) FOOTER -->
-    <!-- <footer class="sts-footer text-center text-muted py-4">
-      © {{ new Date().getFullYear() }} Sustainable Timing System. All rights reserved.
-    </footer> -->
   </div>
 </template>
 

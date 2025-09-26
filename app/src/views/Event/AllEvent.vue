@@ -4,9 +4,7 @@
       <b-col cols="10" offset="1" class="mb-4">
         <div class="card-wrapper p-3 mb-2">
           <!-- TOP BAR (breadcrumb + datetime) -->
-          <div
-            class="d-flex align-items-center justify-content-between text-muted small"
-          >
+          <div class="d-flex align-items-center justify-content-between text-muted small">
             <b-breadcrumb class="mb-0">
               <b-breadcrumb-item to="/">
                 <Icon icon="mdi:home-outline" class="mr-1" />
@@ -21,19 +19,13 @@
         </div>
 
         <!-- HEADER -->
-        <div
-          class="card-wrapper mt-1"
-          style="
+        <div class="card-wrapper mt-1" style="
             padding-left: 45px;
             padding-right: 45px;
             padding-bottom: 45px;
             padding-top: 25px;
-          "
-        >
-          <div
-            @click="goBack"
-            class="btn-custom d-flex align-items-center mb-3"
-          >
+          ">
+          <div @click="goBack" class="btn-custom d-flex align-items-center mb-3">
             <Icon icon="mdi:chevron-left" class="mr-1" />
             <span>Back</span>
           </div>
@@ -45,11 +37,7 @@
               </p>
             </div>
             <div class="d-flex align-items-center">
-              <b-button
-                variant="outline-info"
-                class="btn-action w-100 rounded-pill"
-                @click="goTo('create-new')"
-              >
+              <b-button variant="outline-info" class="btn-action w-100 rounded-pill" @click="goTo('create-new')">
                 <Icon icon="mdi:plus" width="18" height="18" />
                 Create New Event
               </b-button>
@@ -57,10 +45,7 @@
           </div>
 
           <!-- TOOLBAR (Search + Filters) -->
-          <div
-            class="d-flex justify-content-between align-items-center pt-3 flex-wrap"
-            style="gap: 12px"
-          >
+          <div class="d-flex justify-content-between align-items-center pt-3 flex-wrap" style="gap: 12px">
             <div>
               <!-- Search -->
               <b-input-group class="input-soft" style="max-width: 320px">
@@ -69,11 +54,7 @@
                     <Icon icon="mdi:magnify" />
                   </span>
                 </template>
-                <b-form-input
-                  v-model="query"
-                  placeholder="Input some text..."
-                  class="no-border-input"
-                />
+                <b-form-input v-model="query" placeholder="Input some text..." class="no-border-input" />
               </b-input-group>
             </div>
 
@@ -85,11 +66,7 @@
                     <Icon icon="mdi:filter-variant" />
                   </span>
                 </template>
-                <b-form-select
-                  v-model="levelFilter"
-                  :options="levelOptionsUI"
-                  class="no-border-select"
-                />
+                <b-form-select v-model="levelFilter" :options="levelOptionsUI" class="no-border-select" />
                 <template #append>
                   <span class="input-icon-right">
                     <Icon icon="mdi:chevron-down" />
@@ -104,11 +81,7 @@
                     <Icon icon="mdi:filter-variant" />
                   </span>
                 </template>
-                <b-form-select
-                  v-model="statusFilter"
-                  :options="statusOptionsUI"
-                  class="no-border-select"
-                />
+                <b-form-select v-model="statusFilter" :options="statusOptionsUI" class="no-border-select" />
                 <template #append>
                   <span class="input-icon-right">
                     <Icon icon="mdi:chevron-down" />
@@ -120,21 +93,9 @@
 
           <!-- TABLE WRAPPER -->
           <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
-            <b-table
-              striped
-              hover
-              small
-              head-variant="light"
-              :items="filteredEvents"
-              :fields="fields"
-              :per-page="perPage"
-              :current-page="currentPage"
-              class="um-table mt-3"
-              show-empty
-              empty-text=""
-              responsive="md"
-              :busy="loading"
-            >
+            <b-table striped hover small head-variant="light" :items="filteredEvents" :fields="fields"
+              :per-page="perPage" :current-page="currentPage" class="um-table mt-3" show-empty empty-text=""
+              responsive="md" :busy="loading">
               <template #table-busy>
                 <div class="text-center my-3">
                   <b-spinner small class="mr-2" /> Loading events…
@@ -150,10 +111,7 @@
 
               <!-- Status Pill -->
               <template #cell(status)="row">
-                <span
-                  v-if="row.item && row.item.status === 'inactive'"
-                  class="status-pill status-upcoming"
-                >
+                <span v-if="row.item && row.item.status === 'inactive'" class="status-pill status-upcoming">
                   <span class="dot"></span> Inactive
                 </span>
                 <span v-else class="status-pill status-success">
@@ -163,49 +121,31 @@
 
               <!-- Actions -->
               <template #cell(actions)="row">
-                <b-button
-                  size="sm"
-                  variant="outline-danger"
-                  class="btn-icon"
-                  @click="$emit('delete', row.item)"
-                >
+                <b-button size="sm" variant="outline-danger" class="btn-icon" @click="$emit('delete', row.item)">
                   <Icon icon="mdi:delete" width="16" height="16" />
                 </b-button>
               </template>
             </b-table>
 
             <!-- PAGINATION (real, sejajar) -->
-            <div
-              class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap"
-              style="gap: 12px"
-            >
+            <div class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap" style="gap: 12px">
               <!-- kiri: jumlah row -->
               <small class="text-muted">{{ perPage }} Row</small>
 
               <!-- tengah: pagination -->
-              <b-pagination
-                v-model="currentPage"
-                :total-rows="filteredEvents.length"
-                :per-page="perPage"
-                align="center"
-                size="md"
-                class="custom-pagination mb-0"
-              />
+              <b-pagination v-model="currentPage" :total-rows="filteredEvents.length" :per-page="perPage" align="center"
+                size="md" class="custom-pagination mb-0" />
 
               <!-- kanan: select rows per page -->
               <div class="d-flex align-items-center">
                 <span class="mr-2 text-muted">Rows per page</span>
-                <b-form-select
-                  v-model.number="perPage"
-                  :options="[10, 20, 50]"
-                  class="input-soft no-border-select"
-                  style="width: 110px"
-                />
+                <b-form-select v-model.number="perPage" :options="[10, 20, 50]" class="input-soft no-border-select"
+                  style="width: 110px" />
               </div>
             </div>
           </div>
 
-          
+
         </div>
       </b-col>
     </b-row>

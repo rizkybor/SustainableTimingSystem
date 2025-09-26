@@ -1041,7 +1041,6 @@ export default {
           this.internalJuryOptions = normalizeUsersToOptions(filtered);
         });
       } catch (err) {
-        console.warn("removeListener gagal:", err);
         this.usersRaw = [];
         this.internalJuryOptions = [];
       }
@@ -1099,11 +1098,7 @@ export default {
         });
       }
 
-      console.log("=== USERS JUDGES ASSIGNMENT (FINAL) ===");
-      console.log(JSON.stringify(docs, null, 2));
-
       if (typeof ipcRenderer === "undefined") {
-        console.warn("ipcRenderer tidak tersedia");
         return;
       }
 

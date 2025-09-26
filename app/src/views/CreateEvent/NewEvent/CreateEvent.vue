@@ -2,7 +2,7 @@
   <div>
     <b-row>
       <b-col cols="10" offset="1" class="mb-5">
-        <div>
+        <div style="margin-top: 60px;">
           <div class="mx-5 mt-5">
             <p class="h6 text-muted">Home / Create New Event</p>
           </div>
@@ -371,8 +371,6 @@
         </div>
       </b-col>
     </b-row>
-
-    <br /><br /><br />
   </div>
 </template>
 

@@ -1,7 +1,25 @@
 <template>
-  <div style="height: 117vh" class="mt-4">
+  <div class="mt-5">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
+        <div class="card-wrapper p-3 mb-2">
+          <!-- TOP BAR (breadcrumb + datetime) -->
+          <div
+            class="d-flex align-items-center justify-content-between text-muted small"
+          >
+            <b-breadcrumb class="mb-0">
+              <b-breadcrumb-item to="/">
+                <Icon icon="mdi:home-outline" class="mr-1" />
+                Dashboard
+              </b-breadcrumb-item>
+              <b-breadcrumb-item active>
+                {{ $route.params.pageTitle || "All Teams" }}
+              </b-breadcrumb-item>
+            </b-breadcrumb>
+            <div>{{ currentDateTime }}</div>
+          </div>
+        </div>
+
         <b-card
           title="Create New Team"
           sub-title="Create your main team and add sub-teams to represent different categories"
@@ -76,81 +94,133 @@
               Reset
             </b-button>
           </div>
-          <b-table
-            striped
-            hover
-            small
-            bordered
-            head-variant="light"
-            :items="filteredTeams"
-            :fields="fields"
-            responsive="md"
-            class="teams-table"
-            :per-page="perPage"
-            :current-page="currentPage"
-          >
-            <!-- Index Number -->
-            <template #cell(index)="row">
-              {{ (currentPage - 1) * perPage + row.index + 1 }}
-            </template>
-
-            <!-- Type -->
-            <template #cell(typeTeam)="row">
-              <span class="font-weight-bold text-dark">{{
-                row.item.typeTeam
-              }}</span>
-            </template>
-
-            <!-- Status -->
-            <template #cell(statusId)="row">
-              <b-badge
-                :variant="row.item.statusId === 0 ? 'success' : 'secondary'"
-              >
-                {{ row.item.statusId === 0 ? "Active" : "Inactive" }}
-              </b-badge>
-            </template>
-
-            <!-- Actions -->
-            <template #cell(actions)="row">
-              <b-button
-                size="sm"
-                variant="outline-secondary"
-                class="btn-icon mr-2"
-                @click="openEdit(row.item)"
-              >
-                <Icon icon="mdi:pencil" width="16" height="16" />
-              </b-button>
-
-              <b-button
-                size="sm"
-                variant="outline-danger"
-                class="btn-icon"
-                @click="deleteTeam(row.item)"
-              >
-                <Icon icon="mdi:delete" width="16" height="16" />
-              </b-button>
-            </template>
-          </b-table>
-          <div class="d-flex align-items-center justify-content-between mt-3">
-            <small class="text-muted">
-              Showing
-              <strong>
-                {{ totalRows === 0 ? 0 : (currentPage - 1) * perPage + 1 }}
-                –
-                {{ Math.min(currentPage * perPage, totalRows) }}
-              </strong>
-              of <strong>{{ totalRows }}</strong> teams
-            </small>
-
-            <b-pagination
-              v-model="currentPage"
-              :total-rows="totalRows"
+          <!-- TABLE WRAPPER -->
+          <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
+            <b-table
+              striped
+              hover
+              small
+              head-variant="light"
+              :items="filteredTeams"
+              :fields="fields"
               :per-page="perPage"
-              align="right"
-              size="sm"
-              first-number
-              last-number
-            />
+              :current-page="currentPage"
+              class="um-table mt-3"
+              show-empty
+              empty-text=""
+              responsive="md"
+              :busy="loadingTeams"
+            >
+              <!-- Busy -->
+              <template #table-busy>
+                <div class="text-center my-3">
+                  <b-spinner small class="mr-2" /> Loading teams…
+                </div>
+              </template>
+
+              <!-- No / Index -->
+              <template #cell(index)="row">
+                <span class="text-muted">
+                  {{ (currentPage - 1) * perPage + row.index + 1 }}
+                </span>
+              </template>
+
+              <!-- Team Name -->
+<template #cell(nameTeam)="row">
+  <span class="font-weight-bold text-dark">
+    {{ row.item.nameTeam || '-' }}
+  </span>
+</template>
+
+<!-- BIB -->
+<template #cell(bibTeam)="row">
+  <span
+    v-if="row.item.bibTeam"
+    class="status-pill status-neutral"
+    title="BIB"
+  >
+    <span class="dot"></span> {{ row.item.bibTeam }}
+  </span>
+  <span v-else class="text-muted">—</span>
+</template>
+
+              <!-- Type -->
+              <template #cell(typeTeam)="row">
+                <span class="font-weight-bold text-dark">{{
+                  row.item.typeTeam
+                }}</span>
+              </template>
+
+              <!-- Status Pill (Active/Inactive) -->
+              <template #cell(statusId)="row">
+                <span
+                  v-if="row.item.statusId === 0"
+                  class="status-pill status-success"
+                >
+                  <span class="dot"></span> Active
+                </span>
+                <span v-else class="status-pill status-upcoming">
+                  <span class="dot"></span> Inactive
+                </span>
+              </template>
+
+              <!-- Actions -->
+              <template #cell(actions)="row">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  class="btn-icon mr-2"
+                  @click="openEdit(row.item)"
+                >
+                  <Icon icon="mdi:pencil" width="16" height="16" />
+                </b-button>
+
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  class="btn-icon"
+                  @click="deleteTeam(row.item)"
+                >
+                  <Icon icon="mdi:delete" width="16" height="16" />
+                </b-button>
+              </template>
+            </b-table>
+
+            <!-- PAGINATION (real, sejajar) -->
+            <div
+              class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap"
+              style="gap: 12px"
+            >
+              <!-- kiri: jumlah row ditampilkan -->
+              <small class="text-muted">
+                {{ totalRows === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
+                {{ Math.min(currentPage * perPage, totalRows) }}
+                of {{ totalRows }} teams
+              </small>
+
+              <!-- tengah: pagination -->
+              <b-pagination
+                v-model="currentPage"
+                :total-rows="totalRows"
+                :per-page="perPage"
+                align="center"
+                size="md"
+                class="custom-pagination mb-0"
+                first-number
+                last-number
+              />
+
+              <!-- kanan: select rows per page -->
+              <div class="d-flex align-items-center">
+                <span class="mr-2 text-muted">Rows per page</span>
+                <b-form-select
+                  v-model.number="perPage"
+                  :options="[10, 20, 50]"
+                  class="input-soft no-border-select"
+                  style="width: 110px"
+                />
+              </div>
+            </div>
           </div>
         </b-card>
         <div class="mt-4">
@@ -168,14 +238,20 @@
 
     <!-- ✏️ Edit Team Modal -->
     <b-modal
-      id="modal-edit-team"
-      :title="`Edit Team: ${editForm.nameTeam || ''}`"
-      ok-title="Save"
-      cancel-title="Cancel"
-      @ok="submitEdit"
-      :no-close-on-esc="true"
-      :no-close-on-backdrop="true"
-    >
+  id="modal-edit-team"
+  :title="`Edit Team: ${editForm.nameTeam || ''}`"
+  ok-title="Save"
+  cancel-title="Cancel"
+  @ok="submitEdit"
+  :no-close-on-esc="true"
+  :no-close-on-backdrop="true"
+  modal-class="um-modal"          
+  content-class="um-modal-content"
+  header-class="um-modal-header"  
+  body-class="um-modal-body"      
+  footer-class="um-modal-footer"  
+  centered
+>
       <b-form @submit.stop.prevent>
         <b-form-group label="Team Type" label-class="label-strong">
           <b-form-select
@@ -253,34 +329,15 @@ export default {
       fields: [
         {
           key: "index",
-          label: "#",
-          thStyle: { width: "50px" },
-          class: "text-center align-middle",
+          label: "No",
+          class: "text-muted",
+          thClass: "text-uppercase",
         },
-        {
-          key: "typeTeam",
-          label: "Type Team",
-          class: "text-center align-middle",
-        },
-        { key: "nameTeam", label: "Team Name", class: "align-middle" },
-        {
-          key: "bibTeam",
-          label: "BIB",
-          thStyle: { width: "80px" },
-          class: "text-center align-middle",
-        },
-        {
-          key: "statusId",
-          label: "Status",
-          thStyle: { width: "100px" },
-          class: "text-center align-middle",
-        },
-        {
-          key: "actions",
-          label: "Actions",
-          thStyle: { width: "90px" },
-          class: "text-center align-middle",
-        },
+        { key: "nameTeam", label: "Team Name" },
+        { key: "bibTeam", label: "BIB" },
+        { key: "typeTeam", label: "Type" },
+        { key: "statusId", label: "Status" },
+        { key: "actions", label: "", class: "text-right" },
       ],
       editForm: {
         _id: null,
@@ -496,7 +553,7 @@ export default {
 </script>
 
 <!-- jadi -->
-<style scoped>
+<style>
 .team-card {
   border-radius: 24px;
   border: 1px solid #eef2f7;
@@ -550,19 +607,170 @@ export default {
   font-size: 0.95rem;
 }
 
-.teams-table {
-  font-size: 0.9rem;
-}
-
-.teams-table th {
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.3px;
-}
-
 .btn-icon {
   border-radius: 8px;
   padding: 4px 8px;
+}
+
+/* Sudah kamu sediakan */
+.table-rounded-wrapper {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  background: #fff;
+}
+.um-table thead th {
+  background: #f1f5f9 !important;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-bottom: 2px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.um-table tbody td {
+  background: #fff;
+  color: #374151;
+  font-size: 0.9rem;
+  padding: 0.9rem 0.75rem;
+  vertical-align: middle;
+  border-color: #f1f5f9;
+}
+.um-table tbody tr:hover td {
+  background: #f9fafb;
+  transition: background 0.2s;
+}
+
+/* Tambahan agar identik dengan contoh kedua */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.status-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.status-upcoming {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+.status-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+}
+
+.status-neutral {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+/* Ikon tombol kecil rapi */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.45rem;
+  border-radius: 10px;
+}
+
+/* Pagination & select tampak halus */
+.custom-pagination .page-item .page-link {
+  border-radius: 10px;
+}
+.input-soft {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.no-border-select.form-control {
+  box-shadow: none !important;
+}
+
+/* Modal wrapper */
+.modal-content {
+  border-radius: 20px !important;
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+}
+
+/* Modal header */
+.modal-header {
+  border-bottom: none;
+  border-radius: 20px 20px 0 0 !important;
+  background: #f8fafc;
+  padding: 1rem 1.25rem;
+}
+.modal-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+/* Modal body */
+.modal-body {
+  padding: 1.25rem;
+  background: #ffffff;
+  border-radius: 0 0 20px 20px;
+}
+
+/* Form group spacing */
+.modal-body .form-group {
+  margin-bottom: 1.25rem;
+}
+
+/* Input dan select dalam modal */
+.modal-body .input-soft {
+  border-radius: 12px !important;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+.modal-body .input-soft:focus {
+  background: #ffffff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+/* Footer (Save/Cancel buttons) */
+.modal-footer {
+  border-top: none;
+  padding: 1rem 1.25rem;
+  justify-content: flex-end;
+}
+.modal-footer .btn {
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 0.5rem 1.2rem;
+}
+.modal-footer .btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+.modal-footer .btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+.modal-footer .btn-secondary {
+  background: #f1f5f9;
+  color: #374151;
+  border: none;
+}
+.modal-footer .btn-secondary:hover {
+  background: #e5e7eb;
 }
 </style>

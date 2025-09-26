@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 70vh" class="mt-4">
+  <div class="mt-5">
     <b-row>
       <b-col cols="10" offset="1" class="mb-4">
         <div class="card-wrapper p-3 mb-2">
@@ -163,14 +163,6 @@
 
               <!-- Actions -->
               <template #cell(actions)="row">
-                <!-- <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  @click="$emit('edit', row.item)"
-                >
-                  <Icon icon="mdi:pencil" width="16" height="16" />
-                </b-button> -->
                 <b-button
                   size="sm"
                   variant="outline-danger"
@@ -212,6 +204,8 @@
               </div>
             </div>
           </div>
+
+          
         </div>
       </b-col>
     </b-row>

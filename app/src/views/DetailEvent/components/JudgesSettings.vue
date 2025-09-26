@@ -31,7 +31,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
             <b-col md="6" class="mb-3">
@@ -42,7 +42,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -60,7 +60,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
             <b-col md="6" class="mb-3">
@@ -71,7 +71,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -90,7 +90,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -108,7 +108,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
             <b-col md="6" class="mb-3">
@@ -119,7 +119,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -138,7 +138,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -182,7 +182,7 @@
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
                 :clearable="true"
-                :show-empty-option="true"
+                :show-empty-option="false"
               />
             </b-col>
           </b-row>
@@ -358,7 +358,7 @@ export default {
     // opsi untuk semua dropdown juri
     selectOptions: function () {
       var arr = Array.isArray(this.usersRaw) ? this.usersRaw : [];
-      var out = [{ value: "", text: "— Kosong —" }]; // opsi kosong
+      var out = [{ value: "", text: "Select Jury Name" }];
       for (var i = 0; i < arr.length; i++) {
         var u = arr[i];
         var id = pickId(u);

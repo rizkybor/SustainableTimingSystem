@@ -8,19 +8,15 @@ async function updateUser(userId, payload) {
 
   const db = await getDb();
   const col = db.collection("users");
-
-  // Bangun $set dinamis
   const setDoc = { updatedAt: new Date() };
 
-  // Hanya set kalau payload mengandung properti tsb (bukan falsy check)
   if (Object.prototype.hasOwnProperty.call(payload, "username")) {
-    setDoc.username = payload.username; // biarkan undefined/null kalau mau hapus di tempat lain
+    setDoc.username = payload.username;
   }
   if (Object.prototype.hasOwnProperty.call(payload, "image")) {
     setDoc.image = payload.image;
   }
   if (Array.isArray(payload.mainEvents)) {
-    // Normalisasi: unique + hanya string non-empty
     const cleaned = Array.from(
       new Set(payload.mainEvents.map(String).map(s => s.trim()).filter(Boolean))
     );

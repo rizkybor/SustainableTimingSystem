@@ -1,5 +1,10 @@
 <template>
   <div class="sts-page">
+    <!-- Ringtone (dipakai hanya saat first visit di sesi ini) -->
+    <audio ref="ringtone" preload="auto">
+      <source src="@/assets/sounds/opening-tone.mp3" type="audio/mpeg" />
+    </audio>
+
     <!-- 2) JUMBOTRON -->
     <section class="sts-jumbotron">
       <b-container>
@@ -98,13 +103,15 @@
               <div
                 class="action-icon mb-2 d-flex align-items-center justify-content-center"
               >
-                 <img
+                <img
                   src="@/assets/images/ico-jury-accounts.png"
                   alt="See all"
                   class="ml-1 icon-see-all"
                 />
               </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">Jury's Account Management</h5>
+              <h5 class="mb-1 mt-3 font-weight-bold">
+                Jury's Account Management
+              </h5>
               <small class="text-muted d-block mb-3">
                 Management jury accounts and assign roles to manage evaluation
                 efficiently.
@@ -243,6 +250,7 @@ export default {
   components: { Icon },
   data() {
     return {
+      showIntro: false,
       events: [],
       loading: false,
       teams: [],
@@ -250,6 +258,18 @@ export default {
     };
   },
   mounted() {
+    // hanya sekali per sesi app (ringtone tetap sekali)
+    const KEY = "sts_home_visited_session";
+    const firstVisitThisSession = !sessionStorage.getItem(KEY);
+
+    if (firstVisitThisSession) {
+      sessionStorage.setItem(KEY, "1");
+      const audio = this.$refs.ringtone;
+      if (audio) {
+        audio.volume = 0.4;
+        audio.play().catch(() => {});
+      }
+    }
     this.getEvents();
     this.loadTeamsRegistered();
   },

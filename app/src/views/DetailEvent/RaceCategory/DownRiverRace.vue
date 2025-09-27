@@ -126,6 +126,7 @@
               class="mb-0"
             >
               <b-form-select
+                                        style="border-radius: 12px; cursor: pointer;"
                 id="drrBucketSelect"
                 :options="drrBucketOptions"
                 v-model="selectedDrrKey"
@@ -205,6 +206,7 @@
                           v-for="sIdx in drrSectionsCount"
                           :key="sIdx"
                           class="small-select"
+                          style="border-radius: 12px; font-weight: 600;"
                           v-model="item.result.penaltySection[sIdx - 1]"
                           @change="
                             updateTimePen(
@@ -1521,12 +1523,6 @@ export default {
   align-items: start;
 }
 
-/* opsional: biar select-nya konsisten */
-.small-select {
-  width: 140px;
-  min-width: 120px;
-}
-
 /* responsif: di layar kecil, batasi 2 per kolom */
 @media (max-width: 576px) {
   .pen-grid {
@@ -1679,6 +1675,33 @@ td {
 .table-wrapper th,
 .table-wrapper td {
   white-space: nowrap; /* prevent wrapping */
+}
+
+/* ---- Styling utk Switch DRR Category select ---- */
+#drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#drrBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
+}
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 </style>
 >

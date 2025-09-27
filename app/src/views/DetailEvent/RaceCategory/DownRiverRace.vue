@@ -439,6 +439,43 @@ function loadRaceStartPayloadForDRR() {
   return { bucket };
 }
 
+// --- KATALOG DRR (fix) ---
+const DRR_EVENT_ID = "4"; // value eventId untuk DRR
+
+const DIVISIONS = [
+  { id: "1", name: "R4" },
+  { id: "2", name: "R6" },
+];
+
+const INITIALS = [
+  { id: "1", name: "YOUTH" },
+  { id: "2", name: "JUNIOR" },
+  { id: "3", name: "OPEN" },
+  { id: "4", name: "MASTER" },
+  { id: "5", name: "OPEN INTERNASIONAL" },
+  { id: "6", name: "OPEN NASIONAL" },
+  { id: "7", name: "MIX REGIONAL" },
+  { id: "8", name: "OPEN WATER RESCUE" },
+  { id: "9", name: "OPEN RIVER BOARDING" },
+  { id: "10", name: "OPEN KAYAK" },
+  { id: "11", name: "OPEN PITCANO" },
+];
+
+const RACES = [
+  { id: "1", name: "MEN" },
+  { id: "2", name: "WOMEN" },
+];
+
+// key => "eventId|initialId|raceId|divisionId"
+function keyFromIds({ eventId, initialId, raceId, divisionId }) {
+  return [
+    String(eventId || ""),
+    String(initialId || ""),
+    String(raceId || ""),
+    String(divisionId || ""),
+  ].join("|");
+}
+
 import { logger } from "@/utils/logger";
 
 export default {
@@ -522,17 +559,31 @@ export default {
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
 
-    // >>>> AMBIL LANGSUNG DARI DB (IPC) <<<<
-    await this.loadAllDrrBucketsFromDB();
+    // 1) bangun opsi statik dari katalog DRR (eventId ambil dari LS kalau ada)
+    const bucketLS = getBucket();
+    const eventId = bucketLS.eventId || DRR_EVENT_ID;
+    this.buildStaticDrrOptions(eventId);
 
-    // Fallback kalau dari DB kosong
-    if (!Array.isArray(this.participant) || this.participant.length === 0) {
-      this.loadAllDrrBucketsFromEvent(); // optional: tetap pakai eventDetails
+    // 2) pilih default & fetch teams
+    if (this.drrBucketOptions.length) {
+      // restore pilihan terakhir kalau ada
+      const savedKey = localStorage.getItem("currentDRRBucketKey");
+      this.selectedDrrKey =
+        savedKey && this.drrBucketMap[savedKey]
+          ? savedKey
+          : this.drrBucketOptions[0].value;
+
+      await this.fetchBucketTeamsByKey(this.selectedDrrKey);
+    } else {
+      // fallback lama kalau memang perlu
+      await this.loadAllDrrBucketsFromEvent();
       if (!Array.isArray(this.participant) || this.participant.length === 0) {
         const ok = this.loadFromRaceStartPayload();
         if (!ok) await this.checkValueStorage();
       }
     }
+
+    console.log(this.drrBucketOptions, "<<< cek");
 
     this.fetchDrrSectionCountFromSettings();
   },
@@ -540,6 +591,41 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    buildStaticDrrOptions(eventId) {
+      const opts = [];
+      const map = Object.create(null);
+
+      // bikin kombinasi division × race × initial
+      DIVISIONS.forEach((div) => {
+        RACES.forEach((race) => {
+          INITIALS.forEach((init) => {
+            const key = keyFromIds({
+              eventId,
+              initialId: init.id,
+              raceId: race.id,
+              divisionId: div.id,
+            });
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: init.id,
+              raceId: race.id,
+              divisionId: div.id,
+              eventName: "DRR",
+              initialName: init.name,
+              raceName: race.name,
+              divisionName: div.name,
+              teams: [], // diisi saat fetch
+            };
+          });
+        });
+      });
+
+      // commit ke state
+      this.drrBucketOptions = opts;
+      this.drrBucketMap = map;
+    },
     async loadAllDrrBucketsFromDB() {
       try {
         if (typeof ipcRenderer === "undefined") return;
@@ -829,9 +915,75 @@ export default {
       }
     },
 
-    onSelectDrrBucket(key) {
-      console.log(key, "<<< cek key");
-      this._useDrrBucket(key);
+    async onSelectDrrBucket(key) {
+      console.log(key, "<<<< cek");
+      await this.fetchBucketTeamsByKey(key);
+    },
+
+    async fetchBucketTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.drrBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.drrBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        // simpan pilihan
+        this.selectedDrrKey = key;
+        localStorage.setItem("currentDRRBucketKey", key);
+
+        // request ke main
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-registered:find-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("teams-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          console.warn("[DRR] reply error:", res && res.error);
+          this.participant = [];
+          this.currentBucket = null;
+          this.titleCategories = this._bucketLabel(b);
+          return;
+        }
+
+        // server bisa return 1 dokumen bucket atau array dokumen.
+        // Karena kita kasih filter lengkap (4 id), mestinya 0/1 dokumen.
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForDRR)
+            : [];
+
+        // set participant + judul + currentBucket (buat save)
+        this.participant = teams;
+        this.titleCategories = this._bucketLabel(b);
+        this.currentBucket = {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "DRR",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        };
+
+        // sesuaikan jumlah section penalty ke setting
+        this.applyDrrSectionCount(this.drrSectionsCount);
+      } catch (err) {
+        console.warn("fetchBucketTeamsByKey error:", err && err.message);
+      }
     },
     _bucketKey(b) {
       // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil

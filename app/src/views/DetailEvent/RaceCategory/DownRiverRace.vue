@@ -1,5 +1,29 @@
+<
 <template>
   <div>
+    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
+      <!-- TOP BAR (breadcrumb + datetime) -->
+      <div
+        class="d-flex align-items-center justify-content-between text-muted small"
+      >
+        <b-breadcrumb class="mb-0">
+          <b-breadcrumb-item to="/">
+            <Icon icon="mdi:home-outline" class="mr-1" />
+            Dashboard
+          </b-breadcrumb-item>
+          <b-breadcrumb-item
+            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          >
+            {{ dataEventSafe.eventName }}
+          </b-breadcrumb-item>
+          <b-breadcrumb-item active>
+            {{ "Down River Race" }}
+          </b-breadcrumb-item>
+        </b-breadcrumb>
+        <div>{{ currentDateTime }}</div>
+      </div>
+    </div>
+
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
@@ -43,55 +67,96 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : DRR
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Categories : {{ titleCategories || "-" }}
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
-              {{ dataEventSafe.endDateEvent || "-" }}
-            </h6>
+            <div class="meta-panel">
+              <div class="meta-row">
+                <span class="meta-label">Nomor Lomba</span>
+                <span class="meta-value">
+                  <span class="badge-chip badge-chip--blue"
+                    >Down River Race</span
+                  >
+                </span>
+              </div>
+
+              <div class="meta-row">
+                <span class="meta-label">Categories</span>
+                <span
+                  class="meta-value badge-chip badge-chip--blue"
+                  :title="titleCategories || '-'"
+                >
+                  {{ titleCategories || "-" }}
+                </span>
+              </div>
+            </div>
           </b-col>
 
           <b-col>
-            <div style="display: flex; gap: 10px; justify-content: flex-end">
-              <button
-                type="button"
-                class="btn-action btn-secondary"
-                @click="saveResult"
-              >
-                <Icon icon="icon-park-outline:save" /> Save Result
-              </button>
+            <div
+              class="d-flex flex-wrap justify-content-end align-items-center controls-bar"
+            >
+              <!-- selector baud -->
+              <div class="btn-baud-group mr-2 mb-2">
+                <span class="mr-2 text-muted">Baud Rate :</span>
+                <div class="d-inline-flex">
+                  <button
+                    v-for="br in baudOptions"
+                    :key="'baud-' + br"
+                    type="button"
+                    class="btn-action"
+                    :class="
+                      baudRate === br ? 'btn-success' : 'btn-outline-secondary'
+                    "
+                    @click="setBaud(br)"
+                    :disabled="isPortConnected"
+                    style="margin-right: 6px"
+                  >
+                    {{ br }}
+                  </button>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                class="btn-action btn-info"
-                @click="toggleSortRanked"
-              >
-                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-              </button>
-
+              <!-- connect -->
               <button
                 type="button"
                 :class="{
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn-action"
+                class="btn-action mb-2"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
-                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
+                {{ isPortConnected ? "Disconnect" : "Connect Racetime" }}
               </button>
+
               <span
-                class="status-indicator"
+                class="status-indicator mb-2 ml-2"
                 :class="{
                   connected: isPortConnected,
                   disconnected: !isPortConnected,
                 }"
               ></span>
+
+              <!-- break line -->
+              <div class="w-100"></div>
+
+              <!-- path pill -->
+              <div class="mb-1">
+                <span
+                  class="path-pill"
+                  :class="{ 'path-pill--empty': !selectPath }"
+                  :title="selectPath || 'No device selected'"
+                >
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
+                  <span class="truncate">{{
+                    selectPath || "No device selected"
+                  }}</span>
+                </span>
+              </div>
             </div>
           </b-col>
         </b-row>
@@ -108,10 +173,32 @@
       @update-time="updateTime"
     />
 
-    <!-- RESULT TABLE -->
-    <div class="px-4 mt-4">
+    <!-- Selector Bucket DRR -->
+    <div class="px-4 mt-2">
       <div class="card-body">
-        <h4>List Result (Down River Race)</h4>
+        <b-row class="align-items-center">
+          <b-col>
+            <h4>Output Racetime :</h4>
+            <small class="text-muted">
+              Category active: {{ titleCategories || "-" }}
+            </small>
+          </b-col>
+          <b-col cols="12" md="6">
+            <b-form-group
+              label="Switch DRR Category:"
+              label-for="drrBucketSelect"
+            >
+              <b-form-select
+                style="border-radius: 12px; cursor: pointer"
+                id="drrBucketSelect"
+                :options="drrBucketOptions"
+                v-model="selectedDrrKey"
+                @change="onSelectDrrBucket"
+              />
+            </b-form-group>
+          </b-col>
+        </b-row>
+
         <b-row>
           <b-col>
             <div class="table-wrapper">
@@ -134,7 +221,7 @@
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td>{{ index + 1 }}</td>
                     <td class="large-bold text-strong max-char">
@@ -172,11 +259,12 @@
 
                     <!-- Pen Section -->
                     <td>
-                      <div class="d-flex flex-column">
+                      <div class="pen-grid">
                         <b-select
                           v-for="sIdx in drrSectionsCount"
                           :key="sIdx"
                           class="small-select"
+                          style="border-radius: 12px; font-weight: 600"
                           v-model="item.result.penaltySection[sIdx - 1]"
                           @change="
                             updateTimePen(
@@ -247,19 +335,25 @@
                     </td>
                   </tr>
                 </tbody>
+
+                <tbody v-else>
+                  <tr>
+                    <td colspan="14" class="text-center text-muted py-5">
+                      Data not found
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
             <br />
           </b-col>
         </b-row>
+
+        <b-button @click="goTo()" variant="outline-info" class="btn-action">
+          <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
+        </b-button>
       </div>
-
-      <b-button @click="goTo()" variant="outline-info" class="btn-action">
-        <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-      </b-button>
     </div>
-
-    <br /><br />
   </div>
 </template>
 
@@ -412,6 +506,55 @@ function loadRaceStartPayloadForDRR() {
   return { bucket };
 }
 
+// --- KATALOG DRR (fix) ---
+const DRR_EVENT_ID = "4"; // value eventId untuk DRR
+
+function catalogsFromEvent(ev = {}) {
+  const safeArr = (a) => (Array.isArray(a) ? a : []);
+  // eventId utk DRR diambil dari categoriesEvent (value dari name === DRR)
+  const drrCat = safeArr(ev.categoriesEvent).find(
+    (c) => String(c.name || "").toUpperCase() === "DRR"
+  );
+  const eventId = drrCat ? String(drrCat.value) : "4"; // fallback "4"
+
+  const divisions = safeArr(ev.categoriesDivision).map((d) => ({
+    id: String(d.value),
+    name: String(d.name),
+  }));
+
+  const races = safeArr(ev.categoriesRace).map((r) => ({
+    id: String(r.value),
+    name: String(r.name),
+  }));
+
+  const initials = safeArr(ev.categoriesInitial).map((i) => ({
+    id: String(i.value),
+    name: String(i.name),
+  }));
+
+  return { eventId, divisions, races, initials };
+}
+
+// key => "eventId|initialId|raceId|divisionId"
+function keyFromIds({ eventId, initialId, raceId, divisionId }) {
+  return [
+    String(eventId || ""),
+    String(initialId || ""),
+    String(raceId || ""),
+    String(divisionId || ""),
+  ].join("|");
+}
+
+function readEventDetailsFromLS() {
+  try {
+    const raw = localStorage.getItem("eventDetails");
+    const obj = raw ? JSON.parse(raw) : null;
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
 import { logger } from "@/utils/logger";
 
 export default {
@@ -419,10 +562,19 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      selectPath: "",
+      baudRate: 9600,
+      baudOptions: [1200, 2400, 9600],
+      serialCtrl: null,
+      endGame: false,
+      isScrolled: false,
+      drrBucketOptions: [],
+      drrBucketMap: Object.create(null),
+      selectedDrrKey: "",
+      currentBucket: null,
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
-      isScrolled: false,
       port: null,
       isPortConnected: false,
       digitId: [],
@@ -477,6 +629,30 @@ export default {
     };
   },
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
+    currentEventId() {
+      const fromEvent = String(
+        this.dataEventSafe._id || this.dataEventSafe.id || ""
+      );
+      const fromRoute =
+        this.$route && this.$route.params && this.$route.params.id
+          ? String(this.$route.params.id)
+          : "";
+      const fromBucket = getBucket().eventId ? String(getBucket().eventId) : "";
+      return fromEvent || fromRoute || fromBucket || "";
+    },
     participantArr() {
       return Array.isArray(this.participant)
         ? this.participant
@@ -487,11 +663,59 @@ export default {
         ? this.dataEvent
         : {};
     },
+
+    divisions() {
+      return Array.isArray(this.dataEventSafe.categoriesDivision)
+        ? this.dataEventSafe.categoriesDivision.map((d) => ({
+            id: String(d.value),
+            name: String(d.name),
+          }))
+        : [];
+    },
+
+    races() {
+      return Array.isArray(this.dataEventSafe.categoriesRace)
+        ? this.dataEventSafe.categoriesRace.map((r) => ({
+            id: String(r.value),
+            name: String(r.name),
+          }))
+        : [];
+    },
+
+    initials() {
+      return Array.isArray(this.dataEventSafe.categoriesInitial)
+        ? this.dataEventSafe.categoriesInitial.map((i) => ({
+            id: String(i.value),
+            name: String(i.name),
+          }))
+        : [];
+    },
+
+    drrEventId() {
+      // cari eventId untuk kategori DRR
+      const cat = (this.dataEventSafe.categoriesEvent || []).find(
+        (c) => String(c.name || "").toUpperCase() === "DRR"
+      );
+      return cat ? String(cat.value) : "";
+    },
   },
   async mounted() {
+    this.dataEvent = readEventDetailsFromLS();
     window.addEventListener("scroll", this.handleScroll);
-    const ok = this.loadFromRaceStartPayload();
-    if (!ok) await this.checkValueStorage();
+
+    this.buildStaticDrrOptions();
+
+    if (this.drrBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentDRRBucketKey");
+      this.selectedDrrKey =
+        savedKey && this.drrBucketMap[savedKey]
+          ? savedKey
+          : this.drrBucketOptions[0].value;
+
+      await this.fetchBucketTeamsByKey(this.selectedDrrKey);
+    } else {
+      await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
+    }
 
     this.fetchDrrSectionCountFromSettings();
   },
@@ -499,6 +723,466 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    buildStaticDrrOptions() {
+      const eventId = this.currentEventId; // pakai ID event aktif (bukan "4")
+      if (!eventId) return;
+
+      // --- fallback kalau kategori di event kosong ---
+      const divs = this.divisions.length
+        ? this.divisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+
+      const races = this.races.length
+        ? this.races
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+
+      const inits = this.initials.length
+        ? this.initials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
+      const opts = [];
+      const map = Object.create(null);
+
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id].join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: init.id,
+              raceId: race.id,
+              divisionId: div.id,
+              eventName: "DRR",
+              initialName: init.name,
+              raceName: race.name,
+              divisionName: div.name,
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.drrBucketOptions = opts;
+      this.drrBucketMap = map;
+    },
+    buildStaticDrrOptionsFromCatalog(catalog) {
+      const { eventId, divisions, races, initials } = catalog;
+      const opts = [];
+      const map = Object.create(null);
+
+      divisions.forEach((div) => {
+        races.forEach((race) => {
+          initials.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: init.id,
+              raceId: race.id,
+              divisionId: div.id,
+              eventName: "DRR",
+              initialName: init.name,
+              raceName: race.name,
+              divisionName: div.name,
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.drrBucketOptions = opts;
+      this.drrBucketMap = map;
+    },
+    async loadAllDrrBucketsFromDB() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        // 1) sumber eventId
+        const bucketLS = getBucket();
+        const routeId =
+          this.$route && this.$route.params && this.$route.params.id
+            ? String(this.$route.params.id)
+            : "";
+        let eventDetailsId = "";
+        try {
+          const evRaw = localStorage.getItem("eventDetails");
+          const evObj = evRaw ? JSON.parse(evRaw) : null;
+          eventDetailsId =
+            evObj && (evObj._id || evObj.id)
+              ? String(evObj._id || evObj.id)
+              : "";
+        } catch {}
+
+        const finalEventId = bucketLS.eventId || routeId || eventDetailsId;
+
+        if (!finalEventId) {
+          console.warn(
+            "[DRR] eventId tidak ditemukan (payload/route/eventDetails)."
+          );
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+
+        // 2) panggil IPC
+        const filters = { eventId: finalEventId };
+        // SALAH: console.log(payload, 'tes') // payload belum ada di sini
+        console.log("[DRR] send filters:", filters);
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-registered:find-reply", (_e, payload) => {
+            console.log("[DRR] reply payload:", payload); // <- di sini boleh log payload
+            resolve(payload);
+          });
+          ipcRenderer.send("teams-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          console.warn("[DRR] IPC reply error:", res && res.error);
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+        if (!Array.isArray(res.items) || res.items.length === 0) {
+          console.warn("[DRR] items kosong dari DB untuk filters:", filters);
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+
+        // 3) mapping → options + map + agregat
+        const map = Object.create(null);
+        const opts = [];
+
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "DRR",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        const toUpper = (v) => String(v || "").toUpperCase();
+
+        res.items.forEach((b) => {
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForDRR)
+            : [];
+
+          const bucketDoc = {
+            ...b,
+            eventName: toUpper(b.eventName),
+            initialName: toUpper(b.initialName),
+            raceName: toUpper(b.raceName),
+            divisionName: toUpper(b.divisionName),
+            teams: normalizedTeams,
+          };
+
+          const key = this._bucketKey(bucketDoc); // "eventId|initialId|raceId|divisionId"
+          const label = this._bucketLabel(bucketDoc); // "DIV RACE – INITIAL"
+
+          map[key] = bucketDoc;
+          opts.push({ value: key, text: label });
+
+          // agregat
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat tim di agregat (nameTeam+bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+          const aggKey = "__ALL_DRR__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All DRR Teams (aggregate)" });
+        }
+
+        // 4) commit ke state
+        this.drrBucketMap = map;
+        this.drrBucketOptions = opts;
+
+        // 5) pilih bucket default
+        const savedKey = localStorage.getItem("currentDRRBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useDrrBucket(savedKey);
+          this.selectedDrrKey = savedKey;
+          return;
+        }
+
+        const startKey = this._bucketKey({
+          eventId: finalEventId,
+          initialId: bucketLS.initialId,
+          raceId: bucketLS.raceId,
+          divisionId: bucketLS.divisionId,
+        });
+        if (map[startKey]) {
+          this._useDrrBucket(startKey);
+          this.selectedDrrKey = startKey;
+          return;
+        }
+
+        if (opts.length) {
+          this._useDrrBucket(opts[0].value); // biasanya agregat
+          this.selectedDrrKey = opts[0].value;
+        }
+      } catch (err) {
+        console.warn("loadAllDrrBucketsFromDB error:", err && err.message);
+      }
+    },
+    loadAllDrrBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+
+        // Ambil semua bucket yang eventName-nya DRR (case-insensitive)
+        const drrBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "DRR"
+        );
+
+        // siapkan map & options
+        const map = Object.create(null);
+        const opts = [];
+
+        // optional: opsi "All DRR Teams" sebagai agregat
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "DRR",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        drrBuckets.forEach((b) => {
+          const key = this._bucketKey(b);
+          const label = this._bucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForDRR)
+            : [];
+
+          map[key] = {
+            ...b,
+            teams: normalizedTeams,
+          };
+          opts.push({ value: key, text: label });
+
+          // gabungkan ke agregat
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat di agregat berdasarkan (nameTeam + bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+        }
+
+        // masukkan opsi aggregate paling atas kalau mau dipakai
+        if (agg.teams.length) {
+          const aggKey = "__ALL_DRR__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All DRR Teams (aggregate)" });
+        }
+
+        this.drrBucketMap = map;
+        this.drrBucketOptions = opts;
+
+        // pilih default:
+        // 1) restore dari localStorage, atau
+        // 2) kalau ada raceStartPayload dan bucket-nya DRR, pakai itu, atau
+        // 3) ambil opsi pertama
+        const savedKey = localStorage.getItem("currentDRRBucketKey");
+
+        if (savedKey && map[savedKey]) {
+          this._useDrrBucket(savedKey);
+          this.selectedDrrKey = savedKey;
+          return;
+        }
+
+        const { bucket } = loadRaceStartPayloadForDRR();
+        const startKey = bucket && this._bucketKey(bucket);
+        if (startKey && map[startKey]) {
+          this._useDrrBucket(startKey);
+          this.selectedDrrKey = startKey;
+          return;
+        }
+
+        if (opts.length) {
+          this._useDrrBucket(opts[0].value);
+          this.selectedDrrKey = opts[0].value;
+        }
+      } catch {
+        // biarkan fallback yang sudah ada (loadFromRaceStartPayload / checkValueStorage)
+      }
+    },
+
+    _useDrrBucket(key) {
+      const b = this.drrBucketMap[key];
+      if (!b) return;
+
+      // set participant & judul
+      this.participant = (b.teams || []).map((t) => ({ ...t }));
+      this.titleCategories = b._isAggregate
+        ? "ALL DIVISION/RACE – ALL INITIAL (DRR)"
+        : this._bucketLabel(b);
+
+      // set bucket aktif (dipakai Save)
+      this.currentBucket = b._isAggregate
+        ? null // aggregate tidak punya ID → Save dinonaktifkan atau diarahkan untuk pilih bucket spesifik
+        : {
+            eventId: String(b.eventId || ""),
+            initialId: String(b.initialId || ""),
+            raceId: String(b.raceId || ""),
+            divisionId: String(b.divisionId || ""),
+            eventName: String(b.eventName || "").toUpperCase(),
+            initialName: String(b.initialName || "").toUpperCase(),
+            raceName: String(b.raceName || "").toUpperCase(),
+            divisionName: String(b.divisionName || "").toUpperCase(),
+          };
+
+      // simpan pilihan terakhir
+      localStorage.setItem("currentDRRBucketKey", key);
+
+      // sesuaikan jumlah section bila setting berbeda
+      this.applyDrrSectionCount(this.drrSectionsCount);
+
+      if (this.currentBucket && typeof ipcRenderer !== "undefined") {
+        ipcRenderer.send("race-settings:get", this.currentBucket.eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          let count = 3;
+          if (res && res.ok && res.settings && res.settings.drr) {
+            const c = parseInt(res.settings.drr.totalSection, 10);
+            if (Number.isFinite(c) && c > 0) count = c;
+          }
+          this.applyDrrSectionCount(count);
+        });
+      }
+    },
+
+    async onSelectDrrBucket(key) {
+      console.log(key, "<<<< cek");
+      await this.fetchBucketTeamsByKey(key);
+    },
+
+    async fetchBucketTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.drrBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.drrBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        // simpan pilihan
+        this.selectedDrrKey = key;
+        localStorage.setItem("currentDRRBucketKey", key);
+
+        // request ke main
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-registered:find-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("teams-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          console.warn("[DRR] reply error:", res && res.error);
+          this.participant = [];
+          this.currentBucket = null;
+          this.titleCategories = this._bucketLabel(b);
+          return;
+        }
+
+        // server bisa return 1 dokumen bucket atau array dokumen.
+        // Karena kita kasih filter lengkap (4 id), mestinya 0/1 dokumen.
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForDRR)
+            : [];
+
+        // set participant + judul + currentBucket (buat save)
+        this.participant = teams;
+        this.titleCategories = this._bucketLabel(b);
+        this.currentBucket = {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "DRR",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        };
+
+        // sesuaikan jumlah section penalty ke setting
+        this.applyDrrSectionCount(this.drrSectionsCount);
+      } catch (err) {
+        console.warn("fetchBucketTeamsByKey error:", err && err.message);
+      }
+    },
+    _bucketKey(b) {
+      // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil
+      const ei = String(b.eventId || "");
+      const ii = String(b.initialId || "");
+      const ri = String(b.raceId || "");
+      const di = String(b.divisionId || "");
+      return [ei, ii, ri, di].join("|");
+    },
+    _bucketLabel(b) {
+      // contoh label: "R4 MEN – JUNIOR"
+      const div = String(b.divisionName || "").toUpperCase();
+      const rac = String(b.raceName || "").toUpperCase();
+      const ini = String(b.initialName || "").toUpperCase();
+      return `${div} ${rac} – ${ini}`;
+    },
     _resizePenaltySections(arr, targetLen) {
       const out = Array.isArray(arr) ? arr.slice(0, targetLen) : [];
       while (out.length < targetLen) out.push("");
@@ -845,9 +1529,19 @@ export default {
         });
         return;
       }
-      const bucket = getBucket();
+
+      if (!this.currentBucket) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail:
+            "Silakan pilih kategori DRR spesifik (bukan aggregate) sebelum menyimpan.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+
       const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
+      const missing = must.filter((k) => !this.currentBucket[k]);
       if (missing.length) {
         ipcRenderer.send("get-alert", {
           type: "error",
@@ -856,7 +1550,8 @@ export default {
         });
         return;
       }
-      const docs = buildResultDocs(clean, bucket);
+
+      const docs = buildResultDocs(clean, this.currentBucket);
       ipcRenderer.send("insert-drr-result", docs);
       ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
         if (res && res.ok) {
@@ -892,6 +1587,23 @@ export default {
 </script>
 
 <style scoped>
+.pen-grid {
+  display: grid;
+  /* isi 3 baris dulu (kebawah), lalu lanjut buat kolom baru ke samping */
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  grid-column-gap: 8px; /* jarak antar kolom */
+  grid-row-gap: 6px; /* jarak antar item vertikal */
+  align-items: start;
+}
+
+/* responsif: di layar kecil, batasi 2 per kolom */
+@media (max-width: 576px) {
+  .pen-grid {
+    grid-template-rows: repeat(2, auto);
+  }
+}
+
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -1037,5 +1749,122 @@ td {
 .table-wrapper th,
 .table-wrapper td {
   white-space: nowrap; /* prevent wrapping */
+}
+
+/* ---- Styling utk Switch DRR Category select ---- */
+#drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#drrBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
+}
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+/* PATH  */
+.controls-bar {
+  gap: 10px;
+}
+
+/* Pill path */
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 520px; /* sesuaikan */
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.path-pill--empty {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+.path-pill .truncate {
+  display: inline-block;
+  max-width: 460px; /* = max-width pill - padding + ikon */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Meta Panel  */
+.meta-panel {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eef2f7;
+}
+.meta-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.meta-label {
+  min-width: 120px; /* lebar label tetap */
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.meta-value {
+  font-weight: 600;
+  color: #0f172a; /* slate-900 */
+}
+.badge-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.badge-chip--blue {
+  background: #eef6ff;
+  color: rgb(0, 180, 255);
+  border-color: #dbeafe;
+}
+
+/* Responsif: di layar kecil, label di atas value */
+@media (max-width: 575.98px) {
+  .meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+  .meta-label {
+    min-width: auto;
+  }
+  .meta-panel {
+    padding: 12px;
+  }
 }
 </style>

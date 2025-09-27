@@ -315,6 +315,7 @@
         </b-button>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -1199,7 +1200,7 @@ td {
 }
 .badge-chip--blue {
   background: #eef6ff;
-  color: #1d4ed8;
+  color: rgb(0, 180, 255);
   border-color: #dbeafe;
 }
 

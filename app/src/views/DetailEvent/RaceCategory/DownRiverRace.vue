@@ -229,7 +229,7 @@
                 <thead>
                   <tr>
                     <th class="text-center">No</th>
-                    <th style="text-align: start">Team Name</th>
+                    <th class="text-left">Team Name</th>
                     <th class="text-center">BIB Number</th>
                     <th class="text-center">Start Time</th>
                     <th class="text-center">Finish Time</th>
@@ -248,8 +248,7 @@
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
                     <td
-                      style="text-align: start"
-                      class="large-bold text-strong max-char"
+                      class="large-bold text-strong max-char text-left"
                     >
                       {{ item.nameTeam }}
                     </td>

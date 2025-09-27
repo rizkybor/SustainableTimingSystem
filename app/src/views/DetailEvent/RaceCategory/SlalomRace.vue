@@ -1,5 +1,28 @@
 <template>
   <div>
+    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
+      <!-- TOP BAR (breadcrumb + datetime) -->
+      <div
+        class="d-flex align-items-center justify-content-between text-muted small"
+      >
+        <b-breadcrumb class="mb-0">
+          <b-breadcrumb-item to="/">
+            <Icon icon="mdi:home-outline" class="mr-1" />
+            Dashboard
+          </b-breadcrumb-item>
+          <b-breadcrumb-item
+            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          >
+            {{ dataEventSafe.eventName }}
+          </b-breadcrumb-item>
+          <b-breadcrumb-item active>
+            {{ "Slalom Race" }}
+          </b-breadcrumb-item>
+        </b-breadcrumb>
+        <div>{{ currentDateTime }}</div>
+      </div>
+    </div>
+
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
@@ -12,7 +35,7 @@
               <Icon icon="mdi:shield-crown" width="56" height="56" />
             </div>
           </b-col>
-          
+
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{
@@ -21,10 +44,10 @@
               }}
             </h2>
             <div class="meta text-white-50">
-              <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ dataEventSafe.addressCity || "-" }}</span
-              >
+              <span class="mr-3">
+                <strong class="text-white">Location</strong> :
+                {{ dataEventSafe.addressCity || "-" }}
+              </span>
               <span class="mr-3"
                 ><strong class="text-white">River</strong> :
                 {{ dataEventSafe.riverName || "-" }}</span
@@ -44,54 +67,94 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : Slalom
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Categories : {{ titleCategories || "-" }}
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
-              {{ dataEventSafe.endDateEvent || "-" }}
-            </h6>
+            <div class="meta-panel">
+              <div class="meta-row">
+                <span class="meta-label">Nomor Lomba</span>
+                <span class="meta-value">
+                  <span class="badge-chip badge-chip--blue">Slalom Race</span>
+                </span>
+              </div>
+
+              <div class="meta-row">
+                <span class="meta-label">Categories</span>
+                <span
+                  class="meta-value badge-chip badge-chip--blue"
+                  :title="titleCategories || '-'"
+                >
+                  {{ titleCategories || "-" }}
+                </span>
+              </div>
+            </div>
           </b-col>
+
           <b-col>
-            <div style="display: flex; gap: 10px; justify-content: flex-end">
-              <button
-                type="button"
-                class="btn-action btn-secondary"
-                @click="saveResult"
-              >
-                <Icon icon="icon-park-outline:save" /> Save Result
-              </button>
+            <div
+              class="d-flex flex-wrap justify-content-end align-items-center controls-bar"
+            >
+              <!-- selector baud -->
+              <div class="btn-baud-group mr-2 mb-2">
+                <span class="mr-2 text-muted">Baud Rate :</span>
+                <div class="d-inline-flex">
+                  <button
+                    v-for="br in baudOptions"
+                    :key="'baud-' + br"
+                    type="button"
+                    class="btn-action"
+                    :class="
+                      baudRate === br ? 'btn-success' : 'btn-outline-secondary'
+                    "
+                    @click="setBaud(br)"
+                    :disabled="isPortConnected"
+                    style="margin-right: 6px"
+                  >
+                    {{ br }}
+                  </button>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                class="btn-action btn-info"
-                @click="toggleSortRanked"
-              >
-                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-              </button>
-
+              <!-- connect -->
               <button
                 type="button"
                 :class="{
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn-action"
+                class="btn-action mb-2"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
-                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
+                {{ isPortConnected ? "Disconnect" : "Connect Racetime" }}
               </button>
+
               <span
-                class="status-indicator"
+                class="status-indicator mb-2 ml-2"
                 :class="{
                   connected: isPortConnected,
                   disconnected: !isPortConnected,
                 }"
               ></span>
+
+              <!-- break line -->
+              <div class="w-100"></div>
+
+              <!-- path pill -->
+              <div class="mb-1">
+                <span
+                  class="path-pill"
+                  :class="{ 'path-pill--empty': !selectPath }"
+                  :title="selectPath || 'No device selected'"
+                >
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
+                  <span class="truncate">{{
+                    selectPath || "No device selected"
+                  }}</span>
+                </span>
+              </div>
             </div>
           </b-col>
         </b-row>
@@ -108,10 +171,9 @@
       @update-time="updateTime"
     />
 
-    <!-- LIST RESULT (Slalom) -->
+    <!-- RACETIME OUTPUT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>List Result (Slalom)</h4>
         <div class="table-responsive">
           <div class="d-flex justify-content-start mb-2">
             <div class="btn-group" role="group" aria-label="Run Switch">
@@ -134,11 +196,52 @@
             </div>
           </div>
 
-          <table class="table table-bordered">
+          <!-- ACTION BAR: Save & Sort (mirip Sprint/DRR) -->
+          <div class="d-flex justify-content-between">
+            <h4>Output Racetime Run {{ this.activeRun + 1 }}:</h4>
+
+            <div class="slalom-actionbar">
+              <div class="slalom-actionbar__spacer"></div>
+
+              <div class="slalom-actionbar__buttons">
+                <button
+                  type="button"
+                  class="btn-action btn-secondary"
+                  @click="saveResult"
+                  :disabled="!teams.length"
+                  title="Simpan hasil Slalom (semua tim & semua run)"
+                >
+                  <Icon icon="icon-park-outline:save" /> Save Result
+                </button>
+
+                <button
+                  type="button"
+                  class="btn-action btn-info"
+                  @click="toggleSortRanked"
+                  :disabled="!teams.length"
+                  :title="
+                    !sortBest.enabled
+                      ? 'Urutkan berdasarkan best time (ASC)'
+                      : sortBest.desc
+                      ? 'Matikan sort best time'
+                      : 'Urutkan berdasarkan best time (DESC)'
+                  "
+                >
+                  <Icon icon="icon-park-outline:ranking" />
+                  Sort Ranked
+                  <small v-if="sortBest.enabled" class="ml-1">
+                    ({{ sortBest.desc ? "DESC" : "ASC" }})
+                  </small>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <table class="table">
             <thead>
               <tr>
-                <th rowspan="2">No</th>
-                <th class="text-center" rowspan="2">Team Name</th>
+                <th class="text-center" rowspan="2">No</th>
+                <th class="text-start" rowspan="2">Team Name</th>
                 <th class="text-center" rowspan="2">BIB Number</th>
                 <!-- Judul grup penalties: S + 1..N + F -->
                 <th
@@ -171,7 +274,7 @@
                 <th class="text-center" rowspan="2">Best Time</th>
                 <th class="text-center" rowspan="2">Ranked</th>
                 <th class="text-center" rowspan="2">Score</th>
-                <th class="text-center" rowspan="2">Edit</th>
+                <th v-if="endGame">Action</th>
               </tr>
               <tr v-if="!penaltiesWrapped">
                 <th class="text-center">Start</th>
@@ -187,8 +290,10 @@
             </thead>
             <tbody>
               <tr v-for="(team, ti) in visibleTeams" :key="team._id">
-                <td>{{ ti + 1 }}</td>
-                <td style="min-width: 150px">{{ team.nameTeam }}</td>
+                <td class="text-center">{{ ti + 1 }}</td>
+                <td class="large-bold text-strong max-char text-left">
+                  {{ team.nameTeam }}
+                </td>
                 <td>{{ team.bibNumber }}</td>
 
                 <!-- ========== PENALTIES ========== -->
@@ -199,13 +304,14 @@
                     <div class="p-item">
                       <div class="p-label">S</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].startPenalty
                         "
                         :options="penaltyOptions"
                         size="sm"
                         @change="recalcTeam(team)"
+                        style="border-radius: 12px"
                       />
                     </div>
 
@@ -217,13 +323,14 @@
                     >
                       <div class="p-label">{{ gi + 1 }}</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].penalties[gi]
                         "
                         :options="penaltyOptions"
                         size="sm"
                         @change="recalcTeam(team)"
+                        style="border-radius: 12px"
                       />
                     </div>
 
@@ -231,13 +338,14 @@
                     <div class="p-item">
                       <div class="p-label">F</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].finishPenalty
                         "
                         :options="penaltyOptions"
                         size="sm"
                         @change="recalcTeam(team)"
+                        style="border-radius: 12px"
                       />
                     </div>
                   </div>
@@ -248,7 +356,8 @@
                   <!-- S -->
                   <td>
                     <b-form-select
-                      style="min-width: 50px"
+                      style="min-width: 50px; border-radius: 12px"
+                      class="small-select"
                       v-model="
                         team.sessions[selectedSession[team._id]].startPenalty
                       "
@@ -264,7 +373,8 @@
                     :key="team._id + '-' + gi"
                   >
                     <b-form-select
-                      style="min-width: 50px"
+                      class="small-select"
+                      style="min-width: 50px; border-radius: 12px"
                       v-model="
                         team.sessions[selectedSession[team._id]].penalties[gi]
                       "
@@ -277,7 +387,8 @@
                   <!-- F -->
                   <td>
                     <b-form-select
-                      style="min-width: 50px"
+                      class="small-select"
+                      style="min-width: 50px; border-radius: 12px"
                       v-model="
                         team.sessions[selectedSession[team._id]].finishPenalty
                       "
@@ -289,39 +400,72 @@
                 </template>
                 <!-- ========== /PENALTIES ========== -->
 
-                <td style="min-width: 120px">
+                <td class="text-center penalty-char" style="min-width: 120px">
                   {{ displayTotalPenalty(team) }}
                 </td>
 
-                <td>{{ currentSession(team).penaltyTime || "-" }}</td>
-                <td style="min-width: 120px">
+                <td class="text-center penalty-char text-monospace">
+                  {{ currentSession(team).penaltyTime || "-" }}
+                </td>
+                <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).startTime || "-" }}
                 </td>
-                <td style="min-width: 120px">
+                <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).finishTime || "-" }}
                 </td>
-                <td style="min-width: 120px">
+                <td
+                  class="text-center large-bold text-monospace"
+                  style="min-width: 120px"
+                >
                   {{ currentSession(team).raceTime || "-" }}
                 </td>
-                <td style="min-width: 120px">
+                <td
+                  class="text-center large-bold result-char text-monospace"
+                  style="min-width: 120px"
+                >
                   {{ currentSession(team).totalTime || "-" }}
                 </td>
-                <td style="background-color: greenyellow; min-width: 120px">
+                <!-- <td
+                  class="text-center large-bold text-monospace best-time-cell"
+                  style="min-width: 120px"
+                >
                   {{ calculateBestTime(team) || "-" }}
+                </td> -->
+                <td
+                  class="text-center large-bold text-monospace best-time-cell"
+                  style="min-width: 120px"
+                  :title="
+                    bestRunOf(team)
+                      ? 'Best time diambil dari Run ' + bestRunOf(team)
+                      : ''
+                  "
+                >
+                  <small v-if="bestRunOf(team)" class="best-time-tag mb-3"
+                    >Best Time Run {{ bestRunOf(team) }}</small
+                  >
+                  <div>{{ calculateBestTime(team) || "-" }}</div>
                 </td>
-                <td style="min-width: 120px" class="text-center">
+                <td style="min-width: 120px" class="text-center large-bold">
                   {{ rankOf(team._id) }}
                 </td>
-                <td style="min-width: 120px" class="text-center">
+                <td style="min-width: 120px" class="text-center large-bold">
                   {{ scoreOf(team._id) }}
                 </td>
-                <td>
-                  <button
+                <td v-if="endGame">
+                  <!-- <button
                     type="button"
                     class="btn btn-warning btn-sm"
                     @click="openEdit(team)"
                   >
                     Edit
+                  </button> -->
+                  <button
+                    type="button"
+                    class="btn-action btn-danger"
+                    @click="resetRow(team)"
+                    :title="`Reset data run aktif untuk ${team.nameTeam}`"
+                  >
+                    Reset Row
                   </button>
                 </td>
               </tr>
@@ -343,7 +487,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { SerialPort } from "serialport";
+import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
@@ -453,6 +597,12 @@ export default {
 
   data() {
     return {
+      selectPath: "",
+      baudRate: 9600,
+      baudOptions: [1200, 2400, 9600],
+      serialCtrl: null,
+      endGame: false,
+      isScrolled: false,
       activeRun: 0,
       sortBest: { enabled: false, desc: false },
       SLALOM_GATES: buildGates(DEFAULT_S16),
@@ -462,10 +612,8 @@ export default {
       digitTime: [],
       digitTimeStart: null,
       digitTimeFinish: null,
-      // event & category title
       dataEvent: {},
       titleCategories: "",
-      // list result (tim)
       teams: [],
       selectedSession: {},
       penaltyOptions: [
@@ -512,6 +660,19 @@ export default {
   },
 
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
     dataEventSafe() {
       return this.dataEvent && typeof this.dataEvent === "object"
         ? this.dataEvent
@@ -629,10 +790,167 @@ export default {
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        console.log(this.serialCtrl, "<<<< cek");
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
+    // === END CONNECTION ===
+
+    checkEndGameStatus() {
+      const allFinished =
+        Array.isArray(this.teams) &&
+        this.teams.length > 0 &&
+        this.teams.every((t) => {
+          const s = this.currentSession(t); // run aktif per tim
+          return (
+            s && typeof s.finishTime === "string" && s.finishTime.trim() !== ""
+          );
+        });
+
+      this.endGame = !!allFinished;
+    },
+    resetRow(team) {
+      if (!team) return;
+
+      // Tentukan sesi yang sedang aktif untuk tim ini
+      const s = this.currentSession(team);
+      if (!s) return;
+
+      // Opsional: konfirmasi agar tidak kepencet
+      const ok = window.confirm(
+        `Reset data run aktif untuk tim "${team.nameTeam}"?`
+      );
+      if (!ok) return;
+
+      // Reset penalties: S, gates, F
+      this.$set(s, "startPenalty", 0);
+      this.$set(s, "finishPenalty", 0);
+
+      const need = this.SLALOM_GATES.length;
+      const zeros = Array.from({ length: need }, () => 0);
+      this.$set(s, "penalties", zeros);
+
+      // Reset perhitungan & waktu
+      this.$set(s, "totalPenalty", 0);
+      this.$set(s, "penaltyTime", "00:00:00.000");
+      this.$set(s, "startTime", "");
+      this.$set(s, "finishTime", "");
+      this.$set(s, "raceTime", "");
+      this.$set(s, "totalTime", "");
+      this.$set(s, "ranked", 0);
+      this.$set(s, "score", 0);
+
+      // Jika mau, panggil kalkulasi lagi (tidak wajib karena sudah 0 semua)
+      // this.recalcSession(s);
+
+      // Opsional: feedback lewat IPC alert (kalau mau konsisten dengan notifikasi lain)
+      try {
+        ipcRenderer &&
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: `Row untuk "${team.nameTeam}" (Run ${
+              this.selectedSession[team._id] + 1
+            }) telah direset.`,
+            message: "Reset Berhasil",
+          });
+      } catch (e) {
+        /* no-op */
+      }
+      this.checkEndGameStatus();
+    },
+
+    bestTimeWithRun(team) {
+      const msList = (team.sessions || [])
+        .map((s) => s && s.totalTime)
+        .map((t) => (t ? hmsToMs(t) : Infinity));
+
+      let best = Infinity,
+        runIndex = null;
+      msList.forEach((ms, i) => {
+        if (Number.isFinite(ms) && ms < best) {
+          best = ms;
+          runIndex = i; // 0-based
+        }
+      });
+
+      if (!Number.isFinite(best)) return { time: "", run: null };
+      return { time: msToHMSms(best), run: runIndex + 1 }; // 1-based untuk UI
+    },
+
+    bestRunOf(team) {
+      return this.bestTimeWithRun(team).run; // 1 atau 2, atau null jika belum ada
+    },
     setRun(idx) {
       this.activeRun = idx;
-      // sinkronkan pilihan sesi untuk semua tim
       this.teams.forEach((t) => this.$set(this.selectedSession, t._id, idx));
+      this.checkEndGameStatus();
     },
     async fetchSlalomGateCountFromSettings() {
       try {
@@ -769,15 +1087,13 @@ export default {
           this.recalcSession(s);
         }
       }
+      this.checkEndGameStatus();
     },
 
     /** === Navigasi sederhana === */
     goTo() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-    // openEdit(_team) {
-    //   /* TODO: modal edit */
-    // },
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
@@ -793,46 +1109,6 @@ export default {
         this.sortBest.desc = true; // DESC
       } else {
         this.sortBest.enabled = false; // OFF
-      }
-    },
-
-    /** === Device connection (sama pola Sprint, lebih aman) === */
-    async connectPort() {
-      if (this.isPortConnected) return this.disconnected();
-      try {
-        const ports = await SerialPort.list();
-        if (!ports || !ports.length)
-          throw new Error("No serial ports available");
-        const chosen = ports.find((p) => p.path) || ports[0];
-        this.port = new SerialPort({ path: chosen.path, baudRate: 9600 });
-        this.port.on("data", (buf) => {
-          const s = buf.toString();
-          this.digitId.unshift(s.slice(0, 12));
-          this.digitTime.unshift(s.slice(12));
-        });
-        this.isPortConnected = true;
-        alert("Connected");
-      } catch (e) {
-        this.isPortConnected = false;
-        alert(e && e.message ? e.message : "Failed to connect device");
-      }
-    },
-    async disconnected() {
-      try {
-        if (this.port && this.port.isOpen) {
-          this.port.close();
-        }
-      } catch (e) {
-        // Tulis pesan error agar tidak silent
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.error("Error when closing port:", e);
-        }
-        // simpan pesan terakhir ke state kalau perlu
-        this.lastError = e && e.message ? e.message : String(e);
-      } finally {
-        this.isPortConnected = false;
-        alert("Disconnected");
       }
     },
 
@@ -966,6 +1242,100 @@ export default {
 </script>
 
 <style scoped>
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
+}
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+/* ===== Buttons ===== */
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+/* ===== STYLING BEST TIME RACETIME ===== */
+.best-time-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.best-time-cell {
+  background: linear-gradient(135deg, #fff8dc, #ffd700, #ffcc00, #ffb700);
+  color: #000;
+  font-weight: 700;
+  text-align: center;
+  transition: all 0.4s ease;
+  background-size: 200% 200%;
+  animation: gold-gradient 6s ease infinite;
+  position: relative;
+  z-index: 1;
+}
+
+/* Animasi gradient halus */
+@keyframes gold-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Glow halus saat hover */
+.best-time-cell:hover {
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), 0 0 30px rgba(255, 200, 0, 0.4);
+  cursor: pointer;
+}
+
+/* ===== STYLING FONT RACETIME ===== */
+.large-bold {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.max-char {
+  max-width: 260px;
+  word-wrap: break-word;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.text-strong {
+  color: #000;
+}
+.penalty-char {
+  color: red;
+}
+.result-char {
+  color: green;
+}
+.text-monospace {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -1082,7 +1452,7 @@ td {
 .penalties-grid {
   display: grid;
   grid-template-columns: repeat(
-    8,
+    6,
     minmax(56px, 1fr)
   ); /* 8 kolom x 2 baris -> 16 item + S/F = 16 + 2 = 18; akan auto-wrap */
   gap: 6px 8px;
@@ -1104,21 +1474,6 @@ td {
   color: #666;
 }
 
-/* Lebarkan sedikit select agar enak dilihat */
-::v-deep .p-select .custom-select,
-.p-select .custom-select,
-.p-select :deep(.custom-select) {
-  min-width: 56px; /* set 56–72px sesuai selera */
-  padding-left: 6px;
-  padding-right: 18px;
-  height: 28px;
-  font-size: 12px;
-}
-
-.table-bordered th {
-  vertical-align: middle !important; /* teks header vertikal rata tengah */
-}
-
 /* Responsif: jika layar sempit, kurangi kolom grid */
 @media (max-width: 992px) {
   .penalties-grid {
@@ -1128,6 +1483,124 @@ td {
 @media (max-width: 768px) {
   .penalties-grid {
     grid-template-columns: repeat(4, minmax(50px, 1fr));
+  }
+}
+
+/* PATH  */
+.controls-bar {
+  gap: 10px;
+}
+
+/* Pill path */
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 520px; /* sesuaikan */
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.path-pill--empty {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+.path-pill .truncate {
+  display: inline-block;
+  max-width: 460px; /* = max-width pill - padding + ikon */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Meta Panel  */
+.meta-panel {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eef2f7;
+}
+.meta-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.meta-label {
+  min-width: 120px; /* lebar label tetap */
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.meta-value {
+  font-weight: 600;
+  color: #0f172a; /* slate-900 */
+}
+.badge-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.badge-chip--blue {
+  background: #eef6ff;
+  color: rgb(0, 180, 255);
+  border-color: #dbeafe;
+}
+
+/* Responsif: di layar kecil, label di atas value */
+@media (max-width: 575.98px) {
+  .meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+  .meta-label {
+    min-width: auto;
+  }
+  .meta-panel {
+    padding: 12px;
+  }
+}
+
+/* --- Slalom Action Bar --- */
+.slalom-actionbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.slalom-actionbar__spacer {
+  flex: 1 1 auto; /* dorong tombol ke kanan */
+}
+
+.slalom-actionbar__buttons {
+  display: inline-flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767.98px) {
+  .slalom-actionbar__buttons {
+    width: 100%;
+    justify-content: flex-end; /* tombol tetap rapi saat wrap */
   }
 }
 </style>

@@ -170,7 +170,7 @@
       @update-time="updateTime"
     />
 
-    <!-- LIST RESULT -->
+    <!-- RACETIME OUTPUT -->
     <div class="px-4 mt-2">
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
@@ -195,13 +195,15 @@
             </button>
           </div>
         </div>
+
+
         <b-row>
           <b-col>
             <table class="table">
               <thead>
                 <tr>
                   <th class="text-center">No</th>
-                  <th class="text-start">Team Name</th>
+                  <th class="text-left">Team Name</th>
                   <th class="text-center">BIB Number</th>
                   <th class="text-center">Start Time</th>
                   <th class="text-center">Finish Time</th>
@@ -248,6 +250,7 @@
                       v-model.number="item.result.startPenalty"
                       @change="updateStartPenalty(item)"
                       style="border-radius: 12px"
+                      class="small-select"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -268,6 +271,7 @@
                       v-model.number="item.result.finishPenalty"
                       @change="updateFinishPenalty(item)"
                       style="border-radius: 12px"
+                      class="small-select"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -1041,6 +1045,20 @@ export default {
 </script>
 
 <style scoped>
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
+}
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
 /* ===== STYLING FONT RACETIME ===== */
 .large-bold {
   font-size: 1.2rem;

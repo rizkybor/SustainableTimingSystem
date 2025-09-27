@@ -63,12 +63,11 @@
       <!-- 3) ACTION CARDS -->
       <b-row>
         <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card shadow-sm">
+          <b-card class="action-card">
             <div class="d-flex flex-column align-items-center text-center p-2">
               <div
-                class="action-icon mb-2 d-flex align-items-center justify-content-center"
+                class="mb-2 d-flex align-items-center justify-content-center"
               >
-                <!-- <Icon icon="ic:baseline-add-circle" width="36" height="36" /> -->
                 <img
                   src="@/assets/images/ico-create-new-events.png"
                   alt="See all"
@@ -91,10 +90,10 @@
         </b-col>
 
         <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card shadow-sm">
+          <b-card class="action-card">
             <div class="d-flex flex-column align-items-center text-center p-2">
               <div
-                class="action-icon mb-2 d-flex align-items-center justify-content-center"
+                class="mb-2 d-flex align-items-center justify-content-center"
               >
                 <img
                   src="@/assets/images/ico-create-new-teams.png"
@@ -118,10 +117,10 @@
         </b-col>
 
         <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card shadow-sm">
+          <b-card class="action-card">
             <div class="d-flex flex-column align-items-center text-center p-2">
               <div
-                class="action-icon mb-2 d-flex align-items-center justify-content-center"
+                class="mb-2 d-flex align-items-center justify-content-center"
               >
                 <img
                   src="@/assets/images/ico-jury-accounts.png"
@@ -151,9 +150,13 @@
       <!-- 4) EVENTS LIST (SLIDER) -->
       <section class="d-flex align-items-center justify-content-between mb-2">
         <h5 class="font-weight-bold mb-0">Events List</h5>
-        <b-button variant="link" class="p-0" @click="goTo('events')">
+        <b-button
+          variant="link"
+          class="see-all-link p-0"
+          @click="goTo('events')"
+        >
           See all
-          <Icon icon="mdi:arrow-right" class="ml-1" />
+          <Icon icon="mdi:arrow-right" class="ml-1 see-all-icon" />
         </b-button>
       </section>
 
@@ -224,9 +227,13 @@
         class="d-flex align-items-center justify-content-between mt-4 mb-2"
       >
         <h5 class="font-weight-bold mb-0">Teams Registered</h5>
-        <b-button variant="link" class="p-0" @click="goTo('team-create')">
+        <b-button
+          variant="link"
+          class="see-all-link p-0"
+          @click="goTo('team-create')"
+        >
           See all
-          <Icon icon="mdi:arrow-right" class="ml-1" />
+          <Icon icon="mdi:arrow-right" class="ml-1 see-all-icon" />
         </b-button>
       </section>
 
@@ -601,14 +608,19 @@ export default {
 .action-card {
   border-radius: 20px;
   border: 1px solid #eef0f6;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06); /* base tipis */
+  transition: box-shadow 160ms ease, transform 160ms ease,
+    border-color 160ms ease;
+  will-change: transform, box-shadow;
 }
-
-.action-icon {
-  color: #2c5cff;
-  background: #eff3ff;
-  border-radius: 12px;
-  width: 56px;
-  height: 56px;
+.action-card:hover,
+.action-card:focus-within {
+  border-color: rgba(0, 180, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
+    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
+    0 8px 32px rgba(0, 180, 255, 0.2);
+  z-index: 1;
 }
 
 .btn-secondary {
@@ -721,8 +733,11 @@ export default {
 }
 
 .event-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(44, 92, 255, 0.1);
+  border-color: rgba(0, 180, 255, 0.6);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
+    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
+    0 8px 32px rgba(0, 180, 255, 0.2);
+  z-index: 1;
 }
 
 /* Bagian gambar tetap fix */
@@ -759,6 +774,14 @@ export default {
   background: #fff;
   padding: 14px;
   box-shadow: 0 6px 18px rgba(44, 92, 255, 0.06);
+}
+
+.team-card:hover {
+  border-color: rgba(0, 180, 255, 0.6);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
+    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
+    0 8px 32px rgba(0, 180, 255, 0.2);
+  z-index: 1;
 }
 
 .team-avatar {
@@ -970,5 +993,74 @@ export default {
     width: 68px;
     height: 68px;
   }
+}
+
+
+
+/* see all styling  */
+.see-all-link {
+  position: relative;
+  padding: 0;                 /* rapih seperti link */
+  font-weight: 700;
+  color: #0d789d;             /* brand biru */
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 160ms ease;
+}
+
+.see-all-link::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -2px;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+  opacity: 0.85;
+}
+
+/* ikon panah geser sedikit saat hover/focus */
+.see-all-icon {
+  transition: transform 180ms ease;
+}
+
+.see-all-link:hover,
+.see-all-link:focus,
+.see-all-link:focus-visible {
+  color: #095a73;             /* sedikit lebih gelap saat hover */
+  outline: none;
+}
+
+.see-all-link:hover::after,
+.see-all-link:focus::after,
+.see-all-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.see-all-link:hover .see-all-icon,
+.see-all-link:focus .see-all-icon {
+  transform: translateX(3px);
+}
+
+/* state disabled (kalau suatu saat dipakai) */
+.see-all-link.disabled,
+.see-all-link[disabled] {
+  color: #9aa9c2 !important;
+  pointer-events: none;
+}
+
+/* dukungan dark background (opsional) */
+.dark .see-all-link { color: #7dd3fc; }
+.dark .see-all-link:hover { color: #38bdf8; }
+
+/* prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .see-all-link,
+  .see-all-icon,
+  .see-all-link::after { transition: none; }
 }
 </style>

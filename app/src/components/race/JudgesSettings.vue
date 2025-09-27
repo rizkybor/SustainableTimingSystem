@@ -202,8 +202,8 @@
           </b-button>
           <b-button
             style="border-radius: 12px"
-            variant="info"
-            class="px-4 rounded-12"
+            class="px-4 btn-confirm"
+            variant="outline-primary"
             :disabled="saving"
             @click="confirm"
           >
@@ -1233,5 +1233,33 @@ export default {
   background: #fff !important;
   border-color: #9ec5ff !important;
   box-shadow: 0 0 0 4px rgba(42, 104, 196, 0.15) !important;
+}
+
+/* base */
+.btn.btn-confirm {
+  background: #f0f8ff;
+  color: #325a8f;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+  transition: all 0.25s ease;
+  border: 1px solid #cfd8e6;
+}
+
+/* hover */
+.btn.btn-confirm:hover {
+  background: #325a8f;
+  color: #ffffff;
+  border-color: #325a8f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
+}
+
+/* active (klik/tahan) */
+.btn.btn-confirm:active,
+.btn.btn-confirm:focus {
+  background: #0d789d;
+  color: #ffffff;
+  border-color: #0d789d;
 }
 </style>

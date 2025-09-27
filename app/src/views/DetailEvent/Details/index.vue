@@ -55,19 +55,11 @@
           Kirim Pesan ke Judges
         </b-button> -->
 
-        <b-button
-          class="btn-race-settings mr-2"
-          variant="primary"
-          @click="openJudgeSettings"
-        >
+        <b-button class="btn-race-settings mr-2" @click="openJudgeSettings">
           Judges Settings
         </b-button>
 
-        <b-button
-          class="btn-race-settings"
-          variant="primary"
-          @click="openRaceSettings"
-        >
+        <b-button class="btn-race-settings" @click="openRaceSettings">
           Race Settings
         </b-button>
       </div>
@@ -2221,8 +2213,8 @@ export default {
 }
 
 .race-card.active {
-  border-color: var(--blue);
-  box-shadow: 0 14px 30px rgba(31, 111, 163, 0.16);
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
 .race-icon {
@@ -2259,16 +2251,17 @@ export default {
 /* Hover state */
 .init-tab:hover {
   background: #dbeafe; /* biru muda */
-  color: #1e3a8a;      /* biru navy */
+  color: #1e3a8a; /* biru navy */
   cursor: pointer;
   box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
 }
 
 /* Active state */
 .init-tab.active {
-  background: var(--blue);
+  background: rgb(54, 142, 180);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(0, 123, 255, 0.35);
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
 /* TABLE & BUTTONS - class dipakai juga di TeamPanel.vue */

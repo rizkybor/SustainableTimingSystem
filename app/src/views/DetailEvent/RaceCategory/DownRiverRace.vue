@@ -1,3 +1,4 @@
+<
 <template>
   <div>
     <!-- HERO -->
@@ -137,7 +138,7 @@
     </div>
 
     <!-- RESULT TABLE -->
-    <div class="px-4 mt-4">
+    <div class="px-4">
       <div class="card-body">
         <b-row>
           <b-col>
@@ -161,7 +162,7 @@
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td>{{ index + 1 }}</td>
                     <td class="large-bold text-strong max-char">
@@ -271,6 +272,14 @@
                         @click="openModal(item)"
                         >Edit</b-button
                       >
+                    </td>
+                  </tr>
+                </tbody>
+
+                <tbody v-else>
+                  <tr>
+                    <td colspan="14" class="text-center text-muted py-5">
+                      Data not found
                     </td>
                   </tr>
                 </tbody>
@@ -442,29 +451,31 @@ function loadRaceStartPayloadForDRR() {
 // --- KATALOG DRR (fix) ---
 const DRR_EVENT_ID = "4"; // value eventId untuk DRR
 
-const DIVISIONS = [
-  { id: "1", name: "R4" },
-  { id: "2", name: "R6" },
-];
+function catalogsFromEvent(ev = {}) {
+  const safeArr = (a) => (Array.isArray(a) ? a : []);
+  // eventId utk DRR diambil dari categoriesEvent (value dari name === DRR)
+  const drrCat = safeArr(ev.categoriesEvent).find(
+    (c) => String(c.name || "").toUpperCase() === "DRR"
+  );
+  const eventId = drrCat ? String(drrCat.value) : "4"; // fallback "4"
 
-const INITIALS = [
-  { id: "1", name: "YOUTH" },
-  { id: "2", name: "JUNIOR" },
-  { id: "3", name: "OPEN" },
-  { id: "4", name: "MASTER" },
-  { id: "5", name: "OPEN INTERNASIONAL" },
-  { id: "6", name: "OPEN NASIONAL" },
-  { id: "7", name: "MIX REGIONAL" },
-  { id: "8", name: "OPEN WATER RESCUE" },
-  { id: "9", name: "OPEN RIVER BOARDING" },
-  { id: "10", name: "OPEN KAYAK" },
-  { id: "11", name: "OPEN PITCANO" },
-];
+  const divisions = safeArr(ev.categoriesDivision).map((d) => ({
+    id: String(d.value),
+    name: String(d.name),
+  }));
 
-const RACES = [
-  { id: "1", name: "MEN" },
-  { id: "2", name: "WOMEN" },
-];
+  const races = safeArr(ev.categoriesRace).map((r) => ({
+    id: String(r.value),
+    name: String(r.name),
+  }));
+
+  const initials = safeArr(ev.categoriesInitial).map((i) => ({
+    id: String(i.value),
+    name: String(i.name),
+  }));
+
+  return { eventId, divisions, races, initials };
+}
 
 // key => "eventId|initialId|raceId|divisionId"
 function keyFromIds({ eventId, initialId, raceId, divisionId }) {
@@ -474,6 +485,16 @@ function keyFromIds({ eventId, initialId, raceId, divisionId }) {
     String(raceId || ""),
     String(divisionId || ""),
   ].join("|");
+}
+
+function readEventDetailsFromLS() {
+  try {
+    const raw = localStorage.getItem("eventDetails");
+    const obj = raw ? JSON.parse(raw) : null;
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
 }
 
 import { logger } from "@/utils/logger";
@@ -545,6 +566,17 @@ export default {
     };
   },
   computed: {
+    currentEventId() {
+      const fromEvent = String(
+        this.dataEventSafe._id || this.dataEventSafe.id || ""
+      );
+      const fromRoute =
+        this.$route && this.$route.params && this.$route.params.id
+          ? String(this.$route.params.id)
+          : "";
+      const fromBucket = getBucket().eventId ? String(getBucket().eventId) : "";
+      return fromEvent || fromRoute || fromBucket || "";
+    },
     participantArr() {
       return Array.isArray(this.participant)
         ? this.participant
@@ -555,18 +587,49 @@ export default {
         ? this.dataEvent
         : {};
     },
+
+    divisions() {
+      return Array.isArray(this.dataEventSafe.categoriesDivision)
+        ? this.dataEventSafe.categoriesDivision.map((d) => ({
+            id: String(d.value),
+            name: String(d.name),
+          }))
+        : [];
+    },
+
+    races() {
+      return Array.isArray(this.dataEventSafe.categoriesRace)
+        ? this.dataEventSafe.categoriesRace.map((r) => ({
+            id: String(r.value),
+            name: String(r.name),
+          }))
+        : [];
+    },
+
+    initials() {
+      return Array.isArray(this.dataEventSafe.categoriesInitial)
+        ? this.dataEventSafe.categoriesInitial.map((i) => ({
+            id: String(i.value),
+            name: String(i.name),
+          }))
+        : [];
+    },
+
+    drrEventId() {
+      // cari eventId untuk kategori DRR
+      const cat = (this.dataEventSafe.categoriesEvent || []).find(
+        (c) => String(c.name || "").toUpperCase() === "DRR"
+      );
+      return cat ? String(cat.value) : "";
+    },
   },
   async mounted() {
+    this.dataEvent = readEventDetailsFromLS();
     window.addEventListener("scroll", this.handleScroll);
 
-    // 1) bangun opsi statik dari katalog DRR (eventId ambil dari LS kalau ada)
-    const bucketLS = getBucket();
-    const eventId = bucketLS.eventId || DRR_EVENT_ID;
-    this.buildStaticDrrOptions(eventId);
+    this.buildStaticDrrOptions();
 
-    // 2) pilih default & fetch teams
     if (this.drrBucketOptions.length) {
-      // restore pilihan terakhir kalau ada
       const savedKey = localStorage.getItem("currentDRRBucketKey");
       this.selectedDrrKey =
         savedKey && this.drrBucketMap[savedKey]
@@ -575,15 +638,8 @@ export default {
 
       await this.fetchBucketTeamsByKey(this.selectedDrrKey);
     } else {
-      // fallback lama kalau memang perlu
-      await this.loadAllDrrBucketsFromEvent();
-      if (!Array.isArray(this.participant) || this.participant.length === 0) {
-        const ok = this.loadFromRaceStartPayload();
-        if (!ok) await this.checkValueStorage();
-      }
+      await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
     }
-
-    console.log(this.drrBucketOptions, "<<< cek");
 
     this.fetchDrrSectionCountFromSettings();
   },
@@ -591,20 +647,40 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
-    buildStaticDrrOptions(eventId) {
+    buildStaticDrrOptions() {
+      const eventId = this.currentEventId; // pakai ID event aktif (bukan "4")
+      if (!eventId) return;
+
+      // --- fallback kalau kategori di event kosong ---
+      const divs = this.divisions.length
+        ? this.divisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+
+      const races = this.races.length
+        ? this.races
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+
+      const inits = this.initials.length
+        ? this.initials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
       const opts = [];
       const map = Object.create(null);
 
-      // bikin kombinasi division × race × initial
-      DIVISIONS.forEach((div) => {
-        RACES.forEach((race) => {
-          INITIALS.forEach((init) => {
-            const key = keyFromIds({
-              eventId,
-              initialId: init.id,
-              raceId: race.id,
-              divisionId: div.id,
-            });
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id].join("|");
             const label = `${div.name} ${race.name} – ${init.name}`;
             opts.push({ value: key, text: label });
             map[key] = {
@@ -616,13 +692,44 @@ export default {
               initialName: init.name,
               raceName: race.name,
               divisionName: div.name,
-              teams: [], // diisi saat fetch
+              teams: [],
             };
           });
         });
       });
 
-      // commit ke state
+      this.drrBucketOptions = opts;
+      this.drrBucketMap = map;
+    },
+    buildStaticDrrOptionsFromCatalog(catalog) {
+      const { eventId, divisions, races, initials } = catalog;
+      const opts = [];
+      const map = Object.create(null);
+
+      divisions.forEach((div) => {
+        races.forEach((race) => {
+          initials.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: init.id,
+              raceId: race.id,
+              divisionId: div.id,
+              eventName: "DRR",
+              initialName: init.name,
+              raceName: race.name,
+              divisionName: div.name,
+              teams: [],
+            };
+          });
+        });
+      });
+
       this.drrBucketOptions = opts;
       this.drrBucketMap = map;
     },
@@ -1551,3 +1658,4 @@ td {
   white-space: nowrap; /* prevent wrapping */
 }
 </style>
+>

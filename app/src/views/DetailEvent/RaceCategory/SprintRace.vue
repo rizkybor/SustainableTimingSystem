@@ -200,43 +200,54 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>Team Name</th>
-                  <th>BIB Number</th>
-                  <th>Start Time</th>
-                  <th>Finish Time</th>
-                  <th>Race Time</th>
+                  <th class="text-center">No</th>
+                  <th class="text-start">Team Name</th>
+                  <th class="text-center">BIB Number</th>
+                  <th class="text-center">Start Time</th>
+                  <th class="text-center">Finish Time</th>
+                  <th class="text-center">Race Time</th>
 
                   <!-- urutan baru -->
-                  <th>Start Penalties</th>
+                  <th class="text-center">Penalty Start</th>
                   <!-- REMOVED: Penalties (legacy/middle) column -->
-                  <th>Finish Penalties</th>
-                  <th>Total Penalties</th>
-                  <th>Penalty Time</th>
+                  <th class="text-center">Penalty Finish</th>
+                  <th class="text-center">Penalty Total</th>
+                  <th class="text-center">Penalty Time</th>
 
-                  <th>Result</th>
-                  <th>Ranked</th>
-                  <th>Score</th>
+                  <th class="text-center">Result</th>
+                  <th class="text-center">Ranked</th>
+                  <th class="text-center">Score</th>
                   <th v-if="endGame">Action</th>
                 </tr>
               </thead>
 
               <tbody>
                 <tr v-for="(item, index) in participantArr" :key="index">
-                  <td>{{ index + 1 }}</td>
-                  <td>{{ item.nameTeam }}</td>
-                  <td>{{ item.bibTeam }}</td>
-                  <td>{{ item.result.startTime }}</td>
-                  <td>{{ item.result.finishTime }}</td>
-                  <td>{{ item.result.raceTime }}</td>
+                  <td class="text-center">{{ index + 1 }}</td>
+                  <td
+                    style="text-align: start"
+                    class="large-bold text-strong max-char"
+                  >
+                    {{ item.nameTeam }}
+                  </td>
+                  <td class="text-center">{{ item.bibTeam }}</td>
+                  <td class="text-center text-monospace">
+                    {{ item.result.startTime }}
+                  </td>
+                  <td class="text-center text-monospace">
+                    {{ item.result.finishTime }}
+                  </td>
+                  <td class="text-center large-bold text-monospace">
+                    {{ item.result.raceTime }}
+                  </td>
 
                   <!-- Start Penalties -->
-                  <td>
+                  <td class="text-center">
                     <b-select
                       v-if="item.result.startTime"
                       v-model.number="item.result.startPenalty"
                       @change="updateStartPenalty(item)"
-                      style="border-radius: 12px;"
+                      style="border-radius: 12px"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -251,12 +262,12 @@
                   <!-- REMOVED: Penalties (legacy / middle) select -->
 
                   <!-- Finish Penalties -->
-                  <td>
+                  <td class="text-center">
                     <b-select
                       v-if="item.result.finishTime"
                       v-model.number="item.result.finishPenalty"
                       @change="updateFinishPenalty(item)"
-                      style="border-radius: 12px;"
+                      style="border-radius: 12px"
                     >
                       <option
                         v-for="p in dataPenalties"
@@ -269,20 +280,26 @@
                   </td>
 
                   <!-- Total Penalties (detik) -->
-                  <td>{{ item.result.totalPenalty }}</td>
+                  <td class="text-center penalty-char">
+                    {{ item.result.totalPenalty }}
+                  </td>
 
                   <!-- Penalty Time total (format waktu) -->
-                  <td>{{ item.result.penaltyTime }}</td>
+                  <td class="text-center large-bold  penalty-char text-monospace">
+                    {{ item.result.penaltyTime }}
+                  </td>
 
-                  <td>
+                  <td class="text-center large-bold  result-char text-monospace">
                     {{
                       item.result.penaltyTime
                         ? item.result.totalTime
                         : item.result.raceTime
                     }}
                   </td>
-                  <td>{{ item.result.ranked }}</td>
-                  <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                  <td class="text-center large-bold">{{ item.result.ranked }}</td>
+                  <td class="text-center large-bold">
+                    {{ getScoreByRanked(item.result.ranked) }}
+                  </td>
                   <td v-if="endGame">
                     <!-- <button
                       type="button"
@@ -315,7 +332,6 @@
         </b-button>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -688,6 +704,10 @@ export default {
         this.selectPath = null;
       }
     },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
     // === END CONNECTION ===
 
     // === NOTIFY ===
@@ -769,9 +789,6 @@ export default {
       this.assignRanks(this.participantArr);
 
       this.$forceUpdate(); // paksa refresh kalau kadang Vue reactivity lambat
-    },
-    setBaud(br) {
-      this.baudRate = br;
     },
 
     async calculateScore(ranked) {
@@ -1024,6 +1041,32 @@ export default {
 </script>
 
 <style scoped>
+/* ===== STYLING FONT RACETIME ===== */
+.large-bold {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.max-char {
+  max-width: 260px;
+  word-wrap: break-word;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.text-strong {
+  color: #000;
+}
+.penalty-char {
+  color: red;
+}
+.result-char {
+  color: green;
+}
+.text-monospace {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;

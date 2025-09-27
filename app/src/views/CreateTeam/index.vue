@@ -699,7 +699,7 @@ export default {
 
 .status-neutral {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: rgb(0, 180, 255);
   border-color: #bfdbfe;
 }
 
@@ -787,7 +787,7 @@ export default {
 }
 .modal-footer .btn-primary:hover {
   background: #1d4ed8;
-  border-color: #1d4ed8;
+  border-color: rgb(0, 180, 255);
 }
 .modal-footer .btn-secondary {
   background: #f1f5f9;

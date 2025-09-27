@@ -837,7 +837,7 @@ export default {
 
 .custom-pagination .page-link:hover {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: rgb(0, 180, 255);
   border-color: #93c5fd;
 }
 

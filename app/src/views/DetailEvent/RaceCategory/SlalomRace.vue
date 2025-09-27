@@ -829,8 +829,6 @@ export default {
           },
         });
 
-        console.log(this.serialCtrl, "<<<< cek");
-
         const res = await this.serialCtrl.connect();
         if (res.ok) {
           this.isPortConnected = true;

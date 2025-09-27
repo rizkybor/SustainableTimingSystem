@@ -2247,24 +2247,28 @@ export default {
 }
 
 .init-tab {
-  border: 0;
+  border: none;
   background: transparent;
   color: #2b3445;
   font-weight: 700;
   padding: 10px 18px;
   border-radius: 8px;
+  transition: all 0.25s ease;
 }
 
+/* Hover state */
 .init-tab:hover {
-  border: 2;
-  background: #cccccc;
-  color: white;
+  background: #dbeafe; /* biru muda */
+  color: #1e3a8a;      /* biru navy */
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
 }
 
+/* Active state */
 .init-tab.active {
   background: var(--blue);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(31, 111, 163, 0.24);
+  box-shadow: 0 6px 16px rgba(0, 123, 255, 0.35);
 }
 
 /* TABLE & BUTTONS - class dipakai juga di TeamPanel.vue */
@@ -2415,5 +2419,15 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+  transition: all 0.25s ease;
+}
+
+/* Hover effect */
+.btn-race-settings:hover {
+  background: #f0f8ff; /* biru muda lembut */
+  border-color: #1c4c7a;
+  color: #0d2f4f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
 }
 </style>

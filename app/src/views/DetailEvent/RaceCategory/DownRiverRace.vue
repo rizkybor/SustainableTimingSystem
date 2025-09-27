@@ -108,10 +108,37 @@
       @update-time="updateTime"
     />
 
+    <!-- Selector Bucket DRR -->
+    <div class="px-4">
+      <div class="card-body">
+        <b-row class="align-items-center">
+          <b-col>
+            <h4>List Result (Down River Race)</h4>
+            <small class="text-muted">
+              Category active: {{ titleCategories || "-" }}
+            </small>
+          </b-col>
+          <b-col cols="12" md="6">
+            <b-form-group
+              label="Switch DRR Category:"
+              label-for="drrBucketSelect"
+              class="mb-0"
+            >
+              <b-form-select
+                id="drrBucketSelect"
+                :options="drrBucketOptions"
+                v-model="selectedDrrKey"
+                @change="onSelectDrrBucket"
+              />
+            </b-form-group>
+          </b-col>
+        </b-row>
+      </div>
+    </div>
+
     <!-- RESULT TABLE -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <h4>List Result (Down River Race)</h4>
         <b-row>
           <b-col>
             <div class="table-wrapper">
@@ -419,6 +446,10 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      drrBucketOptions: [],
+      drrBucketMap: Object.create(null),
+      selectedDrrKey: "",
+      currentBucket: null,
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
@@ -490,8 +521,18 @@ export default {
   },
   async mounted() {
     window.addEventListener("scroll", this.handleScroll);
-    const ok = this.loadFromRaceStartPayload();
-    if (!ok) await this.checkValueStorage();
+
+    // >>>> AMBIL LANGSUNG DARI DB (IPC) <<<<
+    await this.loadAllDrrBucketsFromDB();
+
+    // Fallback kalau dari DB kosong
+    if (!Array.isArray(this.participant) || this.participant.length === 0) {
+      this.loadAllDrrBucketsFromEvent(); // optional: tetap pakai eventDetails
+      if (!Array.isArray(this.participant) || this.participant.length === 0) {
+        const ok = this.loadFromRaceStartPayload();
+        if (!ok) await this.checkValueStorage();
+      }
+    }
 
     this.fetchDrrSectionCountFromSettings();
   },
@@ -499,6 +540,314 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    async loadAllDrrBucketsFromDB() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        // 1) sumber eventId
+        const bucketLS = getBucket();
+        const routeId =
+          this.$route && this.$route.params && this.$route.params.id
+            ? String(this.$route.params.id)
+            : "";
+        let eventDetailsId = "";
+        try {
+          const evRaw = localStorage.getItem("eventDetails");
+          const evObj = evRaw ? JSON.parse(evRaw) : null;
+          eventDetailsId =
+            evObj && (evObj._id || evObj.id)
+              ? String(evObj._id || evObj.id)
+              : "";
+        } catch {}
+
+        const finalEventId = bucketLS.eventId || routeId || eventDetailsId;
+
+        if (!finalEventId) {
+          console.warn(
+            "[DRR] eventId tidak ditemukan (payload/route/eventDetails)."
+          );
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+
+        // 2) panggil IPC
+        const filters = { eventId: finalEventId };
+        // SALAH: console.log(payload, 'tes') // payload belum ada di sini
+        console.log("[DRR] send filters:", filters);
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-registered:find-reply", (_e, payload) => {
+            console.log("[DRR] reply payload:", payload); // <- di sini boleh log payload
+            resolve(payload);
+          });
+          ipcRenderer.send("teams-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          console.warn("[DRR] IPC reply error:", res && res.error);
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+        if (!Array.isArray(res.items) || res.items.length === 0) {
+          console.warn("[DRR] items kosong dari DB untuk filters:", filters);
+          this.drrBucketOptions = [];
+          this.drrBucketMap = {};
+          return;
+        }
+
+        // 3) mapping → options + map + agregat
+        const map = Object.create(null);
+        const opts = [];
+
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "DRR",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        const toUpper = (v) => String(v || "").toUpperCase();
+
+        res.items.forEach((b) => {
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForDRR)
+            : [];
+
+          const bucketDoc = {
+            ...b,
+            eventName: toUpper(b.eventName),
+            initialName: toUpper(b.initialName),
+            raceName: toUpper(b.raceName),
+            divisionName: toUpper(b.divisionName),
+            teams: normalizedTeams,
+          };
+
+          const key = this._bucketKey(bucketDoc); // "eventId|initialId|raceId|divisionId"
+          const label = this._bucketLabel(bucketDoc); // "DIV RACE – INITIAL"
+
+          map[key] = bucketDoc;
+          opts.push({ value: key, text: label });
+
+          // agregat
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat tim di agregat (nameTeam+bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+          const aggKey = "__ALL_DRR__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All DRR Teams (aggregate)" });
+        }
+
+        // 4) commit ke state
+        this.drrBucketMap = map;
+        this.drrBucketOptions = opts;
+
+        // 5) pilih bucket default
+        const savedKey = localStorage.getItem("currentDRRBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useDrrBucket(savedKey);
+          this.selectedDrrKey = savedKey;
+          return;
+        }
+
+        const startKey = this._bucketKey({
+          eventId: finalEventId,
+          initialId: bucketLS.initialId,
+          raceId: bucketLS.raceId,
+          divisionId: bucketLS.divisionId,
+        });
+        if (map[startKey]) {
+          this._useDrrBucket(startKey);
+          this.selectedDrrKey = startKey;
+          return;
+        }
+
+        if (opts.length) {
+          this._useDrrBucket(opts[0].value); // biasanya agregat
+          this.selectedDrrKey = opts[0].value;
+        }
+      } catch (err) {
+        console.warn("loadAllDrrBucketsFromDB error:", err && err.message);
+      }
+    },
+    loadAllDrrBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+
+        // Ambil semua bucket yang eventName-nya DRR (case-insensitive)
+        const drrBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "DRR"
+        );
+
+        // siapkan map & options
+        const map = Object.create(null);
+        const opts = [];
+
+        // optional: opsi "All DRR Teams" sebagai agregat
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "DRR",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        drrBuckets.forEach((b) => {
+          const key = this._bucketKey(b);
+          const label = this._bucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForDRR)
+            : [];
+
+          map[key] = {
+            ...b,
+            teams: normalizedTeams,
+          };
+          opts.push({ value: key, text: label });
+
+          // gabungkan ke agregat
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat di agregat berdasarkan (nameTeam + bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+        }
+
+        // masukkan opsi aggregate paling atas kalau mau dipakai
+        if (agg.teams.length) {
+          const aggKey = "__ALL_DRR__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All DRR Teams (aggregate)" });
+        }
+
+        this.drrBucketMap = map;
+        this.drrBucketOptions = opts;
+
+        // pilih default:
+        // 1) restore dari localStorage, atau
+        // 2) kalau ada raceStartPayload dan bucket-nya DRR, pakai itu, atau
+        // 3) ambil opsi pertama
+        const savedKey = localStorage.getItem("currentDRRBucketKey");
+
+        if (savedKey && map[savedKey]) {
+          this._useDrrBucket(savedKey);
+          this.selectedDrrKey = savedKey;
+          return;
+        }
+
+        const { bucket } = loadRaceStartPayloadForDRR();
+        const startKey = bucket && this._bucketKey(bucket);
+        if (startKey && map[startKey]) {
+          this._useDrrBucket(startKey);
+          this.selectedDrrKey = startKey;
+          return;
+        }
+
+        if (opts.length) {
+          this._useDrrBucket(opts[0].value);
+          this.selectedDrrKey = opts[0].value;
+        }
+      } catch {
+        // biarkan fallback yang sudah ada (loadFromRaceStartPayload / checkValueStorage)
+      }
+    },
+
+    _useDrrBucket(key) {
+      const b = this.drrBucketMap[key];
+      if (!b) return;
+
+      // set participant & judul
+      this.participant = (b.teams || []).map((t) => ({ ...t }));
+      this.titleCategories = b._isAggregate
+        ? "ALL DIVISION/RACE – ALL INITIAL (DRR)"
+        : this._bucketLabel(b);
+
+      // set bucket aktif (dipakai Save)
+      this.currentBucket = b._isAggregate
+        ? null // aggregate tidak punya ID → Save dinonaktifkan atau diarahkan untuk pilih bucket spesifik
+        : {
+            eventId: String(b.eventId || ""),
+            initialId: String(b.initialId || ""),
+            raceId: String(b.raceId || ""),
+            divisionId: String(b.divisionId || ""),
+            eventName: String(b.eventName || "").toUpperCase(),
+            initialName: String(b.initialName || "").toUpperCase(),
+            raceName: String(b.raceName || "").toUpperCase(),
+            divisionName: String(b.divisionName || "").toUpperCase(),
+          };
+
+      // simpan pilihan terakhir
+      localStorage.setItem("currentDRRBucketKey", key);
+
+      // sesuaikan jumlah section bila setting berbeda
+      this.applyDrrSectionCount(this.drrSectionsCount);
+
+      if (this.currentBucket && typeof ipcRenderer !== "undefined") {
+        ipcRenderer.send("race-settings:get", this.currentBucket.eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          let count = 3;
+          if (res && res.ok && res.settings && res.settings.drr) {
+            const c = parseInt(res.settings.drr.totalSection, 10);
+            if (Number.isFinite(c) && c > 0) count = c;
+          }
+          this.applyDrrSectionCount(count);
+        });
+      }
+    },
+
+    onSelectDrrBucket(key) {
+      console.log(key, "<<< cek key");
+      this._useDrrBucket(key);
+    },
+    _bucketKey(b) {
+      // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil
+      const ei = String(b.eventId || "");
+      const ii = String(b.initialId || "");
+      const ri = String(b.raceId || "");
+      const di = String(b.divisionId || "");
+      return [ei, ii, ri, di].join("|");
+    },
+    _bucketLabel(b) {
+      // contoh label: "R4 MEN – JUNIOR"
+      const div = String(b.divisionName || "").toUpperCase();
+      const rac = String(b.raceName || "").toUpperCase();
+      const ini = String(b.initialName || "").toUpperCase();
+      return `${div} ${rac} – ${ini}`;
+    },
     _resizePenaltySections(arr, targetLen) {
       const out = Array.isArray(arr) ? arr.slice(0, targetLen) : [];
       while (out.length < targetLen) out.push("");
@@ -845,9 +1194,19 @@ export default {
         });
         return;
       }
-      const bucket = getBucket();
+
+      if (!this.currentBucket) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail:
+            "Silakan pilih kategori DRR spesifik (bukan aggregate) sebelum menyimpan.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+
       const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
+      const missing = must.filter((k) => !this.currentBucket[k]);
       if (missing.length) {
         ipcRenderer.send("get-alert", {
           type: "error",
@@ -856,7 +1215,8 @@ export default {
         });
         return;
       }
-      const docs = buildResultDocs(clean, bucket);
+
+      const docs = buildResultDocs(clean, this.currentBucket);
       ipcRenderer.send("insert-drr-result", docs);
       ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
         if (res && res.ok) {

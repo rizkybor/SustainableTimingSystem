@@ -12,6 +12,8 @@ const {
   getEventById,
 } = require("../controllers/GET/getEvent.js");
 
+const { getRegistered } = require("../controllers/GET/getRegistered.js");
+
 const {
   getOptionLevel,
   getOptionCategoriesEvent,
@@ -97,7 +99,7 @@ function setupIPCMainHandlers() {
   // Update user
   ipcMain.on("users:update", async (event, { userId, payload }) => {
     try {
-      console.log(userId, payload,'<<< UPDATE IPC USER')
+      console.log(userId, payload, "<<< UPDATE IPC USER");
       const updated = await updateUser(userId, payload);
       event.reply("users:update:reply", { ok: true, user: updated });
     } catch (err) {
@@ -538,6 +540,13 @@ function setupIPCMainHandlers() {
         error: String(error),
       });
     }
+  });
+
+  // GET: satu user by email (jika perlu prefill individual)
+  ipcMain.on("teams-registered:find", async (event, filters) => {
+    const res = await getRegistered(filters || {});
+    console.log(res,'<<< CEK IPC RES')
+    event.sender.send("teams-registered:find-reply", res);
   });
 
   // =========================

@@ -223,12 +223,19 @@
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
-                    <td style="text-align: start" class="large-bold text-strong max-char">
+                    <td
+                      style="text-align: start"
+                      class="large-bold text-strong max-char"
+                    >
                       {{ item.nameTeam }}
                     </td>
-                    <td class="text-center large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-center text-monospace">{{ item.result.startTime }}</td>
-                    <td class="text-center text-monospace">{{ item.result.finishTime }}</td>
+                    <td class="text-center">{{ item.bibTeam }}</td>
+                    <td class="text-center text-monospace">
+                      {{ item.result.startTime }}
+                    </td>
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
@@ -236,6 +243,7 @@
                     <!-- Pen Start -->
                     <td class="text-center">
                       <b-select
+                        class="small-select"
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyStartTime"
                         :placeholder="'Penalty Start'"
@@ -289,6 +297,7 @@
                     <!-- Pen Finish -->
                     <td class="text-center">
                       <b-select
+                        class="small-select"
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyFinishTime"
                         :placeholder="'Penalty Finish'"
@@ -309,28 +318,44 @@
                       </b-select>
                     </td>
 
-                    <td class="text-center large-bold penalty-char text-monospace">
+                    <td
+                      class="text-center large-bold penalty-char text-monospace"
+                    >
                       {{ item.result.penaltyTime }}
                     </td>
-                    <td class="text-center large-bold result-char text-monospace">
+                    <td
+                      class="text-center large-bold result-char text-monospace"
+                    >
                       {{
                         item.result.penaltyTime
                           ? item.result.totalTime
                           : item.result.raceTime
                       }}
                     </td>
-                    <td class="text-center large-bold">{{ item.result.ranked }}</td>
+                    <td class="text-center large-bold">
+                      {{ item.result.ranked }}
+                    </td>
                     <td class="text-center large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>
 
                     <td v-if="editResult">
-                      <b-button
+                      <!-- <b-button
                         size="sm"
                         variant="warning"
                         @click="openModal(item)"
                         >Edit</b-button
+                      > -->
+
+                      <b-button
+                        size="sm"
+                        class="btn-action"
+                        variant="danger"
+                        @click="resetRow(item)"
+                        title="Reset this row"
                       >
+                        Reset
+                      </b-button>
                     </td>
                   </tr>
                 </tbody>
@@ -358,7 +383,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { SerialPort } from "serialport";
+import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
@@ -567,6 +592,10 @@ export default {
       serialCtrl: null,
       endGame: false,
       isScrolled: false,
+      port: null,
+      isPortConnected: false,
+      digitId: [],
+      digitTime: [],
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
       selectedDrrKey: "",
@@ -574,10 +603,6 @@ export default {
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
       dataPenalties: [
         { label: "0", value: 0, timePen: "00:00:00.000" },
         { label: "+ 10", value: 10, timePen: "00:00:10.000" },
@@ -722,6 +747,140 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        console.log(this.serialCtrl, "<<<< cek");
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
+    // === END CONNECTION ===
+
+    // === NOTIFY ===
+    notify(type, detail, message = "Info") {
+      if (this.$ipc || (window && window.ipcRenderer)) {
+        const ir = this.$ipc || window.ipcRenderer;
+        ir.send && ir.send("get-alert", { type, detail, message });
+      }
+      // bisa juga set state:
+      this.lastErrorMessage = `${message}: ${detail}`;
+    },
+
+    notifyError(err, message = "Error") {
+      const detail =
+        (err && (err.message || err.toString())) || "Unknown error";
+      this.notify("error", detail, message);
+    },
+    // ======
+    resetRow(item) {
+      if (!item || !item.result) return;
+
+      // panjang penalty section mengikuti setting saat ini
+      var secLen =
+        Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+          ? this.drrSectionsCount
+          : 3;
+
+      // kosongkan waktu utama
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+
+      // kosongkan penalti DRR
+      item.result.penaltyStartTime = "";
+      item.result.penaltyFinishTime = "";
+
+      var emptySections = Array.from({ length: secLen }, function () {
+        return "";
+      });
+      if (this.$set) this.$set(item.result, "penaltySection", emptySections);
+      else item.result.penaltySection = emptySections;
+
+      item.result.penaltyTime = "";
+      item.result.totalTime = "";
+
+      // peringkat & skor
+      item.result.ranked = "";
+      item.result.score = "";
+
+      // jika masih ada field model lama (sprint), aman-kan:
+      if (typeof item.result.startPenalty !== "undefined")
+        item.result.startPenalty = 0;
+      if (typeof item.result.finishPenalty !== "undefined")
+        item.result.finishPenalty = 0;
+      if (typeof item.result.totalPenalty !== "undefined")
+        item.result.totalPenalty = 0;
+
+      // re-assign ranking setelah reset
+      this.assignRanks(this.participant);
+
+      // paksa re-render jika diperlukan
+      if (this.$forceUpdate) this.$forceUpdate();
+    },
     buildStaticDrrOptions() {
       const eventId = this.currentEventId; // pakai ID event aktif (bukan "4")
       if (!eventId) return;
@@ -1368,74 +1527,6 @@ export default {
       this.participant = arr;
     },
 
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ok = await this.setupSerialListener();
-        if (ok) {
-          this.isPortConnected = true;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      if (this.port && this.port.isOpen) this.port.close();
-      this.isPortConnected = false;
-    },
-
-    async setupSerialListener() {
-      try {
-        const ports = await SerialPort.list();
-        if (!ports || ports.length === 0) return false;
-        this.currentPort = ports;
-        const selectedPort = ports[6] || ports[5] || ports[ports.length - 1];
-        if (!selectedPort || !selectedPort.path) return false;
-        this.port = new SerialPort({ path: selectedPort.path, baudRate: 9600 });
-
-        let receivedData = "";
-        let a = "",
-          b = "";
-        this.port.on("data", (data) => {
-          const newData = data.toString();
-          receivedData += newData;
-          for (let i = 0; i < receivedData.length; i++) {
-            const ch = receivedData[i];
-            if (ch === "M" || ch === "R") {
-              a = receivedData.slice(0, i + 1);
-              b = receivedData.slice(i + 1);
-              receivedData = "";
-              break;
-            }
-          }
-          this.digitId.unshift(a);
-          this.digitTime.unshift(b);
-          if (a[11] == "0") {
-            this.digitTimeStart = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          } else if (a[11] == "2") {
-            this.digitTimeFinish = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          }
-          return true;
-        });
-        return true;
-      } catch (e) {
-        logger.warn("❌ Failed to update race settings:", e && e.message);
-        return false;
-      }
-    },
-
     async updateTime(val, id, title) {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
       if (title === "start") this.participant[id].result.startTime = val;
@@ -1712,15 +1803,16 @@ td {
   font-size: 1.2rem;
   font-weight: bold;
 }
-.text-strong {
-  color: #000;
-}
 .max-char {
   max-width: 260px;
   word-wrap: break-word;
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.text-strong {
+  color: #000;
 }
 .penalty-char {
   color: red;

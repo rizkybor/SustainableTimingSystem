@@ -139,7 +139,7 @@
               <tr>
                 <th rowspan="2">No</th>
                 <th class="text-center" rowspan="2">Team Name</th>
-                <th class="text-center" rowspan="2">BIB</th>
+                <th class="text-center" rowspan="2">BIB Number</th>
                 <!-- Judul grup penalties: S + 1..N + F -->
                 <th
                   v-if="!penaltiesWrapped"
@@ -148,7 +148,7 @@
                   @click="penaltiesWrapped = true"
                   title="Klik untuk bungkus (wrap) penalties"
                 >
-                  Penalties
+                  Penalty Gates
                 </th>
                 <!-- Mode wrapped: cuma 1 kolom -->
                 <th
@@ -158,10 +158,10 @@
                   @click="penaltiesWrapped = false"
                   title="Klik untuk tampilkan penuh (un-wrap) penalties"
                 >
-                  Penalties
+                  Penalty Gates
                 </th>
 
-                <th rowspan="2">Total Penalty</th>
+                <th class="text-center" rowspan="2">Penalty Total</th>
 
                 <th class="text-center" rowspan="2">Penalty Time</th>
                 <th class="text-center" rowspan="2">Start Time</th>

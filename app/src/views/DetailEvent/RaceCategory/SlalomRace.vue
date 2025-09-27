@@ -410,7 +410,10 @@
                 <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).finishTime || "-" }}
                 </td>
-                <td class="text-center large-bold text-monospace" style="min-width: 120px">
+                <td
+                  class="text-center large-bold text-monospace"
+                  style="min-width: 120px"
+                >
                   {{ currentSession(team).raceTime || "-" }}
                 </td>
                 <td
@@ -419,11 +422,25 @@
                 >
                   {{ currentSession(team).totalTime || "-" }}
                 </td>
-                <td
+                <!-- <td
                   class="text-center large-bold text-monospace best-time-cell"
                   style="min-width: 120px"
                 >
                   {{ calculateBestTime(team) || "-" }}
+                </td> -->
+                <td
+                  class="text-center large-bold text-monospace best-time-cell"
+                  style="min-width: 120px"
+                  :title="
+                    bestRunOf(team)
+                      ? 'Best time diambil dari Run ' + bestRunOf(team)
+                      : ''
+                  "
+                >
+                  <small v-if="bestRunOf(team)" class="best-time-tag mb-3"
+                    >Best Time Run {{ bestRunOf(team) }}</small
+                  >
+                  <div>{{ calculateBestTime(team) || "-" }}</div>
                 </td>
                 <td style="min-width: 120px" class="text-center large-bold">
                   {{ rankOf(team._id) }}
@@ -834,6 +851,28 @@ export default {
       this.baudRate = br;
     },
     // === END CONNECTION ===
+
+    bestTimeWithRun(team) {
+      const msList = (team.sessions || [])
+        .map((s) => s && s.totalTime)
+        .map((t) => (t ? hmsToMs(t) : Infinity));
+
+      let best = Infinity,
+        runIndex = null;
+      msList.forEach((ms, i) => {
+        if (Number.isFinite(ms) && ms < best) {
+          best = ms;
+          runIndex = i; // 0-based
+        }
+      });
+
+      if (!Number.isFinite(best)) return { time: "", run: null };
+      return { time: msToHMSms(best), run: runIndex + 1 }; // 1-based untuk UI
+    },
+
+    bestRunOf(team) {
+      return this.bestTimeWithRun(team).run; // 1 atau 2, atau null jika belum ada
+    },
     setRun(idx) {
       this.activeRun = idx;
       // sinkronkan pilihan sesi untuk semua tim
@@ -1129,7 +1168,18 @@ export default {
 
 <style scoped>
 /* ===== STYLING BEST TIME RACETIME ===== */
-/* ===== STYLING BEST TIME RACETIME ===== */
+.best-time-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
 .best-time-cell {
   background: linear-gradient(135deg, #fff8dc, #ffd700, #ffcc00, #ffb700);
   color: #000;

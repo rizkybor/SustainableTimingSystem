@@ -2567,7 +2567,7 @@ table {
   overflow: hidden;
 }
 thead {
-  background: #4a4a4a;
+  background: #383838;
   color: #fff;
   font-weight: 600;
 }

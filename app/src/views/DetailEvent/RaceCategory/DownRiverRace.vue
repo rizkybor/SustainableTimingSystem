@@ -200,7 +200,7 @@
 
                     <!-- Pen Section -->
                     <td>
-                      <div class="d-flex flex-column">
+                      <div class="pen-grid">
                         <b-select
                           v-for="sIdx in drrSectionsCount"
                           :key="sIdx"
@@ -1511,6 +1511,29 @@ export default {
 </script>
 
 <style scoped>
+.pen-grid {
+  display: grid;
+  /* isi 3 baris dulu (kebawah), lalu lanjut buat kolom baru ke samping */
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  grid-column-gap: 8px; /* jarak antar kolom */
+  grid-row-gap: 6px;    /* jarak antar item vertikal */
+  align-items: start;
+}
+
+/* opsional: biar select-nya konsisten */
+.small-select {
+  width: 140px;
+  min-width: 120px;
+}
+
+/* responsif: di layar kecil, batasi 2 per kolom */
+@media (max-width: 576px) {
+  .pen-grid {
+    grid-template-rows: repeat(2, auto);
+  }
+}
+
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;

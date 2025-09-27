@@ -173,9 +173,9 @@
     />
 
     <!-- Selector Bucket DRR -->
-    <div class="px-4 mt-2">
+    <div class="px-4">
       <div class="card-body">
-        <b-row class="align-items-center">
+        <b-row class="align-items-center py-2">
           <b-col>
             <h4>Output Racetime :</h4>
             <small class="text-muted">
@@ -183,18 +183,42 @@
             </small>
           </b-col>
           <b-col cols="12" md="6">
-            <b-form-group
-              label="Switch DRR Category:"
-              label-for="drrBucketSelect"
-            >
-              <b-form-select
-                style="border-radius: 12px; cursor: pointer"
-                id="drrBucketSelect"
-                :options="drrBucketOptions"
-                v-model="selectedDrrKey"
-                @change="onSelectDrrBucket"
-              />
-            </b-form-group>
+            <div class="drr-actionbar">
+              <b-form-group
+                label="Switch DRR Category:"
+                label-for="drrBucketSelect"
+                class="mb-0 drr-actionbar__select"
+              >
+                <b-form-select
+                  id="drrBucketSelect"
+                  :options="drrBucketOptions"
+                  v-model="selectedDrrKey"
+                  @change="onSelectDrrBucket"
+                />
+              </b-form-group>
+
+              <div class="drr-actionbar__buttons">
+                <button
+                  type="button"
+                  class="btn-action btn-secondary"
+                  @click="saveResult"
+                  :disabled="!currentBucket || !participantArr.length"
+                  title="Simpan hasil untuk bucket yang dipilih"
+                >
+                  <Icon icon="icon-park-outline:save" /> Save Result
+                </button>
+
+                <button
+                  type="button"
+                  class="btn-action btn-info"
+                  @click="toggleSortRanked"
+                  :disabled="!participantArr.length"
+                  title="Urutkan berdasarkan rank naik/turun"
+                >
+                  <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+                </button>
+              </div>
+            </div>
           </b-col>
         </b-row>
 
@@ -1677,6 +1701,41 @@ export default {
 </script>
 
 <style scoped>
+/* --- DRR Action Bar --- */
+.drr-actionbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap; /* biar rapi saat layar kecil */
+}
+
+.drr-actionbar__select {
+  min-width: 260px;
+  flex: 1 1 260px;
+}
+
+.drr-actionbar__select #drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.drr-actionbar__buttons {
+  display: inline-flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767.98px) {
+  .drr-actionbar {
+    align-items: stretch;
+  }
+  .drr-actionbar__buttons {
+    width: 100%;
+    justify-content: flex-end; /* tombol rata kanan saat turun ke baris baru */
+  }
+}
+
 .pen-grid {
   display: grid;
   /* isi 3 baris dulu (kebawah), lalu lanjut buat kolom baru ke samping */

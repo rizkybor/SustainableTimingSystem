@@ -304,7 +304,7 @@
                     <div class="p-item">
                       <div class="p-label">S</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].startPenalty
                         "
@@ -323,7 +323,7 @@
                     >
                       <div class="p-label">{{ gi + 1 }}</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].penalties[gi]
                         "
@@ -338,7 +338,7 @@
                     <div class="p-item">
                       <div class="p-label">F</div>
                       <b-form-select
-                        class="p-select"
+                        class="small-select"
                         v-model="
                           team.sessions[selectedSession[team._id]].finishPenalty
                         "
@@ -357,6 +357,7 @@
                   <td>
                     <b-form-select
                       style="min-width: 50px; border-radius: 12px"
+                      class="small-select"
                       v-model="
                         team.sessions[selectedSession[team._id]].startPenalty
                       "
@@ -372,6 +373,7 @@
                     :key="team._id + '-' + gi"
                   >
                     <b-form-select
+                      class="small-select"
                       style="min-width: 50px; border-radius: 12px"
                       v-model="
                         team.sessions[selectedSession[team._id]].penalties[gi]
@@ -385,6 +387,7 @@
                   <!-- F -->
                   <td>
                     <b-form-select
+                      class="small-select"
                       style="min-width: 50px; border-radius: 12px"
                       v-model="
                         team.sessions[selectedSession[team._id]].finishPenalty
@@ -920,7 +923,7 @@ export default {
       } catch (e) {
         /* no-op */
       }
-        this.checkEndGameStatus();
+      this.checkEndGameStatus();
     },
 
     bestTimeWithRun(team) {
@@ -947,8 +950,7 @@ export default {
     setRun(idx) {
       this.activeRun = idx;
       this.teams.forEach((t) => this.$set(this.selectedSession, t._id, idx));
-        this.checkEndGameStatus();
-
+      this.checkEndGameStatus();
     },
     async fetchSlalomGateCountFromSettings() {
       try {
@@ -1240,6 +1242,20 @@ export default {
 </script>
 
 <style scoped>
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
+}
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
 /* ===== Buttons ===== */
 .btn-action {
   background: #ffffff;
@@ -1456,17 +1472,6 @@ td {
   line-height: 1;
   margin-bottom: 2px;
   color: #666;
-}
-
-/* Lebarkan sedikit select agar enak dilihat */
-::v-deep .p-select .custom-select,
-.p-select .custom-select,
-.p-select :deep(.custom-select) {
-  min-width: 56px; /* set 56–72px sesuai selera */
-  padding-left: 6px;
-  padding-right: 18px;
-  height: 28px;
-  font-size: 12px;
 }
 
 /* Responsif: jika layar sempit, kurangi kolom grid */

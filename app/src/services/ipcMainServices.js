@@ -99,7 +99,6 @@ function setupIPCMainHandlers() {
   // Update user
   ipcMain.on("users:update", async (event, { userId, payload }) => {
     try {
-      console.log(userId, payload, "<<< UPDATE IPC USER");
       const updated = await updateUser(userId, payload);
       event.reply("users:update:reply", { ok: true, user: updated });
     } catch (err) {
@@ -134,7 +133,6 @@ function setupIPCMainHandlers() {
         buttons: ["OK"],
       };
 
-      // Menggabungkan default options dengan options yang diterima dari renderer
       const mergedOptions = { ...defaultOptions, ...options };
       dialog.showMessageBox(null, mergedOptions, (response) => {
         console.log("You clicked:", mergedOptions.buttons[response]);
@@ -251,7 +249,6 @@ function setupIPCMainHandlers() {
           idToLog = String(payload._id);
         }
       }
-      console.log("[update-event-poster]", idToLog, "=>", r);
 
       evt.reply("update-event-poster-reply", r);
     } catch (err) {
@@ -470,7 +467,6 @@ function setupIPCMainHandlers() {
       const ok = await updateTeamById(payload);
       event.reply("teams:update-reply", { ok });
     } catch (e) {
-      console.error("teams:update error:", e);
       event.reply("teams:update-reply", {
         ok: false,
         error: String((e && e.message) || e),
@@ -495,18 +491,6 @@ function setupIPCMainHandlers() {
   // Teams Registered Function
   // ========================================================================
 
-  // main process
-  // ipcMain.on("get-teams-registered", async (event, identity) => {
-  //     try {
-  //       const bucket = await getTeamsRegistered(identity);
-  //       console.log(bucket,'<< BUCKET')
-  //       event.reply("get-teams-registered-reply", bucket || null);
-  //     } catch (err) {
-  //       console.error("get-teams-registered error:", err);
-  //       event.reply("get-teams-registered-reply", null);
-  //     }
-  //   });
-
   ipcMain.on("get-teams-registered", async (event, identity) => {
     try {
       const res = await getTeamsRegistered(identity);
@@ -521,7 +505,6 @@ function setupIPCMainHandlers() {
       const data = await deleteTeamInBucket(payload);
       event.reply("delete-team-in-bucket-reply", data);
     } catch (error) {
-      console.error("delete-team-in-bucket error:", error);
       event.reply("delete-team-in-bucket-reply", {
         ok: false,
         error: String(error),
@@ -534,7 +517,6 @@ function setupIPCMainHandlers() {
       const ok = await upsertTeamsRegistered(bucket);
       event.reply("upsert-teams-registered-reply", { ok });
     } catch (error) {
-      console.error("upsert-teams-registered error:", error);
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
@@ -545,7 +527,6 @@ function setupIPCMainHandlers() {
   // GET: satu user by email (jika perlu prefill individual)
   ipcMain.on("teams-registered:find", async (event, filters) => {
     const res = await getRegistered(filters || {});
-    console.log(res,'<<< CEK IPC RES')
     event.sender.send("teams-registered:find-reply", res);
   });
 
@@ -601,11 +582,9 @@ function setupIPCMainHandlers() {
 ipcMain.on("users-judges-assignment:upsertMany", async (event, payload) => {
   try {
     var arr = [];
-    console.log(event, payload, "<<< READ IPC MAIN");
     if (payload && Array.isArray(payload.docs)) arr = payload.docs;
 
     var result = await upsertManyUserJudgeAssignments(arr);
-    console.log(result, "<<< RESULT IPC MAIN");
     event.sender.send("users-judges-assignment:upsertMany:reply", {
       ok: true,
       result: result,

@@ -170,7 +170,7 @@
       @update-time="updateTime"
     />
 
-    <!-- LIST RESULT -->
+    <!-- RACETIME OUTPUT -->
     <div class="px-4 mt-2">
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
@@ -195,13 +195,15 @@
             </button>
           </div>
         </div>
+
+        
         <b-row>
           <b-col>
             <table class="table">
               <thead>
                 <tr>
                   <th class="text-center">No</th>
-                  <th class="text-start">Team Name</th>
+                  <th class="text-left">Team Name</th>
                   <th class="text-center">BIB Number</th>
                   <th class="text-center">Start Time</th>
                   <th class="text-center">Finish Time</th>

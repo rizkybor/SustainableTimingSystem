@@ -48,18 +48,18 @@
           <tr v-if="draft" class="row-card">
             <td class="muted">1</td>
             <td>
-                <b-form-group label="Pilih Tim" class="mb-2">
-                  <SearchableSelect
-                    v-model="draft.teamId"
-                    :options="selectOptions"
-                    placeholder="Select team name"
-                    search-placeholder="Select team name"
-                    :clearable="true"
-                    :show-empty-option="true"
-                    @input="onPickTeam"
-                    class="ss-inline"
-                  />
-                </b-form-group>
+              <b-form-group label="Pilih Tim" class="mb-2">
+                <SearchableSelect
+                  v-model="draft.teamId"
+                  :options="selectOptions"
+                  placeholder="Select team name"
+                  search-placeholder="Select team name"
+                  :clearable="true"
+                  :show-empty-option="true"
+                  @input="onPickTeam"
+                  class="ss-inline"
+                />
+              </b-form-group>
             </td>
             <td>
               <input
@@ -312,7 +312,6 @@ export default {
   box-shadow: 0 0 0 4px rgba(42, 104, 196, 0.15);
 }
 
-
 /* ===== Tombol aksi (kanan) ===== */
 .text-right {
   text-align: right;
@@ -350,6 +349,16 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+  transition: all 0.25s ease;
+}
+
+/* Hover effect */
+.btn-add:hover {
+  background: #f0f8ff; /* biru muda lembut */
+  border-color: #1c4c7a;
+  color: #0d2f4f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
 }
 
 /* ==== SearchableSelect tweaks agar mirip mockup ==== */

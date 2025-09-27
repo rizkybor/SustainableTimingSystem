@@ -52,7 +52,7 @@
               <label class="mb-0 font-weight-500">Total Gate</label>
             </div>
             <b-form-spinbutton
-              style="border-radius: 10px;"
+              style="border-radius: 10px"
               v-model="draft.slalom.totalGate"
               :max="maxGate"
               :min="minGate"
@@ -75,7 +75,7 @@
               <label class="mb-0 font-weight-500">Total Section</label>
             </div>
             <b-form-spinbutton
-              style="border-radius: 10px;"
+              style="border-radius: 10px"
               v-model="draft.drr.totalSection"
               :min="minSection"
               :max="maxSection"
@@ -99,8 +99,8 @@
           >
           <b-button
             style="border-radius: 12px"
-            variant="info"
-            class="px-4"
+            class="px-4 btn-confirm"
+            variant="outline-primary"
             @click="confirm"
             >Update</b-button
           >
@@ -346,5 +346,33 @@ export default {
 
 .rs-switch .custom-control-label {
   cursor: pointer;
+}
+
+/* base */
+.btn.btn-confirm {
+  background: #f0f8ff;
+  color: #325a8f;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+  transition: all 0.25s ease;
+  border: 1px solid #cfd8e6;
+}
+
+/* hover */
+.btn.btn-confirm:hover {
+  background: #325a8f;
+  color: #ffffff;
+  border-color: #325a8f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
+}
+
+/* active (klik/tahan) */
+.btn.btn-confirm:active,
+.btn.btn-confirm:focus {
+  background: #0d789d;
+  color: #ffffff;
+  border-color: #0d789d;
 }
 </style>

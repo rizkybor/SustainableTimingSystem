@@ -205,37 +205,37 @@
               <table class="table" aria-label="Scrollable results table">
                 <thead>
                   <tr>
-                    <th>No</th>
-                    <th>Team Name</th>
-                    <th>BIB</th>
-                    <th>Start Time</th>
-                    <th>Finish Time</th>
-                    <th>Race Time</th>
-                    <th>Pen Start</th>
-                    <th>Pen Section</th>
-                    <th>Pen Finish</th>
-                    <th>Pen Total</th>
-                    <th>Result</th>
-                    <th>Ranked</th>
-                    <th>Score</th>
+                    <th style="text-align: center">No</th>
+                    <th style="text-align: start">Team Name</th>
+                    <th style="text-align: center">BIB Number</th>
+                    <th style="text-align: center">Start Time</th>
+                    <th style="text-align: center">Finish Time</th>
+                    <th style="text-align: center">Race Time</th>
+                    <th style="text-align: center">Penalty Start</th>
+                    <th style="text-align: center">Penalty Section</th>
+                    <th style="text-align: center">Penalty Finish</th>
+                    <th style="text-align: center">Penalty Total</th>
+                    <th style="text-align: center">Result</th>
+                    <th style="text-align: center">Ranked</th>
+                    <th style="text-align: center">Score</th>
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
-                    <td>{{ index + 1 }}</td>
-                    <td class="large-bold text-strong max-char">
+                    <td style="text-align: center">{{ index + 1 }}</td>
+                    <td style="text-align: start" class="large-bold text-strong max-char">
                       {{ item.nameTeam }}
                     </td>
-                    <td class="large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-monospace">{{ item.result.startTime }}</td>
-                    <td class="text-monospace">{{ item.result.finishTime }}</td>
-                    <td class="large-bold text-monospace">
+                    <td style="text-align: center" class="large-bold">{{ item.bibTeam }}</td>
+                    <td style="text-align: center" class="text-monospace">{{ item.result.startTime }}</td>
+                    <td style="text-align: center" class="text-monospace">{{ item.result.finishTime }}</td>
+                    <td style="text-align: center" class="large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
 
                     <!-- Pen Start -->
-                    <td>
+                    <td style="text-align: center">
                       <b-select
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyStartTime"
@@ -258,7 +258,7 @@
                     </td>
 
                     <!-- Pen Section -->
-                    <td>
+                    <td style="text-align: center">
                       <div class="pen-grid">
                         <b-select
                           v-for="sIdx in drrSectionsCount"
@@ -288,7 +288,7 @@
                     </td>
 
                     <!-- Pen Finish -->
-                    <td>
+                    <td style="text-align: center">
                       <b-select
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyFinishTime"
@@ -310,18 +310,18 @@
                       </b-select>
                     </td>
 
-                    <td class="large-bold penalty-char text-monospace">
+                    <td style="text-align: center" class="large-bold penalty-char text-monospace">
                       {{ item.result.penaltyTime }}
                     </td>
-                    <td class="large-bold result-char text-monospace">
+                    <td style="text-align: center" class="large-bold result-char text-monospace">
                       {{
                         item.result.penaltyTime
                           ? item.result.totalTime
                           : item.result.raceTime
                       }}
                     </td>
-                    <td class="large-bold">{{ item.result.ranked }}</td>
-                    <td class="large-bold">
+                    <td style="text-align: center" class="large-bold">{{ item.result.ranked }}</td>
+                    <td style="text-align: center" class="large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>
 
@@ -1675,7 +1675,6 @@ thead {
 }
 thead th {
   padding: 12px 15px;
-  text-align: left;
   font-size: 14px;
   border-bottom: 2px solid #f1f1f1;
 }

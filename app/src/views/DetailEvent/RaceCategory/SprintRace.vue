@@ -200,38 +200,38 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>Team Name</th>
-                  <th>BIB Number</th>
-                  <th>Start Time</th>
-                  <th>Finish Time</th>
-                  <th>Race Time</th>
+                  <th style="text-align: center">No</th>
+                  <th style="text-align: start">Team Name</th>
+                  <th style="text-align: center">BIB Number</th>
+                  <th style="text-align: center">Start Time</th>
+                  <th style="text-align: center">Finish Time</th>
+                  <th style="text-align: center">Race Time</th>
 
                   <!-- urutan baru -->
-                  <th>Start Penalties</th>
+                  <th style="text-align: center">Penalty Start</th>
                   <!-- REMOVED: Penalties (legacy/middle) column -->
-                  <th>Finish Penalties</th>
-                  <th>Total Penalties</th>
-                  <th>Penalty Time</th>
+                  <th style="text-align: center">Penalty Finish</th>
+                  <th style="text-align: center">Penalty Total</th>
+                  <th style="text-align: center">Penalty Time</th>
 
-                  <th>Result</th>
-                  <th>Ranked</th>
-                  <th>Score</th>
+                  <th style="text-align: center">Result</th>
+                  <th style="text-align: center">Ranked</th>
+                  <th style="text-align: center">Score</th>
                   <th v-if="endGame">Action</th>
                 </tr>
               </thead>
 
               <tbody>
                 <tr v-for="(item, index) in participantArr" :key="index">
-                  <td>{{ index + 1 }}</td>
-                  <td>{{ item.nameTeam }}</td>
-                  <td>{{ item.bibTeam }}</td>
-                  <td>{{ item.result.startTime }}</td>
-                  <td>{{ item.result.finishTime }}</td>
-                  <td>{{ item.result.raceTime }}</td>
+                  <td style="text-align: center">{{ index + 1 }}</td>
+                  <td style="text-align: start">{{ item.nameTeam }}</td>
+                  <td style="text-align: center">{{ item.bibTeam }}</td>
+                  <td style="text-align: center">{{ item.result.startTime }}</td>
+                  <td style="text-align: center">{{ item.result.finishTime }}</td>
+                  <td style="text-align: center">{{ item.result.raceTime }}</td>
 
                   <!-- Start Penalties -->
-                  <td>
+                  <td style="text-align: center">
                     <b-select
                       v-if="item.result.startTime"
                       v-model.number="item.result.startPenalty"
@@ -251,7 +251,7 @@
                   <!-- REMOVED: Penalties (legacy / middle) select -->
 
                   <!-- Finish Penalties -->
-                  <td>
+                  <td style="text-align: center">
                     <b-select
                       v-if="item.result.finishTime"
                       v-model.number="item.result.finishPenalty"
@@ -269,20 +269,20 @@
                   </td>
 
                   <!-- Total Penalties (detik) -->
-                  <td>{{ item.result.totalPenalty }}</td>
+                  <td style="text-align: center">{{ item.result.totalPenalty }}</td>
 
                   <!-- Penalty Time total (format waktu) -->
-                  <td>{{ item.result.penaltyTime }}</td>
+                  <td style="text-align: center">{{ item.result.penaltyTime }}</td>
 
-                  <td>
+                  <td style="text-align: center">
                     {{
                       item.result.penaltyTime
                         ? item.result.totalTime
                         : item.result.raceTime
                     }}
                   </td>
-                  <td>{{ item.result.ranked }}</td>
-                  <td>{{ getScoreByRanked(item.result.ranked) }}</td>
+                  <td style="text-align: center">{{ item.result.ranked }}</td>
+                  <td style="text-align: center">{{ getScoreByRanked(item.result.ranked) }}</td>
                   <td v-if="endGame">
                     <!-- <button
                       type="button"

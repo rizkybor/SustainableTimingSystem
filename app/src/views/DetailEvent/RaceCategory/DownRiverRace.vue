@@ -1,4 +1,3 @@
-<
 <template>
   <div>
     <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
@@ -205,37 +204,37 @@
               <table class="table" aria-label="Scrollable results table">
                 <thead>
                   <tr>
-                    <th style="text-align: center">No</th>
+                    <th class="text-center">No</th>
                     <th style="text-align: start">Team Name</th>
-                    <th style="text-align: center">BIB Number</th>
-                    <th style="text-align: center">Start Time</th>
-                    <th style="text-align: center">Finish Time</th>
-                    <th style="text-align: center">Race Time</th>
-                    <th style="text-align: center">Penalty Start</th>
-                    <th style="text-align: center">Penalty Section</th>
-                    <th style="text-align: center">Penalty Finish</th>
-                    <th style="text-align: center">Penalty Total</th>
-                    <th style="text-align: center">Result</th>
-                    <th style="text-align: center">Ranked</th>
-                    <th style="text-align: center">Score</th>
+                    <th class="text-center">BIB Number</th>
+                    <th class="text-center">Start Time</th>
+                    <th class="text-center">Finish Time</th>
+                    <th class="text-center">Race Time</th>
+                    <th class="text-center">Penalty Start</th>
+                    <th class="text-center">Penalty Section</th>
+                    <th class="text-center">Penalty Finish</th>
+                    <th class="text-center">Penalty Total</th>
+                    <th class="text-center">Result</th>
+                    <th class="text-center">Ranked</th>
+                    <th class="text-center">Score</th>
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
-                    <td style="text-align: center">{{ index + 1 }}</td>
+                    <td class="text-center">{{ index + 1 }}</td>
                     <td style="text-align: start" class="large-bold text-strong max-char">
                       {{ item.nameTeam }}
                     </td>
-                    <td style="text-align: center" class="large-bold">{{ item.bibTeam }}</td>
-                    <td style="text-align: center" class="text-monospace">{{ item.result.startTime }}</td>
-                    <td style="text-align: center" class="text-monospace">{{ item.result.finishTime }}</td>
-                    <td style="text-align: center" class="large-bold text-monospace">
+                    <td class="text-center large-bold">{{ item.bibTeam }}</td>
+                    <td class="text-center text-monospace">{{ item.result.startTime }}</td>
+                    <td class="text-center text-monospace">{{ item.result.finishTime }}</td>
+                    <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
 
                     <!-- Pen Start -->
-                    <td style="text-align: center">
+                    <td class="text-center">
                       <b-select
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyStartTime"
@@ -258,7 +257,7 @@
                     </td>
 
                     <!-- Pen Section -->
-                    <td style="text-align: center">
+                    <td class="text-center">
                       <div class="pen-grid">
                         <b-select
                           v-for="sIdx in drrSectionsCount"
@@ -288,7 +287,7 @@
                     </td>
 
                     <!-- Pen Finish -->
-                    <td style="text-align: center">
+                    <td class="text-center">
                       <b-select
                         v-if="item.result.startTime"
                         v-model="item.result.penaltyFinishTime"
@@ -310,18 +309,18 @@
                       </b-select>
                     </td>
 
-                    <td style="text-align: center" class="large-bold penalty-char text-monospace">
+                    <td class="text-center large-bold penalty-char text-monospace">
                       {{ item.result.penaltyTime }}
                     </td>
-                    <td style="text-align: center" class="large-bold result-char text-monospace">
+                    <td class="text-center large-bold result-char text-monospace">
                       {{
                         item.result.penaltyTime
                           ? item.result.totalTime
                           : item.result.raceTime
                       }}
                     </td>
-                    <td style="text-align: center" class="large-bold">{{ item.result.ranked }}</td>
-                    <td style="text-align: center" class="large-bold">
+                    <td class="text-center large-bold">{{ item.result.ranked }}</td>
+                    <td class="text-center large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>
 

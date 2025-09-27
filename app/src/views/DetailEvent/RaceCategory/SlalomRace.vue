@@ -274,7 +274,7 @@
                 <th class="text-center" rowspan="2">Best Time</th>
                 <th class="text-center" rowspan="2">Ranked</th>
                 <th class="text-center" rowspan="2">Score</th>
-                <th class="text-center" rowspan="2">Edit</th>
+                <th v-if="endGame">Action</th>
               </tr>
               <tr v-if="!penaltiesWrapped">
                 <th class="text-center">Start</th>
@@ -448,13 +448,21 @@
                 <td style="min-width: 120px" class="text-center large-bold">
                   {{ scoreOf(team._id) }}
                 </td>
-                <td>
-                  <button
+                <td v-if="endGame">
+                  <!-- <button
                     type="button"
                     class="btn btn-warning btn-sm"
                     @click="openEdit(team)"
                   >
                     Edit
+                  </button> -->
+                  <button
+                    type="button"
+                    class="btn-action btn-danger"
+                    @click="resetRow(team)"
+                    :title="`Reset data run aktif untuk ${team.nameTeam}`"
+                  >
+                    Reset Row
                   </button>
                 </td>
               </tr>
@@ -852,6 +860,69 @@ export default {
     },
     // === END CONNECTION ===
 
+    checkEndGameStatus() {
+      const allFinished =
+        Array.isArray(this.teams) &&
+        this.teams.length > 0 &&
+        this.teams.every((t) => {
+          const s = this.currentSession(t); // run aktif per tim
+          return (
+            s && typeof s.finishTime === "string" && s.finishTime.trim() !== ""
+          );
+        });
+
+      this.endGame = !!allFinished;
+    },
+    resetRow(team) {
+      if (!team) return;
+
+      // Tentukan sesi yang sedang aktif untuk tim ini
+      const s = this.currentSession(team);
+      if (!s) return;
+
+      // Opsional: konfirmasi agar tidak kepencet
+      const ok = window.confirm(
+        `Reset data run aktif untuk tim "${team.nameTeam}"?`
+      );
+      if (!ok) return;
+
+      // Reset penalties: S, gates, F
+      this.$set(s, "startPenalty", 0);
+      this.$set(s, "finishPenalty", 0);
+
+      const need = this.SLALOM_GATES.length;
+      const zeros = Array.from({ length: need }, () => 0);
+      this.$set(s, "penalties", zeros);
+
+      // Reset perhitungan & waktu
+      this.$set(s, "totalPenalty", 0);
+      this.$set(s, "penaltyTime", "00:00:00.000");
+      this.$set(s, "startTime", "");
+      this.$set(s, "finishTime", "");
+      this.$set(s, "raceTime", "");
+      this.$set(s, "totalTime", "");
+      this.$set(s, "ranked", 0);
+      this.$set(s, "score", 0);
+
+      // Jika mau, panggil kalkulasi lagi (tidak wajib karena sudah 0 semua)
+      // this.recalcSession(s);
+
+      // Opsional: feedback lewat IPC alert (kalau mau konsisten dengan notifikasi lain)
+      try {
+        ipcRenderer &&
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: `Row untuk "${team.nameTeam}" (Run ${
+              this.selectedSession[team._id] + 1
+            }) telah direset.`,
+            message: "Reset Berhasil",
+          });
+      } catch (e) {
+        /* no-op */
+      }
+        this.checkEndGameStatus();
+    },
+
     bestTimeWithRun(team) {
       const msList = (team.sessions || [])
         .map((s) => s && s.totalTime)
@@ -875,8 +946,9 @@ export default {
     },
     setRun(idx) {
       this.activeRun = idx;
-      // sinkronkan pilihan sesi untuk semua tim
       this.teams.forEach((t) => this.$set(this.selectedSession, t._id, idx));
+        this.checkEndGameStatus();
+
     },
     async fetchSlalomGateCountFromSettings() {
       try {
@@ -1013,6 +1085,7 @@ export default {
           this.recalcSession(s);
         }
       }
+      this.checkEndGameStatus();
     },
 
     /** === Navigasi sederhana === */
@@ -1167,6 +1240,16 @@ export default {
 </script>
 
 <style scoped>
+/* ===== Buttons ===== */
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
 /* ===== STYLING BEST TIME RACETIME ===== */
 .best-time-tag {
   display: inline-block;

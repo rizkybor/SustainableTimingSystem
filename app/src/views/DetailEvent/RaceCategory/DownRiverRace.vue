@@ -247,9 +247,7 @@
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
-                    <td
-                      class="large-bold text-strong max-char text-left"
-                    >
+                    <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
                     <td class="text-center">{{ item.bibTeam }}</td>
@@ -553,45 +551,6 @@ function loadRaceStartPayloadForDRR() {
   return { bucket };
 }
 
-// --- KATALOG DRR (fix) ---
-const DRR_EVENT_ID = "4"; // value eventId untuk DRR
-
-function catalogsFromEvent(ev = {}) {
-  const safeArr = (a) => (Array.isArray(a) ? a : []);
-  // eventId utk DRR diambil dari categoriesEvent (value dari name === DRR)
-  const drrCat = safeArr(ev.categoriesEvent).find(
-    (c) => String(c.name || "").toUpperCase() === "DRR"
-  );
-  const eventId = drrCat ? String(drrCat.value) : "4"; // fallback "4"
-
-  const divisions = safeArr(ev.categoriesDivision).map((d) => ({
-    id: String(d.value),
-    name: String(d.name),
-  }));
-
-  const races = safeArr(ev.categoriesRace).map((r) => ({
-    id: String(r.value),
-    name: String(r.name),
-  }));
-
-  const initials = safeArr(ev.categoriesInitial).map((i) => ({
-    id: String(i.value),
-    name: String(i.name),
-  }));
-
-  return { eventId, divisions, races, initials };
-}
-
-// key => "eventId|initialId|raceId|divisionId"
-function keyFromIds({ eventId, initialId, raceId, divisionId }) {
-  return [
-    String(eventId || ""),
-    String(initialId || ""),
-    String(raceId || ""),
-    String(divisionId || ""),
-  ].join("|");
-}
-
 function readEventDetailsFromLS() {
   try {
     const raw = localStorage.getItem("eventDetails");
@@ -808,9 +767,6 @@ export default {
             this.digitTimeFinish = formatted;
           },
         });
-
-        console.log(this.serialCtrl, "<<<< cek");
-
         const res = await this.serialCtrl.connect();
         if (res.ok) {
           this.isPortConnected = true;
@@ -1008,14 +964,13 @@ export default {
             evObj && (evObj._id || evObj.id)
               ? String(evObj._id || evObj.id)
               : "";
-        } catch {}
+        } catch (err) {
+          logger.warn("❌ Failed to update race settings:", err);
+        }
 
         const finalEventId = bucketLS.eventId || routeId || eventDetailsId;
 
         if (!finalEventId) {
-          console.warn(
-            "[DRR] eventId tidak ditemukan (payload/route/eventDetails)."
-          );
           this.drrBucketOptions = [];
           this.drrBucketMap = {};
           return;
@@ -1023,25 +978,20 @@ export default {
 
         // 2) panggil IPC
         const filters = { eventId: finalEventId };
-        // SALAH: console.log(payload, 'tes') // payload belum ada di sini
-        console.log("[DRR] send filters:", filters);
 
         const res = await new Promise((resolve) => {
           ipcRenderer.once("teams-registered:find-reply", (_e, payload) => {
-            console.log("[DRR] reply payload:", payload); // <- di sini boleh log payload
             resolve(payload);
           });
           ipcRenderer.send("teams-registered:find", filters);
         });
 
         if (!res || !res.ok) {
-          console.warn("[DRR] IPC reply error:", res && res.error);
           this.drrBucketOptions = [];
           this.drrBucketMap = {};
           return;
         }
         if (!Array.isArray(res.items) || res.items.length === 0) {
-          console.warn("[DRR] items kosong dari DB untuk filters:", filters);
           this.drrBucketOptions = [];
           this.drrBucketMap = {};
           return;
@@ -1135,7 +1085,7 @@ export default {
           this.selectedDrrKey = opts[0].value;
         }
       } catch (err) {
-        console.warn("loadAllDrrBucketsFromDB error:", err && err.message);
+        logger.warn("❌ Failed to update race settings:", err);
       }
     },
     loadAllDrrBucketsFromEvent() {
@@ -1280,7 +1230,6 @@ export default {
     },
 
     async onSelectDrrBucket(key) {
-      console.log(key, "<<<< cek");
       await this.fetchBucketTeamsByKey(key);
     },
 
@@ -1314,7 +1263,6 @@ export default {
         });
 
         if (!res || !res.ok) {
-          console.warn("[DRR] reply error:", res && res.error);
           this.participant = [];
           this.currentBucket = null;
           this.titleCategories = this._bucketLabel(b);
@@ -1346,7 +1294,7 @@ export default {
         // sesuaikan jumlah section penalty ke setting
         this.applyDrrSectionCount(this.drrSectionsCount);
       } catch (err) {
-        console.warn("fetchBucketTeamsByKey error:", err && err.message);
+        logger.warn("❌ Failed to update race settings:", err);
       }
     },
     _bucketKey(b) {
@@ -1393,7 +1341,7 @@ export default {
           this.applyDrrSectionCount(count);
         });
       } catch (err) {
-        // biarkan default 3
+        logger.warn("❌ Failed to update race settings:", err);
       }
     },
 

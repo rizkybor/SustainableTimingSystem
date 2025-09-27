@@ -6,7 +6,8 @@
     centered
     size="xl"
     body-class="p-0"
-    content-class="rounded-20 overflow-hidden"
+    content-class="rounded-20 overflow-hidden rs-modal"
+    scrollable
   >
     <!-- Header -->
     <template #modal-header>
@@ -191,6 +192,7 @@
         <!-- Footer -->
         <div class="d-flex justify-content-between align-items-center mt-4">
           <b-button
+            style="border-radius: 12px"
             variant="outline-danger"
             class="px-4 rounded-12"
             :disabled="saving"
@@ -199,7 +201,8 @@
             Cancel
           </b-button>
           <b-button
-            variant="primary"
+            style="border-radius: 12px"
+            variant="info"
             class="px-4 rounded-12"
             :disabled="saving"
             @click="confirm"
@@ -1188,6 +1191,28 @@ export default {
   font-size: 20px;
   margin-bottom: 12px;
   color: #1f2940;
+}
+
+/* Batasi tinggi modal & jadikan layout fleksibel */
+.rs-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh; /* atur sesuai selera: 70–90vh */
+  overflow: hidden;
+}
+
+/* Header tetap terlihat saat scroll */
+.rs-modal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+}
+
+/* Area body bisa discroll */
+.rs-modal .modal-body {
+  overflow: auto;
 }
 
 .form-label {

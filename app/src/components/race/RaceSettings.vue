@@ -52,6 +52,7 @@
               <label class="mb-0 font-weight-500">Total Gate</label>
             </div>
             <b-form-spinbutton
+              style="border-radius: 10px;"
               v-model="draft.slalom.totalGate"
               :max="maxGate"
               :min="minGate"
@@ -74,6 +75,7 @@
               <label class="mb-0 font-weight-500">Total Section</label>
             </div>
             <b-form-spinbutton
+              style="border-radius: 10px;"
               v-model="draft.drr.totalSection"
               :min="minSection"
               :max="maxSection"
@@ -97,7 +99,7 @@
           >
           <b-button
             style="border-radius: 12px"
-            variant="primary"
+            variant="info"
             class="px-4"
             @click="confirm"
             >Update</b-button

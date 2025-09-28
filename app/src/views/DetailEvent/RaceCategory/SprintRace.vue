@@ -181,6 +181,14 @@
             <button
               type="button"
               class="btn-action btn-secondary mr-2"
+              @click="sendRealtimeMessage"
+            >
+              <Icon icon="icon-park-outline:save" /> Send to Judges
+            </button>
+
+            <button
+              type="button"
+              class="btn-action btn-secondary mr-2"
               @click="saveResult"
             >
               <Icon icon="icon-park-outline:save" /> Save Result
@@ -195,7 +203,6 @@
             </button>
           </div>
         </div>
-
 
         <b-row>
           <b-col>
@@ -289,18 +296,22 @@
                   </td>
 
                   <!-- Penalty Time total (format waktu) -->
-                  <td class="text-center large-bold  penalty-char text-monospace">
+                  <td
+                    class="text-center large-bold penalty-char text-monospace"
+                  >
                     {{ item.result.penaltyTime }}
                   </td>
 
-                  <td class="text-center large-bold  result-char text-monospace">
+                  <td class="text-center large-bold result-char text-monospace">
                     {{
                       item.result.penaltyTime
                         ? item.result.totalTime
                         : item.result.raceTime
                     }}
                   </td>
-                  <td class="text-center large-bold">{{ item.result.ranked }}</td>
+                  <td class="text-center large-bold">
+                    {{ item.result.ranked }}
+                  </td>
                   <td class="text-center large-bold">
                     {{ getScoreByRanked(item.result.ranked) }}
                   </td>
@@ -344,6 +355,7 @@ import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
+import { getSocket } from "@/services/socket";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -533,6 +545,7 @@ export default {
 
   data() {
     return {
+      selfSocketId: null,
       selectPath: "",
       baudRate: 9600,
       baudOptions: [1200, 2400, 9600],
@@ -622,6 +635,44 @@ export default {
   },
 
   async mounted() {
+    const socket = getSocket();
+
+    // simpan id saat connect (atau reconnect)
+    const onConnect = () => {
+      this.selfSocketId = socket.id || null;
+    };
+    socket.on("connect", onConnect);
+
+    // terima pesan: tampilkan toast hanya jika BUKAN dari diri sendiri
+    const onMessage = (msg) => {
+      // safety: kalau server belum broadcast-only, tetap filter di client
+      if (
+        msg &&
+        msg.senderId &&
+        this.selfSocketId &&
+        msg.senderId === this.selfSocketId
+      ) {
+        // pesan pantulan dari diri sendiri → jangan tampilkan
+        return;
+      }
+
+      if (this.$bvToast) {
+        this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
+          title: "Pesan Realtime",
+          variant: "success",
+          solid: true,
+        });
+      }
+    };
+
+    socket.on("custom:event", onMessage);
+
+    // bersihkan listener saat komponen dilepas
+    this.$once("hook:beforeDestroy", () => {
+      socket.off("connect", onConnect);
+      socket.off("custom:event", onMessage);
+    });
+
     window.addEventListener("scroll", this.handleScroll);
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
@@ -728,6 +779,31 @@ export default {
       this.notify("error", detail, message);
     },
     // ======
+
+    /* =========================================================
+     * SOCKET / IPC (opsional)
+     * =======================================================*/
+    sendRealtimeMessage() {
+      const socket = getSocket();
+      socket.emit(
+        "custom:event",
+        {
+          senderId: socket.id,
+          from: "Sustainable Timing System",
+          text: "Terima kasih, udah gue teerima beks nilai penaltynya",
+          ts: new Date().toISOString(),
+        },
+        (ok) => {
+          if (!ok) {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal mengirim pesan realtime",
+              detail: "Silakan cek koneksi broker/socket.",
+            });
+          }
+        }
+      );
+    },
 
     // === LOAD PAYLOAD ===
     loadFromRaceStartPayload() {

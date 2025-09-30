@@ -326,13 +326,22 @@
             </h4>
           </div>
           <div class="d-flex" style="gap: 8px">
-            <button class="btn-action btn-outline-success" @click="saveAllRoundsLocal">
+            <button
+              class="btn-action btn-outline-success"
+              @click="saveAllRoundsLocal"
+            >
               <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
             </button>
-            <button class="btn-action btn-outline-primary" @click="saveAllRoundsToDB">
+            <button
+              class="btn-action btn-outline-primary"
+              @click="saveAllRoundsToDB"
+            >
               <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
             </button>
-            <button class="btn-action btn-outline-dark" @click="exportAllRoundsJSON">
+            <button
+              class="btn-action btn-outline-dark"
+              @click="exportAllRoundsJSON"
+            >
               <Icon icon="mdi:download" /> Export JSON
             </button>
           </div>
@@ -466,13 +475,15 @@
                         :class="{
                           'badge badge-success': item.result.penalties.pb === 0,
                           'badge badge-danger': item.result.penalties.pb === 50,
-                          'badge badge-danger': item.result.penalties.pb === 100,
+                          'badge badge-danger':
+                            item.result.penalties.pb === 100,
                         }"
                         class="p-2"
                       >
                         {{ item.result.penalties.pb }}
                       </span>
                     </td>
+
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.f"
@@ -483,12 +494,18 @@
                       />
                     </td>
 
-                    <td>
-                      <b-form-select
-                        v-model.number="item.result.penalties.o"
-                        :options="penaltyChoices"
-                        size="sm"
-                        @change="onPenaltyChange(item)"
+                    <td class="pen-o-cell">
+                      <b-form-input
+                        :value="getOthersValue(item)"
+                        size="xs"
+                        style="min-width: 10px;"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="0"
+                        @keypress="digitsOnly($event)"
+                        @paste="digitsPaste($event)"
+                        @input="onOthersTyping($event, item)"
+                        @change="onOthersCommit(item)"
                         :disabled="isByeTeam(item)"
                       />
                     </td>
@@ -1058,6 +1075,48 @@ export default {
   },
 
   methods: {
+    // FUNCTION OTHERS PENALTY
+    getOthersValue(item) {
+      if (!item || !item.result) return "0";
+      if (!item.result.penalties || typeof item.result.penalties !== "object") {
+        return "0";
+      }
+      var v = item.result.penalties.o;
+      if (typeof v === "undefined" || v === null) return "0";
+      return String(v);
+    },
+
+    digitsOnly(e) {
+      var k = e.key || "";
+      if (!/^\d$/.test(k)) {
+        e.preventDefault();
+      }
+    },
+
+    digitsPaste(e) {
+      var clip = e.clipboardData || window.clipboardData;
+      var text = clip ? clip.getData("text") || "" : "";
+      if (!/^\d+$/.test(text)) {
+        e.preventDefault();
+      }
+    },
+
+    onOthersTyping(val, item) {
+      if (!item || !item.result) return;
+      this.ensurePenaltiesObject(item.result);
+
+      var s = String(val || "");
+      var cleaned = s.replace(/\D+/g, "");
+      var num = cleaned === "" ? 0 : Number(cleaned);
+
+      this.$set(item.result.penalties, "o", num);
+    },
+
+    onOthersCommit(item) {
+      // hitung ulang total penalti, time, win/lose, simpan, dll.
+      this.onPenaltyChange(item);
+    },
+
     // ADD: helper untuk reset result di round tertentu
     resetResultsForRound(roundObj) {
       const list = this.participantsForRound(roundObj);
@@ -2860,5 +2919,24 @@ thead th[colspan="8"] {
     flex: 1;
     min-width: 0;
   }
+}
+
+/* Kolom Others: lebih kecil & rapat */
+.pen-o-cell {
+  width: 64px;
+  min-width: 64px;
+  padding-right: 6px; /* biar gak nempel */
+}
+
+/* BootstrapVue render: input.form-control */
+.pen-o-input.form-control,
+.pen-o-input.form-control.form-control-sm {
+  max-width: 60px;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  border-radius: 6px;
 }
 </style>

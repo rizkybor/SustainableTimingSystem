@@ -187,6 +187,10 @@
               class="bracket__match"
               :aria-label="`Match ${m.id}`"
             >
+              <div class="bracket__winner" v-if="m.winner && m.winner.name">
+                <Icon icon="mdi:trophy-variant-outline" />
+                <span class="ml-1">{{ m.winner.name }}</span>
+              </div>
               <!-- Team 1 -->
               <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
                 <div class="bracket__team-main">
@@ -268,15 +272,12 @@
 
               <!-- Actions / badges -->
               <div class="bracket__footer">
-                <span v-if="m.bye" class="badge badge-light"
-                  >Auto-advance (BYE)</span
-                >
-
                 <div
                   class="bracket__actions"
                   v-if="m.team1.name && m.team2.name"
                 >
                   <button
+                    v-if="!editBracketTeams"
                     class="btn-action btn-xs btn-outline-success"
                     @click="advanceWinner(rIdx, mIdx, 1)"
                     title="Set winner: top"
@@ -285,6 +286,7 @@
                     <Icon icon="mdi:crown-outline" /> Top Win
                   </button>
                   <button
+                    v-if="!editBracketTeams"
                     class="btn-action btn-xs btn-outline-primary"
                     @click="advanceWinner(rIdx, mIdx, 2)"
                     title="Set winner: bottom"
@@ -294,10 +296,30 @@
                   </button>
                 </div>
 
-                <div class="bracket__winner" v-if="m.winner && m.winner.name">
-                  <Icon icon="mdi:trophy-variant-outline" />
-                  <span class="ml-1">{{ m.winner.name }}</span>
-                </div>
+                <!-- Toggle BYE (hanya saat edit tim) -->
+                <button
+                  v-if="
+                    editBracketTeams &&
+                    !['Final A', 'Final B', 'Semifinals'].includes(
+                      (round.name || '').trim()
+                    )
+                  "
+                  class="btn-action btn-xs btn-outline-dark"
+                  @click="toggleBye(rIdx, mIdx)"
+                  :title="
+                    round.matches[mIdx] && round.matches[mIdx].bye
+                      ? 'Batalkan BYE'
+                      : 'Set BYE'
+                  "
+                >
+                  <Icon icon="mdi:transfer-right" />
+                  {{
+                    round.matches[mIdx] && round.matches[mIdx].bye
+                      ? "Un-BYE"
+                      : "Set BYE"
+                  }}
+                  {{ round.name }}
+                </button>
               </div>
             </div>
             <!-- /match -->
@@ -411,6 +433,23 @@
                         class="badge badge-light ml-2"
                         >BYE</span
                       >
+
+                      <!-- status pills -->
+                      <span
+                        v-if="item.result && item.result.flag === 'DNF'"
+                        class="badge badge-danger badge-pill ml-2"
+                        >DNF</span
+                      >
+                      <span
+                        v-if="item.result && item.result.flag === 'DNS'"
+                        class="badge badge-secondary badge-pill ml-2"
+                        >DNS</span
+                      >
+                      <span
+                        v-if="item.result && item.result.flag === 'DSQ'"
+                        class="badge badge-dark badge-pill ml-2"
+                        >DSQ</span
+                      >
                     </td>
                     <td class="large-bold">{{ item.bibTeam }}</td>
                     <td class="text-monospace">{{ item.result.startTime }}</td>
@@ -419,7 +458,7 @@
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.s"
-                        :options="penaltyChoices"
+                        :options="sChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -428,7 +467,7 @@
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.cl"
-                        :options="penaltyChoices"
+                        :options="clChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -487,7 +526,7 @@
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.f"
-                        :options="penaltyChoices"
+                        :options="fChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -498,7 +537,7 @@
                       <b-form-input
                         :value="getOthersValue(item)"
                         size="xs"
-                        style="min-width: 10px;"
+                        style="min-width: 10px"
                         inputmode="numeric"
                         pattern="[0-9]*"
                         placeholder="0"
@@ -539,14 +578,36 @@
                     <td class="large-bold">{{ item.result.winLose || "" }}</td>
 
                     <td v-if="editResult">
-                      <button
-                        type="button"
-                        class="btn-action btn-warning"
-                        @click="openModal(item)"
-                        :disabled="isByeTeam(item)"
-                      >
-                        Edit
-                      </button>
+                       <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
+                        <b-button
+                          size="sm"
+                          variant="outline-secondary"
+                          @click="resetRow(item)"
+                          :disabled="isByeTeam(item)"
+                          >RESET</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-danger"
+                          @click="markFlag(item, 'DNF')"
+                          :disabled="isByeTeam(item)"
+                          >DNF</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-warning"
+                          @click="markFlag(item, 'DNS')"
+                          :disabled="isByeTeam(item)"
+                          >DNS</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-dark"
+                          @click="markFlag(item, 'DSQ')"
+                          :disabled="isByeTeam(item)"
+                          >DSQ</b-button
+                        >
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -835,6 +896,26 @@ export default {
   },
 
   computed: {
+    sChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 50, text: "50 (50s)" },
+      ];
+    },
+    fChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 10, text: "10 (10s)" },
+        { value: 50, text: "50 (50s)" },
+      ];
+    },
+    clChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 10, text: "10 (10s)" },
+        { value: 20, text: "20 (20s)" },
+      ];
+    },
     ynChoices() {
       return [
         { value: "N", text: "N" },
@@ -1075,6 +1156,145 @@ export default {
   },
 
   methods: {
+    markFlag(item, type) {
+      if (!item || !item.result) return;
+      // set flag (hanya salah satu dari DNF/DNS/DSQ)
+      this.$set(item.result, "flag", type);
+
+      // kosongkan waktu & total (biar tidak dihitung menang/kalah)
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+      item.result.totalTime = "";
+      item.result.winLose = null;
+
+      // nolkan penalti (biar jelas)
+      this.ensurePenaltiesObject(item.result);
+      const p = item.result.penalties || {};
+      this.$set(p, "s", 0);
+      this.$set(p, "cl", 0);
+      this.$set(p, "r1", "N");
+      this.$set(p, "r2", "N");
+      this.$set(p, "l1", "N");
+      this.$set(p, "l2", "N");
+      this.$set(p, "pb", 0);
+      this.$set(p, "f", 0);
+      this.$set(p, "o", 0);
+      item.result.penalty = 0;
+      item.result.penaltyTime = "00:00:00.000";
+
+      // simpan & recompute agar pairing heat/win-lose bersih
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+    },
+
+    resetRow(item) {
+      if (!item) return;
+      // hapus flag dan reset result bersih
+      this.$set(item.result || (item.result = {}), "flag", null);
+      const fresh = this.makeEmptyResult();
+      // pertahankan HEAT yang sudah dipilih
+      fresh.heat = item.result.heat != null ? item.result.heat : null;
+      item.result = { ...fresh };
+
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+    },
+    pushWinnerToNext(roundIndex, matchIndex, winner) {
+      const round = this.rounds[roundIndex];
+      if (!round || round.bronze) return;
+
+      // cari ronde kompetitif berikutnya
+      let nextRoundIndex = -1;
+      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return;
+
+      const next = this.rounds[nextRoundIndex];
+      const slot = Math.floor(matchIndex / 2);
+      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
+      if (next && next.matches[slot]) {
+        next.matches[slot][pos] =
+          winner && winner.name ? winner : { id: null, seed: null, name: "" };
+      }
+    },
+
+    pullWinnerFromNext(roundIndex, matchIndex, prevWinner) {
+      const round = this.rounds[roundIndex];
+      if (!round || round.bronze) return;
+
+      let nextRoundIndex = -1;
+      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return;
+
+      const next = this.rounds[nextRoundIndex];
+      const slot = Math.floor(matchIndex / 2);
+      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
+      const cell = next && next.matches[slot] && next.matches[slot][pos];
+
+      // hanya kosongkan jika sama dengan prevWinner (hindari menghapus isian manual)
+      if (cell && prevWinner && cell.name === prevWinner.name) {
+        next.matches[slot][pos] = { id: null, seed: null, name: "" };
+      }
+    },
+    toggleBye(roundIndex, matchIndex) {
+      const round = this.rounds[roundIndex];
+      if (!round) return;
+      const match = round.matches[matchIndex];
+      if (!match) return;
+
+      // flip status
+      match.bye = !match.bye;
+
+      // kalau set BYE: tentukan pemenang (tim yang ada)
+      if (match.bye) {
+        const has1 = match.team1 && match.team1.name;
+        const has2 = match.team2 && match.team2.name;
+        if (has1 && !has2) {
+          match.winner = match.team1;
+        } else if (!has1 && has2) {
+          match.winner = match.team2;
+        } else if (!has1 && !has2) {
+          // tidak ada tim, BYE tidak bermakna → batal
+          match.bye = false;
+          this.$bvToast &&
+            this.$bvToast.toast("Tidak ada tim di match ini.", {
+              variant: "warning",
+              autoHideDelay: 2000,
+              title: "BYE dibatalkan",
+            });
+          return;
+        } else {
+          // dua-duanya ada → tetap boleh BYE kalau kamu memang mau auto-lolos salah satu
+          // default pemenang = team1 (atau bisa munculkan modal pilih)
+          match.winner = match.team1;
+        }
+        // dorong ke ronde kompetitif berikutnya
+        this.pushWinnerToNext(roundIndex, matchIndex, match.winner);
+      } else {
+        // un-BYE → hapus winner & cabut dari ronde berikutnya
+        const prevWin = match.winner;
+        match.winner = null;
+        this.pullWinnerFromNext(roundIndex, matchIndex, prevWin);
+      }
+
+      this.syncWinLoseFromBracketToParticipants();
+      this.persistRoundResults();
+      this.computePodium();
+    },
     // FUNCTION OTHERS PENALTY
     getOthersValue(item) {
       if (!item || !item.result) return "0";
@@ -2009,12 +2229,7 @@ export default {
         const [t1, t2] = pairs[i] || [{}, {}];
         m.team1 = t1 || { id: null, seed: null, name: "" };
         m.team2 = t2 || { id: null, seed: null, name: "" };
-        // tandai bye jika salah satunya kosong
-        m.bye = !m.team1.name || !m.team2.name;
       });
-
-      // Jika ada BYE, advance otomatis
-      this.autoAdvanceByes();
     },
 
     /** Advance otomatis untuk match yang bye (tanpa sentuh Bronze/Final) */
@@ -2146,12 +2361,7 @@ export default {
       // kosongkan
       if (!pickedId) {
         match[slot] = { id: null, seed: null, name: "" };
-        match.bye =
-          !(match.team1 && match.team1.name) ||
-          !(match.team2 && match.team2.name);
-        // reset winner bila slot berubah
         match.winner = null;
-        this.autoAdvanceByes();
         return;
       }
 
@@ -2172,13 +2382,7 @@ export default {
       }
 
       match[slot] = this.toBracketTeam(opt);
-      match.bye =
-        !(match.team1 && match.team1.name) ||
-        !(match.team2 && match.team2.name);
       match.winner = null; // reset winner ketika ada perubahan pasangan
-
-      // tiap perubahan, jalankan auto-advance untuk BYE
-      this.autoAdvanceByes();
     },
 
     /** Hapus semua assignment di ronde pertama (quick clear) */
@@ -2190,9 +2394,8 @@ export default {
         m.team1 = { id: null, seed: null, name: "" };
         m.team2 = { id: null, seed: null, name: "" };
         m.winner = null;
-        m.bye = true;
+        m.bye = false;
       });
-      this.autoAdvanceByes();
     },
 
     /** SIGN BRACKET */
@@ -2234,13 +2437,6 @@ export default {
       this.titleCategories = String(
         localStorage.getItem("currentCategories") || ""
       ).trim();
-    },
-
-    openModal(datas) {
-      this.editForm = datas;
-      this.$bvModal &&
-        this.$bvModal.show &&
-        this.$bvModal.show("bv-modal-edit-team");
     },
 
     async assignRanks(items) {
@@ -2938,5 +3134,11 @@ thead th[colspan="8"] {
   line-height: 1.2;
   text-align: center;
   border-radius: 6px;
+}
+
+.badge-pill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
 }
 </style>

@@ -409,7 +409,10 @@
                 </thead>
 
                 <tbody>
-                  <tr v-for="(item, index) in visibleParticipants" :key="index">
+                  <tr
+                    v-for="(item, index) in visibleParticipants"
+                    :key="stableRowKey(item)"
+                  >
                     <td>{{ index + 1 }}</td>
                     <!-- Heat = index match pada babak aktif -->
                     <td style="min-width: 110px">
@@ -578,7 +581,7 @@
                     <td class="large-bold">{{ item.result.winLose || "" }}</td>
 
                     <td v-if="editResult">
-                       <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
+                      <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
                         <b-button
                           size="sm"
                           variant="outline-secondary"
@@ -1156,6 +1159,12 @@ export default {
   },
 
   methods: {
+    stableRowKey(item) {
+    const t = item || {};
+    const name = String((t.nameTeam || t.teamName || "")).toUpperCase();
+    const bib  = String(t.bibTeam || "");
+    return name + "|" + bib;
+  },
     markFlag(item, type) {
       if (!item || !item.result) return;
       // set flag (hanya salah satu dari DNF/DNS/DSQ)

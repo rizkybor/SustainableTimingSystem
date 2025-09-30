@@ -1439,7 +1439,7 @@ export default {
     }
 
     // === (lanjutan logic H2H lama kamu) ===
-    const ok = this.participantArr && this.participantArr.length > 0;
+    // const ok = this.participantArr && this.participantArr.length > 0;
     const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
     this.rebuildBracketDynamic(n);
     this.syncWinLoseFromBracketToParticipants();
@@ -1696,8 +1696,6 @@ export default {
           divisionId: String(b.divisionId),
         };
 
-        console.log(filters, "<<< cek");
-
         this.selectedH2HKey = key;
         localStorage.setItem("currentH2HBucketKey", key);
 
@@ -1714,7 +1712,6 @@ export default {
           this._useH2HBucket(key);
           return;
         }
-        console.log(res.items);
         const doc = Array.isArray(res.items) ? res.items[0] : res.items;
         const teams =
           doc && Array.isArray(doc.teams)
@@ -3090,76 +3087,6 @@ export default {
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
-    },
-
-    /** Serial connect */
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ok = await this.setupSerialListener();
-        if (ok) {
-          this.isPortConnected = true;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      if (this.port && this.port.isOpen) this.port.close();
-      this.isPortConnected = false;
-    },
-
-    async setupSerialListener() {
-      try {
-        const ports = await SerialPort.list();
-        if (!ports || ports.length === 0) return false;
-
-        const selectedPort = ports[6] || ports[5] || ports[ports.length - 1];
-        if (!selectedPort || !selectedPort.path) return false;
-
-        this.port = new SerialPort({ path: selectedPort.path, baudRate: 9600 });
-
-        let receivedData = "",
-          a = "",
-          b = "";
-        this.port.on("data", (data) => {
-          const newData = data.toString();
-          receivedData += newData;
-
-          for (let i = 0; i < receivedData.length; i++) {
-            const ch = receivedData[i];
-            if (ch === "M" || ch === "R") {
-              a = receivedData.slice(0, i + 1);
-              b = receivedData.slice(i + 1);
-              receivedData = "";
-              break;
-            }
-          }
-          this.digitId.unshift(a);
-          this.digitTime.unshift(b);
-          if (a[11] == "0") {
-            this.digitTimeStart = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          } else if (a[11] == "2") {
-            this.digitTimeFinish = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          }
-          return true;
-        });
-        return true;
-      } catch (err) {
-        this.notifyError(err, "Serial setup failed");
-      }
     },
 
     async updateTime(val, visIndex, title) {

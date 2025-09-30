@@ -105,48 +105,60 @@
         <h4 class="mb-0">Bracket Head 2 Head</h4>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
-          <div class="btn-group mr-2" role="group" aria-label="Build actions">
+          <div class="toolbar-actions">
+            <!-- Select category -->
             <b-form-group
               label="Switch H2H Category:"
               label-for="h2hBucketSelect"
-              class="mb-0"
-              style="min-width: 260px"
+              class="mb-0 toolbar-select"
             >
               <b-form-select
                 id="h2hBucketSelect"
                 :options="h2hBucketOptions"
                 v-model="selectedH2HKey"
                 @change="onSelectH2HBucket"
+                class="toolbar-select__control"
               />
             </b-form-group>
 
-            <button
-              class="btn-action"
-              :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
-              @click="editBracketTeams = !editBracketTeams"
-              v-b-tooltip.hover="
-                editBracketTeams
-                  ? 'Selesai edit tim'
-                  : 'Edit tim di ronde pertama'
-              "
+            <!-- Kelompok tombol -->
+            <div
+              class="btn-group-actions"
+              role="group"
+              aria-label="Build actions"
             >
-              <Icon icon="mdi:pencil-outline" class="mr-1" />
-              {{ editBracketTeams ? "Done" : "Edit Teams" }}
-            </button>
-            <button
-              class="btn-action btn-outline-danger mx-2"
-              @click="clearFirstRoundAssignments"
-              v-b-tooltip.hover="'Kosongkan ronde pertama'"
-            >
-              <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
-            </button>
-            <button
-              class="btn-action btn-secondary"
-              @click="populateBronzeFromSemis"
-              v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
-            >
-              <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
-            </button>
+              <button
+                class="btn-action"
+                :class="
+                  editBracketTeams ? 'btn-success' : 'btn-outline-success'
+                "
+                @click="editBracketTeams = !editBracketTeams"
+                v-b-tooltip.hover="
+                  editBracketTeams
+                    ? 'Selesai edit tim'
+                    : 'Edit tim di ronde pertama'
+                "
+              >
+                <Icon icon="mdi:pencil-outline" class="mr-1" />
+                {{ editBracketTeams ? "Done" : "Edit Teams" }}
+              </button>
+
+              <button
+                class="btn-action btn-outline-danger"
+                @click="clearFirstRoundAssignments"
+                v-b-tooltip.hover="'Kosongkan ronde pertama'"
+              >
+                <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
+              </button>
+
+              <button
+                class="btn-action btn-secondary"
+                @click="populateBronzeFromSemis"
+                v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
+              >
+                <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
+              </button>
+            </div>
           </div>
 
           <!-- Divider -->
@@ -3439,10 +3451,40 @@ thead th[colspan="8"] {
   font-weight: 800;
   letter-spacing: 0.2px;
 }
+/* Bar aksi kanan: select + tombol sejajar rapi */
 .toolbar-actions {
   display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap; /* biar responsif */
+}
+
+/* Select block */
+.toolbar-select {
+  min-width: 260px;
+  flex: 1 1 260px;         /* bisa melebar di layar kecil */
+}
+.toolbar-select__control {
+  border-radius: 10px;
+}
+
+/* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */
+.btn-group-actions {
+  display: flex;
   align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Sedikit konsistensi ukuran tombol custom */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  line-height: 1.2;
 }
 .toolbar-divider {
   width: 1px;

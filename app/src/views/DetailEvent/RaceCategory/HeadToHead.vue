@@ -58,6 +58,7 @@
 
           <b-col>
             <div style="display: flex; gap: 10px; justify-content: flex-end">
+              <!-- NEW: Switch H2H Category -->
               <button
                 type="button"
                 :class="{
@@ -105,6 +106,20 @@
         <div class="toolbar-actions">
           <!-- Build / Edit -->
           <div class="btn-group mr-2" role="group" aria-label="Build actions">
+            <b-form-group
+              label="Switch H2H Category:"
+              label-for="h2hBucketSelect"
+              class="mb-0"
+              style="min-width: 260px"
+            >
+              <b-form-select
+                id="h2hBucketSelect"
+                :options="h2hBucketOptions"
+                v-model="selectedH2HKey"
+                @change="onSelectH2HBucket"
+              />
+            </b-form-group>
+
             <button
               class="btn-action"
               :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
@@ -831,6 +846,10 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      h2hBucketOptions: [],
+      h2hBucketMap: Object.create(null),
+      selectedH2HKey: "",
+      currentBucket: null,
       roundResultsRootKey: null,
       podium: {
         gold: null, // Juara 1
@@ -899,6 +918,64 @@ export default {
   },
 
   computed: {
+    currentEventId() {
+      var fromEvent = "";
+      if (
+        this.dataEventSafe &&
+        (this.dataEventSafe._id || this.dataEventSafe.id)
+      ) {
+        fromEvent = String(this.dataEventSafe._id || this.dataEventSafe.id);
+      }
+
+      var fromRoute = "";
+      if (this.$route && this.$route.params && this.$route.params.id) {
+        fromRoute = String(this.$route.params.id);
+      }
+
+      var fromBucket = "";
+      var bucket = getBucket();
+      if (bucket && bucket.eventId) {
+        fromBucket = String(bucket.eventId);
+      }
+
+      return fromEvent || fromRoute || fromBucket || "";
+    },
+
+    divisions() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesDivision)
+      ) {
+        return this.dataEventSafe.categoriesDivision.map(function (d) {
+          return { id: String(d.value), name: String(d.name) };
+        });
+      }
+      return [];
+    },
+
+    races() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesRace)
+      ) {
+        return this.dataEventSafe.categoriesRace.map(function (r) {
+          return { id: String(r.value), name: String(r.name) };
+        });
+      }
+      return [];
+    },
+
+    initials() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesInitial)
+      ) {
+        return this.dataEventSafe.categoriesInitial.map(function (i) {
+          return { id: String(i.value), name: String(i.name) };
+        });
+      }
+      return [];
+    },
     sChoices() {
       return [
         { value: 0, text: "0 (0s)" },
@@ -1144,27 +1221,325 @@ export default {
   },
 
   async mounted() {
-    const ok = this.loadFromRaceStartPayload();
-    if (!ok) await this.checkValueStorage();
+    // event details
+    try {
+      const evRaw = localStorage.getItem("eventDetails");
+      this.dataEvent = evRaw ? JSON.parse(evRaw) : {};
+    } catch {
+      this.dataEvent = {};
+    }
 
-    // jumlah tim aktual (4..32), bisa diambil dari participantArr.length
+    // build opsi statik dari kategori event (fallback ke default bila kosong)
+    this.buildStaticH2HOptions();
+
+    // pilih default & fetch teams via DB
+    if (this.h2hBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentH2HBucketKey");
+      this.selectedH2HKey =
+        savedKey && this.h2hBucketMap[savedKey]
+          ? savedKey
+          : this.h2hBucketOptions[0].value;
+
+      await this.fetchH2HBucketTeamsByKey(this.selectedH2HKey);
+    } else {
+      // fallback: baca seluruh bucket H2H dari eventDetails (mode offline)
+      this.loadAllH2HBucketsFromEvent();
+    }
+
+    // === (lanjutan logic H2H lama kamu) ===
+    const ok = this.participantArr && this.participantArr.length > 0;
     const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
-    this.rebuildBracketDynamic(n); // bangun + seed kolom pertama
-    this.syncWinLoseFromBracketToParticipants(); // NEW
+    this.rebuildBracketDynamic(n);
+    this.syncWinLoseFromBracketToParticipants();
 
-    this.roundResultsRootKey = getResultsRootKey(); // NEW
-    // load hasil tersimpan utk babak awal (jika ada)
-    this.loadRoundResultsForCurrentRound(); // NEW
+    this.roundResultsRootKey = getResultsRootKey();
+    this.loadRoundResultsForCurrentRound();
     this.computeWinLoseByHeat();
   },
 
   methods: {
+    // --- load semua bucket H2H dari eventDetails (offline/fallback) ---
+    loadAllH2HBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+
+        // filter hanya eventName H2H
+        const h2hBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "HEAD2HEAD"
+        );
+
+        const map = Object.create(null);
+        const opts = [];
+
+        // (optional) agregat semua H2H
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "HEAD2HEAD",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        h2hBuckets.forEach((b) => {
+          const key = this._h2hBucketKey(b);
+          const label = this._h2hBucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForH2H)
+            : [];
+
+          map[key] = { ...b, teams: normalizedTeams };
+          opts.push({ value: key, text: label });
+
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat pada agregat berdasarkan (nameTeam|bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+          const aggKey = "__ALL_H2H__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All H2H Teams (aggregate)" });
+        }
+
+        this.h2hBucketMap = map;
+        this.h2hBucketOptions = opts;
+
+        // pilih default
+        const savedKey = localStorage.getItem("currentH2HBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useH2HBucket(savedKey);
+          this.selectedH2HKey = savedKey;
+        } else if (opts.length) {
+          this._useH2HBucket(opts[0].value);
+          this.selectedH2HKey = opts[0].value;
+        }
+      } catch {
+        /* noop */
+      }
+    },
+
+    // --- apply bucket yang dipilih: set teams, judul, currentBucket, dll. ---
+    _useH2HBucket(key) {
+      const b = this.h2hBucketMap[key];
+      if (!b) return;
+
+      // set teams
+      this.participant = (b.teams || []).map((t) => ({ ...t }));
+
+      // title kategori
+      this.titleCategories = b._isAggregate
+        ? "ALL DIVISION/RACE – ALL INITIAL (HEAD2HEAD)"
+        : this._h2hBucketLabel(b);
+
+      // current bucket (untuk Save DB & kunci H2H round results)
+      this.currentBucket = b._isAggregate
+        ? null
+        : {
+            eventId: String(b.eventId || ""),
+            initialId: String(b.initialId || ""),
+            raceId: String(b.raceId || ""),
+            divisionId: String(b.divisionId || ""),
+            eventName: "HEAD2HEAD",
+            initialName: String(b.initialName || "").toUpperCase(),
+            raceName: String(b.raceName || "").toUpperCase(),
+            divisionName: String(b.divisionName || "").toUpperCase(),
+          };
+
+      // simpan pilihan terakhir
+      localStorage.setItem("currentH2HBucketKey", key);
+
+      // update raceStartPayload.bucket agar konsisten antar halaman
+      try {
+        const raw = localStorage.getItem("raceStartPayload") || "{}";
+        const obj = JSON.parse(raw || "{}") || {};
+        obj.bucket =
+          obj.bucket && typeof obj.bucket === "object" ? obj.bucket : {};
+        const c = this.currentBucket || b;
+        obj.bucket.eventId = String(c.eventId || "");
+        obj.bucket.initialId = String(c.initialId || "");
+        obj.bucket.raceId = String(c.raceId || "");
+        obj.bucket.divisionId = String(c.divisionId || "");
+        obj.bucket.eventName = String(c.eventName || "HEAD2HEAD");
+        obj.bucket.initialName = String(c.initialName || "");
+        obj.bucket.raceName = String(c.raceName || "");
+        obj.bucket.divisionName = String(c.divisionName || "");
+        // opsional: obj.bucket.teams = this.participant;
+        localStorage.setItem("raceStartPayload", JSON.stringify(obj));
+      } catch {
+        /* noop */
+      }
+
+      // rebuild bracket berdasar jumlah tim yang baru
+      const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
+      this.rebuildBracketDynamic(n);
+      this.syncWinLoseFromBracketToParticipants();
+
+      // reset hasil per-babak untuk root key baru
+      this.roundResultsRootKey = getResultsRootKey();
+      this.loadRoundResultsForCurrentRound();
+      this.computeWinLoseByHeat();
+    },
+
+    // --- handler perubahan select ---
+    async onSelectH2HBucket(key) {
+      await this.fetchH2HBucketTeamsByKey(key);
+    },
+
+    // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
+    async fetchH2HBucketTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.h2hBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.h2hBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        console.log(filters,'<<< cek')
+
+        this.selectedH2HKey = key;
+        localStorage.setItem("currentH2HBucketKey", key);
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-h2h-registered:find-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("teams-h2h-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          // kosongkan participant tapi tetap apply bucket untuk judul & payload
+          this.participant = [];
+          this._useH2HBucket(key);
+          return;
+        }
+        console.log(res.items)
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForH2H)
+            : [];
+
+        // commit teams ke map → agar _useH2HBucket punya data
+        this.h2hBucketMap[key] = {
+          ...b,
+          teams,
+        };
+
+        // apply bucket
+        this._useH2HBucket(key);
+      } catch {
+        // fallback minimal
+        this._useH2HBucket(key);
+      }
+    },
+    _h2hBucketKey(b) {
+      const ei = b && b.eventId ? String(b.eventId) : "";
+      const ii = b && b.initialId ? String(b.initialId) : "";
+      const ri = b && b.raceId ? String(b.raceId) : "";
+      const di = b && b.divisionId ? String(b.divisionId) : "";
+      return [ei, ii, ri, di].join("|");
+    },
+    _h2hBucketLabel(b) {
+      const div = (
+        b && b.divisionName ? String(b.divisionName) : ""
+      ).toUpperCase();
+      const rac = (b && b.raceName ? String(b.raceName) : "").toUpperCase();
+      const ini = (
+        b && b.initialName ? String(b.initialName) : ""
+      ).toUpperCase();
+      return `${div} ${rac} – ${ini}`;
+    },
+
+    // --- build opsi statik dari catalog event (fallback) ---
+    buildStaticH2HOptions() {
+      const eventId = this.currentEventId || "";
+      if (!eventId) {
+        this.h2hBucketOptions = [];
+        this.h2hBucketMap = {};
+        return;
+      }
+
+      const divs = this.divisions.length
+        ? this.divisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+
+      const races = this.races.length
+        ? this.races
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+
+      const inits = this.initials.length
+        ? this.initials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
+      const opts = [];
+      const map = Object.create(null);
+
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: String(init.id),
+              raceId: String(race.id),
+              divisionId: String(div.id),
+              eventName: "HEAD2HEAD",
+              initialName: String(init.name),
+              raceName: String(race.name),
+              divisionName: String(div.name),
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.h2hBucketOptions = opts;
+      this.h2hBucketMap = map;
+    },
     stableRowKey(item) {
-    const t = item || {};
-    const name = String((t.nameTeam || t.teamName || "")).toUpperCase();
-    const bib  = String(t.bibTeam || "");
-    return name + "|" + bib;
-  },
+      const t = item || {};
+      const name = String(t.nameTeam || t.teamName || "").toUpperCase();
+      const bib = String(t.bibTeam || "");
+      return name + "|" + bib;
+    },
     markFlag(item, type) {
       if (!item || !item.result) return;
       // set flag (hanya salah satu dari DNF/DNS/DSQ)

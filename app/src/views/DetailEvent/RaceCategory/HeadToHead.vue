@@ -1,5 +1,28 @@
 <template>
   <div>
+    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
+      <!-- TOP BAR (breadcrumb + datetime) -->
+      <div
+        class="d-flex align-items-center justify-content-between text-muted small"
+      >
+        <b-breadcrumb class="mb-0">
+          <b-breadcrumb-item to="/">
+            <Icon icon="mdi:home-outline" class="mr-1" />
+            Dashboard
+          </b-breadcrumb-item>
+          <b-breadcrumb-item
+            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          >
+            {{ dataEventSafe.eventName }}
+          </b-breadcrumb-item>
+          <b-breadcrumb-item active>
+            {{ "Head to Head" }}
+          </b-breadcrumb-item>
+        </b-breadcrumb>
+        <div>{{ currentDateTime }}</div>
+      </div>
+    </div>
+
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
@@ -44,39 +67,111 @@
       <div class="card-body">
         <b-row>
           <b-col>
-            <h6 style="font-weight: 800; font-style: italic">
-              Nomor Lomba : Head To Head
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Categories : {{ titleCategories || "-" }}
-            </h6>
-            <h6 style="font-weight: 800; font-style: italic">
-              Tanggal : {{ dataEventSafe.startDateEvent || "-" }} -
-              {{ dataEventSafe.endDateEvent || "-" }}
-            </h6>
+            <div class="meta-panel">
+              <div class="meta-row">
+                <span class="meta-label">Nomor Lomba</span>
+                <span class="meta-value">
+                  <span class="badge-chip badge-chip--blue">Head to Head</span>
+                </span>
+              </div>
+
+              <div class="meta-row">
+                <span class="meta-label">Categories</span>
+                <span
+                  class="meta-value badge-chip badge-chip--blue"
+                  :title="titleCategories || '-'"
+                >
+                  {{ titleCategories || "-" }}
+                </span>
+              </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch Head to Head Category:"
+                  label-for="h2hBucketSelect"
+                  class="mb-0 toolbar-select"
+                >
+                  <b-form-select
+                    id="h2hBucketSelect"
+                    :options="h2hBucketOptions"
+                    v-model="selectedH2HKey"
+                    @change="onSelectH2HBucket"
+                    class="toolbar-select__control"
+                  />
+                </b-form-group>
+              </div>
+            </div>
           </b-col>
 
           <b-col>
-            <div style="display: flex; gap: 10px; justify-content: flex-end">
+            <div
+              class="d-flex flex-wrap justify-content-end align-items-center controls-bar"
+            >
+              <!-- selector baud -->
+              <div class="btn-baud-group mr-2 mb-2">
+                <span class="mr-2 text-muted">Baud Rate :</span>
+                <div class="d-inline-flex">
+                  <button
+                    v-for="br in baudOptions"
+                    :key="'baud-' + br"
+                    type="button"
+                    class="btn-action"
+                    :class="
+                      baudRate === br ? 'btn-success' : 'btn-outline-secondary'
+                    "
+                    @click="setBaud(br)"
+                    :disabled="isPortConnected"
+                    style="margin-right: 6px"
+                  >
+                    {{ br }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- connect -->
               <button
                 type="button"
                 :class="{
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn-action"
+                class="btn-action mb-2"
                 @click="connectPort"
               >
                 <Icon icon="ic:baseline-sync" />
-                {{ isPortConnected ? "Disconnect Device" : "Connect Device" }}
+                {{ isPortConnected ? "Disconnect" : "Connect Racetime" }}
               </button>
+
               <span
-                class="status-indicator"
+                class="status-indicator mb-2 ml-2"
                 :class="{
                   connected: isPortConnected,
                   disconnected: !isPortConnected,
                 }"
               ></span>
+
+              <!-- break line -->
+              <div class="w-100"></div>
+
+              <!-- path pill -->
+              <div class="mb-1">
+                <span
+                  class="path-pill"
+                  :class="{ 'path-pill--empty': !selectPath }"
+                  :title="selectPath || 'No device selected'"
+                >
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
+                  <span class="truncate">{{
+                    selectPath || "No device selected"
+                  }}</span>
+                </span>
+              </div>
             </div>
           </b-col>
         </b-row>
@@ -101,37 +196,66 @@
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <h4 class="mb-0">Bracket Head 2 Head</h4>
+        <h4 class="mb-0">Bracket Head to Head</h4>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
-          <div class="btn-group mr-2" role="group" aria-label="Build actions">
-            <button
-              class="btn-action"
-              :class="editBracketTeams ? 'btn-success' : 'btn-outline-success'"
-              @click="editBracketTeams = !editBracketTeams"
-              v-b-tooltip.hover="
-                editBracketTeams
-                  ? 'Selesai edit tim'
-                  : 'Edit tim di ronde pertama'
-              "
+          <div class="toolbar-actions">
+            <!-- Kelompok tombol -->
+            <div
+              class="btn-group-actions"
+              role="group"
+              aria-label="Build actions"
             >
-              <Icon icon="mdi:pencil-outline" class="mr-1" />
-              {{ editBracketTeams ? "Done" : "Edit Teams" }}
-            </button>
-            <button
-              class="btn-action btn-outline-danger mx-2"
-              @click="clearFirstRoundAssignments"
-              v-b-tooltip.hover="'Kosongkan ronde pertama'"
-            >
-              <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
-            </button>
-            <button
-              class="btn-action btn-secondary"
-              @click="populateBronzeFromSemis"
-              v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
-            >
-              <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
-            </button>
+              <button
+                class="btn-action btn-outline-info ml-2"
+                @click="toggleBracket"
+                v-b-tooltip.hover="
+                  showBracket ? 'Sembunyikan bracket' : 'Tampilkan bracket'
+                "
+                aria-controls="h2h-bracket"
+                :aria-expanded="showBracket ? 'true' : 'false'"
+              >
+                <Icon
+                  :icon="
+                    showBracket ? 'mdi:eye-off-outline' : 'mdi:eye-outline'
+                  "
+                  class="mr-1"
+                />
+                {{ showBracket ? "Hide Bracket" : "Show Bracket" }}
+              </button>
+
+              <button
+                class="btn-action"
+                :class="
+                  editBracketTeams ? 'btn-success' : 'btn-outline-success'
+                "
+                @click="editBracketTeams = !editBracketTeams"
+                v-b-tooltip.hover="
+                  editBracketTeams
+                    ? 'Selesai edit tim'
+                    : 'Edit tim di ronde pertama'
+                "
+              >
+                <Icon icon="mdi:pencil-outline" class="mr-1" />
+                {{ editBracketTeams ? "Done" : "Edit Teams" }}
+              </button>
+
+              <button
+                class="btn-action btn-outline-danger"
+                @click="clearFirstRoundAssignments"
+                v-b-tooltip.hover="'Kosongkan ronde pertama'"
+              >
+                <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
+              </button>
+
+              <button
+                class="btn-action btn-secondary"
+                @click="populateBronzeFromSemis"
+                v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
+              >
+                <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
+              </button>
+            </div>
           </div>
 
           <!-- Divider -->
@@ -165,7 +289,12 @@
         </div>
       </div>
 
-      <div class="bracket" role="region" aria-label="Tournament Bracket">
+      <div
+        v-if="showBracket"
+        class="bracket"
+        role="region"
+        aria-label="Tournament Bracket"
+      >
         <div
           v-for="(round, rIdx) in rounds"
           :key="round.id"
@@ -187,6 +316,10 @@
               class="bracket__match"
               :aria-label="`Match ${m.id}`"
             >
+              <div class="bracket__winner" v-if="m.winner && m.winner.name">
+                <Icon icon="mdi:trophy-variant-outline" />
+                <span class="ml-1">{{ m.winner.name }}</span>
+              </div>
               <!-- Team 1 -->
               <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
                 <div class="bracket__team-main">
@@ -268,15 +401,12 @@
 
               <!-- Actions / badges -->
               <div class="bracket__footer">
-                <span v-if="m.bye" class="badge badge-light"
-                  >Auto-advance (BYE)</span
-                >
-
                 <div
                   class="bracket__actions"
                   v-if="m.team1.name && m.team2.name"
                 >
                   <button
+                    v-if="!editBracketTeams"
                     class="btn-action btn-xs btn-outline-success"
                     @click="advanceWinner(rIdx, mIdx, 1)"
                     title="Set winner: top"
@@ -285,6 +415,7 @@
                     <Icon icon="mdi:crown-outline" /> Top Win
                   </button>
                   <button
+                    v-if="!editBracketTeams"
                     class="btn-action btn-xs btn-outline-primary"
                     @click="advanceWinner(rIdx, mIdx, 2)"
                     title="Set winner: bottom"
@@ -294,10 +425,30 @@
                   </button>
                 </div>
 
-                <div class="bracket__winner" v-if="m.winner && m.winner.name">
-                  <Icon icon="mdi:trophy-variant-outline" />
-                  <span class="ml-1">{{ m.winner.name }}</span>
-                </div>
+                <!-- Toggle BYE (hanya saat edit tim) -->
+                <button
+                  v-if="
+                    editBracketTeams &&
+                    !['Final A', 'Final B', 'Semifinals'].includes(
+                      (round.name || '').trim()
+                    )
+                  "
+                  class="btn-action btn-xs btn-outline-dark"
+                  @click="toggleBye(rIdx, mIdx)"
+                  :title="
+                    round.matches[mIdx] && round.matches[mIdx].bye
+                      ? 'Batalkan BYE'
+                      : 'Set BYE'
+                  "
+                >
+                  <Icon icon="mdi:transfer-right" />
+                  {{
+                    round.matches[mIdx] && round.matches[mIdx].bye
+                      ? "Un-BYE"
+                      : "Set BYE"
+                  }}
+                  {{ round.name }}
+                </button>
               </div>
             </div>
             <!-- /match -->
@@ -306,16 +457,26 @@
         </div>
         <!-- /round -->
       </div>
+
+      <div v-if="!showBracket" class="bracket-hidden-info">
+        <div>
+    <Icon icon="mdi:eye-off-outline" class="info-icon" />
+    <h5 class="mb-1">Bracket is Hidden</h5>
+    <p class="mb-0 text-muted">
+      Gunakan tombol <strong>Show Bracket</strong> untuk menampilkan kembali.
+    </p>
+  </div>
+</div>
       <!-- /bracket -->
     </div>
 
-    <!-- LIST RESULT -->
+    <!-- Racetime Output -->
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="py-3" style="display: flex; justify-content: space-between">
           <div>
             <h4>
-              List Result —
+              Racetime Output —
               {{
                 currentRound
                   ? currentRound.bronze
@@ -326,13 +487,22 @@
             </h4>
           </div>
           <div class="d-flex" style="gap: 8px">
-            <button class="btn-action btn-outline-success" @click="saveAllRoundsLocal">
+            <button
+              class="btn-action btn-outline-success"
+              @click="saveAllRoundsLocal"
+            >
               <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
             </button>
-            <button class="btn-action btn-outline-primary" @click="saveAllRoundsToDB">
+            <button
+              class="btn-action btn-outline-primary"
+              @click="saveAllRoundsToDB"
+            >
               <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
             </button>
-            <button class="btn-action btn-outline-dark" @click="exportAllRoundsJSON">
+            <button
+              class="btn-action btn-outline-dark"
+              @click="exportAllRoundsJSON"
+            >
               <Icon icon="mdi:download" /> Export JSON
             </button>
           </div>
@@ -378,7 +548,10 @@
                 </thead>
 
                 <tbody>
-                  <tr v-for="(item, index) in visibleParticipants" :key="index">
+                  <tr
+                    v-for="(item, index) in visibleParticipants"
+                    :key="stableRowKey(item)"
+                  >
                     <td>{{ index + 1 }}</td>
                     <!-- Heat = index match pada babak aktif -->
                     <td style="min-width: 110px">
@@ -402,6 +575,23 @@
                         class="badge badge-light ml-2"
                         >BYE</span
                       >
+
+                      <!-- status pills -->
+                      <span
+                        v-if="item.result && item.result.flag === 'DNF'"
+                        class="badge badge-danger badge-pill ml-2"
+                        >DNF</span
+                      >
+                      <span
+                        v-if="item.result && item.result.flag === 'DNS'"
+                        class="badge badge-secondary badge-pill ml-2"
+                        >DNS</span
+                      >
+                      <span
+                        v-if="item.result && item.result.flag === 'DSQ'"
+                        class="badge badge-dark badge-pill ml-2"
+                        >DSQ</span
+                      >
                     </td>
                     <td class="large-bold">{{ item.bibTeam }}</td>
                     <td class="text-monospace">{{ item.result.startTime }}</td>
@@ -410,7 +600,7 @@
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.s"
-                        :options="penaltyChoices"
+                        :options="sChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -419,7 +609,7 @@
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.cl"
-                        :options="penaltyChoices"
+                        :options="clChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
@@ -466,29 +656,37 @@
                         :class="{
                           'badge badge-success': item.result.penalties.pb === 0,
                           'badge badge-danger': item.result.penalties.pb === 50,
-                          'badge badge-danger': item.result.penalties.pb === 100,
+                          'badge badge-danger':
+                            item.result.penalties.pb === 100,
                         }"
                         class="p-2"
                       >
                         {{ item.result.penalties.pb }}
                       </span>
                     </td>
+
                     <td>
                       <b-form-select
                         v-model.number="item.result.penalties.f"
-                        :options="penaltyChoices"
+                        :options="fChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="isByeTeam(item)"
                       />
                     </td>
 
-                    <td>
-                      <b-form-select
-                        v-model.number="item.result.penalties.o"
-                        :options="penaltyChoices"
-                        size="sm"
-                        @change="onPenaltyChange(item)"
+                    <td class="pen-o-cell">
+                      <b-form-input
+                        :value="getOthersValue(item)"
+                        size="xs"
+                        style="min-width: 10px"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="0"
+                        @keypress="digitsOnly($event)"
+                        @paste="digitsPaste($event)"
+                        @input="onOthersTyping($event, item)"
+                        @change="onOthersCommit(item)"
                         :disabled="isByeTeam(item)"
                       />
                     </td>
@@ -522,14 +720,36 @@
                     <td class="large-bold">{{ item.result.winLose || "" }}</td>
 
                     <td v-if="editResult">
-                      <button
-                        type="button"
-                        class="btn-action btn-warning"
-                        @click="openModal(item)"
-                        :disabled="isByeTeam(item)"
-                      >
-                        Edit
-                      </button>
+                      <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
+                        <b-button
+                          size="sm"
+                          variant="outline-secondary"
+                          @click="resetRow(item)"
+                          :disabled="isByeTeam(item)"
+                          >RESET</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-danger"
+                          @click="markFlag(item, 'DNF')"
+                          :disabled="isByeTeam(item)"
+                          >DNF</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-warning"
+                          @click="markFlag(item, 'DNS')"
+                          :disabled="isByeTeam(item)"
+                          >DNS</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          variant="outline-dark"
+                          @click="markFlag(item, 'DSQ')"
+                          :disabled="isByeTeam(item)"
+                          >DSQ</b-button
+                        >
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -563,14 +783,38 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { SerialPort } from "serialport";
+import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
 const MAX_HEAT_NUMBER = 24;
-const HEAT_USAGE_LIMIT = 2;
+const HEAT_GLOBAL_KEY = "h2hHeatUsage:page"; // session-scoped
+const HEAT_GLOBAL_LIMIT = 2; // tiap nomor dipakai max 2 tim
+const SHOW_BRACKET_KEY = "h2h:ui:showBracket";
+
+function readGlobalHeatUsage() {
+  try {
+    const raw = sessionStorage.getItem(HEAT_GLOBAL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGlobalHeatUsage(obj) {
+  sessionStorage.setItem(HEAT_GLOBAL_KEY, JSON.stringify(obj || {}));
+}
+
+// tambah/kurang 1 untuk nomor heat tertentu
+function bumpGlobalHeat(heat, delta) {
+  const usage = readGlobalHeatUsage();
+  const h = Number(heat);
+  if (!Number.isFinite(h) || h <= 0) return;
+  usage[h] = Math.max(0, (usage[h] || 0) + (Number(delta) || 0));
+  writeGlobalHeatUsage(usage);
+}
 
 // gabungkan kunci unik berdasar bucket (event/initial/race/division)
 function getResultsRootKey() {
@@ -745,11 +989,37 @@ function loadRaceStartPayloadForH2H() {
   return { bucket };
 }
 
+// === SEED GLOBAL HEAT USAGE DARI DATA YANG SUDAH ADA ===
+function seedGlobalHeatFromList(list, { reset = false } = {}) {
+  const usage = reset ? {} : readGlobalHeatUsage();
+  (list || []).forEach((p) => {
+    const h = p && p.result && Number(p.result.heat);
+    if (Number.isFinite(h) && h > 0) {
+      usage[h] = (usage[h] || 0) + 1;
+      // simpan sebagai prev agar onHeatChanged tidak salah hitung
+      p.__prevHeat = h;
+    }
+  });
+  writeGlobalHeatUsage(usage);
+}
+
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      selfSocketId: null,
+      selectPath: "",
+      baudRate: 9600,
+      baudOptions: [1200, 2400, 9600],
+      serialCtrl: null,
+      endGame: false,
+      isScrolled: false,
+      showBracket: true,
+      h2hBucketOptions: [],
+      h2hBucketMap: Object.create(null),
+      selectedH2HKey: "",
+      currentBucket: null,
       roundResultsRootKey: null,
       podium: {
         gold: null, // Juara 1
@@ -818,6 +1088,97 @@ export default {
   },
 
   computed: {
+    currentDateTime() {
+      const d = new Date();
+      return (
+        d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) +
+        " | " +
+        d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      );
+    },
+    currentEventId() {
+      var fromEvent = "";
+      if (
+        this.dataEventSafe &&
+        (this.dataEventSafe._id || this.dataEventSafe.id)
+      ) {
+        fromEvent = String(this.dataEventSafe._id || this.dataEventSafe.id);
+      }
+
+      var fromRoute = "";
+      if (this.$route && this.$route.params && this.$route.params.id) {
+        fromRoute = String(this.$route.params.id);
+      }
+
+      var fromBucket = "";
+      var bucket = getBucket();
+      if (bucket && bucket.eventId) {
+        fromBucket = String(bucket.eventId);
+      }
+
+      return fromEvent || fromRoute || fromBucket || "";
+    },
+
+    divisions() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesDivision)
+      ) {
+        return this.dataEventSafe.categoriesDivision.map(function (d) {
+          return { id: String(d.value), name: String(d.name) };
+        });
+      }
+      return [];
+    },
+
+    races() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesRace)
+      ) {
+        return this.dataEventSafe.categoriesRace.map(function (r) {
+          return { id: String(r.value), name: String(r.name) };
+        });
+      }
+      return [];
+    },
+
+    initials() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesInitial)
+      ) {
+        return this.dataEventSafe.categoriesInitial.map(function (i) {
+          return { id: String(i.value), name: String(i.name) };
+        });
+      }
+      return [];
+    },
+    sChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 50, text: "50 (50s)" },
+      ];
+    },
+    fChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 10, text: "10 (10s)" },
+        { value: 50, text: "50 (50s)" },
+      ];
+    },
+    clChoices() {
+      return [
+        { value: 0, text: "0 (0s)" },
+        { value: 10, text: "10 (10s)" },
+        { value: 20, text: "20 (20s)" },
+      ];
+    },
     ynChoices() {
       return [
         { value: "N", text: "N" },
@@ -842,7 +1203,10 @@ export default {
     },
     // ... (computed lain tetap)
     allHeatChoices() {
-      return Array.from({ length: MAX_HEAT_NUMBER }, (_, i) => i + 1);
+      const usage = readGlobalHeatUsage();
+      const maxUsed = Math.max(0, ...Object.keys(usage).map(Number));
+      const cap = Math.max(MAX_HEAT_NUMBER, maxUsed + 4); // kasih spare 3-4 nomor
+      return Array.from({ length: cap }, (_, i) => i + 1);
     },
     penaltyChoices() {
       // opsi untuk semua dropdown penalty (S, CL, R1, R2, L1, L2, PB, F)
@@ -1034,30 +1398,604 @@ export default {
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat(); // << tambah
     },
+    showBracket(val) {
+      localStorage.setItem(SHOW_BRACKET_KEY, val ? "1" : "0");
+    },
   },
 
   beforeRouteLeave(to, from, next) {
-    // NEW: reset data hasil pertandingan di localStorage ketika berpindah halaman
     this.clearAllRoundResults();
+    sessionStorage.removeItem(HEAT_GLOBAL_KEY);
     next();
   },
 
   async mounted() {
-    const ok = this.loadFromRaceStartPayload();
-    if (!ok) await this.checkValueStorage();
+    const saved = localStorage.getItem(SHOW_BRACKET_KEY);
+    if (saved !== null) this.showBracket = saved === "1";
 
-    // jumlah tim aktual (4..32), bisa diambil dari participantArr.length
+    // event details
+    try {
+      const evRaw = localStorage.getItem("eventDetails");
+      this.dataEvent = evRaw ? JSON.parse(evRaw) : {};
+    } catch {
+      this.dataEvent = {};
+    }
+
+    // build opsi statik dari kategori event (fallback ke default bila kosong)
+    this.buildStaticH2HOptions();
+
+    // pilih default & fetch teams via DB
+    if (this.h2hBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentH2HBucketKey");
+      this.selectedH2HKey =
+        savedKey && this.h2hBucketMap[savedKey]
+          ? savedKey
+          : this.h2hBucketOptions[0].value;
+
+      await this.fetchH2HBucketTeamsByKey(this.selectedH2HKey);
+    } else {
+      // fallback: baca seluruh bucket H2H dari eventDetails (mode offline)
+      this.loadAllH2HBucketsFromEvent();
+    }
+
+    // === (lanjutan logic H2H lama kamu) ===
+    // const ok = this.participantArr && this.participantArr.length > 0;
     const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
-    this.rebuildBracketDynamic(n); // bangun + seed kolom pertama
-    this.syncWinLoseFromBracketToParticipants(); // NEW
+    this.rebuildBracketDynamic(n);
+    this.syncWinLoseFromBracketToParticipants();
 
-    this.roundResultsRootKey = getResultsRootKey(); // NEW
-    // load hasil tersimpan utk babak awal (jika ada)
-    this.loadRoundResultsForCurrentRound(); // NEW
+    this.roundResultsRootKey = getResultsRootKey();
+    this.loadRoundResultsForCurrentRound();
     this.computeWinLoseByHeat();
+
+    seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
+    // === END CONNECTION ===
+
+    toggleBracket() {
+      this.showBracket = !this.showBracket;
+    },
+
+    getNextAvailableHeat() {
+      const usage = readGlobalHeatUsage();
+      // cari heat bernomor paling kecil yang usage < LIMIT
+      for (let h = 1; ; h++) {
+        if ((usage[h] || 0) < HEAT_GLOBAL_LIMIT) return h;
+      }
+    },
+    // --- load semua bucket H2H dari eventDetails (offline/fallback) ---
+    loadAllH2HBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+
+        // filter hanya eventName H2H
+        const h2hBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "HEAD2HEAD"
+        );
+
+        const map = Object.create(null);
+        const opts = [];
+
+        // (optional) agregat semua H2H
+        const agg = {
+          eventId: "",
+          initialId: "",
+          raceId: "",
+          divisionId: "",
+          eventName: "HEAD2HEAD",
+          initialName: "ALL",
+          raceName: "ALL",
+          divisionName: "ALL",
+          teams: [],
+          _isAggregate: true,
+        };
+
+        h2hBuckets.forEach((b) => {
+          const key = this._h2hBucketKey(b);
+          const label = this._h2hBucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForH2H)
+            : [];
+
+          map[key] = { ...b, teams: normalizedTeams };
+          opts.push({ value: key, text: label });
+
+          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+        });
+
+        // hapus duplikat pada agregat berdasarkan (nameTeam|bibTeam)
+        if (agg.teams.length) {
+          const seen = new Set();
+          agg.teams = agg.teams.filter((t) => {
+            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
+              t.bibTeam
+            )}`;
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+          });
+          const aggKey = "__ALL_H2H__";
+          map[aggKey] = agg;
+          opts.unshift({ value: aggKey, text: "All H2H Teams (aggregate)" });
+        }
+
+        this.h2hBucketMap = map;
+        this.h2hBucketOptions = opts;
+
+        // pilih default
+        const savedKey = localStorage.getItem("currentH2HBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useH2HBucket(savedKey);
+          this.selectedH2HKey = savedKey;
+        } else if (opts.length) {
+          this._useH2HBucket(opts[0].value);
+          this.selectedH2HKey = opts[0].value;
+        }
+      } catch {
+        /* noop */
+      }
+    },
+
+    // --- apply bucket yang dipilih: set teams, judul, currentBucket, dll. ---
+    _useH2HBucket(key) {
+      const b = this.h2hBucketMap[key];
+      if (!b) return;
+
+      // set teams
+      this.participant = (b.teams || []).map((t) => ({ ...t }));
+
+      // title kategori
+      this.titleCategories = b._isAggregate
+        ? "ALL DIVISION/RACE – ALL INITIAL (HEAD2HEAD)"
+        : this._h2hBucketLabel(b);
+
+      // current bucket (untuk Save DB & kunci H2H round results)
+      this.currentBucket = b._isAggregate
+        ? null
+        : {
+            eventId: String(b.eventId || ""),
+            initialId: String(b.initialId || ""),
+            raceId: String(b.raceId || ""),
+            divisionId: String(b.divisionId || ""),
+            eventName: "HEAD2HEAD",
+            initialName: String(b.initialName || "").toUpperCase(),
+            raceName: String(b.raceName || "").toUpperCase(),
+            divisionName: String(b.divisionName || "").toUpperCase(),
+          };
+
+      // simpan pilihan terakhir
+      localStorage.setItem("currentH2HBucketKey", key);
+
+      // update raceStartPayload.bucket agar konsisten antar halaman
+      try {
+        const raw = localStorage.getItem("raceStartPayload") || "{}";
+        const obj = JSON.parse(raw || "{}") || {};
+        obj.bucket =
+          obj.bucket && typeof obj.bucket === "object" ? obj.bucket : {};
+        const c = this.currentBucket || b;
+        obj.bucket.eventId = String(c.eventId || "");
+        obj.bucket.initialId = String(c.initialId || "");
+        obj.bucket.raceId = String(c.raceId || "");
+        obj.bucket.divisionId = String(c.divisionId || "");
+        obj.bucket.eventName = String(c.eventName || "HEAD2HEAD");
+        obj.bucket.initialName = String(c.initialName || "");
+        obj.bucket.raceName = String(c.raceName || "");
+        obj.bucket.divisionName = String(c.divisionName || "");
+        // opsional: obj.bucket.teams = this.participant;
+        localStorage.setItem("raceStartPayload", JSON.stringify(obj));
+      } catch {
+        /* noop */
+      }
+
+      // rebuild bracket berdasar jumlah tim yang baru
+      const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
+      this.rebuildBracketDynamic(n);
+      this.syncWinLoseFromBracketToParticipants();
+
+      // reset hasil per-babak untuk root key baru
+      this.roundResultsRootKey = getResultsRootKey();
+      this.loadRoundResultsForCurrentRound();
+      this.computeWinLoseByHeat();
+
+      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
+    },
+
+    // --- handler perubahan select ---
+    async onSelectH2HBucket(key) {
+      await this.fetchH2HBucketTeamsByKey(key);
+    },
+
+    // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
+    async fetchH2HBucketTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.h2hBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.h2hBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        this.selectedH2HKey = key;
+        localStorage.setItem("currentH2HBucketKey", key);
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("teams-h2h-registered:find-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("teams-h2h-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          // kosongkan participant tapi tetap apply bucket untuk judul & payload
+          this.participant = [];
+          this._useH2HBucket(key);
+          return;
+        }
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForH2H)
+            : [];
+
+        // commit teams ke map → agar _useH2HBucket punya data
+        this.h2hBucketMap[key] = {
+          ...b,
+          teams,
+        };
+
+        // apply bucket
+        this._useH2HBucket(key);
+      } catch {
+        // fallback minimal
+        this._useH2HBucket(key);
+      }
+    },
+    _h2hBucketKey(b) {
+      const ei = b && b.eventId ? String(b.eventId) : "";
+      const ii = b && b.initialId ? String(b.initialId) : "";
+      const ri = b && b.raceId ? String(b.raceId) : "";
+      const di = b && b.divisionId ? String(b.divisionId) : "";
+      return [ei, ii, ri, di].join("|");
+    },
+    _h2hBucketLabel(b) {
+      const div = (
+        b && b.divisionName ? String(b.divisionName) : ""
+      ).toUpperCase();
+      const rac = (b && b.raceName ? String(b.raceName) : "").toUpperCase();
+      const ini = (
+        b && b.initialName ? String(b.initialName) : ""
+      ).toUpperCase();
+      return `${div} ${rac} – ${ini}`;
+    },
+
+    // --- build opsi statik dari catalog event (fallback) ---
+    buildStaticH2HOptions() {
+      const eventId = this.currentEventId || "";
+      if (!eventId) {
+        this.h2hBucketOptions = [];
+        this.h2hBucketMap = {};
+        return;
+      }
+
+      const divs = this.divisions.length
+        ? this.divisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+
+      const races = this.races.length
+        ? this.races
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+
+      const inits = this.initials.length
+        ? this.initials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
+      const opts = [];
+      const map = Object.create(null);
+
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: String(init.id),
+              raceId: String(race.id),
+              divisionId: String(div.id),
+              eventName: "HEAD2HEAD",
+              initialName: String(init.name),
+              raceName: String(race.name),
+              divisionName: String(div.name),
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.h2hBucketOptions = opts;
+      this.h2hBucketMap = map;
+    },
+    stableRowKey(item) {
+      const t = item || {};
+      const name = String(t.nameTeam || t.teamName || "").toUpperCase();
+      const bib = String(t.bibTeam || "");
+      return name + "|" + bib;
+    },
+    markFlag(item, type) {
+      if (!item || !item.result) return;
+      // set flag (hanya salah satu dari DNF/DNS/DSQ)
+      this.$set(item.result, "flag", type);
+
+      // kosongkan waktu & total (biar tidak dihitung menang/kalah)
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+      item.result.totalTime = "";
+      item.result.winLose = null;
+
+      // nolkan penalti (biar jelas)
+      this.ensurePenaltiesObject(item.result);
+      const p = item.result.penalties || {};
+      this.$set(p, "s", 0);
+      this.$set(p, "cl", 0);
+      this.$set(p, "r1", "N");
+      this.$set(p, "r2", "N");
+      this.$set(p, "l1", "N");
+      this.$set(p, "l2", "N");
+      this.$set(p, "pb", 0);
+      this.$set(p, "f", 0);
+      this.$set(p, "o", 0);
+      item.result.penalty = 0;
+      item.result.penaltyTime = "00:00:00.000";
+
+      // simpan & recompute agar pairing heat/win-lose bersih
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+    },
+
+    resetRow(item) {
+      if (!item) return;
+      // hapus flag dan reset result bersih
+      this.$set(item.result || (item.result = {}), "flag", null);
+      const fresh = this.makeEmptyResult();
+      // pertahankan HEAT yang sudah dipilih
+      fresh.heat = item.result.heat != null ? item.result.heat : null;
+      item.result = { ...fresh };
+
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+    },
+    pushWinnerToNext(roundIndex, matchIndex, winner) {
+      const round = this.rounds[roundIndex];
+      if (!round || round.bronze) return;
+
+      // cari ronde kompetitif berikutnya
+      let nextRoundIndex = -1;
+      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return;
+
+      const next = this.rounds[nextRoundIndex];
+      const slot = Math.floor(matchIndex / 2);
+      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
+      if (next && next.matches[slot]) {
+        next.matches[slot][pos] =
+          winner && winner.name ? winner : { id: null, seed: null, name: "" };
+      }
+    },
+
+    pullWinnerFromNext(roundIndex, matchIndex, prevWinner) {
+      const round = this.rounds[roundIndex];
+      if (!round || round.bronze) return;
+
+      let nextRoundIndex = -1;
+      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return;
+
+      const next = this.rounds[nextRoundIndex];
+      const slot = Math.floor(matchIndex / 2);
+      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
+      const cell = next && next.matches[slot] && next.matches[slot][pos];
+
+      // hanya kosongkan jika sama dengan prevWinner (hindari menghapus isian manual)
+      if (cell && prevWinner && cell.name === prevWinner.name) {
+        next.matches[slot][pos] = { id: null, seed: null, name: "" };
+      }
+    },
+    toggleBye(roundIndex, matchIndex) {
+      const round = this.rounds[roundIndex];
+      if (!round) return;
+      const match = round.matches[matchIndex];
+      if (!match) return;
+
+      // flip status
+      match.bye = !match.bye;
+
+      // kalau set BYE: tentukan pemenang (tim yang ada)
+      if (match.bye) {
+        const has1 = match.team1 && match.team1.name;
+        const has2 = match.team2 && match.team2.name;
+        if (has1 && !has2) {
+          match.winner = match.team1;
+        } else if (!has1 && has2) {
+          match.winner = match.team2;
+        } else if (!has1 && !has2) {
+          // tidak ada tim, BYE tidak bermakna → batal
+          match.bye = false;
+          this.$bvToast &&
+            this.$bvToast.toast("Tidak ada tim di match ini.", {
+              variant: "warning",
+              autoHideDelay: 2000,
+              title: "BYE dibatalkan",
+            });
+          return;
+        } else {
+          // dua-duanya ada → tetap boleh BYE kalau kamu memang mau auto-lolos salah satu
+          // default pemenang = team1 (atau bisa munculkan modal pilih)
+          match.winner = match.team1;
+        }
+        // dorong ke ronde kompetitif berikutnya
+        this.pushWinnerToNext(roundIndex, matchIndex, match.winner);
+      } else {
+        // un-BYE → hapus winner & cabut dari ronde berikutnya
+        const prevWin = match.winner;
+        match.winner = null;
+        this.pullWinnerFromNext(roundIndex, matchIndex, prevWin);
+      }
+
+      this.syncWinLoseFromBracketToParticipants();
+      this.persistRoundResults();
+      this.computePodium();
+    },
+    // FUNCTION OTHERS PENALTY
+    getOthersValue(item) {
+      if (!item || !item.result) return "0";
+      if (!item.result.penalties || typeof item.result.penalties !== "object") {
+        return "0";
+      }
+      var v = item.result.penalties.o;
+      if (typeof v === "undefined" || v === null) return "0";
+      return String(v);
+    },
+
+    digitsOnly(e) {
+      var k = e.key || "";
+      if (!/^\d$/.test(k)) {
+        e.preventDefault();
+      }
+    },
+
+    digitsPaste(e) {
+      var clip = e.clipboardData || window.clipboardData;
+      var text = clip ? clip.getData("text") || "" : "";
+      if (!/^\d+$/.test(text)) {
+        e.preventDefault();
+      }
+    },
+
+    onOthersTyping(val, item) {
+      if (!item || !item.result) return;
+      this.ensurePenaltiesObject(item.result);
+
+      var s = String(val || "");
+      var cleaned = s.replace(/\D+/g, "");
+      var num = cleaned === "" ? 0 : Number(cleaned);
+
+      this.$set(item.result.penalties, "o", num);
+    },
+
+    onOthersCommit(item) {
+      // hitung ulang total penalti, time, win/lose, simpan, dll.
+      this.onPenaltyChange(item);
+    },
+
     // ADD: helper untuk reset result di round tertentu
     resetResultsForRound(roundObj) {
       const list = this.participantsForRound(roundObj);
@@ -1195,103 +2133,38 @@ export default {
       });
     },
     getGlobalHeatUsageCount() {
-      var counts = Object.create(null);
-      var rootKey = this.roundResultsRootKey;
-      if (!rootKey) return counts;
-
-      var all = readAllRoundResults(rootKey) || {};
-      var self = this;
-
-      Object.keys(all).forEach(function (roundId) {
-        var arr = all[roundId] || [];
-        arr.forEach(function (row) {
-          var heat =
-            row && row.result && row.result.heat != null
-              ? Number(row.result.heat)
-              : null;
-          var name = String(
-            (row && (row.nameTeam || row.teamName)) || ""
-          ).toUpperCase();
-          if (!heat || !name) return;
-
-          var key = roundId + "|" + name + "|" + heat;
-          if (!self.__seenHeatKeys) self.__seenHeatKeys = new Set();
-          if (self.__seenHeatKeys.has(key)) return;
-          self.__seenHeatKeys.add(key);
-
-          counts[heat] = (counts[heat] || 0) + 1;
-        });
-      });
-
-      // tambahkan yang ada di memori babak aktif (belum tersimpan)
-      var roundKey =
-        typeof this.currentRoundKey === "function"
-          ? this.currentRoundKey()
-          : null;
-      if (roundKey) {
-        (this.visibleParticipants || []).forEach(function (p) {
-          var heat =
-            p && p.result && p.result.heat != null
-              ? Number(p.result.heat)
-              : null;
-          var name = String(
-            (p && (p.nameTeam || p.teamName)) || ""
-          ).toUpperCase();
-          if (!heat || !name) return;
-
-          var k = roundKey + "|" + name + "|" + heat;
-          if (self.__seenHeatKeys && self.__seenHeatKeys.has(k)) return;
-          counts[heat] = (counts[heat] || 0) + 1;
-        });
-      }
-
-      self.__seenHeatKeys = null; // bersihkan cache
-      return counts;
+      return readGlobalHeatUsage();
     },
 
     // opsi heat per baris (sembunyikan yang sudah 2x dipakai global,
     // tapi pertahankan nilai milik baris itu sendiri agar tetap terlihat)
     heatOptionsForItem(item) {
-      var keep =
+      const keep =
         item && item.result && item.result.heat != null
           ? Number(item.result.heat)
           : null;
-      var usage = this.getGlobalHeatUsageCount();
 
-      var allowed = this.allHeatChoices.filter(function (h) {
-        var used = usage[h] || 0;
-        return used < HEAT_USAGE_LIMIT || keep === h;
+      const usage = this.getGlobalHeatUsageCount();
+
+      const allowed = this.allHeatChoices.filter((h) => {
+        const used = usage[h] || 0;
+        return used < HEAT_GLOBAL_LIMIT || keep === h;
       });
 
-      return allowed.map(function (v) {
-        return { value: v, text: "Heat " + v };
-      });
+      return allowed.map((v) => ({ value: v, text: "Heat " + v }));
     },
 
     onHeatChanged(item, newVal) {
       if (!item || !item.result) return;
 
-      // heat sebelumnya yang benar2 kita simpan sendiri
       const prev = Number.isFinite(item.__prevHeat)
         ? item.__prevHeat
-        : Number.isFinite(+item.result.heat)
-        ? +item.result.heat
-        : null;
+        : Number(item.result.heat) || null;
 
-      // normalisasi nilai baru dari event
-      let val =
-        newVal === "" || newVal === null || typeof newVal === "undefined"
-          ? null
-          : Number(newVal);
+      let val = newVal === "" || newVal == null ? null : Number(newVal);
+      if (val != null && (!Number.isFinite(val) || val <= 0)) val = null;
 
-      if (
-        val !== null &&
-        (!Number.isFinite(val) || val < 1 || val > MAX_HEAT_NUMBER)
-      ) {
-        val = null;
-      }
-
-      // kalau sama dengan sebelumnya, cukup persist & recompute ringan
+      // kalau tidak berubah, cukup persist & evaluasi
       if (prev !== null && val === prev) {
         this.persistRoundResults();
         this.computeWinLoseByHeat();
@@ -1299,17 +2172,17 @@ export default {
         return;
       }
 
-      // cek limit global (kecuali kalau sedang mempertahankan heat lama)
+      // cek limit global (kecuali kalau mempertahankan heat lama)
       if (val !== null) {
-        const usage = this.getGlobalHeatUsageCount();
+        const usage = readGlobalHeatUsage();
         const used = usage[val] || 0;
-        if (used >= HEAT_USAGE_LIMIT && val !== prev) {
-          // revert ke nilai sebelumnya
+        if (used >= HEAT_GLOBAL_LIMIT && val !== prev) {
+          // revert ke sebelumnya
           this.$set(item.result, "heat", prev);
           item.__prevHeat = prev;
           this.$bvToast &&
             this.$bvToast.toast(
-              `Heat ${val} sudah dipakai ${HEAT_USAGE_LIMIT}×.`,
+              `Heat ${val} sudah terpakai ${HEAT_GLOBAL_LIMIT}× secara global.`,
               {
                 variant: "warning",
                 autoHideDelay: 2500,
@@ -1320,21 +2193,18 @@ export default {
         }
       }
 
-      // set nilai baru
+      // release heat lama
+      if (prev != null) bumpGlobalHeat(prev, -1);
+      // set nilai baru & reserve
       this.$set(item.result, "heat", val);
       item.__prevHeat = val;
+      if (val != null) bumpGlobalHeat(val, +1);
 
-      // simpan & hitung ulang konsekuensi heat
+      // simpan & hitung ulang
       this.persistRoundResults();
-
-      // re-evaluate win/lose berdasarkan pasangan heat & waktu
       this.computeWinLoseByHeat();
       this.evaluateHeatWinnersForCurrentRound();
-
-      // perbarui ranking subset yang tampil
       this.assignRanks(this.visibleParticipants);
-
-      // jaga UI sinkron (opsional)
       this.$nextTick &&
         this.$nextTick(() => this.$forceUpdate && this.$forceUpdate());
     },
@@ -1555,16 +2425,16 @@ export default {
     },
 
     // Pastikan setiap item punya result.heat; jika kosong → isi dari bracket
-    // ensureDefaultHeatForVisible() {
-    //   var heatMap = this.buildHeatMapFromBracket();
-    //   this.visibleParticipants.forEach(function (p) {
-    //     if (!p.result) p.result = {};
-    //     if (!p.result.heat || Number(p.result.heat) <= 0) {
-    //       var key = String(p.nameTeam || p.teamName || "").toUpperCase();
-    //       p.result.heat = heatMap[key] || 1;
-    //     }
-    //   });
-    // },
+    ensureDefaultHeatForVisible() {
+      var heatMap = this.buildHeatMapFromBracket();
+      this.visibleParticipants.forEach(function (p) {
+        if (!p.result) p.result = {};
+        if (!p.result.heat || Number(p.result.heat) <= 0) {
+          var key = String(p.nameTeam || p.teamName || "").toUpperCase();
+          p.result.heat = heatMap[key] || 1;
+        }
+      });
+    },
 
     // mapping tim -> nomor heat (index match + 1) pada babak aktif
     getPB(item, key) {
@@ -1652,6 +2522,8 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants();
       this.computeWinLoseByHeat();
+
+      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
@@ -1950,12 +2822,7 @@ export default {
         const [t1, t2] = pairs[i] || [{}, {}];
         m.team1 = t1 || { id: null, seed: null, name: "" };
         m.team2 = t2 || { id: null, seed: null, name: "" };
-        // tandai bye jika salah satunya kosong
-        m.bye = !m.team1.name || !m.team2.name;
       });
-
-      // Jika ada BYE, advance otomatis
-      this.autoAdvanceByes();
     },
 
     /** Advance otomatis untuk match yang bye (tanpa sentuh Bronze/Final) */
@@ -2087,12 +2954,7 @@ export default {
       // kosongkan
       if (!pickedId) {
         match[slot] = { id: null, seed: null, name: "" };
-        match.bye =
-          !(match.team1 && match.team1.name) ||
-          !(match.team2 && match.team2.name);
-        // reset winner bila slot berubah
         match.winner = null;
-        this.autoAdvanceByes();
         return;
       }
 
@@ -2113,13 +2975,7 @@ export default {
       }
 
       match[slot] = this.toBracketTeam(opt);
-      match.bye =
-        !(match.team1 && match.team1.name) ||
-        !(match.team2 && match.team2.name);
       match.winner = null; // reset winner ketika ada perubahan pasangan
-
-      // tiap perubahan, jalankan auto-advance untuk BYE
-      this.autoAdvanceByes();
     },
 
     /** Hapus semua assignment di ronde pertama (quick clear) */
@@ -2131,9 +2987,8 @@ export default {
         m.team1 = { id: null, seed: null, name: "" };
         m.team2 = { id: null, seed: null, name: "" };
         m.winner = null;
-        m.bye = true;
+        m.bye = false;
       });
-      this.autoAdvanceByes();
     },
 
     /** SIGN BRACKET */
@@ -2175,13 +3030,6 @@ export default {
       this.titleCategories = String(
         localStorage.getItem("currentCategories") || ""
       ).trim();
-    },
-
-    openModal(datas) {
-      this.editForm = datas;
-      this.$bvModal &&
-        this.$bvModal.show &&
-        this.$bvModal.show("bv-modal-edit-team");
     },
 
     async assignRanks(items) {
@@ -2239,76 +3087,6 @@ export default {
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
-    },
-
-    /** Serial connect */
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ok = await this.setupSerialListener();
-        if (ok) {
-          this.isPortConnected = true;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      if (this.port && this.port.isOpen) this.port.close();
-      this.isPortConnected = false;
-    },
-
-    async setupSerialListener() {
-      try {
-        const ports = await SerialPort.list();
-        if (!ports || ports.length === 0) return false;
-
-        const selectedPort = ports[6] || ports[5] || ports[ports.length - 1];
-        if (!selectedPort || !selectedPort.path) return false;
-
-        this.port = new SerialPort({ path: selectedPort.path, baudRate: 9600 });
-
-        let receivedData = "",
-          a = "",
-          b = "";
-        this.port.on("data", (data) => {
-          const newData = data.toString();
-          receivedData += newData;
-
-          for (let i = 0; i < receivedData.length; i++) {
-            const ch = receivedData[i];
-            if (ch === "M" || ch === "R") {
-              a = receivedData.slice(0, i + 1);
-              b = receivedData.slice(i + 1);
-              receivedData = "";
-              break;
-            }
-          }
-          this.digitId.unshift(a);
-          this.digitTime.unshift(b);
-          if (a[11] == "0") {
-            this.digitTimeStart = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          } else if (a[11] == "2") {
-            this.digitTimeFinish = b.replace(
-              /(\d{2})(\d{2})(\d{2})(\d{3})/,
-              "$1:$2:$3.$4"
-            );
-          }
-          return true;
-        });
-        return true;
-      } catch (err) {
-        this.notifyError(err, "Serial setup failed");
-      }
     },
 
     async updateTime(val, visIndex, title) {
@@ -2814,10 +3592,40 @@ thead th[colspan="8"] {
   font-weight: 800;
   letter-spacing: 0.2px;
 }
+/* Bar aksi kanan: select + tombol sejajar rapi */
 .toolbar-actions {
   display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap; /* biar responsif */
+}
+
+/* Select block */
+.toolbar-select {
+  min-width: 260px;
+  flex: 1 1 260px; /* bisa melebar di layar kecil */
+}
+.toolbar-select__control {
+  border-radius: 10px;
+}
+
+/* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */
+.btn-group-actions {
+  display: flex;
   align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Sedikit konsistensi ukuran tombol custom */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  line-height: 1.2;
 }
 .toolbar-divider {
   width: 1px;
@@ -2860,5 +3668,140 @@ thead th[colspan="8"] {
     flex: 1;
     min-width: 0;
   }
+}
+
+/* Kolom Others: lebih kecil & rapat */
+.pen-o-cell {
+  width: 64px;
+  min-width: 64px;
+  padding-right: 6px; /* biar gak nempel */
+}
+
+/* BootstrapVue render: input.form-control */
+.pen-o-input.form-control,
+.pen-o-input.form-control.form-control-sm {
+  max-width: 60px;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.badge-pill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+}
+
+/* PATH  */
+.controls-bar {
+  gap: 10px;
+}
+
+/* Pill path */
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 520px; /* sesuaikan */
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.path-pill--empty {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+.path-pill .truncate {
+  display: inline-block;
+  max-width: 460px; /* = max-width pill - padding + ikon */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Meta Panel  */
+.meta-panel {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eef2f7;
+}
+.meta-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.meta-label {
+  min-width: 120px; /* lebar label tetap */
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.meta-value {
+  font-weight: 600;
+  color: #0f172a; /* slate-900 */
+}
+.badge-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.badge-chip--blue {
+  background: #eef6ff;
+  color: rgb(0, 180, 255);
+  border-color: #dbeafe;
+}
+
+/* Responsif: di layar kecil, label di atas value */
+@media (max-width: 575.98px) {
+  .meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+  .meta-label {
+    min-width: auto;
+  }
+  .meta-panel {
+    padding: 12px;
+  }
+}
+
+.bracket-hidden-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  margin: 16px 0;
+  border: 2px dashed #d1d5db; /* abu-abu */
+  border-radius: 12px;
+  background: #f9fafb; /* abu terang */
+  color: #374151;      /* teks abu gelap */
+  text-align: center;
+}
+
+.bracket-hidden-info .info-icon {
+  font-size: 28px;
+  color: #6b7280; /* abu-abu */
 }
 </style>

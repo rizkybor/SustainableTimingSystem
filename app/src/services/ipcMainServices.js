@@ -12,7 +12,7 @@ const {
   getEventById,
 } = require("../controllers/GET/getEvent.js");
 
-const { getRegistered } = require("../controllers/GET/getRegistered.js");
+const { getRegistered, getRegisteredH2H } = require("../controllers/GET/getRegistered.js");
 
 const {
   getOptionLevel,
@@ -528,6 +528,11 @@ function setupIPCMainHandlers() {
   ipcMain.on("teams-registered:find", async (event, filters) => {
     const res = await getRegistered(filters || {});
     event.sender.send("teams-registered:find-reply", res);
+  });
+
+  ipcMain.on("teams-h2h-registered:find", async (event, filters) => {
+    const res = await getRegisteredH2H(filters || {});
+    event.sender.send("teams-h2h-registered:find-reply", res);
   });
 
   // =========================

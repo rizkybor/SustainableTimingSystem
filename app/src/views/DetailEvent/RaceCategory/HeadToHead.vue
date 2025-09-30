@@ -667,6 +667,30 @@ import { Icon } from "@iconify/vue2";
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
 const MAX_HEAT_NUMBER = 24;
 const HEAT_USAGE_LIMIT = 2;
+const HEAT_GLOBAL_KEY = "h2hHeatUsage:page"; // session-scoped
+const HEAT_GLOBAL_LIMIT = 2; // tiap nomor dipakai max 2 tim
+
+function readGlobalHeatUsage() {
+  try {
+    const raw = sessionStorage.getItem(HEAT_GLOBAL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGlobalHeatUsage(obj) {
+  sessionStorage.setItem(HEAT_GLOBAL_KEY, JSON.stringify(obj || {}));
+}
+
+// tambah/kurang 1 untuk nomor heat tertentu
+function bumpGlobalHeat(heat, delta) {
+  const usage = readGlobalHeatUsage();
+  const h = Number(heat);
+  if (!Number.isFinite(h) || h <= 0) return;
+  usage[h] = Math.max(0, (usage[h] || 0) + (Number(delta) || 0));
+  writeGlobalHeatUsage(usage);
+}
 
 // gabungkan kunci unik berdasar bucket (event/initial/race/division)
 function getResultsRootKey() {
@@ -839,6 +863,20 @@ function loadRaceStartPayloadForH2H() {
     teams: Array.isArray(b.teams) ? b.teams.map(normalizeTeamForH2H) : [],
   };
   return { bucket };
+}
+
+// === SEED GLOBAL HEAT USAGE DARI DATA YANG SUDAH ADA ===
+function seedGlobalHeatFromList(list, { reset = false } = {}) {
+  const usage = reset ? {} : readGlobalHeatUsage();
+  (list || []).forEach((p) => {
+    const h = p && p.result && Number(p.result.heat);
+    if (Number.isFinite(h) && h > 0) {
+      usage[h] = (usage[h] || 0) + 1;
+      // simpan sebagai prev agar onHeatChanged tidak salah hitung
+      p.__prevHeat = h;
+    }
+  });
+  writeGlobalHeatUsage(usage);
 }
 
 export default {
@@ -1020,7 +1058,10 @@ export default {
     },
     // ... (computed lain tetap)
     allHeatChoices() {
-      return Array.from({ length: MAX_HEAT_NUMBER }, (_, i) => i + 1);
+      const usage = readGlobalHeatUsage();
+      const maxUsed = Math.max(0, ...Object.keys(usage).map(Number));
+      const cap = Math.max(MAX_HEAT_NUMBER, maxUsed + 4); // kasih spare 3-4 nomor
+      return Array.from({ length: cap }, (_, i) => i + 1);
     },
     penaltyChoices() {
       // opsi untuk semua dropdown penalty (S, CL, R1, R2, L1, L2, PB, F)
@@ -1215,8 +1256,8 @@ export default {
   },
 
   beforeRouteLeave(to, from, next) {
-    // NEW: reset data hasil pertandingan di localStorage ketika berpindah halaman
     this.clearAllRoundResults();
+    sessionStorage.removeItem(HEAT_GLOBAL_KEY);
     next();
   },
 
@@ -1255,9 +1296,18 @@ export default {
     this.roundResultsRootKey = getResultsRootKey();
     this.loadRoundResultsForCurrentRound();
     this.computeWinLoseByHeat();
+
+    seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
   },
 
   methods: {
+    getNextAvailableHeat() {
+      const usage = readGlobalHeatUsage();
+      // cari heat bernomor paling kecil yang usage < LIMIT
+      for (let h = 1; ; h++) {
+        if ((usage[h] || 0) < HEAT_GLOBAL_LIMIT) return h;
+      }
+    },
     // --- load semua bucket H2H dari eventDetails (offline/fallback) ---
     loadAllH2HBucketsFromEvent() {
       try {
@@ -1393,6 +1443,8 @@ export default {
       this.roundResultsRootKey = getResultsRootKey();
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat();
+
+      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     },
 
     // --- handler perubahan select ---
@@ -1418,7 +1470,7 @@ export default {
           divisionId: String(b.divisionId),
         };
 
-        console.log(filters,'<<< cek')
+        console.log(filters, "<<< cek");
 
         this.selectedH2HKey = key;
         localStorage.setItem("currentH2HBucketKey", key);
@@ -1436,7 +1488,7 @@ export default {
           this._useH2HBucket(key);
           return;
         }
-        console.log(res.items)
+        console.log(res.items);
         const doc = Array.isArray(res.items) ? res.items[0] : res.items;
         const teams =
           doc && Array.isArray(doc.teams)
@@ -1858,103 +1910,38 @@ export default {
       });
     },
     getGlobalHeatUsageCount() {
-      var counts = Object.create(null);
-      var rootKey = this.roundResultsRootKey;
-      if (!rootKey) return counts;
-
-      var all = readAllRoundResults(rootKey) || {};
-      var self = this;
-
-      Object.keys(all).forEach(function (roundId) {
-        var arr = all[roundId] || [];
-        arr.forEach(function (row) {
-          var heat =
-            row && row.result && row.result.heat != null
-              ? Number(row.result.heat)
-              : null;
-          var name = String(
-            (row && (row.nameTeam || row.teamName)) || ""
-          ).toUpperCase();
-          if (!heat || !name) return;
-
-          var key = roundId + "|" + name + "|" + heat;
-          if (!self.__seenHeatKeys) self.__seenHeatKeys = new Set();
-          if (self.__seenHeatKeys.has(key)) return;
-          self.__seenHeatKeys.add(key);
-
-          counts[heat] = (counts[heat] || 0) + 1;
-        });
-      });
-
-      // tambahkan yang ada di memori babak aktif (belum tersimpan)
-      var roundKey =
-        typeof this.currentRoundKey === "function"
-          ? this.currentRoundKey()
-          : null;
-      if (roundKey) {
-        (this.visibleParticipants || []).forEach(function (p) {
-          var heat =
-            p && p.result && p.result.heat != null
-              ? Number(p.result.heat)
-              : null;
-          var name = String(
-            (p && (p.nameTeam || p.teamName)) || ""
-          ).toUpperCase();
-          if (!heat || !name) return;
-
-          var k = roundKey + "|" + name + "|" + heat;
-          if (self.__seenHeatKeys && self.__seenHeatKeys.has(k)) return;
-          counts[heat] = (counts[heat] || 0) + 1;
-        });
-      }
-
-      self.__seenHeatKeys = null; // bersihkan cache
-      return counts;
+      return readGlobalHeatUsage();
     },
 
     // opsi heat per baris (sembunyikan yang sudah 2x dipakai global,
     // tapi pertahankan nilai milik baris itu sendiri agar tetap terlihat)
     heatOptionsForItem(item) {
-      var keep =
+      const keep =
         item && item.result && item.result.heat != null
           ? Number(item.result.heat)
           : null;
-      var usage = this.getGlobalHeatUsageCount();
 
-      var allowed = this.allHeatChoices.filter(function (h) {
-        var used = usage[h] || 0;
-        return used < HEAT_USAGE_LIMIT || keep === h;
+      const usage = this.getGlobalHeatUsageCount();
+
+      const allowed = this.allHeatChoices.filter((h) => {
+        const used = usage[h] || 0;
+        return used < HEAT_GLOBAL_LIMIT || keep === h;
       });
 
-      return allowed.map(function (v) {
-        return { value: v, text: "Heat " + v };
-      });
+      return allowed.map((v) => ({ value: v, text: "Heat " + v }));
     },
 
     onHeatChanged(item, newVal) {
       if (!item || !item.result) return;
 
-      // heat sebelumnya yang benar2 kita simpan sendiri
       const prev = Number.isFinite(item.__prevHeat)
         ? item.__prevHeat
-        : Number.isFinite(+item.result.heat)
-        ? +item.result.heat
-        : null;
+        : Number(item.result.heat) || null;
 
-      // normalisasi nilai baru dari event
-      let val =
-        newVal === "" || newVal === null || typeof newVal === "undefined"
-          ? null
-          : Number(newVal);
+      let val = newVal === "" || newVal == null ? null : Number(newVal);
+      if (val != null && (!Number.isFinite(val) || val <= 0)) val = null;
 
-      if (
-        val !== null &&
-        (!Number.isFinite(val) || val < 1 || val > MAX_HEAT_NUMBER)
-      ) {
-        val = null;
-      }
-
-      // kalau sama dengan sebelumnya, cukup persist & recompute ringan
+      // kalau tidak berubah, cukup persist & evaluasi
       if (prev !== null && val === prev) {
         this.persistRoundResults();
         this.computeWinLoseByHeat();
@@ -1962,17 +1949,17 @@ export default {
         return;
       }
 
-      // cek limit global (kecuali kalau sedang mempertahankan heat lama)
+      // cek limit global (kecuali kalau mempertahankan heat lama)
       if (val !== null) {
-        const usage = this.getGlobalHeatUsageCount();
+        const usage = readGlobalHeatUsage();
         const used = usage[val] || 0;
-        if (used >= HEAT_USAGE_LIMIT && val !== prev) {
-          // revert ke nilai sebelumnya
+        if (used >= HEAT_GLOBAL_LIMIT && val !== prev) {
+          // revert ke sebelumnya
           this.$set(item.result, "heat", prev);
           item.__prevHeat = prev;
           this.$bvToast &&
             this.$bvToast.toast(
-              `Heat ${val} sudah dipakai ${HEAT_USAGE_LIMIT}×.`,
+              `Heat ${val} sudah terpakai ${HEAT_GLOBAL_LIMIT}× secara global.`,
               {
                 variant: "warning",
                 autoHideDelay: 2500,
@@ -1983,21 +1970,18 @@ export default {
         }
       }
 
-      // set nilai baru
+      // release heat lama
+      if (prev != null) bumpGlobalHeat(prev, -1);
+      // set nilai baru & reserve
       this.$set(item.result, "heat", val);
       item.__prevHeat = val;
+      if (val != null) bumpGlobalHeat(val, +1);
 
-      // simpan & hitung ulang konsekuensi heat
+      // simpan & hitung ulang
       this.persistRoundResults();
-
-      // re-evaluate win/lose berdasarkan pasangan heat & waktu
       this.computeWinLoseByHeat();
       this.evaluateHeatWinnersForCurrentRound();
-
-      // perbarui ranking subset yang tampil
       this.assignRanks(this.visibleParticipants);
-
-      // jaga UI sinkron (opsional)
       this.$nextTick &&
         this.$nextTick(() => this.$forceUpdate && this.$forceUpdate());
     },
@@ -2218,16 +2202,16 @@ export default {
     },
 
     // Pastikan setiap item punya result.heat; jika kosong → isi dari bracket
-    // ensureDefaultHeatForVisible() {
-    //   var heatMap = this.buildHeatMapFromBracket();
-    //   this.visibleParticipants.forEach(function (p) {
-    //     if (!p.result) p.result = {};
-    //     if (!p.result.heat || Number(p.result.heat) <= 0) {
-    //       var key = String(p.nameTeam || p.teamName || "").toUpperCase();
-    //       p.result.heat = heatMap[key] || 1;
-    //     }
-    //   });
-    // },
+    ensureDefaultHeatForVisible() {
+      var heatMap = this.buildHeatMapFromBracket();
+      this.visibleParticipants.forEach(function (p) {
+        if (!p.result) p.result = {};
+        if (!p.result.heat || Number(p.result.heat) <= 0) {
+          var key = String(p.nameTeam || p.teamName || "").toUpperCase();
+          p.result.heat = heatMap[key] || 1;
+        }
+      });
+    },
 
     // mapping tim -> nomor heat (index match + 1) pada babak aktif
     getPB(item, key) {
@@ -2315,6 +2299,8 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants();
       this.computeWinLoseByHeat();
+
+      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)

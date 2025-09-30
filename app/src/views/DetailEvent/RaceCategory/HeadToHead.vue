@@ -88,7 +88,7 @@
               <div class="meta-row">
                 <!-- Select category -->
                 <b-form-group
-                  label="Switch H2H Category:"
+                  label="Switch Head to Head Category:"
                   label-for="h2hBucketSelect"
                   class="mb-0 toolbar-select"
                 >
@@ -196,7 +196,7 @@
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <h4 class="mb-0">Bracket Head 2 Head</h4>
+        <h4 class="mb-0">Bracket Head to Head</h4>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
           <div class="toolbar-actions">
@@ -470,13 +470,13 @@
       <!-- /bracket -->
     </div>
 
-    <!-- LIST RESULT -->
+    <!-- Racetime Output -->
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="py-3" style="display: flex; justify-content: space-between">
           <div>
             <h4>
-              List Result —
+              Racetime Output —
               {{
                 currentRound
                   ? currentRound.bronze

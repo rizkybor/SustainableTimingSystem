@@ -12,7 +12,12 @@ const {
   getEventById,
 } = require("../controllers/GET/getEvent.js");
 
-const { getRegistered, getRegisteredH2H } = require("../controllers/GET/getRegistered.js");
+const {
+  getRegistered,
+  getRegisteredH2H,
+  getRegisteredSprint,
+  getRegisteredSlalom,
+} = require("../controllers/GET/getRegistered.js");
 
 const {
   getOptionLevel,
@@ -533,6 +538,17 @@ function setupIPCMainHandlers() {
   ipcMain.on("teams-h2h-registered:find", async (event, filters) => {
     const res = await getRegisteredH2H(filters || {});
     event.sender.send("teams-h2h-registered:find-reply", res);
+  });
+
+  ipcMain.on("teams-sprint-registered:find", async (event, filters) => {
+    console.log(filters, "<<< FILTER");
+    const res = await getRegisteredSprint(filters || {});
+    event.sender.send("teams-sprint-registered:find-reply", res);
+  });
+
+  ipcMain.on("teams-slalom-registered:find", async (event, filters) => {
+    const res = await getRegisteredSlalom(filters || {});
+    event.sender.send("teams-slalom-registered:find-reply", res);
   });
 
   // =========================

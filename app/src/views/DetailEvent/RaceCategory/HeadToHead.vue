@@ -275,7 +275,7 @@
               v-model="currentRoundIndex"
               :options="roundOptions"
               class="round-select mx-2"
-              v-b-tooltip.hover="'Pilih ronde aktif'"
+              v-b-tooltip.hover="'Select Round'"
             />
 
             <button
@@ -290,183 +290,196 @@
       </div>
 
       <div
-        v-if="showBracket"
-        class="bracket"
-        role="region"
-        aria-label="Tournament Bracket"
+        v-if="isLoadingBracket"
+        class="bracket-loading d-flex align-items-center justify-content-center py-5"
       >
-        <div
-          v-for="(round, rIdx) in rounds"
-          :key="round.id"
-          class="bracket__round"
-          :class="{ 'bracket__round--bronze': round.bronze }"
-        >
-          <div class="bracket__round-header">
-            <span class="bracket__round-title">{{ round.name }}</span>
-            <span class="bracket__round-meta" v-if="!round.bronze"
-              >Matches: {{ round.matches.length }}</span
-            >
-            <span class="bracket__round-meta" v-else>Final B</span>
-          </div>
-
-          <div class="bracket__list">
-            <div
-              v-for="(m, mIdx) in round.matches"
-              :key="m.id"
-              class="bracket__match"
-              :aria-label="`Match ${m.id}`"
-            >
-              <div class="bracket__winner" v-if="m.winner && m.winner.name">
-                <Icon icon="mdi:trophy-variant-outline" />
-                <span class="ml-1">{{ m.winner.name }}</span>
-              </div>
-              <!-- Team 1 -->
-              <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
-                <div class="bracket__team-main">
-                  <span class="bracket__seed" v-if="m.team1.seed">{{
-                    m.team1.seed
-                  }}</span>
-                  <span
-                    class="bracket__name"
-                    v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                  >
-                    {{ m.team1.name || "—" }}
-                  </span>
-
-                  <!-- Editor slot Team 1 (ronde pertama saja) -->
-                  <div v-else class="w-100">
-                    <b-form-select
-                      :value="m.team1.__pid || ''"
-                      @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
-                      class="w-100"
-                    >
-                      <option :value="''">— pilih tim —</option>
-                      <option
-                        v-for="opt in availableTeamOptions(
-                          m.team1 && m.team1.__pid
-                        )"
-                        :key="'t1-' + opt.id"
-                        :value="opt.id"
-                      >
-                        {{ opt.label }}
-                      </option>
-                    </b-form-select>
-                  </div>
-                </div>
-                <span class="bracket__score" v-if="m.score1 != null">{{
-                  m.score1
-                }}</span>
-              </div>
-
-              <!-- vs divider -->
-              <div class="bracket__vs" aria-hidden="true">vs</div>
-
-              <!-- Team 2 -->
-              <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
-                <div class="bracket__team-main">
-                  <span class="bracket__seed" v-if="m.team2.seed">{{
-                    m.team2.seed
-                  }}</span>
-                  <span
-                    class="bracket__name"
-                    v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                  >
-                    {{ m.team2.name || "—" }}
-                  </span>
-
-                  <!-- Editor slot Team 2 (ronde pertama saja) -->
-                  <div v-else class="w-100">
-                    <b-form-select
-                      :value="m.team2.__pid || ''"
-                      @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
-                      class="w-100"
-                    >
-                      <option :value="''">— pilih tim —</option>
-                      <option
-                        v-for="opt in availableTeamOptions(
-                          m.team2 && m.team2.__pid
-                        )"
-                        :key="'t2-' + opt.id"
-                        :value="opt.id"
-                      >
-                        {{ opt.label }}
-                      </option>
-                    </b-form-select>
-                  </div>
-                </div>
-                <span class="bracket__score" v-if="m.score2 != null">{{
-                  m.score2
-                }}</span>
-              </div>
-
-              <!-- Actions / badges -->
-              <div class="bracket__footer">
-                <div
-                  class="bracket__actions"
-                  v-if="m.team1.name && m.team2.name"
-                >
-                  <button
-                    v-if="!editBracketTeams"
-                    class="btn-action btn-xs btn-outline-success"
-                    @click="advanceWinner(rIdx, mIdx, 1)"
-                    title="Set winner: top"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Top Win
-                  </button>
-                  <button
-                    v-if="!editBracketTeams"
-                    class="btn-action btn-xs btn-outline-primary"
-                    @click="advanceWinner(rIdx, mIdx, 2)"
-                    title="Set winner: bottom"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Bottom Win
-                  </button>
-                </div>
-
-                <!-- Toggle BYE (hanya saat edit tim) -->
-                <button
-                  v-if="
-                    editBracketTeams &&
-                    !['Final A', 'Final B', 'Semifinals'].includes(
-                      (round.name || '').trim()
-                    )
-                  "
-                  class="btn-action btn-xs btn-outline-dark"
-                  @click="toggleBye(rIdx, mIdx)"
-                  :title="
-                    round.matches[mIdx] && round.matches[mIdx].bye
-                      ? 'Batalkan BYE'
-                      : 'Set BYE'
-                  "
-                >
-                  <Icon icon="mdi:transfer-right" />
-                  {{
-                    round.matches[mIdx] && round.matches[mIdx].bye
-                      ? "Un-BYE"
-                      : "Set BYE"
-                  }}
-                  {{ round.name }}
-                </button>
-              </div>
-            </div>
-            <!-- /match -->
-          </div>
-          <!-- /list -->
+        <div class="text-center">
+          <b-spinner label="Loading" class="mb-2"></b-spinner>
+          <div class="text-muted">Loading bracket & teams…</div>
         </div>
-        <!-- /round -->
+      </div>
+      <div>
+        <div
+          v-if="showBracket"
+          class="bracket"
+          role="region"
+          aria-label="Tournament Bracket"
+        >
+          <div
+            v-for="(round, rIdx) in rounds"
+            :key="round.id"
+            class="bracket__round"
+            :class="{ 'bracket__round--bronze': round.bronze }"
+          >
+            <div class="bracket__round-header">
+              <span class="bracket__round-title">{{ round.name }}</span>
+              <span class="bracket__round-meta" v-if="!round.bronze"
+                >Matches: {{ round.matches.length }}</span
+              >
+              <span class="bracket__round-meta" v-else>Final B</span>
+            </div>
+
+            <div class="bracket__list">
+              <div
+                v-for="(m, mIdx) in round.matches"
+                :key="m.id"
+                class="bracket__match"
+                :aria-label="`Match ${m.id}`"
+              >
+                <div class="bracket__winner" v-if="m.winner && m.winner.name">
+                  <Icon icon="mdi:trophy-variant-outline" />
+                  <span class="ml-1">{{ m.winner.name }}</span>
+                </div>
+                <!-- Team 1 -->
+                <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
+                  <div class="bracket__team-main">
+                    <span class="bracket__seed" v-if="m.team1.seed">{{
+                      m.team1.seed
+                    }}</span>
+                    <span
+                      class="bracket__name"
+                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
+                    >
+                      {{ m.team1.name || "—" }}
+                    </span>
+
+                    <!-- Editor slot Team 1 (ronde pertama saja) -->
+                    <div v-else class="w-100">
+                      <b-form-select
+                        :value="m.team1.__pid || ''"
+                        @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
+                        class="w-100"
+                      >
+                        <option :value="''">— pilih tim —</option>
+                        <option
+                          v-for="opt in availableTeamOptions(
+                            m.team1 && m.team1.__pid
+                          )"
+                          :key="'t1-' + opt.id"
+                          :value="opt.id"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </b-form-select>
+                    </div>
+                  </div>
+                  <span class="bracket__score" v-if="m.score1 != null">{{
+                    m.score1
+                  }}</span>
+                </div>
+
+                <!-- vs divider -->
+                <div class="bracket__vs" aria-hidden="true">vs</div>
+
+                <!-- Team 2 -->
+                <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
+                  <div class="bracket__team-main">
+                    <span class="bracket__seed" v-if="m.team2.seed">{{
+                      m.team2.seed
+                    }}</span>
+                    <span
+                      class="bracket__name"
+                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
+                    >
+                      {{ m.team2.name || "—" }}
+                    </span>
+
+                    <!-- Editor slot Team 2 (ronde pertama saja) -->
+                    <div v-else class="w-100">
+                      <b-form-select
+                        :value="m.team2.__pid || ''"
+                        @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
+                        class="w-100"
+                      >
+                        <option :value="''">— pilih tim —</option>
+                        <option
+                          v-for="opt in availableTeamOptions(
+                            m.team2 && m.team2.__pid
+                          )"
+                          :key="'t2-' + opt.id"
+                          :value="opt.id"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </b-form-select>
+                    </div>
+                  </div>
+                  <span class="bracket__score" v-if="m.score2 != null">{{
+                    m.score2
+                  }}</span>
+                </div>
+
+                <!-- Actions / badges -->
+                <div class="bracket__footer">
+                  <div
+                    class="bracket__actions"
+                    v-if="m.team1.name && m.team2.name"
+                  >
+                    <button
+                      v-if="!editBracketTeams"
+                      class="btn-action btn-xs btn-outline-success"
+                      @click="advanceWinner(rIdx, mIdx, 1)"
+                      title="Set winner: top"
+                      :disabled="editBracketTeams"
+                    >
+                      <Icon icon="mdi:crown-outline" /> Top Win
+                    </button>
+                    <button
+                      v-if="!editBracketTeams"
+                      class="btn-action btn-xs btn-outline-primary"
+                      @click="advanceWinner(rIdx, mIdx, 2)"
+                      title="Set winner: bottom"
+                      :disabled="editBracketTeams"
+                    >
+                      <Icon icon="mdi:crown-outline" /> Bottom Win
+                    </button>
+                  </div>
+
+                  <!-- Toggle BYE (hanya saat edit tim) -->
+                  <button
+                    v-if="
+                      editBracketTeams &&
+                      !['Final A', 'Final B', 'Semifinals'].includes(
+                        (round.name || '').trim()
+                      )
+                    "
+                    class="btn-action btn-xs btn-outline-dark"
+                    @click="toggleBye(rIdx, mIdx)"
+                    :title="
+                      round.matches[mIdx] && round.matches[mIdx].bye
+                        ? 'Batalkan BYE'
+                        : 'Set BYE'
+                    "
+                  >
+                    <Icon icon="mdi:transfer-right" />
+                    {{
+                      round.matches[mIdx] && round.matches[mIdx].bye
+                        ? "Un-BYE"
+                        : "Set BYE"
+                    }}
+                    {{ round.name }}
+                  </button>
+                </div>
+              </div>
+              <!-- /match -->
+            </div>
+            <!-- /list -->
+          </div>
+          <!-- /round -->
+        </div>
+
+        <div v-if="!showBracket" class="bracket-hidden-info">
+          <div>
+            <Icon icon="mdi:eye-off-outline" class="info-icon" />
+            <h5 class="mb-1">Bracket is Hidden</h5>
+            <p class="mb-0 text-muted">
+              Gunakan tombol <strong>Show Bracket</strong> untuk menampilkan
+              kembali.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div v-if="!showBracket" class="bracket-hidden-info">
-        <div>
-    <Icon icon="mdi:eye-off-outline" class="info-icon" />
-    <h5 class="mb-1">Bracket is Hidden</h5>
-    <p class="mb-0 text-muted">
-      Gunakan tombol <strong>Show Bracket</strong> untuk menampilkan kembali.
-    </p>
-  </div>
-</div>
       <!-- /bracket -->
     </div>
 
@@ -514,7 +527,19 @@
               aria-label="Scrollable results table"
               role="region"
             >
-              <table class="table">
+              <div
+                v-if="isLoadingBracket"
+                class="bracket-loading d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center">
+                  <b-spinner label="Loading" class="mb-2"></b-spinner>
+                  <div class="text-muted">Loading bracket & teams…</div>
+                </div>
+              </div>
+              <table
+                v-else-if="visibleParticipants && visibleParticipants.length"
+                class="table"
+              >
                 <thead>
                   <tr>
                     <th rowspan="2">No</th>
@@ -531,8 +556,10 @@
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
                     <th class="text-center" rowspan="2">Result</th>
-                    <th rowspan="2">Win/Lose</th>
-                    <th v-if="editResult" rowspan="2">Action</th>
+                    <th class="text-center" rowspan="2">Win/Lose</th>
+                    <th v-if="editResult" class="text-center" rowspan="2">
+                      Action
+                    </th>
                   </tr>
                   <tr>
                     <th class="text-center">S</th>
@@ -568,118 +595,182 @@
                       />
                     </td>
 
-                    <td class="large-bold text-strong max-char">
-                      {{ item.nameTeam }}
-                      <span
-                        v-if="isByeTeam(item)"
-                        class="badge badge-light ml-2"
-                        >BYE</span
-                      >
+                    <td class="large-bold text-strong max-char text-left">
+                      <!-- status pills di atas -->
+                      <div class="mb-1">
+                        <span
+                          v-if="item.result && item.result.flag === 'DNF'"
+                          class="badge badge-danger badge-pill"
+                        >
+                          Did Not Finish
+                        </span>
+                        <span
+                          v-if="item.result && item.result.flag === 'DNS'"
+                          class="badge badge-secondary badge-pill"
+                        >
+                          Did Not Start
+                        </span>
+                        <span
+                          v-if="item.result && item.result.flag === 'DSQ'"
+                          class="badge badge-dark badge-pill"
+                        >
+                          Disqualified
+                        </span>
+                      </div>
 
-                      <!-- status pills -->
-                      <span
-                        v-if="item.result && item.result.flag === 'DNF'"
-                        class="badge badge-danger badge-pill ml-2"
-                        >DNF</span
-                      >
-                      <span
-                        v-if="item.result && item.result.flag === 'DNS'"
-                        class="badge badge-secondary badge-pill ml-2"
-                        >DNS</span
-                      >
-                      <span
-                        v-if="item.result && item.result.flag === 'DSQ'"
-                        class="badge badge-dark badge-pill ml-2"
-                        >DSQ</span
-                      >
+                      <!-- nama tim di bawah -->
+                      <div>
+                        {{ item.nameTeam }}
+                        <span
+                          v-if="isByeTeam(item)"
+                          class="badge badge-light ml-2"
+                          >BYE</span
+                        >
+                      </div>
                     </td>
-                    <td class="large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-monospace">{{ item.result.startTime }}</td>
+                    <td class="text-center">{{ item.bibTeam }}</td>
+                    <td class="text-center text-monospace">
+                      {{ item.result.startTime }}
+                    </td>
 
-                    <!-- Penalties breakdown (read-only jika belum ada rincian) -->
+                    <!-- PEENALTY START -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.s"
                         :options="sChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY CL  -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.cl"
                         :options="clChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY R1 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.r1"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showR1
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY R2 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.r2"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showR2
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY L1 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.l1"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showL1
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY L2 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.l2"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showL2
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY BOOYAN  -->
                     <td class="text-center">
                       <span
                         :class="{
+                          'badge badge-light':
+                            item.result.penalties.pb === null,
                           'badge badge-success': item.result.penalties.pb === 0,
-                          'badge badge-danger': item.result.penalties.pb === 50,
+                          'badge badge-warning':
+                            item.result.penalties.pb === 50,
                           'badge badge-danger':
                             item.result.penalties.pb === 100,
                         }"
-                        class="p-2"
+                        class="p-3"
+                        style="border-radius: 12px"
                       >
-                        {{ item.result.penalties.pb }}
+                        {{
+                          item.result.penalties.pb === null
+                            ? "—"
+                            : item.result.penalties.pb
+                        }}
                       </span>
                     </td>
 
+                    <!-- PENALTY FINISH  -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.f"
                         :options="fChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
 
+                    <!-- INPUT PENALTY OTHER  -->
                     <td class="pen-o-cell">
                       <b-form-input
                         :value="getOthersValue(item)"
                         size="xs"
-                        style="min-width: 10px"
+                        style="min-width: 10px; border-radius: 12px"
                         inputmode="numeric"
                         pattern="[0-9]*"
                         placeholder="0"
@@ -687,10 +778,14 @@
                         @paste="digitsPaste($event)"
                         @input="onOthersTyping($event, item)"
                         @change="onOthersCommit(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
 
+                    <!-- JUMLAH PENALTY  -->
                     <td class="large-bold">
                       {{ getTotalPenalty(item) }}
                       <small class="text-muted"
@@ -698,18 +793,25 @@
                       >
                     </td>
 
-                    <!-- Penalty selector tetap ada (biar gampang input) -->
-                    <td class="text-monospace large-bold">
+                    <!-- PENALTY TIME -->
+                    <td class="text-center text-monospace penalty-char">
                       {{ item.result.penaltyTime }}
                     </td>
 
-                    <td class="text-monospace">{{ item.result.finishTime }}</td>
+                    <!-- FINISH TIME  -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
 
-                    <td class="large-bold text-monospace">
+                    <!-- RACETIME  -->
+                    <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
 
-                    <td class="text-monospace large-bold">
+                    <!-- RESULT  -->
+                    <td
+                      class="text-center result-char text-monospace large-bold"
+                    >
                       {{
                         item.result.penaltyTime
                           ? item.result.totalTime
@@ -717,19 +819,37 @@
                       }}
                     </td>
 
-                    <td class="large-bold">{{ item.result.winLose || "" }}</td>
+                    <!-- WIN/LOSE  -->
+                    <td class="large-bold text-center">
+                      <span
+                        v-if="item.result.winLose === 'Win'"
+                        class="badge px-3 p-2"
+                        style="
+                          background-color: gold;
+                          color: black;
+                          border-radius: 12px;
+                        "
+                      >
+                        🏆 WIN
+                      </span>
+                      <span
+                        v-else-if="item.result.winLose === 'Lose'"
+                        class="badge badge-secondary px-4 py-2"
+                        style="border-radius: 12px"
+                      >
+                        LOSE
+                      </span>
+                      <span v-else>
+                        {{ item.result.winLose || "" }}
+                      </span>
+                    </td>
 
+                    <!-- ACTION BUTTON  -->
                     <td v-if="editResult">
                       <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
                         <b-button
                           size="sm"
-                          variant="outline-secondary"
-                          @click="resetRow(item)"
-                          :disabled="isByeTeam(item)"
-                          >RESET</b-button
-                        >
-                        <b-button
-                          size="sm"
+                          class="btn-action-racetime"
                           variant="outline-danger"
                           @click="markFlag(item, 'DNF')"
                           :disabled="isByeTeam(item)"
@@ -737,6 +857,7 @@
                         >
                         <b-button
                           size="sm"
+                          class="btn-action-racetime"
                           variant="outline-warning"
                           @click="markFlag(item, 'DNS')"
                           :disabled="isByeTeam(item)"
@@ -744,16 +865,44 @@
                         >
                         <b-button
                           size="sm"
+                          class="btn-action-racetime"
                           variant="outline-dark"
                           @click="markFlag(item, 'DSQ')"
                           :disabled="isByeTeam(item)"
                           >DSQ</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          class="btn-action-racetime"
+                          variant="outline-secondary"
+                          @click="resetRow(item)"
+                          :disabled="isByeTeam(item)"
+                          >RESET</b-button
                         >
                       </div>
                     </td>
                   </tr>
                 </tbody>
               </table>
+
+              <!-- EMPTY STATE -->
+              <div
+                v-else
+                class="bracket-empty d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center text-muted">
+                  <Icon
+                    icon="mdi:account-off-outline"
+                    width="36"
+                    height="36"
+                    class="mb-2"
+                  />
+                  <div><strong>Teams on this categories not found</strong></div>
+                  <small>
+                    Coba pilih kategori lain atau sinkronkan ulang data tim.
+                  </small>
+                </div>
+              </div>
             </div>
             <br />
           </b-col>
@@ -786,6 +935,7 @@ import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
+import { logger } from "@/utils/logger";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1008,6 +1158,8 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      isLoadingBracket: false,
+      isLoadingTableList: false,
       selfSocketId: null,
       selectPath: "",
       baudRate: 9600,
@@ -1021,6 +1173,7 @@ export default {
       selectedH2HKey: "",
       currentBucket: null,
       roundResultsRootKey: null,
+      booyanActive: { r1: false, r2: false, l1: false, l2: false },
       podium: {
         gold: null, // Juara 1
         silver: null, // Juara 2
@@ -1088,6 +1241,24 @@ export default {
   },
 
   computed: {
+    showR1() {
+      return !!this.booyanActive.r1;
+    },
+    showR2() {
+      return !!this.booyanActive.r2;
+    },
+    showL1() {
+      return !!this.booyanActive.l1;
+    },
+    showL2() {
+      return !!this.booyanActive.l2;
+    },
+    activeBooyanCount() {
+      return ["r1", "r2", "l1", "l2"].reduce(
+        (n, k) => n + (this.booyanActive[k] ? 1 : 0),
+        0
+      );
+    },
     currentDateTime() {
       const d = new Date();
       return (
@@ -1181,6 +1352,7 @@ export default {
     },
     ynChoices() {
       return [
+        { value: null, text: "-" },
         { value: "N", text: "N" },
         { value: "Y", text: "Y" },
       ];
@@ -1449,6 +1621,7 @@ export default {
     this.computeWinLoseByHeat();
 
     seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
+    this.fetchBooyanActiveFromSettings();
   },
 
   methods: {
@@ -1523,8 +1696,97 @@ export default {
     },
     // === END CONNECTION ===
 
+    resetByRow(item) {
+      if (!item || !item.result) return;
+
+      // pastikan object penalties ada & reactive
+      this.ensurePenaltiesObject(item.result);
+      const p = item.result.penalties;
+
+      // kosongkan semua penalti ke null (biar dropdown kembali "—")
+      this.$set(p, "s", null);
+      this.$set(p, "cl", null);
+      this.$set(p, "r1", null);
+      this.$set(p, "r2", null);
+      this.$set(p, "l1", null);
+      this.$set(p, "l2", null);
+      this.$set(p, "pb", null);
+      this.$set(p, "f", null);
+      this.$set(p, "o", null);
+
+      // reset agregat penalti
+      item.result.penalty = 0;
+      item.result.penaltyTime = "00:00:00.000";
+
+      // totalTime = raceTime (karena penalti 0)
+      if (item.result.raceTime) {
+        item.result.totalTime = item.result.raceTime;
+      } else {
+        item.result.totalTime = "";
+      }
+
+      // bersihkan flag (kalau ada)
+      this.$set(item.result, "flag", null);
+
+      // simpan dan hitung ulang efeknya
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+
+      // force re-render jika perlu
+      this.$nextTick &&
+        this.$nextTick(() => {
+          this.$forceUpdate && this.$forceUpdate();
+        });
+    },
+
     toggleBracket() {
       this.showBracket = !this.showBracket;
+    },
+
+    async fetchBooyanActiveFromSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        const bucket = getBucket();
+        const eventId = String(bucket.eventId || "");
+        if (!eventId) return;
+
+        const token = Date.now();
+        this._lastRSFetchToken = token;
+
+        ipcRenderer.send("race-settings:get", eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          if (this._lastRSFetchToken !== token) return;
+
+          if (res && res.ok && res.settings && res.settings.h2h) {
+            const h = res.settings.h2h || {};
+            // map: "R1" → r1, dst
+            this.booyanActive = {
+              r1: !!h.R1 || !!h.r1,
+              r2: !!h.R2 || !!h.r2,
+              l1: !!h.L1 || !!h.l1,
+              l2: !!h.L2 || !!h.l2,
+            };
+
+            (this.participantArr || []).forEach((p) => {
+              if (!p.result) p.result = {};
+              this.ensurePenaltiesObject(p.result);
+
+              const pen = p.result.penalties;
+              if (!this.booyanActive.r1) this.$set(pen, "r1", false);
+              if (!this.booyanActive.r2) this.$set(pen, "r2", false);
+              if (!this.booyanActive.l1) this.$set(pen, "l1", false);
+              if (!this.booyanActive.l2) this.$set(pen, "l2", false);
+              // re-hitung PB sesuai rule baru
+              // this.onPenaltyChange(p);
+            });
+          }
+        });
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
     },
 
     getNextAvailableHeat() {
@@ -1681,6 +1943,8 @@ export default {
     // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
     async fetchH2HBucketTeamsByKey(key) {
       try {
+        this.isLoadingBracket = true;
+
         if (
           !key ||
           !this.h2hBucketMap[key] ||
@@ -1730,6 +1994,8 @@ export default {
         // fallback minimal
         this._useH2HBucket(key);
       }
+
+      this.isLoadingBracket = false;
     },
     _h2hBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
@@ -2131,6 +2397,7 @@ export default {
           B.result.winLose = null;
         }
       });
+      this.editResult = true;
     },
     getGlobalHeatUsageCount() {
       return readGlobalHeatUsage();
@@ -2313,58 +2580,112 @@ export default {
       const pad = (n, w = 2) => String(n).padStart(w, "0");
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
+
+    getBooyanMode() {
+      const a = this.booyanActive || {};
+      const any = !!(a.r1 || a.r2 || a.l1 || a.l2);
+      if (!any) return "classic";
+      if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2";
+      return "4";
+    },
+
     ensurePenaltiesObject(result) {
       if (!result || typeof result !== "object") return;
+
+      const def = {
+        s: null,
+        cl: null,
+        r1: null,
+        r2: null,
+        l1: null,
+        l2: null,
+        pb: null,
+        f: null,
+        o: null,
+      };
+
       if (!result.penalties || typeof result.penalties !== "object") {
-        this.$set(result, "penalties", {
-          s: 0,
-          cl: 0,
-          r1: "N",
-          r2: "N",
-          l1: "N",
-          l2: "N",
-          pb: 0,
-          f: 0,
-          o: 0,
-        });
+        this.$set(result, "penalties", { ...def });
       } else {
-        if (typeof result.penalties.r1 === "undefined")
-          this.$set(result.penalties, "r1", "N");
-        if (typeof result.penalties.r2 === "undefined")
-          this.$set(result.penalties, "r2", "N");
-        if (typeof result.penalties.l1 === "undefined")
-          this.$set(result.penalties, "l1", "N");
-        if (typeof result.penalties.l2 === "undefined")
-          this.$set(result.penalties, "l2", "N");
-        if (typeof result.penalties.pb === "undefined")
-          this.$set(result.penalties, "pb", 0);
-        if (typeof result.penalties.o === "undefined")
-          this.$set(result.penalties, "o", 0);
+        const p = result.penalties;
+        Object.keys(def).forEach((k) => {
+          if (typeof p[k] === "undefined") this.$set(p, k, def[k]);
+        });
       }
+
+      // Samakan ON/OFF sesuai mode
+      // const mode = this.getBooyanMode();
+      // const a = this.booyanActive || {};
+      // const p = result.penalties;
+
+      // if (mode === "classic") {
+      //   this.$set(p, "r1", "N");
+      //   this.$set(p, "r2", "N");
+      //   this.$set(p, "l1", "N");
+      //   this.$set(p, "l2", "N");
+      // } else if (mode === "2") {
+      //   if (!a.r1) this.$set(p, "r1", "N");
+      //   if (!a.l1) this.$set(p, "l1", "N");
+      //   this.$set(p, "r2", "N");
+      //   this.$set(p, "l2", "N");
+      // } else {
+      //   // mode "4"
+      //   if (!a.r1) this.$set(p, "r1", "N");
+      //   if (!a.r2) this.$set(p, "r2", "N");
+      //   if (!a.l1) this.$set(p, "l1", "N");
+      //   if (!a.l2) this.$set(p, "l2", "N");
+      // }
     },
 
     async onPenaltyChange(item) {
       if (!item || !item.result) return;
       this.ensurePenaltiesObject(item.result);
-
       const p = item.result.penalties;
+      const mode = this.getBooyanMode();
 
-      // --- rule Y/N ---
-      const r1 = p.r1 === "Y";
-      const r2 = p.r2 === "Y";
-      const l1 = p.l1 === "Y";
-      const l2 = p.l2 === "Y";
+      // deteksi belum ada input sama sekali
+      const noInputBooyan = [p.r1, p.r2, p.l1, p.l2].every((v) => v === null);
+      const noInputNum = [p.s, p.cl, p.f, p.o].every((v) => v === null);
+      const noInputAll = noInputBooyan && noInputNum;
 
-      // jika semua N → PB = 100
-      if (!r1 && !r2 && !l1 && !l2) {
-        this.$set(p, "pb", 100);
+      // Jika benar-benar belum ada input, kosongkan PB dan lompat hitungan PB
+      if (noInputAll) {
+        this.$set(p, "pb", null);
       } else {
-        const comboValid = (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
-        // PB menampilkan hasil rule: 0 jika valid, 50 jika tidak
-        this.$set(p, "pb", comboValid ? 0 : 50);
+        // --- Hitung PB sesuai mode ---
+        const r1 = p.r1 === "Y";
+        const r2 = p.r2 === "Y";
+        const l1 = p.l1 === "Y";
+        const l2 = p.l2 === "Y";
+
+        if (mode == "classic") {
+          this.$set(p, "pb", 0);
+        } else if (mode == "2") {
+          // R1 & L1 saja
+          if (p.r1 === null && p.l1 === null) {
+            this.$set(p, "pb", null);
+          } else if (r1 && l1) {
+            this.$set(p, "pb", 100);
+          } else if (r1 || l1) {
+            this.$set(p, "pb", 50);
+          } else {
+            this.$set(p, "pb", 0);
+          }
+        } else {
+          // 4 booyan
+          if ([p.r1, p.r2, p.l1, p.l2].every((v) => v === null)) {
+            this.$set(p, "pb", null);
+          } else if (!r1 && !r2 && !l1 && !l2) {
+            this.$set(p, "pb", 100);
+          } else {
+            const comboValid =
+              (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
+            this.$set(p, "pb", comboValid ? 0 : 50);
+          }
+        }
       }
 
-      // --- total penalti (detik) ---
+      // total penalti: treat null as 0 (sudah aman)
       const totalPenaltySeconds =
         (Number(p.s) || 0) +
         (Number(p.cl) || 0) +
@@ -3065,25 +3386,6 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(selectedValue, item) {
-      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
-      if (sel) item.result.penaltyTime = sel.timePen;
-
-      if (item.result.raceTime && item.result.penaltyTime) {
-        item.result.totalTime = await this.tambahWaktu(
-          item.result.raceTime,
-          item.result.penaltyTime
-        );
-      }
-      this.editResult = true;
-      await this.assignRanks(this.visibleParticipants);
-      this.evaluateHeatWinnersForCurrentRound();
-      this.syncWinLoseFromBracketToParticipants(); // NEW
-      this.persistRoundResults(); // NEW
-
-      this.computeWinLoseByHeat();
-    },
-
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
@@ -3267,6 +3569,15 @@ export default {
   padding: 8px 14px;
 }
 
+.btn-action-racetime {
+  background: #ffffff;
+  border: 1px solid #cfe1e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
@@ -3366,25 +3677,50 @@ td {
   border: none;
   white-space: nowrap;
 } /* <-- cegah wrap; geser ke samping */
+
+.max-char {
+  max-width: 260px;
+  word-wrap: break-word;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.large-bold {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.text-strong {
+  color: #000;
+}
+.penalty-char {
+  color: red;
+}
+.result-char {
+  color: green;
+}
 .text-monospace {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
 
-.large-bold {
-  font-size: 1.2rem;
-  font-weight: 800;
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  margin-bottom: 5px;
+  width: 80px;
 }
-.text-strong {
-  color: #000;
+
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
 }
-.max-char {
-  max-width: 260px;
-  white-space: normal;
-  word-wrap: break-word;
-  overflow: hidden;
-  text-overflow: ellipsis;
-} /* Team name boleh wrap */
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
 
 /* ===== PORT STATUS ===== */
 .status-indicator {
@@ -3608,6 +3944,7 @@ thead th[colspan="8"] {
 }
 .toolbar-select__control {
   border-radius: 10px;
+  cursor: pointer;
 }
 
 /* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */
@@ -3616,17 +3953,10 @@ thead th[colspan="8"] {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  cursor: pointer;
 }
 
 /* Sedikit konsistensi ukuran tombol custom */
-.btn-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  line-height: 1.2;
-}
 .toolbar-divider {
   width: 1px;
   height: 28px;
@@ -3638,7 +3968,9 @@ thead th[colspan="8"] {
   align-items: center;
 }
 .round-select {
+  cursor: pointer;
   min-width: 200px;
+  border-radius: 12px;
 }
 .bracket-toolbar .btn {
   border-radius: 10px;
@@ -3665,6 +3997,7 @@ thead th[colspan="8"] {
     justify-content: space-between;
   }
   .round-select {
+    cursor: pointer;
     flex: 1;
     min-width: 0;
   }
@@ -3674,7 +4007,7 @@ thead th[colspan="8"] {
 .pen-o-cell {
   width: 64px;
   min-width: 64px;
-  padding-right: 6px; /* biar gak nempel */
+  padding-right: 6px;
 }
 
 /* BootstrapVue render: input.form-control */
@@ -3689,10 +4022,26 @@ thead th[colspan="8"] {
   border-radius: 6px;
 }
 
-.badge-pill {
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-weight: 700;
+  color: #fff;
+}
+
+.status-pill--dnf {
+  background-color: #dc3545; /* merah */
+}
+
+.status-pill--dns {
+  background-color: #6c757d; /* abu */
+}
+
+.status-pill--dsq {
+  background-color: #343a40; /* hitam */
 }
 
 /* PATH  */
@@ -3796,12 +4145,17 @@ thead th[colspan="8"] {
   border: 2px dashed #d1d5db; /* abu-abu */
   border-radius: 12px;
   background: #f9fafb; /* abu terang */
-  color: #374151;      /* teks abu gelap */
+  color: #374151; /* teks abu gelap */
   text-align: center;
 }
 
 .bracket-hidden-info .info-icon {
   font-size: 28px;
   color: #6b7280; /* abu-abu */
+}
+
+.bracket-empty {
+  border: 1px dashed #dee2e6;
+  border-radius: 6px;
 }
 </style>

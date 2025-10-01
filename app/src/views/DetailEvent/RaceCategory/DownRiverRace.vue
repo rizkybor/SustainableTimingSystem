@@ -1801,10 +1801,6 @@ td {
   background: red;
 }
 
-.small-select {
-  margin-bottom: 5px;
-  width: 140px;
-}
 .large-bold {
   font-size: 1.2rem;
   font-weight: bold;
@@ -1860,6 +1856,11 @@ td {
 }
 
 /* ---- Styling utk penalty section select ---- */
+.small-select {
+  margin-bottom: 5px;
+  width: 140px;
+}
+
 .small-select {
   border-radius: 12px;
   font-weight: 600;

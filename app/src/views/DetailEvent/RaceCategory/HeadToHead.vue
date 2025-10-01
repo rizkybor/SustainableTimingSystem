@@ -275,7 +275,7 @@
               v-model="currentRoundIndex"
               :options="roundOptions"
               class="round-select mx-2"
-              v-b-tooltip.hover="'Pilih ronde aktif'"
+              v-b-tooltip.hover="'Select Round'"
             />
 
             <button
@@ -740,7 +740,7 @@
                             item.result.penalties.pb === 100,
                         }"
                         class="p-3"
-                        style="border-radius: 12px;"
+                        style="border-radius: 12px"
                       >
                         {{
                           item.result.penalties.pb === null
@@ -3954,7 +3954,6 @@ thead th[colspan="8"] {
   gap: 8px;
   flex-wrap: wrap;
   cursor: pointer;
-
 }
 
 /* Sedikit konsistensi ukuran tombol custom */
@@ -3969,7 +3968,9 @@ thead th[colspan="8"] {
   align-items: center;
 }
 .round-select {
+  cursor: pointer;
   min-width: 200px;
+  border-radius: 12px;
 }
 .bracket-toolbar .btn {
   border-radius: 10px;
@@ -3996,6 +3997,7 @@ thead th[colspan="8"] {
     justify-content: space-between;
   }
   .round-select {
+    cursor: pointer;
     flex: 1;
     min-width: 0;
   }

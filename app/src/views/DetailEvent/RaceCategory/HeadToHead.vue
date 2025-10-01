@@ -290,183 +290,215 @@
       </div>
 
       <div
-        v-if="showBracket"
-        class="bracket"
-        role="region"
-        aria-label="Tournament Bracket"
+        v-if="isLoadingBracket"
+        class="bracket-loading d-flex align-items-center justify-content-center py-5"
       >
-        <div
-          v-for="(round, rIdx) in rounds"
-          :key="round.id"
-          class="bracket__round"
-          :class="{ 'bracket__round--bronze': round.bronze }"
-        >
-          <div class="bracket__round-header">
-            <span class="bracket__round-title">{{ round.name }}</span>
-            <span class="bracket__round-meta" v-if="!round.bronze"
-              >Matches: {{ round.matches.length }}</span
-            >
-            <span class="bracket__round-meta" v-else>Final B</span>
-          </div>
-
-          <div class="bracket__list">
-            <div
-              v-for="(m, mIdx) in round.matches"
-              :key="m.id"
-              class="bracket__match"
-              :aria-label="`Match ${m.id}`"
-            >
-              <div class="bracket__winner" v-if="m.winner && m.winner.name">
-                <Icon icon="mdi:trophy-variant-outline" />
-                <span class="ml-1">{{ m.winner.name }}</span>
-              </div>
-              <!-- Team 1 -->
-              <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
-                <div class="bracket__team-main">
-                  <span class="bracket__seed" v-if="m.team1.seed">{{
-                    m.team1.seed
-                  }}</span>
-                  <span
-                    class="bracket__name"
-                    v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                  >
-                    {{ m.team1.name || "—" }}
-                  </span>
-
-                  <!-- Editor slot Team 1 (ronde pertama saja) -->
-                  <div v-else class="w-100">
-                    <b-form-select
-                      :value="m.team1.__pid || ''"
-                      @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
-                      class="w-100"
-                    >
-                      <option :value="''">— pilih tim —</option>
-                      <option
-                        v-for="opt in availableTeamOptions(
-                          m.team1 && m.team1.__pid
-                        )"
-                        :key="'t1-' + opt.id"
-                        :value="opt.id"
-                      >
-                        {{ opt.label }}
-                      </option>
-                    </b-form-select>
-                  </div>
-                </div>
-                <span class="bracket__score" v-if="m.score1 != null">{{
-                  m.score1
-                }}</span>
-              </div>
-
-              <!-- vs divider -->
-              <div class="bracket__vs" aria-hidden="true">vs</div>
-
-              <!-- Team 2 -->
-              <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
-                <div class="bracket__team-main">
-                  <span class="bracket__seed" v-if="m.team2.seed">{{
-                    m.team2.seed
-                  }}</span>
-                  <span
-                    class="bracket__name"
-                    v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                  >
-                    {{ m.team2.name || "—" }}
-                  </span>
-
-                  <!-- Editor slot Team 2 (ronde pertama saja) -->
-                  <div v-else class="w-100">
-                    <b-form-select
-                      :value="m.team2.__pid || ''"
-                      @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
-                      class="w-100"
-                    >
-                      <option :value="''">— pilih tim —</option>
-                      <option
-                        v-for="opt in availableTeamOptions(
-                          m.team2 && m.team2.__pid
-                        )"
-                        :key="'t2-' + opt.id"
-                        :value="opt.id"
-                      >
-                        {{ opt.label }}
-                      </option>
-                    </b-form-select>
-                  </div>
-                </div>
-                <span class="bracket__score" v-if="m.score2 != null">{{
-                  m.score2
-                }}</span>
-              </div>
-
-              <!-- Actions / badges -->
-              <div class="bracket__footer">
-                <div
-                  class="bracket__actions"
-                  v-if="m.team1.name && m.team2.name"
-                >
-                  <button
-                    v-if="!editBracketTeams"
-                    class="btn-action btn-xs btn-outline-success"
-                    @click="advanceWinner(rIdx, mIdx, 1)"
-                    title="Set winner: top"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Top Win
-                  </button>
-                  <button
-                    v-if="!editBracketTeams"
-                    class="btn-action btn-xs btn-outline-primary"
-                    @click="advanceWinner(rIdx, mIdx, 2)"
-                    title="Set winner: bottom"
-                    :disabled="editBracketTeams"
-                  >
-                    <Icon icon="mdi:crown-outline" /> Bottom Win
-                  </button>
-                </div>
-
-                <!-- Toggle BYE (hanya saat edit tim) -->
-                <button
-                  v-if="
-                    editBracketTeams &&
-                    !['Final A', 'Final B', 'Semifinals'].includes(
-                      (round.name || '').trim()
-                    )
-                  "
-                  class="btn-action btn-xs btn-outline-dark"
-                  @click="toggleBye(rIdx, mIdx)"
-                  :title="
-                    round.matches[mIdx] && round.matches[mIdx].bye
-                      ? 'Batalkan BYE'
-                      : 'Set BYE'
-                  "
-                >
-                  <Icon icon="mdi:transfer-right" />
-                  {{
-                    round.matches[mIdx] && round.matches[mIdx].bye
-                      ? "Un-BYE"
-                      : "Set BYE"
-                  }}
-                  {{ round.name }}
-                </button>
-              </div>
-            </div>
-            <!-- /match -->
-          </div>
-          <!-- /list -->
+        <div class="text-center">
+          <b-spinner label="Loading" class="mb-2"></b-spinner>
+          <div class="text-muted">Loading bracket & teams…</div>
         </div>
-        <!-- /round -->
+      </div>
+      <div v-else-if="visibleParticipants && visibleParticipants.length">
+        <div
+          v-if="showBracket"
+          class="bracket"
+          role="region"
+          aria-label="Tournament Bracket"
+        >
+          <div
+            v-for="(round, rIdx) in rounds"
+            :key="round.id"
+            class="bracket__round"
+            :class="{ 'bracket__round--bronze': round.bronze }"
+          >
+            <div class="bracket__round-header">
+              <span class="bracket__round-title">{{ round.name }}</span>
+              <span class="bracket__round-meta" v-if="!round.bronze"
+                >Matches: {{ round.matches.length }}</span
+              >
+              <span class="bracket__round-meta" v-else>Final B</span>
+            </div>
+
+            <div class="bracket__list">
+              <div
+                v-for="(m, mIdx) in round.matches"
+                :key="m.id"
+                class="bracket__match"
+                :aria-label="`Match ${m.id}`"
+              >
+                <div class="bracket__winner" v-if="m.winner && m.winner.name">
+                  <Icon icon="mdi:trophy-variant-outline" />
+                  <span class="ml-1">{{ m.winner.name }}</span>
+                </div>
+                <!-- Team 1 -->
+                <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
+                  <div class="bracket__team-main">
+                    <span class="bracket__seed" v-if="m.team1.seed">{{
+                      m.team1.seed
+                    }}</span>
+                    <span
+                      class="bracket__name"
+                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
+                    >
+                      {{ m.team1.name || "—" }}
+                    </span>
+
+                    <!-- Editor slot Team 1 (ronde pertama saja) -->
+                    <div v-else class="w-100">
+                      <b-form-select
+                        :value="m.team1.__pid || ''"
+                        @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
+                        class="w-100"
+                      >
+                        <option :value="''">— pilih tim —</option>
+                        <option
+                          v-for="opt in availableTeamOptions(
+                            m.team1 && m.team1.__pid
+                          )"
+                          :key="'t1-' + opt.id"
+                          :value="opt.id"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </b-form-select>
+                    </div>
+                  </div>
+                  <span class="bracket__score" v-if="m.score1 != null">{{
+                    m.score1
+                  }}</span>
+                </div>
+
+                <!-- vs divider -->
+                <div class="bracket__vs" aria-hidden="true">vs</div>
+
+                <!-- Team 2 -->
+                <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
+                  <div class="bracket__team-main">
+                    <span class="bracket__seed" v-if="m.team2.seed">{{
+                      m.team2.seed
+                    }}</span>
+                    <span
+                      class="bracket__name"
+                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
+                    >
+                      {{ m.team2.name || "—" }}
+                    </span>
+
+                    <!-- Editor slot Team 2 (ronde pertama saja) -->
+                    <div v-else class="w-100">
+                      <b-form-select
+                        :value="m.team2.__pid || ''"
+                        @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
+                        class="w-100"
+                      >
+                        <option :value="''">— pilih tim —</option>
+                        <option
+                          v-for="opt in availableTeamOptions(
+                            m.team2 && m.team2.__pid
+                          )"
+                          :key="'t2-' + opt.id"
+                          :value="opt.id"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </b-form-select>
+                    </div>
+                  </div>
+                  <span class="bracket__score" v-if="m.score2 != null">{{
+                    m.score2
+                  }}</span>
+                </div>
+
+                <!-- Actions / badges -->
+                <div class="bracket__footer">
+                  <div
+                    class="bracket__actions"
+                    v-if="m.team1.name && m.team2.name"
+                  >
+                    <button
+                      v-if="!editBracketTeams"
+                      class="btn-action btn-xs btn-outline-success"
+                      @click="advanceWinner(rIdx, mIdx, 1)"
+                      title="Set winner: top"
+                      :disabled="editBracketTeams"
+                    >
+                      <Icon icon="mdi:crown-outline" /> Top Win
+                    </button>
+                    <button
+                      v-if="!editBracketTeams"
+                      class="btn-action btn-xs btn-outline-primary"
+                      @click="advanceWinner(rIdx, mIdx, 2)"
+                      title="Set winner: bottom"
+                      :disabled="editBracketTeams"
+                    >
+                      <Icon icon="mdi:crown-outline" /> Bottom Win
+                    </button>
+                  </div>
+
+                  <!-- Toggle BYE (hanya saat edit tim) -->
+                  <button
+                    v-if="
+                      editBracketTeams &&
+                      !['Final A', 'Final B', 'Semifinals'].includes(
+                        (round.name || '').trim()
+                      )
+                    "
+                    class="btn-action btn-xs btn-outline-dark"
+                    @click="toggleBye(rIdx, mIdx)"
+                    :title="
+                      round.matches[mIdx] && round.matches[mIdx].bye
+                        ? 'Batalkan BYE'
+                        : 'Set BYE'
+                    "
+                  >
+                    <Icon icon="mdi:transfer-right" />
+                    {{
+                      round.matches[mIdx] && round.matches[mIdx].bye
+                        ? "Un-BYE"
+                        : "Set BYE"
+                    }}
+                    {{ round.name }}
+                  </button>
+                </div>
+              </div>
+              <!-- /match -->
+            </div>
+            <!-- /list -->
+          </div>
+          <!-- /round -->
+        </div>
+
+        <div v-if="!showBracket" class="bracket-hidden-info">
+          <div>
+            <Icon icon="mdi:eye-off-outline" class="info-icon" />
+            <h5 class="mb-1">Bracket is Hidden</h5>
+            <p class="mb-0 text-muted">
+              Gunakan tombol <strong>Show Bracket</strong> untuk menampilkan
+              kembali.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div v-if="!showBracket" class="bracket-hidden-info">
-        <div>
-    <Icon icon="mdi:eye-off-outline" class="info-icon" />
-    <h5 class="mb-1">Bracket is Hidden</h5>
-    <p class="mb-0 text-muted">
-      Gunakan tombol <strong>Show Bracket</strong> untuk menampilkan kembali.
-    </p>
-  </div>
-</div>
+      <!-- EMPTY STATE -->
+      <div
+        v-else
+        class="bracket-empty d-flex align-items-center justify-content-center py-5"
+      >
+        <div class="text-center text-muted">
+          <Icon
+            icon="mdi:account-off-outline"
+            width="36"
+            height="36"
+            class="mb-2"
+          />
+          <div><strong>Teams on this categories not found</strong></div>
+          <small>
+            Coba pilih kategori lain atau sinkronkan ulang data tim.
+          </small>
+        </div>
+      </div>
+
       <!-- /bracket -->
     </div>
 
@@ -514,7 +546,19 @@
               aria-label="Scrollable results table"
               role="region"
             >
-              <table class="table">
+              <div
+                v-if="isLoadingBracket"
+                class="bracket-loading d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center">
+                  <b-spinner label="Loading" class="mb-2"></b-spinner>
+                  <div class="text-muted">Loading bracket & teams…</div>
+                </div>
+              </div>
+              <table
+                v-else-if="visibleParticipants && visibleParticipants.length"
+                class="table"
+              >
                 <thead>
                   <tr>
                     <th rowspan="2">No</th>
@@ -621,7 +665,7 @@
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="isByeTeam(item) || !showR1"
                       />
                     </td>
                     <td>
@@ -630,7 +674,7 @@
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="isByeTeam(item) || !showR2"
                       />
                     </td>
                     <td>
@@ -639,7 +683,7 @@
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="isByeTeam(item) || !showL1"
                       />
                     </td>
                     <td>
@@ -648,7 +692,7 @@
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="isByeTeam(item) || !showL2"
                       />
                     </td>
                     <td class="text-center">
@@ -754,6 +798,25 @@
                   </tr>
                 </tbody>
               </table>
+
+              <!-- EMPTY STATE -->
+              <div
+                v-else
+                class="bracket-empty d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center text-muted">
+                  <Icon
+                    icon="mdi:account-off-outline"
+                    width="36"
+                    height="36"
+                    class="mb-2"
+                  />
+                  <div><strong>Teams on this categories not found</strong></div>
+                  <small>
+                    Coba pilih kategori lain atau sinkronkan ulang data tim.
+                  </small>
+                </div>
+              </div>
             </div>
             <br />
           </b-col>
@@ -1008,6 +1071,8 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      isLoadingBracket: false,
+      isLoadingTableList: false,
       selfSocketId: null,
       selectPath: "",
       baudRate: 9600,
@@ -1021,6 +1086,7 @@ export default {
       selectedH2HKey: "",
       currentBucket: null,
       roundResultsRootKey: null,
+      booyanActive: { r1: false, r2: false, l1: false, l2: false },
       podium: {
         gold: null, // Juara 1
         silver: null, // Juara 2
@@ -1088,6 +1154,24 @@ export default {
   },
 
   computed: {
+    showR1() {
+      return !!this.booyanActive.r1;
+    },
+    showR2() {
+      return !!this.booyanActive.r2;
+    },
+    showL1() {
+      return !!this.booyanActive.l1;
+    },
+    showL2() {
+      return !!this.booyanActive.l2;
+    },
+    activeBooyanCount() {
+      return ["r1", "r2", "l1", "l2"].reduce(
+        (n, k) => n + (this.booyanActive[k] ? 1 : 0),
+        0
+      );
+    },
     currentDateTime() {
       const d = new Date();
       return (
@@ -1181,8 +1265,8 @@ export default {
     },
     ynChoices() {
       return [
-        { value: "N", text: "N" },
-        { value: "Y", text: "Y" },
+        { value: "N", text: "NO" },
+        { value: "Y", text: "YES" },
       ];
     },
     storedResultsByRound() {
@@ -1449,9 +1533,54 @@ export default {
     this.computeWinLoseByHeat();
 
     seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
+    this.fetchBooyanActiveFromSettings();
   },
 
   methods: {
+    async fetchBooyanActiveFromSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        const bucket = getBucket();
+        const eventId = String(bucket.eventId || "");
+        if (!eventId) return;
+
+        const token = Date.now();
+        this._lastRSFetchToken = token;
+
+        ipcRenderer.send("race-settings:get", eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          if (this._lastRSFetchToken !== token) return;
+
+          if (res && res.ok && res.settings && res.settings.h2h) {
+            const h = res.settings.h2h || {};
+            // map: "R1" → r1, dst
+            this.booyanActive = {
+              r1: !!h.R1 || !!h.r1,
+              r2: !!h.R2 || !!h.r2,
+              l1: !!h.L1 || !!h.l1,
+              l2: !!h.L2 || !!h.l2,
+            };
+
+            // sanitasi semua peserta: set kolom yang non-aktif → false
+            (this.participantArr || []).forEach((p) => {
+              if (!p.result) p.result = {};
+              this.ensurePenaltiesObject(p.result);
+
+              const pen = p.result.penalties;
+              if (!this.booyanActive.r1) this.$set(pen, "r1", false);
+              if (!this.booyanActive.r2) this.$set(pen, "r2", false);
+              if (!this.booyanActive.l1) this.$set(pen, "l1", false);
+              if (!this.booyanActive.l2) this.$set(pen, "l2", false);
+              // re-hitung PB sesuai rule baru
+              this.onPenaltyChange(p);
+            });
+          }
+        });
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1681,6 +1810,8 @@ export default {
     // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
     async fetchH2HBucketTeamsByKey(key) {
       try {
+        this.isLoadingBracket = true;
+
         if (
           !key ||
           !this.h2hBucketMap[key] ||
@@ -1730,6 +1861,8 @@ export default {
         // fallback minimal
         this._useH2HBucket(key);
       }
+
+      this.isLoadingBracket = false;
     },
     _h2hBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
@@ -2313,81 +2446,136 @@ export default {
       const pad = (n, w = 2) => String(n).padStart(w, "0");
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
+
+    getBooyanMode() {
+      const a = this.booyanActive || {};
+      const any = !!(a.r1 || a.r2 || a.l1 || a.l2);
+      if (!any) return "classic"; // tidak ada booyan aktif
+      if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2"; // hanya R1 & L1 aktif
+      return "4"; // selebihnya dianggap 4 booyan
+    },
+
     ensurePenaltiesObject(result) {
       if (!result || typeof result !== "object") return;
+
+      const def = {
+        s: 0,
+        cl: 0,
+        r1: "",
+        r2: "",
+        l1: "",
+        l2: "",
+        pb: 0,
+        f: 0,
+        o: 0,
+      };
+
       if (!result.penalties || typeof result.penalties !== "object") {
-        this.$set(result, "penalties", {
-          s: 0,
-          cl: 0,
-          r1: "N",
-          r2: "N",
-          l1: "N",
-          l2: "N",
-          pb: 0,
-          f: 0,
-          o: 0,
+        this.$set(result, "penalties", { ...def });
+      } else {
+        const p = result.penalties;
+        Object.keys(def).forEach((k) => {
+          if (typeof p[k] === "undefined") this.$set(p, k, def[k]);
         });
+        ["r1", "r2", "l1", "l2"].forEach((k) => {
+          this.$set(p, k, p[k] === "Y" ? "Y" : "N");
+        });
+      }
+
+      // Samakan ON/OFF sesuai mode
+      const mode = this.getBooyanMode();
+      const a = this.booyanActive || {};
+      const p = result.penalties;
+
+      if (mode === "classic") {
+        this.$set(p, "r1", "N");
+        this.$set(p, "r2", "N");
+        this.$set(p, "l1", "N");
+        this.$set(p, "l2", "N");
+        // pb biarkan null di sini; akan jadi 0 saat onPenaltyChange pertama
+      } else if (mode === "2") {
+        if (!a.r1) this.$set(p, "r1", "N");
+        if (!a.l1) this.$set(p, "l1", "N");
+        this.$set(p, "r2", "N");
+        this.$set(p, "l2", "N");
       } else {
-        if (typeof result.penalties.r1 === "undefined")
-          this.$set(result.penalties, "r1", "N");
-        if (typeof result.penalties.r2 === "undefined")
-          this.$set(result.penalties, "r2", "N");
-        if (typeof result.penalties.l1 === "undefined")
-          this.$set(result.penalties, "l1", "N");
-        if (typeof result.penalties.l2 === "undefined")
-          this.$set(result.penalties, "l2", "N");
-        if (typeof result.penalties.pb === "undefined")
-          this.$set(result.penalties, "pb", 0);
-        if (typeof result.penalties.o === "undefined")
-          this.$set(result.penalties, "o", 0);
+        // mode "4"
+        if (!a.r1) this.$set(p, "r1", "N");
+        if (!a.r2) this.$set(p, "r2", "N");
+        if (!a.l1) this.$set(p, "l1", "N");
+        if (!a.l2) this.$set(p, "l2", "N");
       }
     },
 
-    async onPenaltyChange(item) {
-      if (!item || !item.result) return;
-      this.ensurePenaltiesObject(item.result);
+    // async onPenaltyChange(item) {
+    //   if (!item || !item.result) return;
+    //   this.ensurePenaltiesObject(item.result);
 
-      const p = item.result.penalties;
+    //   const p = item.result.penalties;
+    //   const mode = this.getBooyanMode();
 
-      // --- rule Y/N ---
-      const r1 = p.r1 === "Y";
-      const r2 = p.r2 === "Y";
-      const l1 = p.l1 === "Y";
-      const l2 = p.l2 === "Y";
+    //   console.log(p.r1)
+    //   // --- baca Y/N ---
+    //   const r1 = p.r1 === "Y";
+    //   const r2 = p.r2 === "Y";
+    //   const l1 = p.l1 === "Y";
+    //   const l2 = p.l2 === "Y";
+    //   const allN = !r1 && !r2 && !l1 && !l2;
 
-      // jika semua N → PB = 100
-      if (!r1 && !r2 && !l1 && !l2) {
-        this.$set(p, "pb", 100);
-      } else {
-        const comboValid = (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
-        // PB menampilkan hasil rule: 0 jika valid, 50 jika tidak
-        this.$set(p, "pb", comboValid ? 0 : 50);
-      }
+    //   // --- FIRST-TIME GUARD ---
+    //   // Jika pertama kali (pb === null) dan semua N → tampilkan 0, JANGAN 100
+    //   if (p.pb === null && allN) {
+    //     this.$set(p, "pb", 0);
+    //   }
 
-      // --- total penalti (detik) ---
-      const totalPenaltySeconds =
-        (Number(p.s) || 0) +
-        (Number(p.cl) || 0) +
-        (Number(p.pb) || 0) +
-        (Number(p.f) || 0) +
-        (Number(p.o) || 0);
+    //   // --- Hitung PB sesuai mode ---
+    //   if (mode === "classic") {
+    //     // klasik: PB tidak dipakai
+    //     this.$set(p, "pb", 0);
+    //   } else if (mode === "2") {
+    //     // 2 booyan (R1 & L1):
+    //     if (r1 && l1) {
+    //       this.$set(p, "pb", 100); // Y+Y
+    //     } else if (r1 || l1) {
+    //       this.$set(p, "pb", 50); // salah satu Y
+    //     } else {
+    //       this.$set(p, "pb", 0); // N+N
+    //     }
+    //   } else {
+    //     // 4 booyan:
+    //     if (!r1 && !r2 && !l1 && !l2) {
+    //       this.$set(p, "pb", 100); // semua N
+    //     } else {
+    //       const comboValid =
+    //         (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
+    //       this.$set(p, "pb", comboValid ? 0 : 50);
+    //     }
+    //   }
 
-      item.result.penalty = totalPenaltySeconds;
-      item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
+    //   // --- total penalti (detik) ---
+    //   const totalPenaltySeconds =
+    //     (Number(p.s) || 0) +
+    //     (Number(p.cl) || 0) +
+    //     (Number(p.pb) || 0) +
+    //     (Number(p.f) || 0) +
+    //     (Number(p.o) || 0);
 
-      if (item.result.raceTime) {
-        item.result.totalTime = await this.tambahWaktu(
-          item.result.raceTime,
-          item.result.penaltyTime
-        );
-      }
+    //   item.result.penalty = totalPenaltySeconds;
+    //   item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
 
-      this.evaluateHeatWinnersForCurrentRound();
-      await this.assignRanks(this.visibleParticipants);
-      this.syncWinLoseFromBracketToParticipants();
-      this.persistRoundResults();
-      this.computeWinLoseByHeat();
-    },
+    //   if (item.result.raceTime) {
+    //     item.result.totalTime = await this.tambahWaktu(
+    //       item.result.raceTime,
+    //       item.result.penaltyTime
+    //     );
+    //   }
+
+    //   this.evaluateHeatWinnersForCurrentRound();
+    //   await this.assignRanks(this.visibleParticipants);
+    //   this.syncWinLoseFromBracketToParticipants();
+    //   this.persistRoundResults();
+    //   this.computeWinLoseByHeat();
+    // },
 
     // map: NAMA_TIM (UPPER) -> { heat: number, pos: 0|1 }  (pos: team1=0, team2=1)
     buildHeatOrderPosMapFromBracket() {
@@ -3796,12 +3984,17 @@ thead th[colspan="8"] {
   border: 2px dashed #d1d5db; /* abu-abu */
   border-radius: 12px;
   background: #f9fafb; /* abu terang */
-  color: #374151;      /* teks abu gelap */
+  color: #374151; /* teks abu gelap */
   text-align: center;
 }
 
 .bracket-hidden-info .info-icon {
   font-size: 28px;
   color: #6b7280; /* abu-abu */
+}
+
+.bracket-empty {
+  border: 1px dashed #dee2e6;
+  border-radius: 6px;
 }
 </style>

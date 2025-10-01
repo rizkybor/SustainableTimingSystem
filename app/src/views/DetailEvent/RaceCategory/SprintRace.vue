@@ -373,6 +373,7 @@ import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
+import { logger } from "@/utils/logger";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -847,7 +848,9 @@ export default {
         obj.bucket.divisionName = String(b.divisionName || "");
         // opsional: obj.bucket.teams = this.participant;
         localStorage.setItem("raceStartPayload", JSON.stringify(obj));
-      } catch {}
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
 
       // refresh ranking jika sudah ada waktu
       this.assignRanks(this.participantArr);

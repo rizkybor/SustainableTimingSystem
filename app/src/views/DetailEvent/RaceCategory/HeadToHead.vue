@@ -298,7 +298,7 @@
           <div class="text-muted">Loading bracket & teams…</div>
         </div>
       </div>
-      <div v-else-if="visibleParticipants && visibleParticipants.length">
+      <div>
         <div
           v-if="showBracket"
           class="bracket"
@@ -480,25 +480,6 @@
         </div>
       </div>
 
-      <!-- EMPTY STATE -->
-      <div
-        v-else
-        class="bracket-empty d-flex align-items-center justify-content-center py-5"
-      >
-        <div class="text-center text-muted">
-          <Icon
-            icon="mdi:account-off-outline"
-            width="36"
-            height="36"
-            class="mb-2"
-          />
-          <div><strong>Teams on this categories not found</strong></div>
-          <small>
-            Coba pilih kategori lain atau sinkronkan ulang data tim.
-          </small>
-        </div>
-      </div>
-
       <!-- /bracket -->
     </div>
 
@@ -575,8 +556,10 @@
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
                     <th class="text-center" rowspan="2">Result</th>
-                    <th rowspan="2">Win/Lose</th>
-                    <th v-if="editResult" rowspan="2">Action</th>
+                    <th class="text-center" rowspan="2">Win/Lose</th>
+                    <th v-if="editResult" class="text-center" rowspan="2">
+                      Action
+                    </th>
                   </tr>
                   <tr>
                     <th class="text-center">S</th>
@@ -612,118 +595,181 @@
                       />
                     </td>
 
-                    <td class="large-bold text-strong max-char">
-                      {{ item.nameTeam }}
-                      <span
-                        v-if="isByeTeam(item)"
-                        class="badge badge-light ml-2"
-                        >BYE</span
-                      >
+                    <td class="large-bold text-strong max-char text-left">
+                      <!-- status pills di atas -->
+                      <div class="mb-1">
+                        <span
+                          v-if="item.result && item.result.flag === 'DNF'"
+                          class="badge badge-danger badge-pill"
+                        >
+                          Did Not Finish
+                        </span>
+                        <span
+                          v-if="item.result && item.result.flag === 'DNS'"
+                          class="badge badge-secondary badge-pill"
+                        >
+                          Did Not Start
+                        </span>
+                        <span
+                          v-if="item.result && item.result.flag === 'DSQ'"
+                          class="badge badge-dark badge-pill"
+                        >
+                          Disqualified
+                        </span>
+                      </div>
 
-                      <!-- status pills -->
-                      <span
-                        v-if="item.result && item.result.flag === 'DNF'"
-                        class="badge badge-danger badge-pill ml-2"
-                        >DNF</span
-                      >
-                      <span
-                        v-if="item.result && item.result.flag === 'DNS'"
-                        class="badge badge-secondary badge-pill ml-2"
-                        >DNS</span
-                      >
-                      <span
-                        v-if="item.result && item.result.flag === 'DSQ'"
-                        class="badge badge-dark badge-pill ml-2"
-                        >DSQ</span
-                      >
+                      <!-- nama tim di bawah -->
+                      <div>
+                        {{ item.nameTeam }}
+                        <span
+                          v-if="isByeTeam(item)"
+                          class="badge badge-light ml-2"
+                          >BYE</span
+                        >
+                      </div>
                     </td>
-                    <td class="large-bold">{{ item.bibTeam }}</td>
-                    <td class="text-monospace">{{ item.result.startTime }}</td>
+                    <td class="text-center">{{ item.bibTeam }}</td>
+                    <td class="text-center text-monospace">
+                      {{ item.result.startTime }}
+                    </td>
 
-                    <!-- Penalties breakdown (read-only jika belum ada rincian) -->
+                    <!-- PEENALTY START -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.s"
                         :options="sChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY CL  -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.cl"
                         :options="clChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY R1 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.r1"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item) || !showR1"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showR1
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY R2 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.r2"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item) || !showR2"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showR2
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY L1 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.l1"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item) || !showL1"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showL1
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY L2 -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model="item.result.penalties.l2"
                         :options="ynChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item) || !showL2"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
+                          !showL2
+                        "
                       />
                     </td>
+
+                    <!-- PENALTY BOOYAN  -->
                     <td class="text-center">
                       <span
                         :class="{
+                          'badge badge-light':
+                            item.result.penalties.pb === null,
                           'badge badge-success': item.result.penalties.pb === 0,
-                          'badge badge-danger': item.result.penalties.pb === 50,
+                          'badge badge-warning':
+                            item.result.penalties.pb === 50,
                           'badge badge-danger':
                             item.result.penalties.pb === 100,
                         }"
                         class="p-2"
                       >
-                        {{ item.result.penalties.pb }}
+                        {{
+                          item.result.penalties.pb === null
+                            ? "—"
+                            : item.result.penalties.pb
+                        }}
                       </span>
                     </td>
 
+                    <!-- PENALTY FINISH  -->
                     <td>
                       <b-form-select
+                        class="small-select"
                         v-model.number="item.result.penalties.f"
                         :options="fChoices"
                         size="sm"
                         @change="onPenaltyChange(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
 
+                    <!-- INPUT PENALTY OTHER  -->
                     <td class="pen-o-cell">
                       <b-form-input
                         :value="getOthersValue(item)"
                         size="xs"
-                        style="min-width: 10px"
+                        style="min-width: 10px; border-radius: 12px"
                         inputmode="numeric"
                         pattern="[0-9]*"
                         placeholder="0"
@@ -731,10 +777,14 @@
                         @paste="digitsPaste($event)"
                         @input="onOthersTyping($event, item)"
                         @change="onOthersCommit(item)"
-                        :disabled="isByeTeam(item)"
+                        :disabled="
+                          isByeTeam(item) ||
+                          ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
+                        "
                       />
                     </td>
 
+                    <!-- JUMLAH PENALTY  -->
                     <td class="large-bold">
                       {{ getTotalPenalty(item) }}
                       <small class="text-muted"
@@ -742,18 +792,25 @@
                       >
                     </td>
 
-                    <!-- Penalty selector tetap ada (biar gampang input) -->
-                    <td class="text-monospace large-bold">
+                    <!-- PENALTY TIME -->
+                    <td class="text-center text-monospace penalty-char">
                       {{ item.result.penaltyTime }}
                     </td>
 
-                    <td class="text-monospace">{{ item.result.finishTime }}</td>
+                    <!-- FINISH TIME  -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
 
-                    <td class="large-bold text-monospace">
+                    <!-- RACETIME  -->
+                    <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
 
-                    <td class="text-monospace large-bold">
+                    <!-- RESULT  -->
+                    <td
+                      class="text-center result-char text-monospace large-bold"
+                    >
                       {{
                         item.result.penaltyTime
                           ? item.result.totalTime
@@ -761,8 +818,27 @@
                       }}
                     </td>
 
-                    <td class="large-bold">{{ item.result.winLose || "" }}</td>
+                    <!-- WIN/LOSE  -->
+                    <td class="large-bold text-center">
+                      <span
+                        v-if="item.result.winLose === 'WIN'"
+                        class="badge px-3 py-1"
+                        style="background-color: gold; color: black"
+                      >
+                        🏆 WIN
+                      </span>
+                      <span
+                        v-else-if="item.result.winLose === 'LOSE'"
+                        class="badge badge-secondary px-3 py-1"
+                      >
+                        LOSE
+                      </span>
+                      <span v-else>
+                        {{ item.result.winLose || "" }}
+                      </span>
+                    </td>
 
+                    <!-- ACTION BUTTON  -->
                     <td v-if="editResult">
                       <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
                         <b-button
@@ -1265,8 +1341,9 @@ export default {
     },
     ynChoices() {
       return [
-        { value: "N", text: "NO" },
-        { value: "Y", text: "YES" },
+        { value: null, text: "-" },
+        { value: "N", text: "N" },
+        { value: "Y", text: "Y" },
       ];
     },
     storedResultsByRound() {
@@ -1537,50 +1614,6 @@ export default {
   },
 
   methods: {
-    async fetchBooyanActiveFromSettings() {
-      try {
-        if (typeof ipcRenderer === "undefined") return;
-
-        const bucket = getBucket();
-        const eventId = String(bucket.eventId || "");
-        if (!eventId) return;
-
-        const token = Date.now();
-        this._lastRSFetchToken = token;
-
-        ipcRenderer.send("race-settings:get", eventId);
-        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
-          if (this._lastRSFetchToken !== token) return;
-
-          if (res && res.ok && res.settings && res.settings.h2h) {
-            const h = res.settings.h2h || {};
-            // map: "R1" → r1, dst
-            this.booyanActive = {
-              r1: !!h.R1 || !!h.r1,
-              r2: !!h.R2 || !!h.r2,
-              l1: !!h.L1 || !!h.l1,
-              l2: !!h.L2 || !!h.l2,
-            };
-
-            // sanitasi semua peserta: set kolom yang non-aktif → false
-            (this.participantArr || []).forEach((p) => {
-              if (!p.result) p.result = {};
-              this.ensurePenaltiesObject(p.result);
-
-              const pen = p.result.penalties;
-              if (!this.booyanActive.r1) this.$set(pen, "r1", false);
-              if (!this.booyanActive.r2) this.$set(pen, "r2", false);
-              if (!this.booyanActive.l1) this.$set(pen, "l1", false);
-              if (!this.booyanActive.l2) this.$set(pen, "l2", false);
-              // re-hitung PB sesuai rule baru
-              this.onPenaltyChange(p);
-            });
-          }
-        });
-      } catch (err) {
-        logger.warn("❌ Failed to update race settings:", err);
-      }
-    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1652,8 +1685,97 @@ export default {
     },
     // === END CONNECTION ===
 
+    resetByRow(item) {
+      if (!item || !item.result) return;
+
+      // pastikan object penalties ada & reactive
+      this.ensurePenaltiesObject(item.result);
+      const p = item.result.penalties;
+
+      // kosongkan semua penalti ke null (biar dropdown kembali "—")
+      this.$set(p, "s", null);
+      this.$set(p, "cl", null);
+      this.$set(p, "r1", null);
+      this.$set(p, "r2", null);
+      this.$set(p, "l1", null);
+      this.$set(p, "l2", null);
+      this.$set(p, "pb", null);
+      this.$set(p, "f", null);
+      this.$set(p, "o", null);
+
+      // reset agregat penalti
+      item.result.penalty = 0;
+      item.result.penaltyTime = "00:00:00.000";
+
+      // totalTime = raceTime (karena penalti 0)
+      if (item.result.raceTime) {
+        item.result.totalTime = item.result.raceTime;
+      } else {
+        item.result.totalTime = "";
+      }
+
+      // bersihkan flag (kalau ada)
+      this.$set(item.result, "flag", null);
+
+      // simpan dan hitung ulang efeknya
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+      this.evaluateHeatWinnersForCurrentRound();
+      this.assignRanks(this.visibleParticipants);
+
+      // force re-render jika perlu
+      this.$nextTick &&
+        this.$nextTick(() => {
+          this.$forceUpdate && this.$forceUpdate();
+        });
+    },
+
     toggleBracket() {
       this.showBracket = !this.showBracket;
+    },
+
+    async fetchBooyanActiveFromSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+
+        const bucket = getBucket();
+        const eventId = String(bucket.eventId || "");
+        if (!eventId) return;
+
+        const token = Date.now();
+        this._lastRSFetchToken = token;
+
+        ipcRenderer.send("race-settings:get", eventId);
+        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          if (this._lastRSFetchToken !== token) return;
+
+          if (res && res.ok && res.settings && res.settings.h2h) {
+            const h = res.settings.h2h || {};
+            // map: "R1" → r1, dst
+            this.booyanActive = {
+              r1: !!h.R1 || !!h.r1,
+              r2: !!h.R2 || !!h.r2,
+              l1: !!h.L1 || !!h.l1,
+              l2: !!h.L2 || !!h.l2,
+            };
+
+            (this.participantArr || []).forEach((p) => {
+              if (!p.result) p.result = {};
+              this.ensurePenaltiesObject(p.result);
+
+              const pen = p.result.penalties;
+              if (!this.booyanActive.r1) this.$set(pen, "r1", false);
+              if (!this.booyanActive.r2) this.$set(pen, "r2", false);
+              if (!this.booyanActive.l1) this.$set(pen, "l1", false);
+              if (!this.booyanActive.l2) this.$set(pen, "l2", false);
+              // re-hitung PB sesuai rule baru
+              // this.onPenaltyChange(p);
+            });
+          }
+        });
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
     },
 
     getNextAvailableHeat() {
@@ -2264,6 +2386,7 @@ export default {
           B.result.winLose = null;
         }
       });
+      this.editResult = true;
     },
     getGlobalHeatUsageCount() {
       return readGlobalHeatUsage();
@@ -2450,24 +2573,24 @@ export default {
     getBooyanMode() {
       const a = this.booyanActive || {};
       const any = !!(a.r1 || a.r2 || a.l1 || a.l2);
-      if (!any) return "classic"; // tidak ada booyan aktif
-      if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2"; // hanya R1 & L1 aktif
-      return "4"; // selebihnya dianggap 4 booyan
+      if (!any) return "classic";
+      if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2";
+      return "4";
     },
 
     ensurePenaltiesObject(result) {
       if (!result || typeof result !== "object") return;
 
       const def = {
-        s: 0,
-        cl: 0,
-        r1: "",
-        r2: "",
-        l1: "",
-        l2: "",
-        pb: 0,
-        f: 0,
-        o: 0,
+        s: null,
+        cl: null,
+        r1: null,
+        r2: null,
+        l1: null,
+        l2: null,
+        pb: null,
+        f: null,
+        o: null,
       };
 
       if (!result.penalties || typeof result.penalties !== "object") {
@@ -2477,9 +2600,6 @@ export default {
         Object.keys(def).forEach((k) => {
           if (typeof p[k] === "undefined") this.$set(p, k, def[k]);
         });
-        ["r1", "r2", "l1", "l2"].forEach((k) => {
-          this.$set(p, k, p[k] === "Y" ? "Y" : "N");
-        });
       }
 
       // Samakan ON/OFF sesuai mode
@@ -2487,95 +2607,97 @@ export default {
       const a = this.booyanActive || {};
       const p = result.penalties;
 
-      if (mode === "classic") {
-        this.$set(p, "r1", "N");
-        this.$set(p, "r2", "N");
-        this.$set(p, "l1", "N");
-        this.$set(p, "l2", "N");
-        // pb biarkan null di sini; akan jadi 0 saat onPenaltyChange pertama
-      } else if (mode === "2") {
-        if (!a.r1) this.$set(p, "r1", "N");
-        if (!a.l1) this.$set(p, "l1", "N");
-        this.$set(p, "r2", "N");
-        this.$set(p, "l2", "N");
-      } else {
-        // mode "4"
-        if (!a.r1) this.$set(p, "r1", "N");
-        if (!a.r2) this.$set(p, "r2", "N");
-        if (!a.l1) this.$set(p, "l1", "N");
-        if (!a.l2) this.$set(p, "l2", "N");
-      }
+      // if (mode === "classic") {
+      //   this.$set(p, "r1", "N");
+      //   this.$set(p, "r2", "N");
+      //   this.$set(p, "l1", "N");
+      //   this.$set(p, "l2", "N");
+      // } else if (mode === "2") {
+      //   if (!a.r1) this.$set(p, "r1", "N");
+      //   if (!a.l1) this.$set(p, "l1", "N");
+      //   this.$set(p, "r2", "N");
+      //   this.$set(p, "l2", "N");
+      // } else {
+      //   // mode "4"
+      //   if (!a.r1) this.$set(p, "r1", "N");
+      //   if (!a.r2) this.$set(p, "r2", "N");
+      //   if (!a.l1) this.$set(p, "l1", "N");
+      //   if (!a.l2) this.$set(p, "l2", "N");
+      // }
     },
 
-    // async onPenaltyChange(item) {
-    //   if (!item || !item.result) return;
-    //   this.ensurePenaltiesObject(item.result);
+    async onPenaltyChange(item) {
+      if (!item || !item.result) return;
+      this.ensurePenaltiesObject(item.result);
+      const p = item.result.penalties;
+      const mode = this.getBooyanMode();
 
-    //   const p = item.result.penalties;
-    //   const mode = this.getBooyanMode();
+      // deteksi belum ada input sama sekali
+      const noInputBooyan = [p.r1, p.r2, p.l1, p.l2].every((v) => v === null);
+      const noInputNum = [p.s, p.cl, p.f, p.o].every((v) => v === null);
+      const noInputAll = noInputBooyan && noInputNum;
 
-    //   console.log(p.r1)
-    //   // --- baca Y/N ---
-    //   const r1 = p.r1 === "Y";
-    //   const r2 = p.r2 === "Y";
-    //   const l1 = p.l1 === "Y";
-    //   const l2 = p.l2 === "Y";
-    //   const allN = !r1 && !r2 && !l1 && !l2;
+      // Jika benar-benar belum ada input, kosongkan PB dan lompat hitungan PB
+      if (noInputAll) {
+        this.$set(p, "pb", null);
+      } else {
+        // --- Hitung PB sesuai mode ---
+        const r1 = p.r1 === "Y";
+        const r2 = p.r2 === "Y";
+        const l1 = p.l1 === "Y";
+        const l2 = p.l2 === "Y";
 
-    //   // --- FIRST-TIME GUARD ---
-    //   // Jika pertama kali (pb === null) dan semua N → tampilkan 0, JANGAN 100
-    //   if (p.pb === null && allN) {
-    //     this.$set(p, "pb", 0);
-    //   }
+        if (mode === "classic") {
+          this.$set(p, "pb", 0);
+        } else if (mode === "2") {
+          // R1 & L1 saja
+          if (p.r1 === null && p.l1 === null) {
+            this.$set(p, "pb", null);
+          } else if (r1 && l1) {
+            this.$set(p, "pb", 100);
+          } else if (r1 || l1) {
+            this.$set(p, "pb", 50);
+          } else {
+            this.$set(p, "pb", 0);
+          }
+        } else {
+          // 4 booyan
+          if ([p.r1, p.r2, p.l1, p.l2].every((v) => v === null)) {
+            this.$set(p, "pb", null);
+          } else if (!r1 && !r2 && !l1 && !l2) {
+            this.$set(p, "pb", 100);
+          } else {
+            const comboValid =
+              (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
+            this.$set(p, "pb", comboValid ? 0 : 50);
+          }
+        }
+      }
 
-    //   // --- Hitung PB sesuai mode ---
-    //   if (mode === "classic") {
-    //     // klasik: PB tidak dipakai
-    //     this.$set(p, "pb", 0);
-    //   } else if (mode === "2") {
-    //     // 2 booyan (R1 & L1):
-    //     if (r1 && l1) {
-    //       this.$set(p, "pb", 100); // Y+Y
-    //     } else if (r1 || l1) {
-    //       this.$set(p, "pb", 50); // salah satu Y
-    //     } else {
-    //       this.$set(p, "pb", 0); // N+N
-    //     }
-    //   } else {
-    //     // 4 booyan:
-    //     if (!r1 && !r2 && !l1 && !l2) {
-    //       this.$set(p, "pb", 100); // semua N
-    //     } else {
-    //       const comboValid =
-    //         (r1 && l1) || (r1 && l2) || (r2 && l1) || (r2 && l2);
-    //       this.$set(p, "pb", comboValid ? 0 : 50);
-    //     }
-    //   }
+      // total penalti: treat null as 0 (sudah aman)
+      const totalPenaltySeconds =
+        (Number(p.s) || 0) +
+        (Number(p.cl) || 0) +
+        (Number(p.pb) || 0) +
+        (Number(p.f) || 0) +
+        (Number(p.o) || 0);
 
-    //   // --- total penalti (detik) ---
-    //   const totalPenaltySeconds =
-    //     (Number(p.s) || 0) +
-    //     (Number(p.cl) || 0) +
-    //     (Number(p.pb) || 0) +
-    //     (Number(p.f) || 0) +
-    //     (Number(p.o) || 0);
+      item.result.penalty = totalPenaltySeconds;
+      item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
 
-    //   item.result.penalty = totalPenaltySeconds;
-    //   item.result.penaltyTime = this.secondsToTimeString(totalPenaltySeconds);
+      if (item.result.raceTime) {
+        item.result.totalTime = await this.tambahWaktu(
+          item.result.raceTime,
+          item.result.penaltyTime
+        );
+      }
 
-    //   if (item.result.raceTime) {
-    //     item.result.totalTime = await this.tambahWaktu(
-    //       item.result.raceTime,
-    //       item.result.penaltyTime
-    //     );
-    //   }
-
-    //   this.evaluateHeatWinnersForCurrentRound();
-    //   await this.assignRanks(this.visibleParticipants);
-    //   this.syncWinLoseFromBracketToParticipants();
-    //   this.persistRoundResults();
-    //   this.computeWinLoseByHeat();
-    // },
+      this.evaluateHeatWinnersForCurrentRound();
+      await this.assignRanks(this.visibleParticipants);
+      this.syncWinLoseFromBracketToParticipants();
+      this.persistRoundResults();
+      this.computeWinLoseByHeat();
+    },
 
     // map: NAMA_TIM (UPPER) -> { heat: number, pos: 0|1 }  (pos: team1=0, team2=1)
     buildHeatOrderPosMapFromBracket() {
@@ -3253,25 +3375,6 @@ export default {
       return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
-    async updateTimePen(selectedValue, item) {
-      const sel = this.dataPenalties.find((p) => p.value === selectedValue);
-      if (sel) item.result.penaltyTime = sel.timePen;
-
-      if (item.result.raceTime && item.result.penaltyTime) {
-        item.result.totalTime = await this.tambahWaktu(
-          item.result.raceTime,
-          item.result.penaltyTime
-        );
-      }
-      this.editResult = true;
-      await this.assignRanks(this.visibleParticipants);
-      this.evaluateHeatWinnersForCurrentRound();
-      this.syncWinLoseFromBracketToParticipants(); // NEW
-      this.persistRoundResults(); // NEW
-
-      this.computeWinLoseByHeat();
-    },
-
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
       return m ? m.score : null;
@@ -3554,25 +3657,50 @@ td {
   border: none;
   white-space: nowrap;
 } /* <-- cegah wrap; geser ke samping */
+
+.max-char {
+  max-width: 260px;
+  word-wrap: break-word;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.large-bold {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.text-strong {
+  color: #000;
+}
+.penalty-char {
+  color: red;
+}
+.result-char {
+  color: green;
+}
 .text-monospace {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
 
-.large-bold {
-  font-size: 1.2rem;
-  font-weight: 800;
+/* ---- Styling utk penalty section select ---- */
+.small-select {
+  margin-bottom: 5px;
+  width: 80px;
 }
-.text-strong {
-  color: #000;
+
+.small-select {
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 6px; /* jarak antar select */
 }
-.max-char {
-  max-width: 260px;
-  white-space: normal;
-  word-wrap: break-word;
-  overflow: hidden;
-  text-overflow: ellipsis;
-} /* Team name boleh wrap */
+
+.small-select:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
 
 /* ===== PORT STATUS ===== */
 .status-indicator {
@@ -3862,7 +3990,7 @@ thead th[colspan="8"] {
 .pen-o-cell {
   width: 64px;
   min-width: 64px;
-  padding-right: 6px; /* biar gak nempel */
+  padding-right: 6px;
 }
 
 /* BootstrapVue render: input.form-control */
@@ -3877,10 +4005,26 @@ thead th[colspan="8"] {
   border-radius: 6px;
 }
 
-.badge-pill {
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-weight: 700;
+  color: #fff;
+}
+
+.status-pill--dnf {
+  background-color: #dc3545; /* merah */
+}
+
+.status-pill--dns {
+  background-color: #6c757d; /* abu */
+}
+
+.status-pill--dsq {
+  background-color: #343a40; /* hitam */
 }
 
 /* PATH  */

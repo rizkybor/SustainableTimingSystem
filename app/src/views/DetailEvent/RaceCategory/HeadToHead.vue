@@ -739,7 +739,8 @@
                           'badge badge-danger':
                             item.result.penalties.pb === 100,
                         }"
-                        class="p-2"
+                        class="p-3"
+                        style="border-radius: 12px;"
                       >
                         {{
                           item.result.penalties.pb === null
@@ -821,15 +822,20 @@
                     <!-- WIN/LOSE  -->
                     <td class="large-bold text-center">
                       <span
-                        v-if="item.result.winLose === 'WIN'"
-                        class="badge px-3 py-1"
-                        style="background-color: gold; color: black"
+                        v-if="item.result.winLose === 'Win'"
+                        class="badge px-3 p-2"
+                        style="
+                          background-color: gold;
+                          color: black;
+                          border-radius: 12px;
+                        "
                       >
                         🏆 WIN
                       </span>
                       <span
-                        v-else-if="item.result.winLose === 'LOSE'"
-                        class="badge badge-secondary px-3 py-1"
+                        v-else-if="item.result.winLose === 'Lose'"
+                        class="badge badge-secondary px-4 py-2"
+                        style="border-radius: 12px"
                       >
                         LOSE
                       </span>
@@ -843,13 +849,7 @@
                       <div class="d-flex" style="gap: 6px; flex-wrap: wrap">
                         <b-button
                           size="sm"
-                          variant="outline-secondary"
-                          @click="resetRow(item)"
-                          :disabled="isByeTeam(item)"
-                          >RESET</b-button
-                        >
-                        <b-button
-                          size="sm"
+                          class="btn-action-racetime"
                           variant="outline-danger"
                           @click="markFlag(item, 'DNF')"
                           :disabled="isByeTeam(item)"
@@ -857,6 +857,7 @@
                         >
                         <b-button
                           size="sm"
+                          class="btn-action-racetime"
                           variant="outline-warning"
                           @click="markFlag(item, 'DNS')"
                           :disabled="isByeTeam(item)"
@@ -864,10 +865,19 @@
                         >
                         <b-button
                           size="sm"
+                          class="btn-action-racetime"
                           variant="outline-dark"
                           @click="markFlag(item, 'DSQ')"
                           :disabled="isByeTeam(item)"
                           >DSQ</b-button
+                        >
+                        <b-button
+                          size="sm"
+                          class="btn-action-racetime"
+                          variant="outline-secondary"
+                          @click="resetRow(item)"
+                          :disabled="isByeTeam(item)"
+                          >RESET</b-button
                         >
                       </div>
                     </td>
@@ -925,6 +935,7 @@ import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
+import { logger } from "@/utils/logger";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -2603,9 +2614,9 @@ export default {
       }
 
       // Samakan ON/OFF sesuai mode
-      const mode = this.getBooyanMode();
-      const a = this.booyanActive || {};
-      const p = result.penalties;
+      // const mode = this.getBooyanMode();
+      // const a = this.booyanActive || {};
+      // const p = result.penalties;
 
       // if (mode === "classic") {
       //   this.$set(p, "r1", "N");
@@ -2647,9 +2658,9 @@ export default {
         const l1 = p.l1 === "Y";
         const l2 = p.l2 === "Y";
 
-        if (mode === "classic") {
+        if (mode == "classic") {
           this.$set(p, "pb", 0);
-        } else if (mode === "2") {
+        } else if (mode == "2") {
           // R1 & L1 saja
           if (p.r1 === null && p.l1 === null) {
             this.$set(p, "pb", null);
@@ -3558,6 +3569,15 @@ export default {
   padding: 8px 14px;
 }
 
+.btn-action-racetime {
+  background: #ffffff;
+  border: 1px solid #cfe1e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
@@ -3924,6 +3944,7 @@ thead th[colspan="8"] {
 }
 .toolbar-select__control {
   border-radius: 10px;
+  cursor: pointer;
 }
 
 /* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */
@@ -3932,17 +3953,11 @@ thead th[colspan="8"] {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  cursor: pointer;
+
 }
 
 /* Sedikit konsistensi ukuran tombol custom */
-.btn-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  line-height: 1.2;
-}
 .toolbar-divider {
   width: 1px;
   height: 28px;

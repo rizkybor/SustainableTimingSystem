@@ -1,5 +1,16 @@
-// vue.config.js (di folder yang sama dengan package.json)
+// vue.config.js
+const isLan = process.env.NODE_ENV
+
+const DEV_HOST = isLan ? '27.3.82.50' : 'localhost';
+const DEV_PORT = isLan ? 8181 : 8080;
+
+// vue.config.js
 module.exports = {
+   devServer: {
+    host: process.env.DEV_SERVER_HOST || 'localhost',
+    port: process.env.DEV_SERVER_PORT || 8080,
+    allowedHosts: ['localhost', '127.0.0.1', '172.20.10.7', '27.3.82.50']
+  },
   pluginOptions: {
     electronBuilder: {
       preload: "src/preload.js",

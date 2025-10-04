@@ -65,7 +65,7 @@ async function createWindow() {
 
   // --- SPLASH ---
   if (isDev) {
-    await splash.loadFile(path.join(__dirname, "../public/splash.html"));
+    await splash.loadURL(pathToFileURL(path.join(__dirname, "../public/splash.html")).toString());
   } else {
     createProtocol("app");
     await splash.loadURL("app://./splash.html");

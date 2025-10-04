@@ -6,7 +6,7 @@ import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 import path from "path";
 import { pathToFileURL } from "url";
 
-const isDevelopment = process.env.NODE_ENV !== "production";
+const isDevelopment = process.env.VUE_APP_ENV !== "production";
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 
 // Function to Services Communication to Database
@@ -70,7 +70,7 @@ async function createWindow() {
   });
 
   // DEV: ../public  |  PROD: __static
-  const isDev = !!process.env.WEBPACK_DEV_SERVER_URL;
+  const isDev = !!process.env.VUE_APP_BASE_URL;
   // Path ABSOLUT ke file splash.html
   const splashHtmlPath = isDev
     ? path.join(__dirname, "../public/splash.html") // dev
@@ -94,8 +94,8 @@ async function createWindow() {
     win.show();
   }, 7000);
 
-  if (process.env.WEBPACK_DEV_SERVER_URL) {
-    await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
+  if (process.env.VUE_APP_BASE_URL) {
+    await win.loadURL(process.env.VUE_APP_BASE_URL);
     if (!process.env.IS_TEST) win.webContents.openDevTools();
   } else {
     createProtocol("app");

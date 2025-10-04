@@ -1,4 +1,4 @@
-// vue.config.js (di folder yang sama dengan package.json)
+// vue.config.js
 module.exports = {
   pluginOptions: {
     electronBuilder: {

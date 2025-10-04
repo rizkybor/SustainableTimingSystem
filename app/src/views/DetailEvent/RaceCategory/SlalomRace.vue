@@ -84,6 +84,23 @@
                   {{ titleCategories || "-" }}
                 </span>
               </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch Slalom Category:"
+                  label-for="sprintBucketSelect"
+                  class="mb-0 toolbar-select"
+                >
+                  <b-form-select
+                    id="slalomBucketSelect"
+                    :options="slalomBucketOptions"
+                    v-model="selectedSlalomKey"
+                    @change="onSelectSlalomBucket"
+                    class="toolbar-select__control"
+                  />
+                </b-form-group>
+              </div>
             </div>
           </b-col>
 
@@ -305,9 +322,7 @@
                       <div class="p-label">S</div>
                       <b-form-select
                         class="small-select"
-                        v-model="
-                          team.sessions[selectedSession[team._id]].startPenalty
-                        "
+                       v-model="team.sessions[selectedSession[team._id]].startPenalty"
                         :options="penaltyOptions"
                         size="sm"
                         @change="recalcTeam(team)"
@@ -490,6 +505,7 @@ import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
+import { logger } from "@/utils/logger";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -572,23 +588,15 @@ function normalizeTeamFromBucketForSlalom(t = {}) {
   return { ...base, sessions };
 }
 
-function loadFromRaceStartPayloadForSlalom() {
+function getBucket() {
   const obj = safeJSON(RACE_PAYLOAD_KEY, {});
-  const b = obj.bucket || {};
-  const bucket = {
-    eventId: String(b.eventId || ""),
-    initialId: String(b.initialId || ""),
-    raceId: String(b.raceId || ""),
-    divisionId: String(b.divisionId || ""),
-    eventName: String(b.eventName || "").toUpperCase(),
-    initialName: String(b.initialName || "").toUpperCase(),
-    raceName: String(b.raceName || "").toUpperCase(),
-    divisionName: String(b.divisionName || "").toUpperCase(),
-  };
-  const teams = Array.isArray(b.teams)
-    ? b.teams.map(normalizeTeamFromBucketForSlalom)
-    : [];
-  return { bucket, teams };
+  return obj.bucket || {};
+}
+
+function loadFromRaceStartPayloadForSlalom() {
+  // Define the function logic here, for example:
+  const obj = safeJSON("raceStartPayload", {});
+  return obj.bucket || {}; // return the bucket or an empty object if not found
 }
 
 export default {
@@ -597,6 +605,9 @@ export default {
 
   data() {
     return {
+      slalomBucketOptions: [],
+      slalomBucketMap: Object.create(null),
+      selectedSlalomKey: "",
       selectPath: "",
       baudRate: 9600,
       baudOptions: [1200, 2400, 9600],
@@ -660,6 +671,67 @@ export default {
   },
 
   computed: {
+    getBucket() {
+      const obj = safeJSON(RACE_PAYLOAD_KEY, {});
+      return obj.bucket || {};
+    },
+    currentSlalomEventId() {
+      let fromEvent = "";
+      if (
+        this.dataEventSafe &&
+        (this.dataEventSafe._id || this.dataEventSafe.id)
+      ) {
+        fromEvent = String(this.dataEventSafe._id || this.dataEventSafe.id);
+      }
+      let fromRoute = "";
+      if (this.$route && this.$route.params && this.$route.params.id) {
+        fromRoute = String(this.$route.params.id);
+      }
+      let fromBucket = "";
+      const bucket = getBucket(); // Use the external function
+      if (bucket && bucket.eventId) fromBucket = String(bucket.eventId);
+
+      return fromEvent || fromRoute || fromBucket || "";
+    },
+
+    slalomDivisions() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesDivision)
+      ) {
+        return this.dataEventSafe.categoriesDivision.map((d) => ({
+          id: String(d.value),
+          name: String(d.name),
+        }));
+      }
+      return [];
+    },
+
+    slalomRaces() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesRace)
+      ) {
+        return this.dataEventSafe.categoriesRace.map((r) => ({
+          id: String(r.value),
+          name: String(r.name),
+        }));
+      }
+      return [];
+    },
+
+    slalomInitials() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesInitial)
+      ) {
+        return this.dataEventSafe.categoriesInitial.map((i) => ({
+          id: String(i.value),
+          name: String(i.name),
+        }));
+      }
+      return [];
+    },
     currentDateTime() {
       const d = new Date();
       return (
@@ -754,42 +826,229 @@ export default {
     },
   },
 
-  mounted() {
-    // ambil event info
-    this.dataEvent = safeJSON("eventDetails", {});
-
-    // 1) payload baru (seperti Sprint Result)
-    const { bucket, teams } = loadFromRaceStartPayloadForSlalom();
-    this._eventId = String(bucket.eventId || "");
-    if (teams.length) {
-      this.teams = teams;
-      this.titleCategories =
-        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
-    } else {
-      // 2) fallback format lama
-      const legacyTeams = safeJSON("participantByCategories", []);
-      this.teams = (
-        Array.isArray(legacyTeams)
-          ? legacyTeams
-          : Object.values(legacyTeams || {})
-      )
-        .sort((a, b) =>
-          String(a.praStart || "").localeCompare(String(b.praStart || ""))
-        )
-        .map(normalizeTeamFromBucketForSlalom);
-      this.titleCategories = String(
-        localStorage.getItem("currentCategories") || ""
-      ).trim();
+  async mounted() {
+    // Ambil event info dari localStorage dengan aman
+    try {
+      const events = localStorage.getItem("eventDetails");
+      this.dataEvent = events ? JSON.parse(events) : {};
+    } catch {
+      this.dataEvent = {};
     }
 
-    // default session index
+    // Coba muat data payload baru untuk Slalom
+    const ok = this.loadFromRaceStartPayloadForSlalom();
+    if (!ok) {
+      // Jika tidak berhasil, coba muat data dari penyimpanan lokal
+      await this.checkValueStorage();
+    }
+
+    // === SLALOM BUCKET: bangun opsi & muat tim terdaftar via DB ===
+    this.buildSlalomOptions();
+
+    // Jika ada opsi slalom, ambil tim berdasarkan key yang tersimpan
+    if (this.slalomBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentSlalomBucketKey");
+      this.selectedSlalomKey =
+        savedKey && this.slalomBucketMap[savedKey]
+          ? savedKey
+          : this.slalomBucketOptions[0].value;
+
+      // Ambil tim berdasarkan key yang dipilih
+      await this.fetchSlalomTeamsByKey(this.selectedSlalomKey);
+    } else {
+      // Fallback jika tidak ada opsi slalom, muat semua bucket dari eventDetails
+      this.loadAllSlalomBucketsFromEvent();
+    }
+
+    // Tentukan indeks sesi default untuk setiap tim
     this.teams.forEach((t) =>
       this.$set(this.selectedSession, t._id, this.activeRun)
     );
+
+    // Ambil jumlah gate untuk slalom dari pengaturan
     this.fetchSlalomGateCountFromSettings();
   },
 
   methods: {
+    loadFromRaceStartPayloadForSlalom() {
+      const obj = safeJSON(RACE_PAYLOAD_KEY, {});
+      const b = obj.bucket || {};
+      const bucket = {
+        eventId: String(b.eventId || ""),
+        initialId: String(b.initialId || ""),
+        raceId: String(b.raceId || ""),
+        divisionId: String(b.divisionId || ""),
+        eventName: String(b.eventName || "").toUpperCase(),
+        initialName: String(b.initialName || "").toUpperCase(),
+        raceName: String(b.raceName || "").toUpperCase(),
+        divisionName: String(b.divisionName || "").toUpperCase(),
+      };
+      const teams = Array.isArray(b.teams)
+        ? b.teams.map(normalizeTeamFromBucketForSlalom)
+        : [];
+      return { bucket, teams };
+    },
+    buildSlalomOptions() {
+      const eventId = this.currentSlalomEventId || "";
+      if (!eventId) {
+        this.slalomBucketOptions = [];
+        this.slalomBucketMap = {};
+        return;
+      }
+
+      const divs = this.slalomDivisions.length
+        ? this.slalomDivisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+      const races = this.slalomRaces.length
+        ? this.slalomRaces
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+      const inits = this.slalomInitials.length
+        ? this.slalomInitials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
+      const opts = [];
+      const map = Object.create(null);
+
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: String(init.id),
+              raceId: String(race.id),
+              divisionId: String(div.id),
+              eventName: "SLALOM",
+              initialName: String(init.name),
+              raceName: String(race.name),
+              divisionName: String(div.name),
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.slalomBucketOptions = opts;
+      this.slalomBucketMap = map;
+    },
+    async onSelectSlalomBucket(key) {
+      await this.fetchSlalomTeamsByKey(key);
+    },
+    async fetchSlalomTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.slalomBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.slalomBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        this.selectedSlalomKey = key;
+        localStorage.setItem("currentSlalomBucketKey", key);
+
+        // Fetch data teams from IPC (channel baru untuk slalom)
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once(
+            "teams-slalom-registered:find-reply",
+            (_e, payload) => resolve(payload)
+          );
+          ipcRenderer.send("teams-slalom-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          this.teams = [];
+          this._useSlalomBucket(key);
+          return;
+        }
+
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamFromBucketForSlalom)
+            : [];
+
+        this.slalomBucketMap[key] = { ...b, teams };
+        this._useSlalomBucket(key);
+      } catch {
+        this._useSlalomBucket(key);
+      }
+    },
+    _slalomBucketLabel(b) {
+      const div = b && b.divisionName ? String(b.divisionName) : "";
+      const rac = b && b.raceName ? String(b.raceName) : "";
+      const ini = b && b.initialName ? String(b.initialName) : "";
+      return `${div} ${rac} – ${ini}`;
+    },
+    _useSlalomBucket(key) {
+      const b = this.slalomBucketMap[key];
+      if (!b) return;
+
+      this.teams = (b.teams || []).map((t) => ({ ...t }));
+      this.titleCategories = this._slalomBucketLabel(b);
+
+      localStorage.setItem("currentSlalomBucketKey", key);
+
+      try {
+        const raw = localStorage.getItem("raceStartPayload") || "{}";
+        const obj = JSON.parse(raw || "{}") || {};
+        obj.bucket =
+          obj.bucket && typeof obj.bucket === "object" ? obj.bucket : {};
+        obj.bucket.eventId = String(b.eventId || "");
+        obj.bucket.initialId = String(b.initialId || "");
+        obj.bucket.raceId = String(b.raceId || "");
+        obj.bucket.divisionId = String(b.divisionId || "");
+        obj.bucket.eventName = "SLALOM";
+        obj.bucket.initialName = String(b.initialName || "");
+        obj.bucket.raceName = String(b.raceName || "");
+        obj.bucket.divisionName = String(b.divisionName || "");
+        localStorage.setItem("raceStartPayload", JSON.stringify(obj));
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
+
+      this.assignRanks(this.teams);
+    },
+    assignRanks(teams) {
+      // Rank teams based on their best times (use calculateBestTime for each team)
+      teams.forEach((team) => {
+        const bestTime = this.calculateBestTime(team);
+        team.bestTime = bestTime; // Store the best time in the team object
+      });
+
+      // Sort teams by best time in ascending order (lower time is better)
+      teams.sort((a, b) => {
+        const timeA = hmsToMs(a.bestTime); // Convert best time to milliseconds for comparison
+        const timeB = hmsToMs(b.bestTime);
+        return timeA - timeB; // Sort from fastest to slowest
+      });
+
+      // Assign ranks based on sorted order
+      teams.forEach((team, index) => {
+        team.rank = index + 1; // Rank starts from 1, hence add 1
+      });
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1001,26 +1260,29 @@ export default {
     sessionOptions(team) {
       return team.sessions.map((_, i) => ({ text: `Run ${i + 1}`, value: i }));
     },
-    currentSession(team) {
-      const idx =
-        this.selectedSession[team._id] != null
-          ? this.selectedSession[team._id]
-          : 0;
-      const s = team.sessions[idx] || {};
-      if (
-        !Array.isArray(s.penalties) ||
-        s.penalties.length !== this.SLALOM_GATES.length
-      ) {
-        const need = this.SLALOM_GATES.length;
-        const a = Array.isArray(s.penalties) ? s.penalties.slice() : [];
-        while (a.length < need) a.push(0);
-        if (a.length > need) a.length = need;
-        this.$set(s, "penalties", a);
-      }
-      if (s.startPenalty == null) this.$set(s, "startPenalty", 0);
-      if (s.finishPenalty == null) this.$set(s, "finishPenalty", 0);
-      return s;
-    },
+    // Modify currentSession to handle undefined cases
+   currentSession(team) {
+  const idx =
+    this.selectedSession[team._id] != null ? this.selectedSession[team._id] : 0;
+
+  // Safeguard: Ensure the session is defined
+  const session = team.sessions && team.sessions[idx] ? team.sessions[idx] : {}; // Default to empty object if session is undefined
+
+  // Ensure penalties is always an array
+  const need = this.SLALOM_GATES.length;
+  let penalties = Array.isArray(session.penalties) ? session.penalties : [];
+  while (penalties.length < need) penalties.push(0); // Ensure enough penalties
+  if (penalties.length > need) penalties.length = need; // Ensure no more penalties than needed
+
+  // Safeguard: Ensure startPenalty and finishPenalty are defined
+  session.startPenalty = session.startPenalty != null ? session.startPenalty : 0;
+  session.finishPenalty = session.finishPenalty != null ? session.finishPenalty : 0;
+
+  // Set the penalties in the session object
+  session.penalties = penalties;
+
+  return session;
+},
 
     /** === Perhitungan penalty/time === */
     recalcSession(s) {
@@ -1240,6 +1502,16 @@ export default {
 </script>
 
 <style scoped>
+/* Select block */
+.toolbar-select {
+  min-width: 260px;
+  flex: 1 1 260px; /* bisa melebar di layar kecil */
+}
+.toolbar-select__control {
+  border-radius: 10px;
+  cursor: pointer;
+}
+
 /* ---- Styling utk penalty section select ---- */
 .small-select {
   border-radius: 12px;

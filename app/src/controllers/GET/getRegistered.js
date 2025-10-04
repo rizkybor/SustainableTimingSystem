@@ -145,7 +145,7 @@ async function getRegisteredSlalom(filters = {}) {
     const col = db.collection("teamsRegisteredCollection");
 
     // query dasar (wajib DRR)
-    const q = { eventName: "DRR" };
+    const q = { eventName: "SLALOM" };
 
     if (!filters.eventId) {
       return { ok: false, error: "eventId is required" };

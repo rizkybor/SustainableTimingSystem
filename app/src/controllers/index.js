@@ -42,6 +42,7 @@ async function getDb() {
           err && typeof err === "object" && err.message
             ? err.message
             : String(err);
+        console.error("❌ Mongo connect failed:", msg);
         // reset state supaya percobaan selanjutnya bisa create client baru
         client = undefined;
         db = undefined;

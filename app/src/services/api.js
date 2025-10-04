@@ -1,14 +1,12 @@
-// default dari .env aktif
-const DEFAULT_CONFIG = {
-  ONLINE: process.env.VUE_APP_RT_URL || "https://sts-racehub.onrender.com",
-  LAN: "http://27.3.82.50:5050",
-  OFFLINE: "http://localhost:4000"
-};
+import axios from 'axios';
 
-// Simpan default ini dulu ke localStorage (hanya jika belum ada)
-try {
-  if (!localStorage.getItem("network_urls")) {
-    localStorage.setItem("network_urls", JSON.stringify(DEFAULT_CONFIG));
-    localStorage.setItem("network_base_url", DEFAULT_CONFIG.ONLINE);
-  }
-} catch (e) {}
+export async function createApi() {
+  // ambil pilihan endpoint saat ini
+  const { apiBase } = await window.netcfg.get();
+  const instance = axios.create({
+    baseURL: apiBase,
+    timeout: 8000,
+  });
+  // interceptor dsb di sini…
+  return instance;
+}

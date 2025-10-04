@@ -21,6 +21,13 @@ function expose(key, api) {
   }
 }
 
+
+contextBridge.exposeInMainWorld('netcfg', {
+  get: () => ipcRenderer.invoke('network:get'),
+  set: (partial) => ipcRenderer.invoke('network:set', partial),
+  refresh: () => ipcRenderer.invoke('network:refresh'),
+});
+
 expose("app", {
   exit: () => ipcRenderer.invoke("app:exit"),
   closeWindow: () => ipcRenderer.invoke("app:close-window"),

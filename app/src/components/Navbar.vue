@@ -80,17 +80,10 @@
 import { lock } from "@/utils/auth";
 import { log } from "@/utils/logger";
 
-function getIpc() {
-  try {
-    if (typeof window !== "undefined" && window.require) {
-      var e = window.require("electron");
-      if (e && e.ipcRenderer) return e.ipcRenderer;
-    }
-  } catch (e) {
-    log.error(e);
-  }
-  return null;
-}
+// map UI → mode di main process
+const toCore = { ONLINE: "online", LAN: "lan", OFFLINE: "auto" };
+// map core → UI
+const fromCore = { online: "ONLINE", lan: "LAN", auto: "OFFLINE" };
 
 export default {
   name: "SustainableTimingSystemRaftingNavbar",
@@ -98,6 +91,7 @@ export default {
   data() {
     return {
       mode: localStorage.getItem("sts_network_mode") || "ONLINE",
+      active: { apiBase: "-", realtime: "-", coreMode: "online" },
       urls: {},
     };
   },
@@ -110,64 +104,94 @@ export default {
       );
     },
     modeLabel() {
-      switch (this.mode) {
-        case "ONLINE":
-          return "Online";
-        case "LAN":
-          return "LAN";
-        case "OFFLINE":
-          return "Offline";
-        default:
-          return "Unknown";
-      }
+      return this.mode === "ONLINE"
+        ? "Online"
+        : this.mode === "LAN"
+        ? "LAN"
+        : this.mode === "OFFLINE"
+        ? "Offline"
+        : "Unknown";
     },
     statusDotClass() {
-      switch (this.mode) {
-        case "ONLINE":
-          return "bg-success";
-        case "LAN":
-          return "bg-warning";
-        case "OFFLINE":
-          return "bg-secondary";
-        default:
-          return "bg-secondary";
-      }
+      return this.mode === "ONLINE"
+        ? "bg-success"
+        : this.mode === "LAN"
+        ? "bg-warning"
+        : "bg-secondary";
     },
     tooltipNetwork() {
-      const urls = JSON.parse(localStorage.getItem("network_urls")) || {};
-      const current = (this.mode === "LAN" && urls.LAN) ||
-        (this.mode === "OFFLINE" && urls.OFFLINE) ||
-        urls.ONLINE || { base: "-", realtime: "-" };
+      const ls = JSON.parse(localStorage.getItem("network_urls") || "{}");
+      const lsProfile =
+        (this.mode === "LAN" && ls.LAN) ||
+        (this.mode === "OFFLINE" && ls.OFFLINE) ||
+        ls.ONLINE || { base: "-", realtime: "-" };
 
-      return `
-      <div style='font-size: 0.85rem; line-height: 1.3'>
-        <strong>${this.modeLabel} Mode</strong><br>
-        🌐 <b>Base URL:</b> ${current.base || "-"}<br>
-        🔄 <b>Realtime URL:</b> ${current.realtime || "-"}
-      </div>
-    `;
+      const base = this.active.apiBase || lsProfile.base || "-";
+      const rt = this.active.realtime || lsProfile.realtime || "-";
+
+      return (
+        "<div style='font-size: 0.85rem; line-height: 1.3'>" +
+        "<strong>" + this.modeLabel + " Mode</strong><br>" +
+        "🌐 <b>Base URL:</b> " + base + "<br>" +
+        "🔄 <b>Realtime URL:</b> " + rt +
+        "</div>"
+      );
     },
   },
 
   async mounted() {
-    const ipc = getIpc();
-    if (!ipc) {
-      log.error("ipcRenderer tidak tersedia (sedang run di web serve?)");
-    } else {
+    // Cek ketersediaan IPC aman (tanpa optional chaining)
+    const hasIpcGet =
+      typeof window !== "undefined" &&
+      window.netcfg &&
+      typeof window.netcfg.get === "function";
+
+    if (hasIpcGet) {
       try {
-        const res = await ipc.invoke("network-config:map");
-        if (res && res.ok) {
-          localStorage.setItem("network_urls", JSON.stringify(res.data));
-          this.urls = res.data;
-        } else {
-          log.error("network-config:map gagal:", res && res.error);
+        const st = await window.netcfg.get(); // { mode, apiBase, realtime, config }
+        this.mode = fromCore[st.mode] || this.mode;
+        this.active = {
+          apiBase: st.apiBase,
+          realtime: st.realtime || "-",
+          coreMode: st.mode,
+        };
+
+        localStorage.setItem("sts_network_mode", this.mode);
+        localStorage.setItem("network_base_url", st.apiBase || "");
+        localStorage.setItem("network_realtime_url", st.realtime || "");
+
+        // map config tanpa optional chaining
+        if (st.config) {
+          const mapped = {
+            ONLINE: {
+              base:
+                (st.config.api && st.config.api.online) || "",
+              realtime:
+                (st.config.realtime && st.config.realtime.online) || "",
+            },
+            LAN: {
+              base:
+                (st.config.api && st.config.api.lan) || "",
+              realtime:
+                (st.config.realtime && st.config.realtime.lan) || "",
+            },
+            OFFLINE: {
+              base:
+                (st.config.api && st.config.api.lan) || "",
+              realtime:
+                (st.config.realtime && st.config.realtime.lan) || "",
+            },
+          };
+          localStorage.setItem("network_urls", JSON.stringify(mapped));
+          this.urls = mapped;
         }
       } catch (e) {
-        log.error("❌ IPC error:", e);
+        log.error("netcfg.get() gagal:", e && e.message ? e.message : e);
+        this.applyNetworkMode(this.mode);
       }
+    } else {
+      this.applyNetworkMode(this.mode);
     }
-
-    this.applyNetworkMode(this.mode);
   },
 
   methods: {
@@ -199,27 +223,66 @@ export default {
 
     applyNetworkMode(mode) {
       try {
-        const urls =
-          JSON.parse(localStorage.getItem("network_urls")) || this.urls || {};
+        const urls = JSON.parse(localStorage.getItem("network_urls") || "{}") || {};
         const fallback = urls.ONLINE || { base: "", realtime: "" };
         const profile =
           (mode === "LAN" && urls.LAN) ||
           (mode === "OFFLINE" && urls.OFFLINE) ||
           (mode === "ONLINE" && urls.ONLINE) ||
           fallback;
+
         localStorage.setItem("sts_network_mode", mode);
         localStorage.setItem("network_base_url", profile.base || "");
         localStorage.setItem("network_realtime_url", profile.realtime || "");
+
+        this.active = {
+          apiBase: profile.base || "-",
+          realtime: profile.realtime || "-",
+          coreMode: toCore[mode] || "online",
+        };
       } catch (e) {
         log.error(e);
       }
     },
 
-    setMode(nextMode) {
+    async setMode(nextMode) {
       if (this.mode === nextMode) return;
+
+      const hasIpcSet =
+        typeof window !== "undefined" &&
+        window.netcfg &&
+        typeof window.netcfg.set === "function";
+
+      if (hasIpcSet) {
+        try {
+          const core = toCore[nextMode] || "online";
+          const st = await window.netcfg.set({ mode: core }); // { mode, apiBase, realtime, config }
+          this.mode = fromCore[st.mode] || nextMode;
+
+          this.active = {
+            apiBase: st.apiBase,
+            realtime: st.realtime || "-",
+            coreMode: st.mode,
+          };
+          localStorage.setItem("sts_network_mode", this.mode);
+          localStorage.setItem("network_base_url", st.apiBase || "");
+          localStorage.setItem("network_realtime_url", st.realtime || "");
+
+          if (this.$bvToast) {
+            this.$bvToast.toast(
+              "Mode jaringan diubah ke " + this.modeLabel + " (" + (st.apiBase || "") + ")",
+              { title: "Pengaturan Jaringan", variant: "info", solid: true, autoHideDelay: 2200 }
+            );
+          }
+          return;
+        } catch (e) {
+          log.error("netcfg.set() gagal:", e && e.message ? e.message : e);
+        }
+      }
+
+      // Fallback (tanpa IPC)
       this.mode = nextMode;
       this.applyNetworkMode(nextMode);
-
       if (this.$bvToast) {
         this.$bvToast.toast("Mode jaringan diubah ke " + this.modeLabel, {
           title: "Pengaturan Jaringan",

@@ -2,6 +2,7 @@
 module.exports = {
   pluginOptions: {
     electronBuilder: {
+      extraResources: [{ from: "public/defaults", to: "defaults" }],
       preload: "src/preload.js",
       nodeIntegration: true,
       externals: [

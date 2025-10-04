@@ -1,42 +1,91 @@
 "use strict";
 
-import { app, protocol, BrowserWindow, ipcMain, nativeImage } from "electron";
+import { app, protocol, BrowserWindow, ipcMain, nativeImage, screen } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 import path from "path";
 import { pathToFileURL } from "url";
 
+
 const isDev = !app.isPackaged;
-const DEV_URL =
-  process.env.WEBPACK_DEV_SERVER_URL ||  
-  process.env.VUE_APP_BASE_URL
+const DEV_URL = process.env.WEBPACK_DEV_SERVER_URL || process.env.VUE_APP_BASE_URL || "";
+
+let splash = null;
+let mainWindow = null;
 
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 setupIPCMainHandlers();
 
-protocol.registerSchemesAsPrivileged([
-  { scheme: "app", privileges: { secure: true, standard: true } },
-]);
+protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { secure: true, standard: true } }]);
 
 function resolveIcon() {
-  const file = process.platform === "win32" ? "icon.ico" : "icon.png";
+  let file = process.platform === "win32" ? "icon.ico" : "icon.png";
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "assets", "icons", file);
+  } else {
+    return path.join(__dirname, "../src/assets/icons", file);
   }
-  return path.join(__dirname, "../src/assets/icons", file);
+}
+
+function centerWindow(win) {
+  if (!win) return;
+  const winBounds = win.getBounds();
+  const cursorPoint = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursorPoint);
+  const wa = display.workArea;
+  const x = Math.round(wa.x + (wa.width  - winBounds.width)  / 2);
+  const y = Math.round(wa.y + (wa.height - winBounds.height) / 2);
+  win.setPosition(x, y);
 }
 
 function setDockIconIfMac() {
-  if (process.platform !== "darwin") return;
-  const pngPath = path.join(__dirname, "../src/assets/icons/icon.png");
-  const img = nativeImage.createFromPath(pngPath);
-  if (!img.isEmpty()) app.dock.setIcon(img);
+  if (process.platform === "darwin") {
+    const pngPath = path.join(__dirname, "../src/assets/icons/icon.png");
+    const img = nativeImage.createFromPath(pngPath);
+    if (!img.isEmpty()) {
+      app.dock.setIcon(img);
+    }
+  }
 }
 
-async function createWindow() {
-  const preloadPath = path.join(__dirname, "preload.js");
+function createSplash(preloadPath) {
+  splash = new BrowserWindow({
+    width: 500,
+    height: 200,
+    useContentSize: true,     
+    show: false,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    center: false,           
+    backgroundColor: "#00000000",
+    icon: resolveIcon(),
+    webPreferences: {
+      preload: preloadPath,
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
 
-  const win = new BrowserWindow({
+  let splashUrl = "";
+  if (isDev) {
+    splashUrl = `${DEV_URL.replace(/\/$/, "")}/splash.html`;
+  } else {
+    createProtocol("app");
+    splashUrl = "app://./splash.html";
+  }
+  centerWindow(splash);
+
+  splash.loadURL(splashUrl);
+  splash.once("ready-to-show", function () {
+    splash.webContents.setZoomFactor(0.7);
+    centerWindow(splash);
+    splash.show();
+  });
+}
+
+function createMain(preloadPath) {
+  mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
     show: false,
@@ -48,77 +97,69 @@ async function createWindow() {
     },
   });
 
-  const splash = new BrowserWindow({
-    width: 500,
-    height: 200,
-    show: false,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: false,
-    icon: resolveIcon(),
-    webPreferences: {
-      preload: preloadPath,
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  });
-
-  // --- SPLASH ---
+  let mainUrl = "";
   if (isDev) {
-    await splash.loadURL(pathToFileURL(path.join(__dirname, "../public/splash.html")).toString());
+    mainUrl = DEV_URL;
   } else {
     createProtocol("app");
-    await splash.loadURL("app://./splash.html");
-  }
-  splash.once("ready-to-show", () => splash.show());
-
-  setTimeout(() => {
-    try {
-      splash.close();
-    } catch {}
-    win.center();
-    win.show();
-  }, 7000);
-
-
-// --- MAIN ---
-  if (isDev) {
-    await win.loadURL(DEV_URL);
-    if (!process.env.IS_TEST) win.webContents.openDevTools();
-  } else {
-    createProtocol("app");
-    await win.loadURL("app://./index.html");
+    mainUrl = "app://./index.html";
   }
 
-  // tampilkan main ketika siap, lalu tutup splash
-  win.once("ready-to-show", () => {
-    if (!splash.isDestroyed()) splash.close();
-    win.center();
-    win.show();
-  });
-
-  // logging opsional
-  win.webContents.on("did-fail-load", (e, code, desc, url) => {
-    console.error("❌ did-fail-load", code, desc, url);
-  });
-  win.webContents.on("render-process-gone", (e, details) => {
-    console.error("⚠️ Renderer crashed:", details);
-  });
+  mainWindow.loadURL(mainUrl);
 }
 
-// IPC
-ipcMain.handle("app:exit", () => app.quit());
+function bootApp() {
+  const preloadPath = path.join(__dirname, "preload.js");
 
-// Lifecycle
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  createSplash(preloadPath);
+  createMain(preloadPath);
+
+  const splashStart = Date.now();
+  const MIN_SPLASH_MS = 5000;
+  const MAX_SPLASH_MS = 15000;
+
+  mainWindow.once("ready-to-show", function () {
+    const elapsed = Date.now() - splashStart;
+    const waitTime = Math.max(0, MIN_SPLASH_MS - elapsed);
+
+    setTimeout(function () {
+      mainWindow.center();
+      mainWindow.show();
+
+      if (splash && !splash.isDestroyed()) {
+        splash.close();
+      }
+    }, waitTime);
+  });
+
+  setTimeout(function () {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.center();
+      mainWindow.show();
+    }
+    if (splash && !splash.isDestroyed()) {
+      splash.close();
+    }
+  }, MAX_SPLASH_MS);
+}
+
+ipcMain.handle("app:exit", function () {
+  app.quit();
 });
 
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.on("window-all-closed", function () {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
 
-app.on("ready", async () => {
+app.on("activate", function () {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    bootApp();
+  }
+});
+
+app.on("ready", async function () {
   if (isDev && !process.env.IS_TEST) {
     try {
       await installExtension(VUEJS_DEVTOOLS);
@@ -127,16 +168,19 @@ app.on("ready", async () => {
     }
   }
   setDockIconIfMac();
-  createWindow();
+  bootApp();
 });
 
-// graceful-exit dev
 if (isDev) {
   if (process.platform === "win32") {
-    process.on("message", (data) => {
-      if (data === "graceful-exit") app.quit();
+    process.on("message", function (data) {
+      if (data === "graceful-exit") {
+        app.quit();
+      }
     });
   } else {
-    process.on("SIGTERM", () => app.quit());
+    process.on("SIGTERM", function () {
+      app.quit();
+    });
   }
 }

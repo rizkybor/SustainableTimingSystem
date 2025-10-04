@@ -2,9 +2,21 @@
   <head>
     <meta charset="UTF-8" />
     <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden; /* ⬅️ hindari scroll */
+      }
+
       body {
         background-color: #f9f9fa;
         background-image: url("assets/gif/sts.gif");
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: contain;
+        height: 100%;
+        margin: 0;
       }
 
       .flex {
@@ -58,9 +70,10 @@
     <h3
       style="
         display: flex;
+        margin-top: 10px;
         justify-content: center;
         font-family: 'Courier New', Courier, monospace;
-        font-size: 10px;
+        font-size: 14px;
         color: rgb(49, 111, 185);
       "
     >
@@ -73,7 +86,7 @@
         align-items: end;
         justify-content: center;
         font-family: 'Courier New', Courier, monospace;
-        font-size: 10px;
+        font-size: 12px;
         color: rgb(49, 111, 185);
       "
     >
@@ -100,7 +113,7 @@
         right: 0;
         text-align: center;
         font-family: 'Courier New', Courier, monospace;
-        font-size: 10px;
+        font-size: 12px;
         color: rgb(49, 111, 185);
       "
     >

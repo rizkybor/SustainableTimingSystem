@@ -116,7 +116,7 @@
 
           <tr v-if="!draft && !rows.length">
             <td colspan="4" class="text-center text-muted py-3">
-              Belum ada tim pada kombinasi ini.
+              There are no teams in this combination yet.
             </td>
           </tr>
         </tbody>

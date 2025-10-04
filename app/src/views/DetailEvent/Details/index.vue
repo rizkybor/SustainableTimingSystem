@@ -201,7 +201,7 @@
           @click="handleStartRaceAll()"
         >
           <Icon icon="mdi:flag-variant" class="mr-2" />
-          Start Race
+          START {{ this.raceActive.selected.name }} RACE
         </b-button>
       </div>
     </b-container>

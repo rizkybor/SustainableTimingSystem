@@ -1459,7 +1459,6 @@ export default {
       try {
         const docs = this.buildDocs();
         // Debug optional
-        // console.log("DEBUG saveResult (Slalom):", docs);
 
         if (!Array.isArray(docs) || docs.length === 0) {
           ipcRenderer.send("get-alert", {

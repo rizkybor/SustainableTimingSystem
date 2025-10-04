@@ -26,15 +26,6 @@ import Navbar from "./components/Navbar.vue";
 export default {
   name: "app",
   components: { Navbar, FooterVue },
-  // computed: {
-  //   showNavbar() {
-  //     const currentPath = this.$route.path;
-  //     console.log(currentPath,'<<<< ROUTE')
-  //     return !(
-  //       currentPath.includes("sprint-race") || currentPath.includes("slalom")
-  //     );
-  //   },
-  // },
 };
 </script>
 

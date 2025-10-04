@@ -390,28 +390,6 @@ export default {
 
     onUpdateJudgeSettings(payload) {
       logger.info("✅ Data payload:", payload);
-      // if (payload && payload.settings) this.raceSettings = payload.settings;
-
-      // if (typeof window !== "undefined" && window.ipcRenderer) {
-      //   window.ipcRenderer.send("race-settings:upsert", payload);
-
-      //   // sekali saja, tunggu reply lalu lepas listener
-      //   const handler = (_event, res) => {
-      //     if (res && res.ok) {
-      //       console.log("✅ Race settings updated in DB:", res);
-      //     } else {
-      //       console.error(
-      //         "❌ Failed to update race settings:",
-      //         res && res.error
-      //       );
-      //     }
-      //     window.ipcRenderer.removeListener(
-      //       "race-settings:upsert-reply",
-      //       handler
-      //     );
-      //   };
-      //   window.ipcRenderer.on("race-settings:upsert-reply", handler);
-      // }
     },
 
     async selectCategory(c) {

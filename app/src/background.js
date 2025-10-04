@@ -11,7 +11,6 @@ const DEV_URL =
   process.env.WEBPACK_DEV_SERVER_URL ||  
   process.env.VUE_APP_BASE_URL
 
-  console.log(DEV_URL,'<<<< cek')
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 setupIPCMainHandlers();
 

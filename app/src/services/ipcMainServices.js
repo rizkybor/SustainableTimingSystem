@@ -302,7 +302,6 @@ function setupIPCMainHandlers() {
   });
 
   // LOAD SPRINT RESULT
-  // main process
   ipcMain.on("get-sprint-result", async (event, query = {}) => {
     try {
       const data = await getSprintResult(query); // << kirim objek, bukan eventId doang

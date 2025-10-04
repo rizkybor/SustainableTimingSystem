@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-const enabled = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "lan";
+const enabled = process.env.VUE_APP_ENV === "development" || process.env.VUE_APP_ENV === "lan";
 
 export const logger = {
   info:  (...args) => enabled && console.info(...args),

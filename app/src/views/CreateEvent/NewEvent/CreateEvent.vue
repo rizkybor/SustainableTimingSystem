@@ -591,7 +591,7 @@ export default {
           await window.cloud.deleteImage(pub);
         }
       } catch (e) {
-        if (process.env.NODE_ENV !== "production") {
+        if (process.env.VUE_APP_ENV !== "production") {
           // eslint-disable-next-line no-console
           console.warn("Failed to delete from Cloudinary:", e);
         }

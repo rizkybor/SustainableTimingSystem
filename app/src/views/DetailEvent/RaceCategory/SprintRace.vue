@@ -206,6 +206,14 @@
             <button
               type="button"
               class="btn-action btn-secondary mr-2"
+              @click="previewResult"
+            >
+              <Icon icon="icon-park-outline:save" /> Preview JSON
+            </button>
+
+            <button
+              type="button"
+              class="btn-action btn-secondary mr-2"
               @click="saveResult"
             >
               <Icon icon="icon-park-outline:save" /> Save Result
@@ -1351,8 +1359,11 @@ export default {
       const sec = Math.floor((diff / 1000) % 60);
       const min = Math.floor((diff / (1000 * 60)) % 60);
       const hr = Math.floor(diff / (1000 * 60 * 60));
-      const pad = (n) => (n < 10 ? "0" + n : "" + n);
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${ms}`;
+
+      const pad2 = (n) => String(n).padStart(2, "0");
+      const pad3 = (n) => String(n).padStart(3, "0"); // ⬅️ penting
+
+      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`; // ⬅️ 3 digit
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -1436,6 +1447,39 @@ export default {
           });
         }
       });
+    },
+
+    previewResult() {
+      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+      if (!Array.isArray(clean) || clean.length === 0) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Belum ada data.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+      const bucket = getBucket();
+      const must = ["eventId", "initialId", "raceId", "divisionId"];
+      const missing = must.filter((k) => !bucket[k]);
+      if (missing.length) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: `Bucket fields missing: ${missing.join(", ")}`,
+          message: "Failed",
+        });
+        return;
+      }
+
+      const docs = buildResultDocs(clean, bucket);
+      const jsonStr = JSON.stringify(docs, null, 2);
+
+      const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
+  <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
+  pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
+  <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
+      const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+      window.open(url, "_blank", "width=980,height=700");
     },
   },
 };

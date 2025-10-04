@@ -46,7 +46,7 @@
               <b-dropdown-header disabled> Network Choice </b-dropdown-header>
               <b-dropdown-divider></b-dropdown-divider>
 
-              <b-dropdown-item v-if="isProdEnv" @click="setMode('ONLINE')"
+              <b-dropdown-item v-if="!isDevEnv" @click="setMode('ONLINE')"
                 >🌐 Online (Internet)
               </b-dropdown-item>
               <b-dropdown-item @click="setMode('LAN')"
@@ -87,7 +87,7 @@ function getIpc() {
       if (e && e.ipcRenderer) return e.ipcRenderer;
     }
   } catch (e) {
-    log(e);
+    log.error(e);
   }
   return null;
 }
@@ -106,12 +106,6 @@ export default {
     isDevEnv() {
       return (
         process.env.VUE_APP_ENV === "development" ||
-        process.env.VUE_APP_ENV === "lan"
-      );
-    },
-    isProdEnv() {
-      return (
-        process.env.VUE_APP_ENV === "production" ||
         process.env.VUE_APP_ENV === "lan"
       );
     },
@@ -158,7 +152,7 @@ export default {
   async mounted() {
     const ipc = getIpc();
     if (!ipc) {
-      log("ipcRenderer tidak tersedia (sedang run di web serve?)");
+      log.error("ipcRenderer tidak tersedia (sedang run di web serve?)");
     } else {
       try {
         const res = await ipc.invoke("network-config:map");
@@ -166,10 +160,10 @@ export default {
           localStorage.setItem("network_urls", JSON.stringify(res.data));
           this.urls = res.data;
         } else {
-          log("network-config:map gagal:", res && res.error);
+          log.error("network-config:map gagal:", res && res.error);
         }
       } catch (e) {
-        log("❌ IPC error:", e);
+        log.error("❌ IPC error:", e);
       }
     }
 
@@ -187,7 +181,7 @@ export default {
         lock();
         this.$router.replace("/unlock");
       } catch (e) {
-        log(e);
+        log.error(e);
       }
     },
 
@@ -199,7 +193,7 @@ export default {
           window.close();
         }
       } catch (e) {
-        log(e);
+        log.error(e);
       }
     },
 
@@ -217,7 +211,7 @@ export default {
         localStorage.setItem("network_base_url", profile.base || "");
         localStorage.setItem("network_realtime_url", profile.realtime || "");
       } catch (e) {
-        log(e);
+        log.error(e);
       }
     },
 

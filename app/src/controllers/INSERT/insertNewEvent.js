@@ -1,5 +1,5 @@
 const { getDb } = require("../index");
-const { ObjectId } = require('mongodb');
+const { ObjectId } = require("mongodb");
 
 // Insert new event
 async function insertNewEvent(payload) {
@@ -256,11 +256,6 @@ async function insertSprintResult(payload) {
 
 async function insertSlalomResult(payload) {
   try {
-    console.log("[DAO] insertSlalomResult called", {
-      isArray: Array.isArray(payload),
-      length: (payload && payload.length) || 0,
-    });
-
     const db = await getDb();
     const col = db.collection("temporarySlalomResult");
 
@@ -583,7 +578,7 @@ async function insertSlalomResult(payload) {
           initialName: meta.initialName,
           raceName: meta.raceName,
           divisionName: meta.divisionName,
-          teams: mergedArray, // <== simpan di TEAMS
+          teams: mergedArray,
           updatedAt: now,
         },
         $setOnInsert: { createdAt: now },
@@ -591,16 +586,6 @@ async function insertSlalomResult(payload) {
 
       var res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
-      console.log(
-        "[DAO] upsert bucket:",
-        filter,
-        "-> matched:",
-        res.matchedCount,
-        "modified:",
-        res.modifiedCount,
-        "upserted:",
-        res.upsertedCount || 0
-      );
     }
 
     return { ok: true, upsertedCount: upsertedCount };
@@ -656,7 +641,6 @@ async function insertDrrResult(payload) {
     console.error("Error inserting sprint result:", error);
     return { ok: false, error: error.message };
   }
-
 }
 
 async function updateEventPoster(payload) {
@@ -668,7 +652,10 @@ async function updateEventPoster(payload) {
       return { ok: false, error: "updateEventPoster: _id is required" };
     }
     if (payload.poster === null || payload.poster === undefined) {
-      return { ok: false, error: "updateEventPoster: poster object is required" };
+      return {
+        ok: false,
+        error: "updateEventPoster: poster object is required",
+      };
     }
 
     var idStr = String(payload._id).trim();
@@ -689,7 +676,7 @@ async function updateEventPoster(payload) {
       bytes: null,
       format: "",
       version: null,
-      created_at: ""
+      created_at: "",
     };
 
     if (p !== null && p !== undefined) {
@@ -705,13 +692,25 @@ async function updateEventPoster(payload) {
       if (p.folder !== null && p.folder !== undefined) {
         posterDoc.folder = String(p.folder);
       }
-      if (p.width !== null && p.width !== undefined && Number.isFinite(p.width)) {
+      if (
+        p.width !== null &&
+        p.width !== undefined &&
+        Number.isFinite(p.width)
+      ) {
         posterDoc.width = Number(p.width);
       }
-      if (p.height !== null && p.height !== undefined && Number.isFinite(p.height)) {
+      if (
+        p.height !== null &&
+        p.height !== undefined &&
+        Number.isFinite(p.height)
+      ) {
         posterDoc.height = Number(p.height);
       }
-      if (p.bytes !== null && p.bytes !== undefined && Number.isFinite(p.bytes)) {
+      if (
+        p.bytes !== null &&
+        p.bytes !== undefined &&
+        Number.isFinite(p.bytes)
+      ) {
         posterDoc.bytes = Number(p.bytes);
       }
       if (p.format !== null && p.format !== undefined) {
@@ -731,9 +730,9 @@ async function updateEventPoster(payload) {
     var updateDoc = {
       $set: {
         poster: posterDoc,
-        poster_url: posterDoc.secure_url,   // URL siap pakai
-        updatedAt: new Date()
-      }
+        poster_url: posterDoc.secure_url, // URL siap pakai
+        updatedAt: new Date(),
+      },
     };
 
     var res = await col.updateOne({ _id: oid }, updateDoc);
@@ -741,30 +740,29 @@ async function updateEventPoster(payload) {
     var matched = 0;
     var modified = 0;
     if (res !== null && res !== undefined) {
-      if (typeof res.matchedCount === 'number') matched = res.matchedCount;
-      if (typeof res.modifiedCount === 'number') modified = res.modifiedCount;
+      if (typeof res.matchedCount === "number") matched = res.matchedCount;
+      if (typeof res.modifiedCount === "number") modified = res.modifiedCount;
     }
 
     return {
       ok: true,
       matchedCount: matched,
       modifiedCount: modified,
-      poster_url: posterDoc.secure_url
+      poster_url: posterDoc.secure_url,
     };
   } catch (error) {
-    var msg = 'Unknown error';
+    var msg = "Unknown error";
     if (error !== null && error !== undefined) {
-      if (typeof error.message === 'string') msg = error.message;
+      if (typeof error.message === "string") msg = error.message;
     }
     return { ok: false, error: msg };
   }
 }
-
 
 module.exports = {
   insertNewEvent,
   insertSprintResult,
   insertSlalomResult,
   insertDrrResult,
-  updateEventPoster
+  updateEventPoster,
 };

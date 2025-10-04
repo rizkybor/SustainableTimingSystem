@@ -81,6 +81,7 @@ export default {
   methods: {
     submit() {
       this.error = "";
+      console.log(this.key, this.expectedKey)
       if (this.key !== this.expectedKey) {
         this.error = "Key salah.";
         setTimeout(() => {

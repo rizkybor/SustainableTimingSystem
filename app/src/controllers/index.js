@@ -35,7 +35,6 @@ async function getDb() {
       .connect()
       .then(() => {
         db = client.db("sustainabledb_atlas");
-        console.log("✅ Mongo connected to:", db.databaseName);
         return db;
       })
       .catch((err) => {
@@ -43,7 +42,6 @@ async function getDb() {
           err && typeof err === "object" && err.message
             ? err.message
             : String(err);
-        console.error("❌ Mongo connect failed:", msg);
         // reset state supaya percobaan selanjutnya bisa create client baru
         client = undefined;
         db = undefined;

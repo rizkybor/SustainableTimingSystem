@@ -59,6 +59,7 @@
           Race Settings
         </b-button>
       </div>
+
       <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR) -->
       <h5 class="font-weight-bold mb-3">Race Categories</h5>
       <b-row>
@@ -191,6 +192,17 @@
 
       <div v-if="!anyPanelShown" class="text-center text-muted py-5">
         Belum ada konfigurasi divisi/race untuk event ini.
+      </div>
+
+      <div class="d-flex align-items-center justify-content-end mt-5 mb-2">
+        <b-button
+          variant="primary"
+          class="btn-add"
+          @click="handleStartRaceAll()"
+        >
+          <Icon icon="mdi:flag-variant" class="mr-2" />
+          START {{ this.raceActive.selected.name }} RACE
+        </b-button>
       </div>
     </b-container>
 
@@ -390,28 +402,6 @@ export default {
 
     onUpdateJudgeSettings(payload) {
       logger.info("✅ Data payload:", payload);
-      // if (payload && payload.settings) this.raceSettings = payload.settings;
-
-      // if (typeof window !== "undefined" && window.ipcRenderer) {
-      //   window.ipcRenderer.send("race-settings:upsert", payload);
-
-      //   // sekali saja, tunggu reply lalu lepas listener
-      //   const handler = (_event, res) => {
-      //     if (res && res.ok) {
-      //       console.log("✅ Race settings updated in DB:", res);
-      //     } else {
-      //       console.error(
-      //         "❌ Failed to update race settings:",
-      //         res && res.error
-      //       );
-      //     }
-      //     window.ipcRenderer.removeListener(
-      //       "race-settings:upsert-reply",
-      //       handler
-      //     );
-      //   };
-      //   window.ipcRenderer.on("race-settings:upsert-reply", handler);
-      // }
     },
 
     async selectCategory(c) {
@@ -1145,6 +1135,18 @@ export default {
       const path = this._mapRaceToPath(eventName);
       this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
     },
+
+    handleStartRaceAll() {
+      let eventName = this.raceActive.selected.name;
+      ipcRenderer.send("get-alert-saved", {
+        type: "info",
+        message: "Start Race",
+      });
+
+      // navigasi ke halaman race
+      const path = this._mapRaceToPath(eventName);
+      this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+    },
   },
 };
 </script>
@@ -1354,8 +1356,17 @@ export default {
   border: 1px solid #cfd8e6;
   color: #1c4c7a;
   font-weight: 700;
-  border-radius: 10px;
-  padding: 8px 14px;
+  border-radius: 15px;
+  padding: 18px 44px;
+}
+
+/* Hover effect */
+.btn-add:hover {
+  background: #f0f8ff; /* biru muda lembut */
+  border-color: #1c4c7a;
+  color: #0d2f4f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
 }
 
 .team-table {

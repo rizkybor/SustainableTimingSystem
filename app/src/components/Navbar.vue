@@ -46,7 +46,7 @@
               <b-dropdown-header disabled> Network Choice </b-dropdown-header>
               <b-dropdown-divider></b-dropdown-divider>
 
-              <b-dropdown-item v-if="isProdEnv" @click="setMode('ONLINE')"
+              <b-dropdown-item v-if="!isDevEnv" @click="setMode('ONLINE')"
                 >🌐 Online (Internet)
               </b-dropdown-item>
               <b-dropdown-item @click="setMode('LAN')"
@@ -106,12 +106,6 @@ export default {
     isDevEnv() {
       return (
         process.env.VUE_APP_ENV === "development" ||
-        process.env.VUE_APP_ENV === "lan"
-      );
-    },
-    isProdEnv() {
-      return (
-        process.env.VUE_APP_ENV === "production" ||
         process.env.VUE_APP_ENV === "lan"
       );
     },

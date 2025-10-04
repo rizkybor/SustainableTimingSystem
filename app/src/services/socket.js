@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
-import { log } from "@/utils/logger";
+import { logger } from "@/utils/logger";
 
 const BROKER_URL =
   process.env.VUE_APP_MODE === "lan"
@@ -16,13 +16,13 @@ export function getSocket() {
     socket = io(BROKER_URL, { auth: { token: TOKEN } });
     socket.on("connect", () => {
       if (process.env.VUE_APP_ENV !== "production") {
-        log.info("[Electron] socket connected:", socket.id);
+        logger.info("[Electron] socket connected:", socket.id);
       }
     });
 
     socket.on("disconnect", () => {
       if (process.env.VUE_APP_ENV !== "production") {
-        log.info("[Electron] socket disconnected");
+        logger.info("[Electron] socket disconnected");
       }
     });
   }

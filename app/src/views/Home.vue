@@ -459,8 +459,8 @@ export default {
     formatDate(inputDate) {
       if (!inputDate) return "-";
 
-      const dt = new Date(inputDate); // langsung parse string "YYYY-MM-DD"
-      if (isNaN(dt)) return "-"; // jaga-jaga kalau input bukan tanggal valid
+      const dt = new Date(inputDate);
+      if (isNaN(dt)) return "-"; 
 
       const monthNames = [
         "Januari",
@@ -488,7 +488,6 @@ export default {
       var self = this;
       setTimeout(function () {
         ipcRenderer.send("get-events");
-        // gunakan once agar listener tidak menumpuk saat HMR
         ipcRenderer.once("get-events-reply", function (_e, data) {
           self.events = Array.isArray(data) ? data : [];
           self.loading = false;
@@ -501,7 +500,6 @@ export default {
         const items =
           res && res.ok && Array.isArray(res.items) ? res.items : [];
 
-        // Group by nameTeam+typeTeam => { name, typeTeam, count }
         const grouped = items.reduce((acc, t) => {
           const name = String(t.nameTeam || "Unknown").trim();
           const typeTeam = String(t.typeTeam || "Unknown").trim();

@@ -20,7 +20,7 @@
             <Icon icon="mdi:podium" class="mr-1" /> Show Result
           </b-button>
 
-          <b-button
+          <!-- <b-button
             size="sm"
             variant="primary"
             class="btn-add"
@@ -28,6 +28,14 @@
           >
             <Icon icon="mdi:flag-variant" class="mr-2" />
             Start Race
+          </b-button> -->
+          <b-button
+            size="sm"
+            variant="primary"
+            class="btn-add"
+            @click="$emit('add-draft')"
+          >
+            <Icon icon="mdi:plus" class="mr-1" /> Add Team
           </b-button>
         </b-col>
       </b-row>
@@ -114,11 +122,11 @@
         </tbody>
       </table>
 
-      <div class="panel-footer">
+      <!-- <div class="panel-footer">
         <b-button variant="light" class="btn-add" @click="$emit('add-draft')">
           <Icon icon="mdi:plus" class="mr-1" /> Add Team
         </b-button>
-      </div>
+      </div> -->
     </div>
   </section>
 </template>

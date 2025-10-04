@@ -914,38 +914,6 @@ export default {
       this.drrBucketOptions = opts;
       this.drrBucketMap = map;
     },
-    buildStaticDrrOptionsFromCatalog(catalog) {
-      const { eventId, divisions, races, initials } = catalog;
-      const opts = [];
-      const map = Object.create(null);
-
-      divisions.forEach((div) => {
-        races.forEach((race) => {
-          initials.forEach((init) => {
-            const key = [eventId, init.id, race.id, div.id]
-              .map(String)
-              .join("|");
-            const label = `${div.name} ${race.name} – ${init.name}`;
-
-            opts.push({ value: key, text: label });
-            map[key] = {
-              eventId,
-              initialId: init.id,
-              raceId: race.id,
-              divisionId: div.id,
-              eventName: "DRR",
-              initialName: init.name,
-              raceName: race.name,
-              divisionName: div.name,
-              teams: [],
-            };
-          });
-        });
-      });
-
-      this.drrBucketOptions = opts;
-      this.drrBucketMap = map;
-    },
     async loadAllDrrBucketsFromDB() {
       try {
         if (typeof ipcRenderer === "undefined") return;

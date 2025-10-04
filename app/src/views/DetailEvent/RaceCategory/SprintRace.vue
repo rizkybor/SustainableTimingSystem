@@ -83,6 +83,23 @@
                   {{ titleCategories || "-" }}
                 </span>
               </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch Sprint Category:"
+                  label-for="sprintBucketSelect"
+                  class="mb-0 toolbar-select"
+                >
+                  <b-form-select
+                    id="sprintBucketSelect"
+                    :options="sprintBucketOptions"
+                    v-model="selectedSprintKey"
+                    @change="onSelectSprintBucket"
+                    class="toolbar-select__control"
+                  />
+                </b-form-group>
+              </div>
             </div>
           </b-col>
 
@@ -356,6 +373,7 @@ import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
+import { logger } from "@/utils/logger";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -545,6 +563,9 @@ export default {
 
   data() {
     return {
+      sprintBucketOptions: [],
+      sprintBucketMap: Object.create(null),
+      selectedSprintKey: "",
       selfSocketId: null,
       selectPath: "",
       baudRate: 9600,
@@ -609,6 +630,64 @@ export default {
   },
 
   computed: {
+    // === SPRINT BUCKET ===
+    currentEventId() {
+      let fromEvent = "";
+      if (
+        this.dataEventSafe &&
+        (this.dataEventSafe._id || this.dataEventSafe.id)
+      ) {
+        fromEvent = String(this.dataEventSafe._id || this.dataEventSafe.id);
+      }
+      let fromRoute = "";
+      if (this.$route && this.$route.params && this.$route.params.id) {
+        fromRoute = String(this.$route.params.id);
+      }
+      let fromBucket = "";
+      const bucket = getBucket();
+      if (bucket && bucket.eventId) fromBucket = String(bucket.eventId);
+
+      return fromEvent || fromRoute || fromBucket || "";
+    },
+
+    divisions() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesDivision)
+      ) {
+        return this.dataEventSafe.categoriesDivision.map((d) => ({
+          id: String(d.value),
+          name: String(d.name),
+        }));
+      }
+      return [];
+    },
+
+    races() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesRace)
+      ) {
+        return this.dataEventSafe.categoriesRace.map((r) => ({
+          id: String(r.value),
+          name: String(r.name),
+        }));
+      }
+      return [];
+    },
+
+    initials() {
+      if (
+        this.dataEventSafe &&
+        Array.isArray(this.dataEventSafe.categoriesInitial)
+      ) {
+        return this.dataEventSafe.categoriesInitial.map((i) => ({
+          id: String(i.value),
+          name: String(i.name),
+        }));
+      }
+      return [];
+    },
     currentDateTime() {
       const d = new Date();
       return (
@@ -673,9 +752,37 @@ export default {
       socket.off("custom:event", onMessage);
     });
 
-    window.addEventListener("scroll", this.handleScroll);
+    // window.addEventListener("scroll", this.handleScroll);
+    // const ok = this.loadFromRaceStartPayload();
+    // if (!ok) await this.checkValueStorage();
+
+    // event details
+    try {
+      const events = localStorage.getItem("eventDetails");
+      this.dataEvent = events ? JSON.parse(events) : {};
+    } catch {
+      this.dataEvent = {};
+    }
+
+    // Tetap coba muat dari payload jika ada (agar tabel tidak kosong)
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
+
+    // === SPRINT BUCKET: bangun opsi & muat teams terdaftar via DB ===
+    this.buildStaticSprintOptions();
+
+    if (this.sprintBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentSprintBucketKey");
+      this.selectedSprintKey =
+        savedKey && this.sprintBucketMap[savedKey]
+          ? savedKey
+          : this.sprintBucketOptions[0].value;
+
+      await this.fetchSprintBucketTeamsByKey(this.selectedSprintKey);
+    } else {
+      // fallback penuh dari eventDetails
+      this.loadAllSprintBucketsFromEvent();
+    }
   },
 
   beforeDestroy() {
@@ -692,6 +799,222 @@ export default {
   },
 
   methods: {
+    // === SPRINT BUCKET ===
+    _sprintBucketKey(b) {
+      const ei = b && b.eventId ? String(b.eventId) : "";
+      const ii = b && b.initialId ? String(b.initialId) : "";
+      const ri = b && b.raceId ? String(b.raceId) : "";
+      const di = b && b.divisionId ? String(b.divisionId) : "";
+      return [ei, ii, ri, di].join("|");
+    },
+    _sprintBucketLabel(b) {
+      const div = (
+        b && b.divisionName ? String(b.divisionName) : ""
+      ).toUpperCase();
+      const rac = (b && b.raceName ? String(b.raceName) : "").toUpperCase();
+      const ini = (
+        b && b.initialName ? String(b.initialName) : ""
+      ).toUpperCase();
+      return `${div} ${rac} – ${ini}`;
+    },
+
+    // apply bucket: set peserta, judul, sinkron raceStartPayload
+    _useSprintBucket(key) {
+      const b = this.sprintBucketMap[key];
+      if (!b) return;
+
+      // set teams
+      this.participant = (b.teams || []).map((t) => ({ ...t }));
+
+      // title kategori
+      this.titleCategories = this._sprintBucketLabel(b);
+
+      // simpan pilihan terakhir
+      localStorage.setItem("currentSprintBucketKey", key);
+
+      // update raceStartPayload agar saveResult memakai kunci yang sama
+      try {
+        const raw = localStorage.getItem("raceStartPayload") || "{}";
+        const obj = JSON.parse(raw || "{}") || {};
+        obj.bucket =
+          obj.bucket && typeof obj.bucket === "object" ? obj.bucket : {};
+        obj.bucket.eventId = String(b.eventId || "");
+        obj.bucket.initialId = String(b.initialId || "");
+        obj.bucket.raceId = String(b.raceId || "");
+        obj.bucket.divisionId = String(b.divisionId || "");
+        obj.bucket.eventName = "SPRINT";
+        obj.bucket.initialName = String(b.initialName || "");
+        obj.bucket.raceName = String(b.raceName || "");
+        obj.bucket.divisionName = String(b.divisionName || "");
+        // opsional: obj.bucket.teams = this.participant;
+        localStorage.setItem("raceStartPayload", JSON.stringify(obj));
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
+
+      // refresh ranking jika sudah ada waktu
+      this.assignRanks(this.participantArr);
+    },
+
+    // Build opsi statik dari katalog event (fallback kalau belum ada DB)
+    buildStaticSprintOptions() {
+      const eventId = this.currentEventId || "";
+      if (!eventId) {
+        this.sprintBucketOptions = [];
+        this.sprintBucketMap = {};
+        return;
+      }
+
+      const divs = this.divisions.length
+        ? this.divisions
+        : [
+            { id: "1", name: "R4" },
+            { id: "2", name: "R6" },
+          ];
+      const races = this.races.length
+        ? this.races
+        : [
+            { id: "1", name: "MEN" },
+            { id: "2", name: "WOMEN" },
+          ];
+      const inits = this.initials.length
+        ? this.initials
+        : [
+            { id: "1", name: "YOUTH" },
+            { id: "2", name: "JUNIOR" },
+            { id: "3", name: "OPEN" },
+          ];
+
+      const opts = [];
+      const map = Object.create(null);
+
+      divs.forEach((div) => {
+        races.forEach((race) => {
+          inits.forEach((init) => {
+            const key = [eventId, init.id, race.id, div.id]
+              .map(String)
+              .join("|");
+            const label = `${div.name} ${race.name} – ${init.name}`;
+            opts.push({ value: key, text: label });
+            map[key] = {
+              eventId,
+              initialId: String(init.id),
+              raceId: String(race.id),
+              divisionId: String(div.id),
+              eventName: "SPRINT",
+              initialName: String(init.name),
+              raceName: String(race.name),
+              divisionName: String(div.name),
+              teams: [],
+            };
+          });
+        });
+      });
+
+      this.sprintBucketOptions = opts;
+      this.sprintBucketMap = map;
+    },
+
+    // Fallback penuh: baca semua bucket Sprint dari eventDetails.participant
+    loadAllSprintBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+
+        // hanya SPRINT
+        const sprintBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
+        );
+
+        const map = Object.create(null);
+        const opts = [];
+
+        sprintBuckets.forEach((b) => {
+          const key = this._sprintBucketKey(b);
+          const label = this._sprintBucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForSprint)
+            : [];
+
+          map[key] = { ...b, teams: normalizedTeams };
+          opts.push({ value: key, text: label });
+        });
+
+        this.sprintBucketMap = map;
+        this.sprintBucketOptions = opts;
+
+        // pilih default dan apply
+        const savedKey = localStorage.getItem("currentSprintBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useSprintBucket(savedKey);
+          this.selectedSprintKey = savedKey;
+        } else if (opts.length) {
+          this._useSprintBucket(opts[0].value);
+          this.selectedSprintKey = opts[0].value;
+        }
+      } catch {
+        /* noop */
+      }
+    },
+    // --- handler perubahan select ---
+    async onSelectSprintBucket(key) {
+      await this.fetchSprintBucketTeamsByKey(key);
+    },
+
+    // --- fetch teams via IPC (mirip SPRINT: fetchBucketTeamsByKey) ---
+    // --- fetch teams via IPC (khusus Sprint) ---
+    async fetchSprintBucketTeamsByKey(key) {
+      try {
+        if (
+          !key ||
+          !this.sprintBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.sprintBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        this.selectedSprintKey = key;
+        localStorage.setItem("currentSprintBucketKey", key);
+
+        // >>> gunakan channel yang benar: teams-sprint-registered <<<
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once(
+            "teams-sprint-registered:find-reply",
+            (_e, payload) => resolve(payload)
+          );
+          ipcRenderer.send("teams-sprint-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          // kalau gagal, tetap apply bucket agar judul/payload sinkron
+          this.participant = [];
+          this._useSprintBucket(key);
+          return;
+        }
+
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForSprint)
+            : [];
+
+        // commit ke map agar _useSprintBucket dapat data
+        this.sprintBucketMap[key] = { ...b, teams };
+
+        // apply
+        this._useSprintBucket(key);
+      } catch {
+        this._useSprintBucket(key);
+      }
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1119,6 +1442,16 @@ export default {
 </script>
 
 <style scoped>
+/* Select block */
+.toolbar-select {
+  min-width: 260px;
+  flex: 1 1 260px; /* bisa melebar di layar kecil */
+}
+.toolbar-select__control {
+  border-radius: 10px;
+  cursor: pointer;
+}
+
 /* ---- Styling utk penalty section select ---- */
 .small-select {
   border-radius: 12px;

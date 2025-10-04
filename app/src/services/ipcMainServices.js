@@ -12,7 +12,12 @@ const {
   getEventById,
 } = require("../controllers/GET/getEvent.js");
 
-const { getRegistered, getRegisteredH2H } = require("../controllers/GET/getRegistered.js");
+const {
+  getRegistered,
+  getRegisteredH2H,
+  getRegisteredSprint,
+  getRegisteredSlalom,
+} = require("../controllers/GET/getRegistered.js");
 
 const {
   getOptionLevel,
@@ -66,6 +71,9 @@ const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 
+const { getNetworkConfigRaw, getNetworkConfigMap } = require("../controllers/NETWORK/getNetwork");
+
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -82,6 +90,26 @@ function assertCloudinaryConfig() {
 
 // communication with database
 function setupIPCMainHandlers() {
+// RAW (opsional)
+  ipcMain.handle("network-config:get-all", async function () {
+    try {
+      const data = await getNetworkConfigRaw();
+      return { ok: true, data };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+  });
+
+  // MAP { ONLINE, LAN, OFFLINE } —> INI yang dipanggil renderer
+  ipcMain.handle("network-config:map", async function () {
+    try {
+      const map = await getNetworkConfigMap();
+      return { ok: true, data: map };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+  });
+
   // Get all users
   ipcMain.on("users:getAll", async (event) => {
     try {
@@ -533,6 +561,17 @@ function setupIPCMainHandlers() {
   ipcMain.on("teams-h2h-registered:find", async (event, filters) => {
     const res = await getRegisteredH2H(filters || {});
     event.sender.send("teams-h2h-registered:find-reply", res);
+  });
+
+  ipcMain.on("teams-sprint-registered:find", async (event, filters) => {
+    console.log(filters, "<<< FILTER");
+    const res = await getRegisteredSprint(filters || {});
+    event.sender.send("teams-sprint-registered:find-reply", res);
+  });
+
+  ipcMain.on("teams-slalom-registered:find", async (event, filters) => {
+    const res = await getRegisteredSlalom(filters || {});
+    event.sender.send("teams-slalom-registered:find-reply", res);
   });
 
   // =========================

@@ -1,6 +1,10 @@
 import { io } from "socket.io-client";
+import { log } from "@/utils/logger";
 
-const BROKER_URL = process.env.VUE_APP_RT_URL || "http://localhost:4000";
+const BROKER_URL =
+  process.env.VUE_APP_MODE === "lan"
+    ? process.env.VUE_APP_RT_URL_LAN
+    : process.env.VUE_APP_RT_URL;
 
 const TOKEN =
   typeof window !== "undefined" ? localStorage.getItem("authToken") : undefined;
@@ -11,14 +15,14 @@ export function getSocket() {
   if (!socket) {
     socket = io(BROKER_URL, { auth: { token: TOKEN } });
     socket.on("connect", () => {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Electron] socket connected:", socket.id);
+      if (process.env.VUE_APP_ENV !== "production") {
+        log("[Electron] socket connected:", socket.id);
       }
     });
 
     socket.on("disconnect", () => {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Electron] socket disconnected");
+      if (process.env.VUE_APP_ENV !== "production") {
+        log("[Electron] socket disconnected");
       }
     });
   }

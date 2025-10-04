@@ -1360,6 +1360,15 @@ export default {
   padding: 18px 44px;
 }
 
+/* Hover effect */
+.btn-add:hover {
+  background: #f0f8ff; /* biru muda lembut */
+  border-color: #1c4c7a;
+  color: #0d2f4f;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
+  cursor: pointer;
+}
+
 .team-table {
   width: 100%;
   border-collapse: separate;

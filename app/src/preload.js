@@ -1,57 +1,107 @@
+// preload.js
 const { contextBridge, ipcRenderer } = require("electron");
 
-window.addEventListener("DOMContentLoaded", () => {
-  const replaceText = (selector, text) => {
-    const element = document.getElementById(selector);
-    if (element) element.innerText = text;
-  };
-  for (const type of ["chrome", "node", "electron"]) {
-    replaceText(`${type}-version`, process.versions[type]);
+// versi & DOMContentLoaded (opsional)
+window.addEventListener("DOMContentLoaded", function () {
+  function replaceText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.innerText = text;
+  }
+  var types = ["chrome", "node", "electron"];
+  for (var i = 0; i < types.length; i++) {
+    var t = types[i];
+    replaceText(t + "-version", process.versions[t]);
   }
 });
 
+// Helper expose: aman utk contextIsolation ON/OFF
 function expose(key, api) {
   if (process.contextIsolated) {
     try {
       contextBridge.exposeInMainWorld(key, api);
     } catch (e) {}
   } else {
-    // fallback jika contextIsolation dimatikan
     window[key] = api;
   }
 }
 
+/* ======================
+   NETCFG (network bridge)
+   ====================== */
+var netcfgAPI = {
+  get: () => ipcRenderer.invoke("network:get"),
+  set: (partial) => ipcRenderer.invoke("network:set", partial),
+  refresh: () => ipcRenderer.invoke("network:refresh"),
+  inspect: () => ipcRenderer.invoke("network:inspect"),
+  pingDb: () => ipcRenderer.invoke("network:ping-db"),
 
-contextBridge.exposeInMainWorld('netcfg', {
-  get: () => ipcRenderer.invoke('network:get'),
-  set: (partial) => ipcRenderer.invoke('network:set', partial),
-  refresh: () => ipcRenderer.invoke('network:refresh'),
-});
+  // subscribe; return function untuk un-subscribe
+  onBooted: function (cb) {
+    function handler(_e, pick) {
+      try {
+        cb && cb(pick);
+      } catch (e) {}
+    }
+    ipcRenderer.on("network:booted", handler);
+    return function () {
+      ipcRenderer.removeListener("network:booted", handler);
+    };
+  },
+  onChanged: function (cb) {
+    function handler(_e, pick) {
+      try {
+        cb && cb(pick);
+      } catch (e) {}
+    }
+    ipcRenderer.on("network:changed", handler);
+    return function () {
+      ipcRenderer.removeListener("network:changed", handler);
+    };
+  },
+};
 
+expose("netcfg", netcfgAPI);
+
+/* ==============
+   APP controls
+   ============== */
 expose("app", {
-  exit: () => ipcRenderer.invoke("app:exit"),
-  closeWindow: () => ipcRenderer.invoke("app:close-window"),
-  minimize: () => ipcRenderer.invoke("app:minimize"),
-  toggleMaximize: () => ipcRenderer.invoke("app:toggle-maximize"),
+  exit: function () {
+    return ipcRenderer.invoke("app:exit");
+  },
+  closeWindow: function () {
+    return ipcRenderer.invoke("app:close-window");
+  },
+  minimize: function () {
+    return ipcRenderer.invoke("app:minimize");
+  },
+  toggleMaximize: function () {
+    return ipcRenderer.invoke("app:toggle-maximize");
+  },
 });
 
-// file picker (dipanggil renderer: window.fileAPI.pickImage())
+/* ====================
+   File helper (reader)
+   ==================== */
 expose("fileAPI", {
-  // tambahkan di expose('fileAPI', { ... })
   toDataURL: async function (absPath) {
     const fs = require("fs").promises;
     const path = require("path");
     const buf = await fs.readFile(absPath);
-    const ext = path.extname(absPath).toLowerCase();
+    var ext = path.extname(absPath).toLowerCase();
     var mime = "application/octet-stream";
     if (ext === ".png") mime = "image/png";
     else if (ext === ".jpg" || ext === ".jpeg") mime = "image/jpeg";
     return "data:" + mime + ";base64," + buf.toString("base64");
   },
-  pickImage: () => ipcRenderer.invoke("file:pick-image"),
+  pickImage: function () {
+    return ipcRenderer.invoke("file:pick-image");
+  },
 });
 
-// Cloudinary bridge (renderer: window.cloud.uploadImage(), deleteImage())
+/* ==================
+   Cloudinary Bridge
+   ================== */
 expose("cloud", {
   uploadEventImage: function (absPath, options) {
     if (!options) options = {};
@@ -63,7 +113,11 @@ expose("cloud", {
     };
     return ipcRenderer.invoke("cloud:upload-image", absPath, opts);
   },
-  uploadImage: (absPath, options = {}) =>
-    ipcRenderer.invoke("cloud:upload-image", absPath, options),
-  deleteImage: (publicId) => ipcRenderer.invoke("cloud:delete-image", publicId),
+  uploadImage: function (absPath, options) {
+    if (!options) options = {};
+    return ipcRenderer.invoke("cloud:upload-image", absPath, options);
+  },
+  deleteImage: function (publicId) {
+    return ipcRenderer.invoke("cloud:delete-image", publicId);
+  },
 });

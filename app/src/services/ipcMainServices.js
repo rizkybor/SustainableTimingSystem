@@ -71,8 +71,10 @@ const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 
-const { getNetworkConfigRaw, getNetworkConfigMap } = require("../controllers/NETWORK/getNetwork");
-
+const {
+  getNetworkConfigRaw,
+  getNetworkConfigMap,
+} = require("../controllers/NETWORK/getNetwork");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -90,13 +92,16 @@ function assertCloudinaryConfig() {
 
 // communication with database
 function setupIPCMainHandlers() {
-// RAW (opsional)
+  // RAW (opsional)
   ipcMain.handle("network-config:get-all", async function () {
     try {
       const data = await getNetworkConfigRaw();
       return { ok: true, data };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+      };
     }
   });
 
@@ -106,7 +111,66 @@ function setupIPCMainHandlers() {
       const map = await getNetworkConfigMap();
       return { ok: true, data: map };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+  });
+
+  ipcMain.handle("network:verify", async function () {
+    const pick = await pickEndpoints(); // { mode, apiBase, mongoUri, realtime }
+
+    var host = null;
+    try {
+      host = new URL(pick.apiBase).hostname;
+    } catch (e) {
+      host = null;
+    }
+
+    const results = await Promise.all([
+      resolveHost(host),
+      httpHealth(pick.apiBase),
+      mongoPing(pick.mongoUri),
+    ]);
+
+    return {
+      mode: pick.mode,
+      apiBase: pick.apiBase,
+      mongoUri: pick.mongoUri,
+      realtime: pick.realtime || null,
+      resolvedIp: results[0],
+      http: results[1],
+      db: results[2],
+      ts: Date.now(),
+    };
+  });
+
+  ipcMain.handle("network:reset-defaults", function () {
+    try {
+      const cfgPath = path.join(app.getPath("userData"), "configurationNetworking.json");
+      if (fs.existsSync(cfgPath)) fs.unlinkSync(cfgPath);
+      ensureDefaults();
+      const cfg = readConfig();
+      return { ok: true, config: cfg };
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  });
+
+  ipcMain.handle("network:ping-db", async () => {
+    try {
+      const { MongoClient } = require("mongodb");
+      const pick = await pickEndpoints();
+      const client = new MongoClient(pick.mongoUri, {
+        serverSelectionTimeoutMS: 3000,
+      });
+      await client.connect();
+      await client.db("admin").command({ ping: 1 });
+      await client.close();
+      return { ok: true, uri: pick.mongoUri, mode: pick.mode };
+    } catch (e) {
+      return { ok: false, error: e.message };
     }
   });
 

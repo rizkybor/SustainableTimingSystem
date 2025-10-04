@@ -1,11 +1,12 @@
-const { getDb } = require("../index");
+// const { connectMongo } = require("../index");
+const { connectMongo } = require("../../services/db")
 const { ObjectId } = require("mongodb");
 
 // get All Events
 // get All Events
 async function getAllEvents() {
   try {
-    const database = await getDb();
+    const database = await connectMongo();
     const collection = database.collection("eventsCollection");
     const data = await collection.find({}).toArray();
     return data.map((d) => ({
@@ -21,7 +22,7 @@ async function getAllEvents() {
 // get Events By Id
 async function getEventById(payload) {
   try {
-    const database = await getDb();
+    const database = await connectMongo();
     const collection = database.collection("eventsCollection");
     const result = await collection.findOne({ _id: ObjectId(payload) });
     return result;

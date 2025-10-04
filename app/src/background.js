@@ -1,4 +1,8 @@
 "use strict";
+// Tangkap semua Promise rejection biar gak bikin crash diam-diam
+process.on("unhandledRejection", function (e) {
+  console.error("[UNHANDLED] Rejection:", e && e.message ? e.message : e);
+});
 
 import { app, protocol, BrowserWindow, ipcMain, nativeImage } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
@@ -13,6 +17,9 @@ import {
   pickEndpoints,
 } from "./services/networkManager";
 import { connectMongo } from "./services/db";
+
+import dns from "dns";
+import fetch from "node-fetch";
 
 const isDev = !app.isPackaged;
 
@@ -30,8 +37,58 @@ setupIPCMainHandlers();
 async function bootNetwork() {
   ensureDefaults();
   const pick = await pickEndpoints();
-  await connectMongo(pick.mongoUri);
-  return pick; // { mode, apiBase, mongoUri, realtime }
+  console.log("🌐 [BOOT NETWORK]", {
+    mode: pick.mode,
+    apiBase: pick.apiBase,
+    mongoUri: pick.mongoUri,
+    realtime: pick.realtime,
+  });
+  const result = await connectMongo(pick.mongoUri);
+  console.log("✅ Mongo connected to:", pick.mongoUri);
+  return pick;
+}
+
+function httpTimeout(ms) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function httpHealth(url) {
+  if (!url) return { ok: false, reason: "no-url" };
+  try {
+    const u = new URL("/health", url).toString();
+    const ctrl = new AbortController();
+    const to = setTimeout(function () {
+      ctrl.abort();
+    }, 3000);
+    const res = await fetch(u, { signal: ctrl.signal });
+    clearTimeout(to);
+    return { ok: !!res && res.ok, status: res ? res.status : 0 };
+  } catch (e) {
+    return { ok: false, reason: e && e.message ? e.message : String(e) };
+  }
+}
+
+async function mongoPing(uri) {
+  try {
+    // 1 attempt saja, kita hanya cek “hidup” atau tidak
+    const db = await connectMongo(uri, 1);
+    const r = await db.command({ ping: 1 });
+    return { ok: r && r.ok === 1 };
+  } catch (e) {
+    return { ok: false, reason: e && e.message ? e.message : String(e) };
+  }
+}
+
+function resolveHost(host) {
+  return new Promise(function (resolve) {
+    if (!host) return resolve(null);
+    dns.lookup(host, function (err, addr) {
+      if (err) return resolve(null);
+      resolve(addr);
+    });
+  });
 }
 
 // ===== IPC: network config =====
@@ -45,8 +102,34 @@ ipcMain.handle("network:set", async (_e, partial) => {
   writeConfig(next);
   const pick = await pickEndpoints();
   await connectMongo(pick.mongoUri);
+
+  // ⬇️ kirim ke semua renderer
+  const wins = BrowserWindow.getAllWindows();
+  for (let i = 0; i < wins.length; i++) {
+    const w = wins[i];
+    if (!w.isDestroyed()) {
+      w.webContents.send("network:changed", pick);
+    }
+  }
+
+  console.log("🔁 Network mode changed:", pick.mode, pick.apiBase);
   return { ...pick, config: next };
 });
+
+ipcMain.handle("network:inspect", async () => {
+  const pick = await pickEndpoints();
+  return { ok: true, pick };
+});
+
+// ipcMain.handle("network:ping-db", async () => {
+//   try {
+//     await connectMongo(/* kalau connectMongo simpan client global, cukup ping */);
+//     const pick = await pickEndpoints();
+//     return { ok: true, uri: pick.mongoUri };
+//   } catch (e) {
+//     return { ok: false, error: e && e.message ? e.message : String(e) };
+//   }
+// });
 
 ipcMain.handle("network:refresh", async () => {
   const pick = await pickEndpoints();
@@ -130,7 +213,10 @@ async function createWindow() {
       try {
         await win.loadURL(DEV_URL);
       } catch (e) {
-        console.warn("[DEV] loadURL failed (attempt " + attempt + "):", e && e.message ? e.message : e);
+        console.warn(
+          "[DEV] loadURL failed (attempt " + attempt + "):",
+          e && e.message ? e.message : e
+        );
       }
     };
 

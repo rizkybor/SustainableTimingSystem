@@ -46,7 +46,7 @@
               <b-dropdown-header disabled> Network Choice </b-dropdown-header>
               <b-dropdown-divider></b-dropdown-divider>
 
-              <b-dropdown-item v-if="!isDevEnv" @click="setMode('ONLINE')"
+              <b-dropdown-item @click="setMode('ONLINE')"
                 >🌐 Online (Internet)
               </b-dropdown-item>
               <b-dropdown-item @click="setMode('LAN')"
@@ -65,6 +65,10 @@
               >
                 🔎 URL activated
               </b-dropdown-item>
+
+              <b-dropdown-item @click="testConnection">
+                🔍 Test Connection
+              </b-dropdown-item>
             </b-nav-item-dropdown>
 
             <b-nav-item @click="lockAndExit">🔒 Lock Apps</b-nav-item>
@@ -80,10 +84,8 @@
 import { lock } from "@/utils/auth";
 import { log } from "@/utils/logger";
 
-// map UI → mode di main process
-const toCore = { ONLINE: "online", LAN: "lan", OFFLINE: "auto" };
-// map core → UI
-const fromCore = { online: "ONLINE", lan: "LAN", auto: "OFFLINE" };
+const toCore  = { ONLINE: "online", LAN: "lan", OFFLINE: "offline" };
+const fromCore = { online: "ONLINE", lan: "LAN", offline: "OFFLINE", auto: "OFFLINE" };
 
 export default {
   name: "SustainableTimingSystemRaftingNavbar",
@@ -121,8 +123,7 @@ export default {
     },
     tooltipNetwork() {
       const ls = JSON.parse(localStorage.getItem("network_urls") || "{}");
-      const lsProfile =
-        (this.mode === "LAN" && ls.LAN) ||
+      const lsProfile = (this.mode === "LAN" && ls.LAN) ||
         (this.mode === "OFFLINE" && ls.OFFLINE) ||
         ls.ONLINE || { base: "-", realtime: "-" };
 
@@ -131,15 +132,41 @@ export default {
 
       return (
         "<div style='font-size: 0.85rem; line-height: 1.3'>" +
-        "<strong>" + this.modeLabel + " Mode</strong><br>" +
-        "🌐 <b>Base URL:</b> " + base + "<br>" +
-        "🔄 <b>Realtime URL:</b> " + rt +
+        "<strong>" +
+        this.modeLabel +
+        " Mode</strong><br>" +
+        "🌐 <b>Base URL:</b> " +
+        base +
+        "<br>" +
+        "🔄 <b>Realtime URL:</b> " +
+        rt +
         "</div>"
       );
     },
   },
 
   async mounted() {
+    if (
+      typeof window !== "undefined" &&
+      window.netcfg &&
+      typeof window.netcfg.onChanged === "function"
+    ) {
+      window.netcfg.onChanged((pick) => {
+        console.log("🛰️ [Renderer] Network changed:", pick);
+        this.mode =
+          pick.mode === "online"
+            ? "ONLINE"
+            : pick.mode === "lan"
+            ? "LAN"
+            : "OFFLINE";
+        this.active = {
+          apiBase: pick.apiBase || "-",
+          realtime: pick.realtime || "-",
+          coreMode: pick.mode,
+        };
+      });
+    }
+
     // Cek ketersediaan IPC aman (tanpa optional chaining)
     const hasIpcGet =
       typeof window !== "undefined" &&
@@ -164,22 +191,16 @@ export default {
         if (st.config) {
           const mapped = {
             ONLINE: {
-              base:
-                (st.config.api && st.config.api.online) || "",
-              realtime:
-                (st.config.realtime && st.config.realtime.online) || "",
+              base: (st.config.api && st.config.api.online) || "",
+              realtime: (st.config.realtime && st.config.realtime.online) || "",
             },
             LAN: {
-              base:
-                (st.config.api && st.config.api.lan) || "",
-              realtime:
-                (st.config.realtime && st.config.realtime.lan) || "",
+              base: (st.config.api && st.config.api.lan) || "",
+              realtime: (st.config.realtime && st.config.realtime.lan) || "",
             },
             OFFLINE: {
-              base:
-                (st.config.api && st.config.api.lan) || "",
-              realtime:
-                (st.config.realtime && st.config.realtime.lan) || "",
+              base: (st.config.api && st.config.api.lan) || "",
+              realtime: (st.config.realtime && st.config.realtime.lan) || "",
             },
           };
           localStorage.setItem("network_urls", JSON.stringify(mapped));
@@ -195,6 +216,22 @@ export default {
   },
 
   methods: {
+    async testConnection() {
+      const info = await window.netcfg.inspect();
+      console.log(
+        "Mode:",
+        info.pick.mode,
+        "API:",
+        info.pick.apiBase,
+        "RT:",
+        info.pick.realtime
+      );
+      const ping = await window.netcfg.pingDb();
+      console.log(
+        "Mongo:",
+        ping.ok ? "OK → " + ping.uri : "FAIL → " + ping.error
+      );
+    },
     goTo(path) {
       if (!path) return this.$router.push("/");
       this.$router.push("/" + path);
@@ -223,7 +260,8 @@ export default {
 
     applyNetworkMode(mode) {
       try {
-        const urls = JSON.parse(localStorage.getItem("network_urls") || "{}") || {};
+        const urls =
+          JSON.parse(localStorage.getItem("network_urls") || "{}") || {};
         const fallback = urls.ONLINE || { base: "", realtime: "" };
         const profile =
           (mode === "LAN" && urls.LAN) ||
@@ -270,8 +308,17 @@ export default {
 
           if (this.$bvToast) {
             this.$bvToast.toast(
-              "Mode jaringan diubah ke " + this.modeLabel + " (" + (st.apiBase || "") + ")",
-              { title: "Pengaturan Jaringan", variant: "info", solid: true, autoHideDelay: 2200 }
+              "Mode jaringan diubah ke " +
+                this.modeLabel +
+                " (" +
+                (st.apiBase || "") +
+                ")",
+              {
+                title: "Pengaturan Jaringan",
+                variant: "info",
+                solid: true,
+                autoHideDelay: 2200,
+              }
             );
           }
           return;

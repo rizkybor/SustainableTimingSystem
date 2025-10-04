@@ -1,15 +1,15 @@
-// src/services/networkManager.js
+// src/services/configurationNetworkingManager.js
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import fetch from 'node-fetch';
 
-const userCfgPath = path.join(app.getPath('userData'), 'net.json');
+const userCfgPath = path.join(app.getPath('userData'), 'configurationNetworking.json');
 
 export function ensureDefaults() {
-  const defaultsPath = path.join(process.resourcesPath, 'defaults', 'net.json');
+  const defaultsPath = path.join(process.resourcesPath, 'defaults', 'configurationNetworking.json');
   if (!fs.existsSync(userCfgPath)) {
-    const devFallback = path.join(process.cwd(), 'public', 'defaults', 'net.json');
+    const devFallback = path.join(process.cwd(), 'public', 'defaults', 'configurationNetworking.json');
     const src = fs.existsSync(defaultsPath) ? defaultsPath : devFallback;
     fs.copyFileSync(src, userCfgPath);
   }
@@ -39,23 +39,33 @@ async function ok(url, timeoutMs = 800) {
 
 export async function pickEndpoints() {
   const cfg = readConfig();
-  let mode = cfg.mode; // 'auto' | 'online' | 'lan'
+  var mode = cfg && cfg.mode ? cfg.mode : "online";
 
-  if (mode === 'auto') {
-    const lanUrl = (cfg.api && cfg.api.lan) ? cfg.api.lan : '';
-    const onUrl  = (cfg.api && cfg.api.online) ? cfg.api.online : '';
+  // ⬇️ mode offline: langsung pakai offline (tanpa probing)
+  if (mode === "offline") {
+    return {
+      mode: "offline",
+      apiBase:  (cfg && cfg.api && cfg.api.offline) ? cfg.api.offline : "",
+      mongoUri: (cfg && cfg.mongo && cfg.mongo.offline) ? cfg.mongo.offline : "",
+      realtime: (cfg && cfg.realtime && cfg.realtime.offline) ? cfg.realtime.offline : null
+    };
+  }
 
-    const lanUp = await ok(lanUrl);
-    if (lanUp) mode = 'lan';
+  // ⬇️ mode auto: prefer LAN, kalau gagal baru online
+  if (mode === "auto") {
+    var lanUrl = (cfg && cfg.api && cfg.api.lan) ? cfg.api.lan : "";
+    var onUrl  = (cfg && cfg.api && cfg.api.online) ? cfg.api.online : "";
+    var lanUp = await ok(lanUrl);
+    if (lanUp) mode = "lan";
     else {
-      const onUp = await ok(onUrl);
-      mode = onUp ? 'online' : 'lan';
+      var onUp = await ok(onUrl);
+      mode = onUp ? "online" : "lan";
     }
   }
 
-  const apiBase  = (cfg.api && cfg.api[mode]) ? cfg.api[mode] : '';
-  const mongoUri = (cfg.mongo && cfg.mongo[mode]) ? cfg.mongo[mode] : '';
-  const realtime = (cfg.realtime && cfg.realtime[mode]) ? cfg.realtime[mode] : null;
+  var apiBase  = (cfg && cfg.api && cfg.api[mode]) ? cfg.api[mode] : "";
+  var mongoUri = (cfg && cfg.mongo && cfg.mongo[mode]) ? cfg.mongo[mode] : "";
+  var realtime = (cfg && cfg.realtime && cfg.realtime[mode]) ? cfg.realtime[mode] : null;
 
   return { mode, apiBase, mongoUri, realtime };
 }

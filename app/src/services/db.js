@@ -7,8 +7,8 @@ let connecting;
 let currentUri = null;
 
 async function connectMongo(uri, attempts = 3) {
+      console.log("⚙️ [DB] Connecting to Mongo:", uri);
 
-    console.log(uri,'<< MONG')
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
     try {

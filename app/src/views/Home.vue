@@ -272,6 +272,16 @@ import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import defaultImg from "@/assets/images/default-first.jpeg";
 
+function getIpc() {
+  try {
+    if (typeof window !== "undefined" && window.require) {
+      var e = window.require("electron");
+      if (e && e.ipcRenderer) return e.ipcRenderer;
+    }
+  } catch (e) {}
+  return null;
+}
+
 export default {
   name: "SustainableTimingSystemHome",
   components: { Icon },
@@ -283,17 +293,22 @@ export default {
       loading: false,
       teams: [],
       defaultImg,
+      currentApiBase: localStorage.getItem("network_base_url") || "",
+      _unsubFlagBound: false,
     };
   },
   mounted() {
-    const KEY = "sts_home_visited_session";
-    const firstVisitThisSession = !sessionStorage.getItem(KEY);
-
-    if (firstVisitThisSession) {
-      this.showIntro = true;
-      sessionStorage.setItem(KEY, "1");
-      setTimeout(() => this.hideIntro(), 5000);
+    if (window.netcfg && typeof window.netcfg.onChanged === "function") {
+      window.netcfg.onChanged((pick) => {
+        // simpan base yg aktif → dipakai service HTTP atau IPC
+        localStorage.setItem("network_base_url", pick.apiBase || "");
+        localStorage.setItem("network_realtime_url", pick.realtime || "");
+        // refresh data agar ikut jaringan baru
+        this.getEvents();
+        this.loadTeamsRegistered();
+      });
     }
+    // pertama kali
     this.getEvents();
     this.loadTeamsRegistered();
   },
@@ -483,37 +498,74 @@ export default {
 
       return `${day} ${month} ${year}`;
     },
+    _applyNetworkPick(pick, source) {
+      // pick: { mode, apiBase, realtime, ... }
+      try {
+        this.currentApiBase = pick && pick.apiBase ? pick.apiBase : "";
+        localStorage.setItem("network_base_url", this.currentApiBase || "");
+        localStorage.setItem(
+          "network_realtime_url",
+          pick && pick.realtime ? pick.realtime : ""
+        );
+
+        // feedback kecil (opsional)
+        if (this.$bvToast) {
+          this.$bvToast.toast(
+            "Network " +
+              (source === "boot" ? "ready" : "switched") +
+              " → " +
+              (pick.mode || "-") +
+              " (" +
+              (this.currentApiBase || "-") +
+              ")",
+            {
+              title: "Network",
+              variant: "info",
+              solid: true,
+              autoHideDelay: 1800,
+            }
+          );
+        }
+
+        // re-fetch data agar sesuai jaringan aktif
+        this.getEvents();
+        this.loadTeamsRegistered();
+      } catch (e) {}
+    },
+
     getEvents() {
       this.loading = true;
       var self = this;
       setTimeout(function () {
-        ipcRenderer.send("get-events");
-        // gunakan once agar listener tidak menumpuk saat HMR
-        ipcRenderer.once("get-events-reply", function (_e, data) {
+        const ipc = getIpc();
+        if (!ipc) {
+          self.loading = false;
+          return;
+        }
+        ipc.send("get-events");
+        ipc.once("get-events-reply", function (_e, data) {
           self.events = Array.isArray(data) ? data : [];
           self.loading = false;
         });
-      }, 400);
+      }, 200);
     },
+
     loadTeamsRegistered() {
-      ipcRenderer.send("teams:get-all");
-      ipcRenderer.once("teams:get-all-reply", (_e, res) => {
+      const ipc = getIpc();
+      if (!ipc) return;
+      ipc.send("teams:get-all");
+      ipc.once("teams:get-all-reply", (_e, res) => {
         const items =
           res && res.ok && Array.isArray(res.items) ? res.items : [];
-
-        // Group by nameTeam+typeTeam => { name, typeTeam, count }
-        const grouped = items.reduce((acc, t) => {
-          const name = String(t.nameTeam || "Unknown").trim();
-          const typeTeam = String(t.typeTeam || "Unknown").trim();
-          const key = `${name}__${typeTeam}`;
-
-          if (!acc[key]) {
-            acc[key] = { name, typeTeam, count: 0 };
-          }
+        const grouped = items.reduce(function (acc, t) {
+          var name = String(t.nameTeam || "Unknown").trim();
+          var typeTeam = String(t.typeTeam || "Unknown").trim();
+          var key = name + "__" + typeTeam;
+          if (!acc[key])
+            acc[key] = { name: name, typeTeam: typeTeam, count: 0 };
           acc[key].count += 1;
           return acc;
         }, {});
-
         this.teams = Object.values(grouped);
       });
     },
@@ -995,14 +1047,12 @@ export default {
   }
 }
 
-
-
 /* see all styling  */
 .see-all-link {
   position: relative;
-  padding: 0;                 /* rapih seperti link */
+  padding: 0; /* rapih seperti link */
   font-weight: 700;
-  color: #0d789d;             /* brand biru */
+  color: #0d789d; /* brand biru */
   text-decoration: none !important;
   display: inline-flex;
   align-items: center;
@@ -1013,7 +1063,8 @@ export default {
 .see-all-link::after {
   content: "";
   position: absolute;
-  left: 0; bottom: -2px;
+  left: 0;
+  bottom: -2px;
   height: 2px;
   width: 100%;
   background: currentColor;
@@ -1031,7 +1082,7 @@ export default {
 .see-all-link:hover,
 .see-all-link:focus,
 .see-all-link:focus-visible {
-  color: #095a73;             /* sedikit lebih gelap saat hover */
+  color: #095a73; /* sedikit lebih gelap saat hover */
   outline: none;
 }
 
@@ -1054,13 +1105,19 @@ export default {
 }
 
 /* dukungan dark background (opsional) */
-.dark .see-all-link { color: #7dd3fc; }
-.dark .see-all-link:hover { color: #38bdf8; }
+.dark .see-all-link {
+  color: #7dd3fc;
+}
+.dark .see-all-link:hover {
+  color: #38bdf8;
+}
 
 /* prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .see-all-link,
   .see-all-icon,
-  .see-all-link::after { transition: none; }
+  .see-all-link::after {
+    transition: none;
+  }
 }
 </style>

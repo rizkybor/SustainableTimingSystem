@@ -17,6 +17,7 @@ let db;
 let connecting;
 
 async function getDb() {
+  console.log('holaaaass')
   if (db) return db;
 
   if (!client) {

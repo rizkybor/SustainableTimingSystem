@@ -16,13 +16,13 @@ export function getSocket() {
     socket = io(BROKER_URL, { auth: { token: TOKEN } });
     socket.on("connect", () => {
       if (process.env.VUE_APP_ENV !== "production") {
-        log("[Electron] socket connected:", socket.id);
+        log.info("[Electron] socket connected:", socket.id);
       }
     });
 
     socket.on("disconnect", () => {
       if (process.env.VUE_APP_ENV !== "production") {
-        log("[Electron] socket disconnected");
+        log.info("[Electron] socket disconnected");
       }
     });
   }

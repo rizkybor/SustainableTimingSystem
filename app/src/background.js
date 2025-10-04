@@ -9,31 +9,23 @@ import { pathToFileURL } from "url";
 const isDevelopment = process.env.VUE_APP_ENV !== "production";
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 
-// Function to Services Communication to Database
 setupIPCMainHandlers();
 
-// wajib utk app:// protocol saat production
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { secure: true, standard: true } },
 ]);
 
-/** Tentukan path icon sesuai platform & mode (dev vs build) */
 function resolveIcon() {
   const file = process.platform === "win32" ? "icon.ico" : "icon.png";
 
-  // production: electron-builder menaruh di resources/assets/icons
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "assets", "icons", file);
   }
-  // development: kamu menaruh di src/assets/icons
   return path.join(__dirname, "../src/assets/icons", file);
 }
 
-/** Set Dock icon khusus macOS (BrowserWindow.icon diabaikan oleh Dock) */
 function setDockIconIfMac() {
   if (process.platform !== "darwin") return;
-  // const iconPath = resolveIcon();
-  // const img = nativeImage.createFromPath(iconPath);
   const pngPath = path.join(__dirname, "../src/assets/icons/icon.png");
   const img = nativeImage.createFromPath(pngPath);
   if (!img.isEmpty()) app.dock.setIcon(img);
@@ -46,7 +38,7 @@ async function createWindow() {
     width: 1000,
     height: 800,
     show: false,
-    icon: resolveIcon(), // dipakai Win/Linux; di mac untuk window bukan Dock
+    icon: resolveIcon(),
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: true,
@@ -57,7 +49,7 @@ async function createWindow() {
   const splash = new BrowserWindow({
     width: 500,
     height: 200,
-    show: false, // tampil setelah ready-to-show
+    show: false,
     transparent: true,
     frame: false,
     alwaysOnTop: false,
@@ -69,20 +61,13 @@ async function createWindow() {
     },
   });
 
-  // DEV: ../public  |  PROD: __static
   const isDev = !!process.env.VUE_APP_BASE_URL;
-  // Path ABSOLUT ke file splash.html
   const splashHtmlPath = isDev
-    ? path.join(__dirname, "../public/splash.html") // dev
-    : path.join(__static, "splash.html"); // build
+    ? path.join(__dirname, "../public/splash.html")
+    : path.join(__static, "splash.html"); 
 
-  // Debug cepat (cek apakah file ada)
-  console.log("splashHtmlPath:", splashHtmlPath);
-
-  // Ubah ke file:// URL secara aman lintas OS
   const splashFileURL = pathToFileURL(splashHtmlPath).toString();
 
-  // Muat via file:// ke FILE langsung
   splash.loadURL(splashFileURL);
   splash.once("ready-to-show", () => splash.show());
 
@@ -120,15 +105,12 @@ app.on("ready", async () => {
     try {
       await installExtension(VUEJS_DEVTOOLS);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("Vue Devtools failed to install:", e.toString());
     }
   }
 
-  // set Dock icon untuk macOS (dev & build)
   setDockIconIfMac();
 
-  // buat window utama
   createWindow();
 });
 

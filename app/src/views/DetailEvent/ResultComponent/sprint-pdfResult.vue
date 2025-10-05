@@ -2,6 +2,8 @@
   <div class="page">
     <!-- HEADER -->
     <header class="head">
+              <!-- TRADEMARK -->
+    <div class="trademark">@STiming.System.424.Timestamp {{ timestamp }} #-</div>
       <div class="band">
         <div class="band-left">
           <strong>SCORE BOARD</strong>
@@ -21,7 +23,6 @@
       </div>
 
       <!-- IMAGE DI ATAS EVENT NAME -->
-      <!-- LOGO HORIZONTAL SELALU RATA TENGAH -->
       <div
         class="mid-image-row"
         v-if="data && data.event_logo && data.event_logo.length > 0"
@@ -29,7 +30,7 @@
         <div
           v-for="(url, index) in data.event_logo"
           :key="index"
-          class="mid-image"
+          class="mid-image py-4"
         >
           <img :src="url" alt="Event Poster" />
         </div>
@@ -66,7 +67,7 @@
             <th>Finish</th>
             <th>Race Time</th>
             <th>Penalties</th>
-            <th>Time Penalty</th>
+            <th>Penalty Time</th>
             <th>Result</th>
             <th>Rank</th>
             <th>Score</th>
@@ -155,6 +156,19 @@
         </span>
       </div>
     </footer>
+
+    <div
+        class="mid-image-sponsor-row"
+        v-if="data && data.event_logo && data.event_logo.length > 0"
+      >
+        <div
+          v-for="(url, index) in data.event_logo"
+          :key="index"
+          class="mid-image-sponsor py-4"
+        >
+          <img :src="url" alt="Event Sponsor" />
+        </div>
+      </div>
   </div>
 </template>
 
@@ -182,6 +196,16 @@ export default {
       const yyyy = d.getFullYear();
       return dd + "/" + mm + "/" + yyyy;
     },
+    timestamp() {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      const ss = String(d.getSeconds()).padStart(2, "0");
+      return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+    },
   },
 };
 </script>
@@ -197,14 +221,30 @@ export default {
   print-color-adjust: exact !important;
 }
 
+/* ===== PAGE AS FLEX COLUMN (baru) ===== */
 .page {
-  padding: 8mm 9mm;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
-  font-size: 10.5px;
+  position: relative;
+  display: flex;                 /* NEW */
+  flex-direction: column;        /* NEW */
+  /* tinggi area konten = tinggi A4 (210mm) - margin @page atas+bawah (8+8) */
+  min-height: calc(210mm - 16mm);/* NEW: menahan sponsor di dasar halaman */
+  padding: 5mm 8mm;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
   line-height: 1.35;
   color: #17202a;
 }
+
+/* biarkan area tabel jadi pengisi ruang tengah fleksibel (baru) */
+.table-wrap {                    /* NEW */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.mid-image-row { margin-bottom: 2mm !important; }
+.band { margin-bottom: 1mm !important; }
+header { margin-bottom: 0 !important; }
 
 /* ===== HEADER ===== */
 .band {
@@ -215,27 +255,12 @@ export default {
   color: white;
   padding: 6px 12px;
   border-radius: 8px;
-  margin-bottom: 6mm;
+  margin-bottom: 6mm; /* akan tertimpa oleh !important di atas → tetap hemat */
   font-weight: 700;
 }
 .band .dot {
   margin: 0 4px;
   opacity: 0.9;
-}
-
-.mid-image {
-  margin: 5mm auto 3mm;
-  text-align: center;
-}
-.mid-image img {
-  max-width: 120px;
-  max-height: 120px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid #e3ebf3;
-  display: inline-block;
 }
 
 .event {
@@ -244,7 +269,7 @@ export default {
 }
 .event-name {
   font-weight: 800;
-  font-size: 13px;
+  font-size: 16px;
   color: rgb(24, 116, 165);
   margin-bottom: 3px;
 }
@@ -269,25 +294,19 @@ export default {
 .score-table thead th {
   background: rgb(240, 250, 255);
   text-transform: uppercase;
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 800;
   text-align: start;
 }
 .score-table tbody td {
-  font-size: 9.5px;
+  font-size: 12px;
 }
 .score-table tbody tr:nth-child(odd) {
   background: #fafcff;
 }
-.text-center {
-  text-align: center;
-}
-.text-strong {
-  font-weight: 700;
-}
-.mono {
-  font-family: monospace;
-}
+.text-center { text-align: center; }
+.text-strong { font-weight: 700; }
+.mono { font-family: monospace; }
 .empty {
   text-align: center;
   color: #999;
@@ -300,14 +319,11 @@ export default {
   justify-content: space-between;
   grid-template-columns: 1fr 1fr 1fr;
   margin-top: 8mm;
+  margin-bottom: 2mm;            /* NEW: beri ruang untuk sponsor */
   text-align: center;
   gap: 8mm;
 }
-
-.sign-col {
-  width: 30%;
-}
-
+.sign-col { width: 30%; }
 .sign-title {
   color: #8a95a3;
   font-size: 9px;
@@ -322,7 +338,7 @@ export default {
 }
 .sign-name {
   font-weight: 800;
-  font-size: 10px;
+  font-size: 12px;
   color: #1f2937;
 }
 
@@ -348,31 +364,66 @@ export default {
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
 
+/* ===== TOP LOGOS ===== */
 .mid-image-row {
   display: flex;
-  justify-content: center;   /* selalu di tengah */
+  justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
-  /* gap: 0;  ← jangan pakai gap */
-  margin: 5mm auto 4mm;
+  flex-wrap: nowrap;
+  gap: 2mm;
+  margin: 2mm 0;
 }
-
 .mid-image {
-  /* kontrol jarak antar logo di sini */
-  margin: 0.6mm;             /* atur lebih rapat/longgar sesukamu */
+  margin: 0;
   flex: 0 1 auto;
   display: flex;
   justify-content: center;
   align-items: center;
 }
-
 .mid-image img {
-  width: 200px;
-  height: 200px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
-  border-radius: 6px;
-  border: 1px solid #dbe3eb;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+
+/* ===== SPONSOR LOGOS (bottom) ===== */
+.mid-image-sponsor-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2mm;
+  margin-top: auto;              /* NEW: tempel ke bawah halaman */
+  margin-bottom: 0;              /* NEW */
+}
+.mid-image-sponsor {
+  margin: 0;
+  flex: 0 1 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.mid-image-sponsor img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+/* perbaikan selektor: pastikan dua baris ini tidak dipecah */
+header, .band, .mid-image-row, .mid-image-sponsor-row {   /* FIXED */
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.trademark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(-9mm, 2mm);
+  font-family: monospace;
+  font-size: 8px;
+  color: #8b8b8b;
+  opacity: 0.7;
+  letter-spacing: 0.5px;
 }
 </style>

@@ -367,7 +367,7 @@ export default {
         (this.sprintCats.race || "-") +
         ")";
       parts.push(catTitle);
-      return parts.join(" - ") + ".pdf";
+      return parts.join(" - ");
     },
     sprintCats() {
       const payload = safeParse(

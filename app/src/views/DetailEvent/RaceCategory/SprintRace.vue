@@ -740,12 +740,12 @@ export default {
     },
   },
 
-  beforeRouteLeave(to, from, next) {
-    if (this.selectedSprintKey) {
-      saveLocalResults(this.selectedSprintKey, this.participantArr);
-    }
-    next();
-  },
+  // beforeRouteLeave(to, from, next) {
+  //   if (this.selectedSprintKey) {
+  //     saveLocalResults(this.selectedSprintKey, this.participantArr);
+  //   }
+  //   next();
+  // },
 
   async mounted() {
     const socket = getSocket();
@@ -779,18 +779,12 @@ export default {
     };
 
     socket.on("custom:event", onMessage);
-
-    // bersihkan listener saat komponen dilepas
+    
     this.$once("hook:beforeDestroy", () => {
       socket.off("connect", onConnect);
       socket.off("custom:event", onMessage);
     });
 
-    // window.addEventListener("scroll", this.handleScroll);
-    // const ok = this.loadFromRaceStartPayload();
-    // if (!ok) await this.checkValueStorage();
-
-    // event details
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -798,11 +792,9 @@ export default {
       this.dataEvent = {};
     }
 
-    // Tetap coba muat dari payload jika ada (agar tabel tidak kosong)
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
-    // === SPRINT BUCKET: bangun opsi & muat teams terdaftar via DB ===
     this.buildStaticSprintOptions();
 
     if (this.sprintBucketOptions.length) {
@@ -814,7 +806,6 @@ export default {
 
       await this.fetchSprintBucketTeamsByKey(this.selectedSprintKey);
     } else {
-      // fallback penuh dari eventDetails
       this.loadAllSprintBucketsFromEvent();
     }
   },
@@ -823,7 +814,6 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
 
-  /** gunakan guard rute yang benar (bukan di methods) */
   beforeRouteLeave(to, from, next) {
     localStorage.removeItem("raceStartPayload");
     localStorage.removeItem("participantByCategories");
@@ -833,7 +823,6 @@ export default {
   },
 
   methods: {
-    // === SPRINT BUCKET ===
     _sprintBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
       const ii = b && b.initialId ? String(b.initialId) : "";
@@ -851,27 +840,17 @@ export default {
       ).toUpperCase();
       return `${div} ${rac} – ${ini}`;
     },
-
-    // apply bucket: set peserta, judul, sinkron raceStartPayload
     _useSprintBucket(key) {
       const b = this.sprintBucketMap[key];
       if (!b) return;
-
-      // set teams
       this.participant = (b.teams || []).map((t) => ({ ...t }));
 
       const cached = loadLocalResults(key);
       if (cached.length) {
         this.participant = mergeTeamsWithCache(this.participant, cached);
       }
-
-      // title kategori
       this.titleCategories = this._sprintBucketLabel(b);
-
-      // simpan pilihan terakhir
       localStorage.setItem("currentSprintBucketKey", key);
-
-      // update raceStartPayload agar saveResult memakai kunci yang sama
       try {
         const raw = localStorage.getItem("raceStartPayload") || "{}";
         const obj = JSON.parse(raw || "{}") || {};
@@ -885,17 +864,13 @@ export default {
         obj.bucket.initialName = String(b.initialName || "");
         obj.bucket.raceName = String(b.raceName || "");
         obj.bucket.divisionName = String(b.divisionName || "");
-        // opsional: obj.bucket.teams = this.participant;
         localStorage.setItem("raceStartPayload", JSON.stringify(obj));
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
-
-      // refresh ranking jika sudah ada waktu
       this.assignRanks(this.participantArr);
     },
 
-    // Build opsi statik dari katalog event (fallback kalau belum ada DB)
     buildStaticSprintOptions() {
       const eventId = this.currentEventId || "";
       if (!eventId) {
@@ -954,14 +929,11 @@ export default {
       this.sprintBucketMap = map;
     },
 
-    // Fallback penuh: baca semua bucket Sprint dari eventDetails.participant
     loadAllSprintBucketsFromEvent() {
       try {
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
         const participant = Array.isArray(ev.participant) ? ev.participant : [];
-
-        // hanya SPRINT
         const sprintBuckets = participant.filter(
           (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
         );
@@ -983,7 +955,6 @@ export default {
         this.sprintBucketMap = map;
         this.sprintBucketOptions = opts;
 
-        // pilih default dan apply
         const savedKey = localStorage.getItem("currentSprintBucketKey");
         if (savedKey && map[savedKey]) {
           this._useSprintBucket(savedKey);
@@ -996,12 +967,9 @@ export default {
         /* noop */
       }
     },
-    // --- handler perubahan select ---
     async onSelectSprintBucket(key) {
       await this.fetchSprintBucketTeamsByKey(key);
     },
-
-    // --- fetch teams via IPC (mirip SPRINT: fetchBucketTeamsByKey) ---
     // --- fetch teams via IPC (khusus Sprint) ---
     async fetchSprintBucketTeamsByKey(key) {
       try {

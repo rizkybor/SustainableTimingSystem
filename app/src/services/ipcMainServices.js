@@ -540,7 +540,6 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-sprint-registered:find", async (event, filters) => {
-    console.log(filters, "<<< FILTER");
     const res = await getRegisteredSprint(filters || {});
     event.sender.send("teams-sprint-registered:find-reply", res);
   });

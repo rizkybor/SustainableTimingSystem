@@ -1137,15 +1137,113 @@ export default {
     },
 
     handleStartRaceAll() {
-      let eventName = this.raceActive.selected.name;
-      ipcRenderer.send("get-alert-saved", {
-        type: "info",
-        message: "Start Race",
-      });
+      let eventName = "";
+      if (
+        this.raceActive &&
+        this.raceActive.selected &&
+        this.raceActive.selected.name
+      ) {
+        eventName = this.raceActive.selected.name;
+      } else if (this.race && this.race.name) {
+        eventName = this.race.name;
+      } else {
+        eventName = "SPRINT"; // default
+      }
 
-      // navigasi ke halaman race
-      const path = this._mapRaceToPath(eventName);
-      this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+      // Siapkan bucket dasar (bisa kamu ganti dengan state lain seperti selectedSprintKey)
+      const bucket = {
+        eventName: this._toUpperSafe(this.eventName || "SPRINT"),
+        divisionName: this._toUpperSafe(this.division || "GENERAL"),
+        raceName: this._toUpperSafe(eventName),
+        initialName: this._toUpperSafe(this.initialName || "DEFAULT"),
+        teams: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+      };
+
+      const startData = {
+        event: this.events || {},
+        context: {
+          eventName: bucket.eventName,
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
+        },
+        bucket: bucket,
+        allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+      };
+
+      try {
+        localStorage.setItem("raceStartPayload", JSON.stringify(startData));
+
+        const currentEvent = {
+          ...(this.events || {}),
+          participant: Array.isArray(this.dataTeams)
+            ? this.dataTeams
+            : (this.events && this.events.participant) || [],
+        };
+
+        let eventId = "";
+        if (currentEvent && currentEvent._id) {
+          if (typeof currentEvent._id === "object" && currentEvent._id.$oid) {
+            eventId = String(currentEvent._id.$oid);
+          } else {
+            eventId = String(currentEvent._id);
+          }
+        } else if (currentEvent.id) {
+          eventId = String(currentEvent.id);
+        } else if (currentEvent.eventName) {
+          eventId = String(currentEvent.eventName);
+        } else {
+          eventId = "default";
+        }
+
+        const raw = localStorage.getItem("eventDetails");
+        let payload;
+        if (!raw) {
+          payload = currentEvent;
+        } else {
+          let prev = null;
+          try {
+            prev = JSON.parse(raw);
+          } catch (err) {
+            prev = null;
+          }
+
+          const looksLikeDict =
+            prev &&
+            typeof prev === "object" &&
+            !Array.isArray(prev) &&
+            !(prev._id || prev.eventName || prev.categoriesInitial);
+
+          if (looksLikeDict && eventId) {
+            payload = Object.assign({}, prev, { [eventId]: currentEvent });
+          } else {
+            payload = currentEvent;
+          }
+        }
+        localStorage.setItem("eventDetails", JSON.stringify(payload));
+      } catch (e) {
+        logger.warn("❌ Error saving start payload", e);
+      }
+
+      // notifikasi tanpa chaining
+      if (ipcRenderer && ipcRenderer.send) {
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Start Race",
+          detail:
+            bucket.eventName +
+            " – " +
+            bucket.divisionName +
+            "/" +
+            bucket.raceName +
+            " (" +
+            bucket.initialName +
+            ")",
+        });
+      }
+
+      const path = this._mapRaceToPath(bucket.eventName);
+      this.$router.push("/event-detail/" + this.$route.params.id + "/" + path);
     },
   },
 };

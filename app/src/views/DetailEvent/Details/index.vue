@@ -17,7 +17,20 @@
             <div
               class="hero-logo mr-2 d-flex align-items-center justify-content-center"
             >
-              <img :src="defaultImg" alt="Logo" class="event-img" />
+              <template v-if="hasEventLogo">
+                <img
+                  :src="eventLogoUrl"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
+              <template v-else>
+                 <img
+                  :src="defaultImg"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
             </div>
           </b-col>
 
@@ -349,6 +362,34 @@ export default {
         this.showPanel("R6", "MEN") ||
         this.showPanel("R6", "WOMEN")
       );
+    },
+    hasEventLogo() {
+      var ev = this.events || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        // string URL langsung atau objek { url: '...' }
+        var first = logos[0];
+        if (typeof first === "string" && first) return true;
+        if (
+          first &&
+          typeof first === "object" &&
+          typeof first.url === "string" &&
+          first.url
+        )
+          return true;
+      }
+      return false;
+    },
+    eventLogoUrl() {
+      var ev = this.events || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        var first = logos[0];
+        if (typeof first === "string") return first;
+        if (first && typeof first === "object" && typeof first.url === "string")
+          return first.url;
+      }
+      return "";
     },
   },
 
@@ -1137,15 +1178,113 @@ export default {
     },
 
     handleStartRaceAll() {
-      let eventName = this.raceActive.selected.name;
-      ipcRenderer.send("get-alert-saved", {
-        type: "info",
-        message: "Start Race",
-      });
+      let eventName = "";
+      if (
+        this.raceActive &&
+        this.raceActive.selected &&
+        this.raceActive.selected.name
+      ) {
+        eventName = this.raceActive.selected.name;
+      } else if (this.race && this.race.name) {
+        eventName = this.race.name;
+      } else {
+        eventName = "SPRINT"; // default
+      }
 
-      // navigasi ke halaman race
-      const path = this._mapRaceToPath(eventName);
-      this.$router.push(`/event-detail/${this.$route.params.id}/${path}`);
+      // Siapkan bucket dasar (bisa kamu ganti dengan state lain seperti selectedSprintKey)
+      const bucket = {
+        eventName: this._toUpperSafe(this.eventName || "SPRINT"),
+        divisionName: this._toUpperSafe(this.division || "GENERAL"),
+        raceName: this._toUpperSafe(eventName),
+        initialName: this._toUpperSafe(this.initialName || "DEFAULT"),
+        teams: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+      };
+
+      const startData = {
+        event: this.events || {},
+        context: {
+          eventName: bucket.eventName,
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
+        },
+        bucket: bucket,
+        allBuckets: Array.isArray(this.dataTeams) ? this.dataTeams : [],
+      };
+
+      try {
+        localStorage.setItem("raceStartPayload", JSON.stringify(startData));
+
+        const currentEvent = {
+          ...(this.events || {}),
+          participant: Array.isArray(this.dataTeams)
+            ? this.dataTeams
+            : (this.events && this.events.participant) || [],
+        };
+
+        let eventId = "";
+        if (currentEvent && currentEvent._id) {
+          if (typeof currentEvent._id === "object" && currentEvent._id.$oid) {
+            eventId = String(currentEvent._id.$oid);
+          } else {
+            eventId = String(currentEvent._id);
+          }
+        } else if (currentEvent.id) {
+          eventId = String(currentEvent.id);
+        } else if (currentEvent.eventName) {
+          eventId = String(currentEvent.eventName);
+        } else {
+          eventId = "default";
+        }
+
+        const raw = localStorage.getItem("eventDetails");
+        let payload;
+        if (!raw) {
+          payload = currentEvent;
+        } else {
+          let prev = null;
+          try {
+            prev = JSON.parse(raw);
+          } catch (err) {
+            prev = null;
+          }
+
+          const looksLikeDict =
+            prev &&
+            typeof prev === "object" &&
+            !Array.isArray(prev) &&
+            !(prev._id || prev.eventName || prev.categoriesInitial);
+
+          if (looksLikeDict && eventId) {
+            payload = Object.assign({}, prev, { [eventId]: currentEvent });
+          } else {
+            payload = currentEvent;
+          }
+        }
+        localStorage.setItem("eventDetails", JSON.stringify(payload));
+      } catch (e) {
+        logger.warn("❌ Error saving start payload", e);
+      }
+
+      // notifikasi tanpa chaining
+      if (ipcRenderer && ipcRenderer.send) {
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Start Race",
+          detail:
+            bucket.eventName +
+            " – " +
+            bucket.divisionName +
+            "/" +
+            bucket.raceName +
+            " (" +
+            bucket.initialName +
+            ")",
+        });
+      }
+
+      const path = this._mapRaceToPath(bucket.eventName);
+      this.$router.push("/event-detail/" + this.$route.params.id + "/" + path);
     },
   },
 };
@@ -1167,7 +1306,7 @@ export default {
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
-  min-height: 200px;
+  min-height: 230px;
   overflow: hidden;
 }
 
@@ -1213,24 +1352,27 @@ export default {
   font-size: clamp(12px, 1.6vw, 16px);
 }
 
-/* Kotak logo putih membulat dengan bayangan */
 .hero-logo {
-  width: 120px;
-  height: 120px;
-  border-radius: 20px;
-  background: #ffffff;
+  width: 150px;
+  height: 150px;
+  margin-right: 10px;
+  border-radius: 30px;
+  background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
 }
 
-.hero-logo img {
-  width: 100%;
-  height: 100%;
+.event-logo-img {
+  width: 140px;
+  height: 140px;
   object-fit: contain;
+  border-radius: 10px;
 }
 
 /* Responsif kecil: logo di atas, teks di bawah */

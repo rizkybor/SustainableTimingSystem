@@ -32,7 +32,20 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-              <Icon icon="mdi:shield-crown" width="56" height="56" />
+              <template v-if="hasEventLogo">
+                <img
+                  :src="eventLogoUrl"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
+              <template v-else>
+                <img
+                  :src="defaultImg"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
             </div>
           </b-col>
 
@@ -931,6 +944,7 @@
 </template>
 
 <script>
+import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
@@ -1158,6 +1172,7 @@ export default {
   components: { OperationTimePanel, Icon },
   data() {
     return {
+      defaultImg,
       isLoadingBracket: false,
       isLoadingTableList: false,
       selfSocketId: null,
@@ -1241,6 +1256,34 @@ export default {
   },
 
   computed: {
+    hasEventLogo() {
+      var ev = this.dataEventSafe || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        // string URL langsung atau objek { url: '...' }
+        var first = logos[0];
+        if (typeof first === "string" && first) return true;
+        if (
+          first &&
+          typeof first === "object" &&
+          typeof first.url === "string" &&
+          first.url
+        )
+          return true;
+      }
+      return false;
+    },
+    eventLogoUrl() {
+      var ev = this.dataEventSafe || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        var first = logos[0];
+        if (typeof first === "string") return first;
+        if (first && typeof first === "object" && typeof first.url === "string")
+          return first.url;
+      }
+      return "";
+    },
     showR1() {
       return !!this.booyanActive.r1;
     },
@@ -3615,9 +3658,10 @@ export default {
   font-size: clamp(12px, 1.6vw, 16px);
 }
 .hero-logo {
-  width: 100px;
-  height: 100px;
-  border-radius: 20px;
+  width: 150px;
+  height: 150px;
+  margin-right: 10px;
+  border-radius: 30px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
@@ -3625,6 +3669,15 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
+}
+
+.event-logo-img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
 /* ===== TABLE WRAPPER: overflow horizontal tanpa mengecilkan kolom ===== */

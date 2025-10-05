@@ -32,16 +32,26 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-              <Icon icon="mdi:shield-crown" width="56" height="56" />
+              <template v-if="hasEventLogo">
+                <img
+                  :src="eventLogoUrl"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
+              <template v-else>
+                 <img
+                  :src="defaultImg"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
             </div>
           </b-col>
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "NO DATA" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3">
@@ -206,17 +216,25 @@
             <button
               type="button"
               class="btn-action btn-secondary mr-2"
-              @click="saveResult"
+              @click="previewResult"
             >
-              <Icon icon="icon-park-outline:save" /> Save Result
+              <Icon icon="icon-park-outline:save" /> Preview JSON
             </button>
 
             <button
               type="button"
-              class="btn-action btn-info"
+              class="btn-action btn-info mr-2"
               @click="toggleSortRanked"
             >
               <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+            </button>
+
+            <button
+              type="button"
+              class="btn-action btn-secondary"
+              @click="saveResult"
+            >
+              <Icon icon="icon-park-outline:save" /> Save Result
             </button>
           </div>
         </div>
@@ -368,12 +386,19 @@
 </template>
 
 <script>
+import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
+import {
+  saveLocalResults,
+  loadLocalResults,
+  mergeTeamsWithCache,
+  debounce,
+} from "@/utils/localStoreSprint";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -563,6 +588,7 @@ export default {
 
   data() {
     return {
+      defaultImg,
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
       selectedSprintKey: "",
@@ -627,6 +653,17 @@ export default {
       dataEvent: {},
       titleCategories: "",
     };
+  },
+
+  watch: {
+    participant: {
+      deep: true,
+      handler: debounce(function () {
+        if (this.selectedSprintKey) {
+          saveLocalResults(this.selectedSprintKey, this.participantArr);
+        }
+      }, 250),
+    },
   },
 
   computed: {
@@ -711,7 +748,42 @@ export default {
         ? this.dataEvent
         : {};
     },
+    hasEventLogo() {
+      var ev = this.dataEventSafe || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        // string URL langsung atau objek { url: '...' }
+        var first = logos[0];
+        if (typeof first === "string" && first) return true;
+        if (
+          first &&
+          typeof first === "object" &&
+          typeof first.url === "string" &&
+          first.url
+        )
+          return true;
+      }
+      return false;
+    },
+    eventLogoUrl() {
+      var ev = this.dataEventSafe || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        var first = logos[0];
+        if (typeof first === "string") return first;
+        if (first && typeof first === "object" && typeof first.url === "string")
+          return first.url;
+      }
+      return "";
+    },
   },
+
+  // beforeRouteLeave(to, from, next) {
+  //   if (this.selectedSprintKey) {
+  //     saveLocalResults(this.selectedSprintKey, this.participantArr);
+  //   }
+  //   next();
+  // },
 
   async mounted() {
     const socket = getSocket();
@@ -746,17 +818,11 @@ export default {
 
     socket.on("custom:event", onMessage);
 
-    // bersihkan listener saat komponen dilepas
     this.$once("hook:beforeDestroy", () => {
       socket.off("connect", onConnect);
       socket.off("custom:event", onMessage);
     });
 
-    // window.addEventListener("scroll", this.handleScroll);
-    // const ok = this.loadFromRaceStartPayload();
-    // if (!ok) await this.checkValueStorage();
-
-    // event details
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -764,11 +830,9 @@ export default {
       this.dataEvent = {};
     }
 
-    // Tetap coba muat dari payload jika ada (agar tabel tidak kosong)
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
-    // === SPRINT BUCKET: bangun opsi & muat teams terdaftar via DB ===
     this.buildStaticSprintOptions();
 
     if (this.sprintBucketOptions.length) {
@@ -780,7 +844,6 @@ export default {
 
       await this.fetchSprintBucketTeamsByKey(this.selectedSprintKey);
     } else {
-      // fallback penuh dari eventDetails
       this.loadAllSprintBucketsFromEvent();
     }
   },
@@ -789,7 +852,6 @@ export default {
     window.removeEventListener("scroll", this.handleScroll);
   },
 
-  /** gunakan guard rute yang benar (bukan di methods) */
   beforeRouteLeave(to, from, next) {
     localStorage.removeItem("raceStartPayload");
     localStorage.removeItem("participantByCategories");
@@ -799,7 +861,6 @@ export default {
   },
 
   methods: {
-    // === SPRINT BUCKET ===
     _sprintBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
       const ii = b && b.initialId ? String(b.initialId) : "";
@@ -817,22 +878,17 @@ export default {
       ).toUpperCase();
       return `${div} ${rac} – ${ini}`;
     },
-
-    // apply bucket: set peserta, judul, sinkron raceStartPayload
     _useSprintBucket(key) {
       const b = this.sprintBucketMap[key];
       if (!b) return;
-
-      // set teams
       this.participant = (b.teams || []).map((t) => ({ ...t }));
 
-      // title kategori
+      const cached = loadLocalResults(key);
+      if (cached.length) {
+        this.participant = mergeTeamsWithCache(this.participant, cached);
+      }
       this.titleCategories = this._sprintBucketLabel(b);
-
-      // simpan pilihan terakhir
       localStorage.setItem("currentSprintBucketKey", key);
-
-      // update raceStartPayload agar saveResult memakai kunci yang sama
       try {
         const raw = localStorage.getItem("raceStartPayload") || "{}";
         const obj = JSON.parse(raw || "{}") || {};
@@ -846,17 +902,13 @@ export default {
         obj.bucket.initialName = String(b.initialName || "");
         obj.bucket.raceName = String(b.raceName || "");
         obj.bucket.divisionName = String(b.divisionName || "");
-        // opsional: obj.bucket.teams = this.participant;
         localStorage.setItem("raceStartPayload", JSON.stringify(obj));
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
-
-      // refresh ranking jika sudah ada waktu
       this.assignRanks(this.participantArr);
     },
 
-    // Build opsi statik dari katalog event (fallback kalau belum ada DB)
     buildStaticSprintOptions() {
       const eventId = this.currentEventId || "";
       if (!eventId) {
@@ -915,14 +967,11 @@ export default {
       this.sprintBucketMap = map;
     },
 
-    // Fallback penuh: baca semua bucket Sprint dari eventDetails.participant
     loadAllSprintBucketsFromEvent() {
       try {
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
         const participant = Array.isArray(ev.participant) ? ev.participant : [];
-
-        // hanya SPRINT
         const sprintBuckets = participant.filter(
           (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
         );
@@ -944,7 +993,6 @@ export default {
         this.sprintBucketMap = map;
         this.sprintBucketOptions = opts;
 
-        // pilih default dan apply
         const savedKey = localStorage.getItem("currentSprintBucketKey");
         if (savedKey && map[savedKey]) {
           this._useSprintBucket(savedKey);
@@ -957,12 +1005,9 @@ export default {
         /* noop */
       }
     },
-    // --- handler perubahan select ---
     async onSelectSprintBucket(key) {
       await this.fetchSprintBucketTeamsByKey(key);
     },
-
-    // --- fetch teams via IPC (mirip SPRINT: fetchBucketTeamsByKey) ---
     // --- fetch teams via IPC (khusus Sprint) ---
     async fetchSprintBucketTeamsByKey(key) {
       try {
@@ -1351,8 +1396,11 @@ export default {
       const sec = Math.floor((diff / 1000) % 60);
       const min = Math.floor((diff / (1000 * 60)) % 60);
       const hr = Math.floor(diff / (1000 * 60 * 60));
-      const pad = (n) => (n < 10 ? "0" + n : "" + n);
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${ms}`;
+
+      const pad2 = (n) => String(n).padStart(2, "0");
+      const pad3 = (n) => String(n).padStart(3, "0"); // ⬅️ penting
+
+      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`; // ⬅️ 3 digit
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -1436,6 +1484,39 @@ export default {
           });
         }
       });
+    },
+
+    previewResult() {
+      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+      if (!Array.isArray(clean) || clean.length === 0) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          detail: "Belum ada data.",
+          message: "Ups Sorry",
+        });
+        return;
+      }
+      const bucket = getBucket();
+      const must = ["eventId", "initialId", "raceId", "divisionId"];
+      const missing = must.filter((k) => !bucket[k]);
+      if (missing.length) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: `Bucket fields missing: ${missing.join(", ")}`,
+          message: "Failed",
+        });
+        return;
+      }
+
+      const docs = buildResultDocs(clean, bucket);
+      const jsonStr = JSON.stringify(docs, null, 2);
+
+      const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
+  <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
+  pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
+  <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
+      const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+      window.open(url, "_blank", "width=980,height=700");
     },
   },
 };
@@ -1529,9 +1610,10 @@ export default {
   font-size: clamp(12px, 1.6vw, 16px);
 }
 .hero-logo {
-  width: 100px;
-  height: 100px;
-  border-radius: 20px;
+  width: 150px;
+  height: 150px;
+  margin-right: 10px;
+  border-radius: 30px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
@@ -1539,6 +1621,15 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
+}
+
+.event-logo-img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
 /* ===== TABLE ===== */

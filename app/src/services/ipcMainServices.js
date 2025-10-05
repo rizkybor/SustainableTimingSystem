@@ -281,7 +281,7 @@ function setupIPCMainHandlers() {
   // LOAD SPRINT RESULT
   ipcMain.on("get-sprint-result", async (event, query = {}) => {
     try {
-      const data = await getSprintResult(query); // << kirim objek, bukan eventId doang
+      const data = await getSprintResult(query);
       event.reply("get-sprint-result-reply", { ok: true, items: data });
     } catch (error) {
       event.reply("get-sprint-result-reply", {
@@ -540,7 +540,6 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-sprint-registered:find", async (event, filters) => {
-    console.log(filters, "<<< FILTER");
     const res = await getRegisteredSprint(filters || {});
     event.sender.send("teams-sprint-registered:find-reply", res);
   });

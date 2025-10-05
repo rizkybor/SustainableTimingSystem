@@ -1283,7 +1283,7 @@ export default {
         });
       }
 
-      const path = this._mapRaceToPath(bucket.eventName);
+      const path = this._mapRaceToPath(this.raceActive.selected.name);
       this.$router.push("/event-detail/" + this.$route.params.id + "/" + path);
     },
   },

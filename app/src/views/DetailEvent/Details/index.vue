@@ -17,7 +17,20 @@
             <div
               class="hero-logo mr-2 d-flex align-items-center justify-content-center"
             >
-              <img :src="defaultImg" alt="Logo" class="event-img" />
+              <template v-if="hasEventLogo">
+                <img
+                  :src="eventLogoUrl"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
+              <template v-else>
+                 <img
+                  :src="defaultImg"
+                  alt="Event Logo"
+                  class="event-logo-img"
+                />
+              </template>
             </div>
           </b-col>
 
@@ -349,6 +362,34 @@ export default {
         this.showPanel("R6", "MEN") ||
         this.showPanel("R6", "WOMEN")
       );
+    },
+    hasEventLogo() {
+      var ev = this.events || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        // string URL langsung atau objek { url: '...' }
+        var first = logos[0];
+        if (typeof first === "string" && first) return true;
+        if (
+          first &&
+          typeof first === "object" &&
+          typeof first.url === "string" &&
+          first.url
+        )
+          return true;
+      }
+      return false;
+    },
+    eventLogoUrl() {
+      var ev = this.events || {};
+      var logos = ev.event_logo;
+      if (Array.isArray(logos) && logos.length > 0) {
+        var first = logos[0];
+        if (typeof first === "string") return first;
+        if (first && typeof first === "object" && typeof first.url === "string")
+          return first.url;
+      }
+      return "";
     },
   },
 
@@ -1265,7 +1306,7 @@ export default {
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
-  min-height: 200px;
+  min-height: 230px;
   overflow: hidden;
 }
 
@@ -1311,24 +1352,27 @@ export default {
   font-size: clamp(12px, 1.6vw, 16px);
 }
 
-/* Kotak logo putih membulat dengan bayangan */
 .hero-logo {
-  width: 120px;
-  height: 120px;
-  border-radius: 20px;
-  background: #ffffff;
+  width: 150px;
+  height: 150px;
+  margin-right: 10px;
+  border-radius: 30px;
+  background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
 }
 
-.hero-logo img {
-  width: 100%;
-  height: 100%;
+.event-logo-img {
+  width: 140px;
+  height: 140px;
   object-fit: contain;
+  border-radius: 10px;
 }
 
 /* Responsif kecil: logo di atas, teks di bawah */

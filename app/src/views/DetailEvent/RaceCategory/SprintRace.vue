@@ -1625,6 +1625,13 @@ export default {
   box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
 }
 
+.event-logo-img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
 /* ===== TABLE ===== */
 table {
   width: 100%;
@@ -1769,12 +1776,5 @@ td {
   .meta-panel {
     padding: 12px;
   }
-}
-
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  border-radius: 10px;
 }
 </style>

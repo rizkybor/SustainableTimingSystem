@@ -1,5 +1,43 @@
 <template>
-  <div class="result-wrap">
+  <div class="result-wrap p-3 mb-2 mt-5">
+    <!-- HERO -->
+    <section class="detail-hero">
+      <div class="hero-bg"></div>
+      <b-container class="hero-inner">
+        <b-row class="align-items-center">
+          <b-col cols="auto" class="pr-0">
+            <div
+              class="hero-logo d-flex align-items-center justify-content-center"
+            >
+              <Icon icon="mdi:shield-crown" width="56" height="56" />
+            </div>
+          </b-col>
+
+          <b-col>
+            <h2 class="h1 font-weight-bold mb-1 text-white">
+              {{
+                eventInfo.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025"
+              }}
+            </h2>
+            <div class="meta text-white-50">
+              <span class="mr-3">
+                <strong class="text-white">Location</strong> :
+                {{ eventInfo.addressCity || "-" }}
+              </span>
+              <span class="mr-3"
+                ><strong class="text-white">River</strong> :
+                {{ eventInfo.riverName || "-" }}</span
+              >
+              <span class="mr-3"
+                ><strong class="text-white">Level</strong> :
+                {{ eventInfo.levelName || "-" }}</span
+              >
+            </div>
+          </b-col>
+        </b-row>
+      </b-container>
+    </section>
+
     <!-- Top bar -->
     <div class="topbar">
       <div class="crumbs">
@@ -48,12 +86,11 @@
       <!-- EVENT HEADER -->
       <div class="event-header">
         <h2 class="event-name">
-          {{ eventInfo.eventName || "-" }}
-          <span class="muted">| SPRINT RESULT</span>
+          <span class="muted"
+            >SPRINT RESULT | {{ sprintCats.initial }} -
+            {{ sprintCats.division }} {{ sprintCats.race }}
+          </span>
         </h2>
-        <h4 class="event-location">
-          {{ eventInfo.riverName || "-" }}, {{ eventInfo.addressCity || "-" }}
-        </h4>
       </div>
 
       <b-alert show variant="danger" v-if="error" class="mb-3">{{
@@ -129,18 +166,45 @@
     </div>
 
     <!-- Komponen PDF (disembunyikan dari layar, tapi ada di DOM) -->
-    <div class="pdf-host sr-only" ref="pdfHost">
-      <SprintPdf
-        :data="pdfEventData"
-        :dataParticipant="pdfParticipants"
-        :categories="pdfCategories"
-      />
-    </div>
+    <vue-html2pdf
+      v-if="showPdf"
+      ref="html2Pdf"
+      :show-layout="false"
+      :float-layout="false"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :pdf-quality="2"
+      :filename="pdfFilename"
+      pdf-format="a4"
+      pdf-orientation="landscape"
+      pdf-content-width="100%"
+      style="
+        position: absolute;
+        left: -99999px;
+        top: 0;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      "
+      @pdfGenerated="onPdfGenerated"
+      @beforeDownload="onBeforeDownload"
+    >
+      <section slot="pdf-content">
+        <SprintPdf
+          :data="pdfEventData"
+          :dataParticipant="pdfParticipants"
+          :categories="pdfCategories"
+          :isOfficial="isOfficial"
+        />
+      </section>
+    </vue-html2pdf>
   </div>
 </template>
 
 <script>
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
+import VueHtml2pdf from "vue-html2pdf";
 import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
@@ -198,14 +262,15 @@ function pickEventFromStore() {
 
 export default {
   name: "SprintResult",
-  components: { Icon, EmptyStateFull, SprintPdf },
-
+  components: { Icon, EmptyStateFull, SprintPdf, VueHtml2pdf },
   data() {
     return {
       isOfficial: false,
       loading: false,
       error: "",
       results: [],
+      showPdf: false,
+      eventInfo: {},
       dataScore: [
         { ranking: 1, score: 100 },
         { ranking: 2, score: 92 },
@@ -244,10 +309,41 @@ export default {
   },
 
   computed: {
+    pdfFilename() {
+      const parts = [];
+      if (this.eventInfo && this.eventInfo.eventName) {
+        parts.push(this.eventInfo.eventName);
+      }
+      const catTitle =
+        "SPRINT (" +
+        (this.sprintCats.initial || "-") +
+        " - " +
+        (this.sprintCats.division || "-") +
+        " " +
+        (this.sprintCats.race || "-") +
+        ")";
+      parts.push(catTitle);
+      return parts.join(" - ") + ".pdf";
+    },
+    sprintCats() {
+      const payload = safeParse(
+        localStorage.getItem("raceStartPayload") || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      const q = this.$route.query || {};
+      return {
+        // urutan sesuai permintaan: Initial, Race, Division
+        initial: b.initialName || q.initialName || "-",
+        race: b.raceName || q.raceName || "-",
+        division: b.divisionName || q.divisionName || "-",
+      };
+    },
     // Info event dari localStorage (fallback ke query)
     eventInfo() {
       const ev = pickEventFromStore();
       const q = this.$route.query || {};
+      console.log(q, ev,'<<< MINGGU')
       return {
         eventName: ev.eventName || q.eventName || "",
         addressCity:
@@ -269,6 +365,8 @@ export default {
 
     // Data untuk komponen PDF
     pdfEventData() {
+      let a ={ ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      console.log(a,'<<<<')
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
     pdfParticipants() {
@@ -303,25 +401,70 @@ export default {
     },
   },
 
-  created() {
+  async created() {
     // load mode OFFICIAL dari localStorage (per event)
     const k = this.officialKey();
     const saved = localStorage.getItem(k);
     if (saved !== null) this.isOfficial = saved === "1";
 
+        // ambil event langsung dari IPC
+    const q = this.$route.query || {};
+    if (q.eventId) {
+      await this.loadEventById(q.eventId);
+    }
+
     this.loadSprintResult();
+  },
+
+  mounted() {
+    window.addEventListener("pdf-generated", (e) =>
+      console.log("[PDF EVENT] pdf-generated", e)
+    );
+    window.addEventListener("hasGenerated", (e) =>
+      console.log("[PDF EVENT] hasGenerated", e)
+    );
+    window.addEventListener("pdfDownloaded", (e) =>
+      console.log("[PDF EVENT] pdfDownloaded", e)
+    );
   },
 
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-    // NEW: key penyimpanan per event
+   // ambil detail event dari IPC
+    async loadEventById(eventId) {
+      try {
+        this.loading = true;
+        ipcRenderer.send("get-events-byid", eventId);
+
+        await new Promise((resolve) => {
+          ipcRenderer.once("get-events-byid-reply", (_e, res) => {
+            this.loading = false;
+            if (res && typeof res === "object") {
+              this.eventInfo = res; // langsung simpan hasil ke data
+            } else {
+              this.eventInfo = {};
+              this.error = "Gagal memuat data event.";
+            }
+            resolve();
+          });
+        });
+      } catch (err) {
+        this.loading = false;
+        this.error = "Terjadi kesalahan saat memuat event.";
+        this.eventInfo = {};
+      }
+    },
+
     officialKey() {
-      // coba pakai eventId dari query atau bucket
       const q = this.$route.query || {};
-      const id = q.eventId || currentEventIdFromBucket() || "global";
-      return `resultOfficialMode:${id}`;
+      return `resultOfficialMode:${q.eventId || "global"}`;
+    },
+
+    toggleOfficial() {
+      this.isOfficial = !this.isOfficial;
+      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
     },
 
     // NEW: toggle & persist
@@ -450,7 +593,7 @@ export default {
         this.error = "Parameter hasil tidak lengkap.";
         return;
       }
-
+      console.log(q, "<< cek");
       this.loading = true;
       this.error = "";
 
@@ -524,29 +667,33 @@ export default {
 
     // PDF
     async generatePdf() {
-      const host = this.$refs.pdfHost;
-      if (!host || !window.html2pdf) {
-        this.error = "PDF generator tidak ditemukan.";
-        return;
-      }
-      await this.$nextTick();
-      const filename =
-        (this.eventInfo.eventName ? `${this.eventInfo.eventName} - ` : "") +
-        "Sprint Result.pdf";
-
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      };
-
       try {
-        await window.html2pdf().set(opt).from(host).save();
-      } catch {
-        this.error = "Gagal membuat PDF.";
+        console.log("[PDF] klik tombol");
+        this.showPdf = true;
+        await this.$nextTick();
+
+        const inst = this.$refs.html2Pdf;
+        if (!inst) return console.error("ref html2Pdf tidak ditemukan");
+
+        // Delay kecil supaya konten sempat render
+        await new Promise((r) => setTimeout(r, 200));
+
+        console.log("[PDF] memanggil generatePdf()…");
+        await inst.generatePdf(); // v1.8.0 akan otomatis trigger download
+        console.log("[PDF] generatePdf() selesai");
+      } catch (e) {
+        console.error("[PDF] gagal generate:", e);
+        this.error = "Gagal membuat PDF";
       }
+    },
+
+    onBeforeDownload() {
+      console.log("[PDF] sebelum download — siap generate PDF");
+    },
+
+    onPdfGenerated(pdf) {
+      console.log("[PDF] pdfGenerated terpanggil:", pdf);
+      this.showPdf = false;
     },
   },
 };
@@ -565,6 +712,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  margin-top: 20px;
 }
 .crumbs {
   display: flex;
@@ -703,5 +851,54 @@ export default {
   transform: rotate(0deg); /* lurus */
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
+}
+
+/* ===== HERO / BANNER ===== */
+.detail-hero {
+  position: relative;
+  overflow: hidden;
+}
+.detail-hero .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
+}
+.detail-hero .hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
+}
+.detail-hero .hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 50px;
+}
+.detail-hero h2 {
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(26px, 4.2vw, 46px);
+  line-height: 1.05;
+  margin-bottom: 6px !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.2px;
+}
+.detail-hero .meta {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(12px, 1.6vw, 16px);
+}
+.hero-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

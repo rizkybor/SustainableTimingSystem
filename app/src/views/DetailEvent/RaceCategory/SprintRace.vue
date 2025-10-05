@@ -211,20 +211,22 @@
               <Icon icon="icon-park-outline:save" /> Preview JSON
             </button>
 
-            <button
-              type="button"
-              class="btn-action btn-secondary mr-2"
-              @click="saveResult"
-            >
-              <Icon icon="icon-park-outline:save" /> Save Result
-            </button>
+           
 
             <button
               type="button"
-              class="btn-action btn-info"
+              class="btn-action btn-info mr-2"
               @click="toggleSortRanked"
             >
               <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+            </button>
+
+             <button
+              type="button"
+              class="btn-action btn-secondary"
+              @click="saveResult"
+            >
+              <Icon icon="icon-park-outline:save" /> Save Result
             </button>
           </div>
         </div>
@@ -382,6 +384,12 @@ import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
+import {
+  saveLocalResults,
+  loadLocalResults,
+  mergeTeamsWithCache,
+  debounce,
+} from "@/utils/localStoreSprint";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -637,6 +645,17 @@ export default {
     };
   },
 
+  watch: {
+    participant: {
+      deep: true,
+      handler: debounce(function () {
+        if (this.selectedSprintKey) {
+          saveLocalResults(this.selectedSprintKey, this.participantArr);
+        }
+      }, 250),
+    },
+  },
+
   computed: {
     // === SPRINT BUCKET ===
     currentEventId() {
@@ -719,6 +738,13 @@ export default {
         ? this.dataEvent
         : {};
     },
+  },
+
+  beforeRouteLeave(to, from, next) {
+    if (this.selectedSprintKey) {
+      saveLocalResults(this.selectedSprintKey, this.participantArr);
+    }
+    next();
   },
 
   async mounted() {
@@ -833,6 +859,11 @@ export default {
 
       // set teams
       this.participant = (b.teams || []).map((t) => ({ ...t }));
+
+      const cached = loadLocalResults(key);
+      if (cached.length) {
+        this.participant = mergeTeamsWithCache(this.participant, cached);
+      }
 
       // title kategori
       this.titleCategories = this._sprintBucketLabel(b);

@@ -694,4 +694,54 @@ export default {
   letter-spacing: 1px;
   display: inline-block;
 }
+
+
+/* ===== HERO / BANNER ===== */
+.detail-hero {
+  position: relative;
+  overflow: hidden;
+}
+.detail-hero .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
+}
+.detail-hero .hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
+}
+.detail-hero .hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 50px;
+}
+.detail-hero h2 {
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(26px, 4.2vw, 46px);
+  line-height: 1.05;
+  margin-bottom: 6px !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.2px;
+}
+.detail-hero .meta {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(12px, 1.6vw, 16px);
+}
+.hero-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>

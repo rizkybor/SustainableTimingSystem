@@ -60,6 +60,7 @@ const {
 
 const {
   getSprintResult,
+  getDrrResult
 } = require("../controllers/GET/getResult.js");
 
 const {

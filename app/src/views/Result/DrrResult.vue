@@ -9,7 +9,7 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-               <template v-if="hasEventLogo">
+              <template v-if="hasEventLogo">
                 <img
                   :src="eventLogoUrl"
                   alt="Event Logo"
@@ -17,7 +17,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -28,9 +28,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                eventInfo.eventName || "-"
-              }}
+              {{ eventInfo.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3">
@@ -77,12 +75,10 @@
     <!-- Card -->
     <div class="card">
       <div class="card-back d-flex justify-content-between align-items-center">
-        <!-- Back di kiri -->
         <b-button variant="link" class="p-0 back-link" @click="goBack">
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <!-- Stamp di kanan: klik untuk toggle -->
         <span
           class="unofficial-stamp"
           :class="{ 'official-stamp': isOfficial }"
@@ -99,9 +95,9 @@
       <!-- EVENT HEADER -->
       <div class="event-header">
         <h2 class="event-name">
-          <span class="muted"
-            >DRR RESULT | {{ sprintCats.initial }} -
-            {{ sprintCats.division }} {{ sprintCats.race }}
+          <span class="muted">
+            DRR RESULT | {{ drrCats.initial }} - {{ drrCats.division }}
+            {{ drrCats.race }}
           </span>
         </h2>
       </div>
@@ -118,7 +114,7 @@
         v-if="!loading && results.length === 0"
         :img-src="require('@/assets/images/404.png')"
         title="No data available"
-        subtitle="Hasil Sprint belum tersedia untuk kategori ini."
+        subtitle="Hasil DRR belum tersedia untuk kategori ini."
         primary-text="Kembali ke Event"
         @primary="goBack"
       />
@@ -134,6 +130,7 @@
               <th>Start Time</th>
               <th>Finish Time</th>
               <th>Race Time</th>
+              <th>Penalty Total</th>
               <th>Penalty Time</th>
               <th>Result</th>
               <th>Ranked</th>
@@ -149,11 +146,12 @@
                 <div class="team">{{ r.nameTeam || "-" }}</div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td>{{ r.startTime || "00:00:000" }}</td>
-              <td>{{ r.finishTime || "00:00:000" }}</td>
-              <td>{{ r.raceTime || "00:00:000" }}</td>
-              <td>{{ r.penaltyTime || "00:00:000" }}</td>
-              <td class="bold">{{ r.resultTime || "00:00:000" }}</td>
+              <td>{{ r.startTime || "00:00:00.000" }}</td>
+              <td>{{ r.finishTime || "00:00:00.000" }}</td>
+              <td>{{ r.raceTime || "00:00:00.000" }}</td>
+              <td>{{ r.totalPenalty || "0" }}</td>
+              <td>{{ r.penaltyTime || "00:00:00.000" }}</td>
+              <td class="bold">{{ r.resultTime || "00:00:00.000" }}</td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
               <td class="text-center">
                 {{
@@ -204,12 +202,12 @@
       @beforeDownload="onBeforeDownload"
     >
       <section slot="pdf-content">
-        <SprintPdf
+        <DrrPdf
           :data="pdfEventData"
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
           :isOfficial="isOfficial"
-          :sprintCats="sprintCats"
+          :drrCats="drrCats"
         />
       </section>
     </vue-html2pdf>
@@ -220,7 +218,7 @@
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import VueHtml2pdf from "vue-html2pdf";
-import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
+import DrrPdf from "../DetailEvent/ResultComponent/drr-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 
@@ -260,24 +258,33 @@ function pickEventFromStore() {
     !Array.isArray(store) &&
     !store.eventName &&
     !store._id;
+
   if (isDict) {
-    return activeId && store[activeId]
-      ? store[activeId]
-      : Object.values(store)[0] || {};
+    if (activeId && store[activeId]) return store[activeId];
+    const vals = Object.values(store);
+    if (vals && vals.length > 0) return vals[0];
+    return {};
   }
+
   if (Array.isArray(store)) {
     if (activeId) {
-      const found = store.find((ev) => evIdToString(ev) === activeId);
-      if (found) return found;
+      let i = 0;
+      while (i < store.length) {
+        const ev = store[i];
+        if (evIdToString(ev) === activeId) return ev;
+        i++;
+      }
     }
     return store[0] || {};
   }
+
   return store; // single object
 }
 
 export default {
-  name: "SprintResult",
-  components: { Icon, EmptyStateFull, SprintPdf, VueHtml2pdf },
+  name: "DrrResult",
+  components: { Icon, EmptyStateFull, DrrPdf, VueHtml2pdf },
+
   data() {
     return {
       defaultImg,
@@ -287,50 +294,51 @@ export default {
       results: [],
       showPdf: false,
       eventInfo: {},
+
+      // DRR score table
       dataScore: [
-        { ranking: 1, score: 100 },
-        { ranking: 2, score: 92 },
-        { ranking: 3, score: 86 },
-        { ranking: 4, score: 82 },
-        { ranking: 5, score: 79 },
-        { ranking: 6, score: 76 },
-        { ranking: 7, score: 73 },
-        { ranking: 8, score: 70 },
-        { ranking: 9, score: 67 },
-        { ranking: 10, score: 64 },
-        { ranking: 11, score: 61 },
-        { ranking: 12, score: 58 },
-        { ranking: 13, score: 55 },
-        { ranking: 14, score: 52 },
-        { ranking: 15, score: 49 },
-        { ranking: 16, score: 46 },
-        { ranking: 17, score: 43 },
-        { ranking: 18, score: 40 },
-        { ranking: 19, score: 38 },
-        { ranking: 20, score: 36 },
-        { ranking: 21, score: 34 },
-        { ranking: 22, score: 32 },
-        { ranking: 23, score: 30 },
-        { ranking: 24, score: 28 },
-        { ranking: 25, score: 26 },
-        { ranking: 26, score: 24 },
-        { ranking: 27, score: 22 },
-        { ranking: 28, score: 20 },
-        { ranking: 29, score: 18 },
-        { ranking: 30, score: 16 },
-        { ranking: 31, score: 14 },
-        { ranking: 32, score: 12 },
+        { ranking: 1, score: 350 },
+        { ranking: 2, score: 322 },
+        { ranking: 3, score: 301 },
+        { ranking: 4, score: 287 },
+        { ranking: 5, score: 277 },
+        { ranking: 6, score: 266 },
+        { ranking: 7, score: 256 },
+        { ranking: 8, score: 245 },
+        { ranking: 9, score: 235 },
+        { ranking: 10, score: 224 },
+        { ranking: 11, score: 214 },
+        { ranking: 12, score: 203 },
+        { ranking: 13, score: 193 },
+        { ranking: 14, score: 182 },
+        { ranking: 15, score: 172 },
+        { ranking: 16, score: 161 },
+        { ranking: 17, score: 151 },
+        { ranking: 18, score: 140 },
+        { ranking: 19, score: 133 },
+        { ranking: 20, score: 126 },
+        { ranking: 21, score: 119 },
+        { ranking: 22, score: 112 },
+        { ranking: 23, score: 105 },
+        { ranking: 24, score: 98 },
+        { ranking: 25, score: 91 },
+        { ranking: 26, score: 84 },
+        { ranking: 27, score: 77 },
+        { ranking: 28, score: 70 },
+        { ranking: 29, score: 63 },
+        { ranking: 30, score: 56 },
+        { ranking: 31, score: 49 },
+        { ranking: 32, score: 42 },
       ],
     };
   },
 
   computed: {
-     hasEventLogo() {
-      var ev = this.eventInfo || {};
-      var logos = ev.event_logo;
+    hasEventLogo() {
+      const ev = this.eventInfo || {};
+      const logos = ev.event_logo;
       if (Array.isArray(logos) && logos.length > 0) {
-        // string URL langsung atau objek { url: '...' }
-        var first = logos[0];
+        const first = logos[0];
         if (typeof first === "string" && first) return true;
         if (
           first &&
@@ -343,10 +351,10 @@ export default {
       return false;
     },
     eventLogoUrl() {
-      var ev = this.eventInfo || {};
-      var logos = ev.event_logo;
+      const ev = this.eventInfo || {};
+      const logos = ev.event_logo;
       if (Array.isArray(logos) && logos.length > 0) {
-        var first = logos[0];
+        const first = logos[0];
         if (typeof first === "string") return first;
         if (first && typeof first === "object" && typeof first.url === "string")
           return first.url;
@@ -355,47 +363,175 @@ export default {
     },
     pdfFilename() {
       const parts = [];
-      if (this.eventInfo && this.eventInfo.eventName) {
+      if (this.eventInfo && this.eventInfo.eventName)
         parts.push(this.eventInfo.eventName);
-      }
       const catTitle =
-        "SPRINT (" +
-        (this.sprintCats.initial || "-") +
+        "DRR (" +
+        (this.drrCats.initial || "-") +
         " - " +
-        (this.sprintCats.division || "-") +
+        (this.drrCats.division || "-") +
         " " +
-        (this.sprintCats.race || "-") +
+        (this.drrCats.race || "-") +
         ")";
       parts.push(catTitle);
       return parts.join(" - ");
     },
-    sprintCats() {
+    drrCats() {
       const payload = safeParse(
-        localStorage.getItem("raceStartPayload") || "{}",
+        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
       const q = this.$route.query || {};
       return {
-        // urutan sesuai permintaan: Initial, Race, Division
         initial: b.initialName || q.initialName || "-",
         race: b.raceName || q.raceName || "-",
         division: b.divisionName || q.divisionName || "-",
       };
     },
-    // Info event dari localStorage (fallback ke query)
-    eventInfo() {
+
+    // Data untuk komponen PDF
+    pdfEventData() {
+      const out = {};
+      const src = this.eventInfo || {};
+      const keys = [
+        "eventName",
+        "addressCity",
+        "riverName",
+        "levelName",
+        "startDateEvent",
+        "endDateEvent",
+        "addressVillage",
+        "addressDistrict",
+        "addressSubDistrict",
+        "addressProvince",
+        "addressState",
+        "addressZipCode",
+        "raceDirector",
+        "chiefJudge",
+        "event_logo",
+      ];
+      let i = 0;
+      while (i < keys.length) {
+        const k = keys[i];
+        out[k] = src[k] != null ? src[k] : k === "event_logo" ? [] : "";
+        i++;
+      }
+      if (!out.levelName) out.levelName = "-";
+      return out;
+    },
+
+    // ambil dari this.results penuh → bentuk yang dipakai PDF
+    pdfParticipants() {
+      const arr = [];
+      const src = Array.isArray(this.results) ? this.results : [];
+      let i = 0;
+      while (i < src.length) {
+        const r = src[i] || {};
+        const rr = r.result || {};
+        const sectionPenalty = Number(rr.sectionPenalty) || 0;
+
+        // aturan: kalau sectionPenalty = 0 → sectionPenaltyTime = []
+        let sectionPenaltyTime;
+        if (sectionPenalty <= 0) {
+          sectionPenaltyTime = [];
+        } else {
+          // normalisasi isi array waktu section (tanpa chaining)
+          sectionPenaltyTime = [];
+          const a = rr.sectionPenaltyTime;
+          if (Array.isArray(a) && a.length > 0) {
+            let j = 0;
+            while (j < a.length) {
+              const val = a[j] != null ? String(a[j]) : "00:00:00.000";
+              sectionPenaltyTime.push(val);
+              j++;
+            }
+          } else {
+            // kalau penalti ada tapi array kosong dari sumber, isi default 3 slot nol
+            sectionPenaltyTime = [
+              "00:00:00.000",
+              "00:00:00.000",
+              "00:00:00.000",
+            ];
+          }
+        }
+
+        arr.push({
+          nameTeam: r.nameTeam || "",
+          bibTeam: r.bibTeam || "",
+          result: {
+            startTime: rr.startTime || "",
+            finishTime: rr.finishTime || "",
+            raceTime: rr.raceTime || "",
+            startPenalty: Number(rr.startPenalty) || 0,
+            finishPenalty: Number(rr.finishPenalty) || 0,
+            sectionPenalty: sectionPenalty,
+            totalPenalty:
+              Number(rr.totalPenalty) ||
+              (Number(rr.startPenalty) || 0) +
+                (Number(rr.finishPenalty) || 0) +
+                sectionPenalty,
+            startPenaltyTime: rr.startPenaltyTime || "00:00:00.000",
+            finishPenaltyTime: rr.finishPenaltyTime || "00:00:00.000",
+            sectionPenaltyTime: sectionPenaltyTime,
+            totalPenaltyTime:
+              rr.totalPenaltyTime || rr.penaltyTime || "00:00:00.000",
+            totalTime: rr.totalTime || r.resultTime || r.raceTime || "",
+            ranked: rr.ranked || r.ranked || "",
+            score:
+              rr.score != null && rr.score !== ""
+                ? Number(rr.score)
+                : this.getScoreByRanked(rr.ranked || r.ranked) || 0,
+            judgesBy: rr.judgesBy || "",
+            judgesTime: rr.judgesTime || "",
+          },
+        });
+        i++;
+      }
+      return arr;
+    },
+
+    pdfCategories() {
+      const payload = safeParse(
+        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      const parts = [];
+      if (b.divisionName) parts.push(b.divisionName);
+      if (b.raceName) parts.push(b.raceName);
+      if (b.initialName) parts.push(b.initialName);
+      if (parts.length === 0) return "DRR";
+      let i = 0;
+      let title = "";
+      while (i < parts.length) {
+        if (i > 0) title += " – ";
+        title += parts[i];
+        i++;
+      }
+      return title;
+    },
+  },
+
+  async created() {
+    // OFFICIAL mode (per event)
+    const k = this.officialKey();
+    const saved = localStorage.getItem(k);
+    if (saved !== null) this.isOfficial = saved === "1";
+
+    // Event info dari IPC atau localStorage
+    const q = this.$route.query || {};
+    if (q.eventId) {
+      await this.loadEventById(q.eventId);
+    } else {
       const ev = pickEventFromStore();
-      const q = this.$route.query || {};
-      console.log(q, ev,'<<< MINGGU')
-      return {
-        eventName: ev.eventName || q.eventName || "",
-        addressCity:
-          ev.addressCity || ev.location || q.addressCity || q.location || "",
-        riverName: ev.riverName || q.riverName || "",
-        levelName: ev.levelName || q.levelName || "",
-        startDateEvent: ev.startDateEvent || q.startDateEvent || "",
-        endDateEvent: ev.endDateEvent || q.endDateEvent || "",
+      this.eventInfo = {
+        eventName: ev.eventName || "",
+        addressCity: ev.addressCity || ev.location || "",
+        riverName: ev.riverName || "",
+        levelName: ev.levelName || "",
+        startDateEvent: ev.startDateEvent || "",
+        endDateEvent: ev.endDateEvent || "",
         addressVillage: ev.addressVillage || "",
         addressDistrict: ev.addressDistrict || "",
         addressSubDistrict: ev.addressSubDistrict || "",
@@ -404,79 +540,31 @@ export default {
         addressZipCode: ev.addressZipCode || "",
         raceDirector: ev.raceDirector || "",
         chiefJudge: ev.chiefJudge || "",
+        event_logo: ev.event_logo || [],
       };
-    },
-
-    // Data untuk komponen PDF
-    pdfEventData() {
-      let a ={ ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
-    },
-    pdfParticipants() {
-      return (this.results || []).map((r) => ({
-        nameTeam: r.nameTeam,
-        bibTeam: r.bibTeam,
-        result: {
-          startTime: r.startTime || "",
-          finishTime: r.finishTime || "",
-          raceTime: r.raceTime || "",
-          penaltyTime: r.penaltyTime || "00:00:00.000",
-          penalty: Number(r.totalPenalty) || 0,
-          totalTime: r.totalTime || r.resultTime || r.raceTime || "",
-          ranked: r.ranked || "",
-          score:
-            r.score !== undefined && r.score !== null && r.score !== ""
-              ? r.score
-              : this.getScoreByRanked(r.ranked) || 0,
-        },
-      }));
-    },
-    pdfCategories() {
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      const title = [b.divisionName, b.raceName, b.initialName]
-        .filter(Boolean)
-        .join(" – ");
-      return title || "SPRINT";
-    },
-  },
-
-  async created() {
-    // load mode OFFICIAL dari localStorage (per event)
-    const k = this.officialKey();
-    const saved = localStorage.getItem(k);
-    if (saved !== null) this.isOfficial = saved === "1";
-
-        // ambil event langsung dari IPC
-    const q = this.$route.query || {};
-    console.log(q,'<<<< cek')
-    if (q.eventId) {
-      await this.loadEventById(q.eventId);
     }
 
-    this.loadSprintResult();
+    this.loadDrrResult();
   },
 
   mounted() {
-    window.addEventListener("pdf-generated", (e) =>
-      console.log("[PDF EVENT] pdf-generated", e)
-    );
-    window.addEventListener("hasGenerated", (e) =>
-      console.log("[PDF EVENT] hasGenerated", e)
-    );
-    window.addEventListener("pdfDownloaded", (e) =>
-      console.log("[PDF EVENT] pdfDownloaded", e)
-    );
+    window.addEventListener("pdf-generated", function (e) {
+      console.log("[PDF EVENT] pdf-generated", e);
+    });
+    window.addEventListener("hasGenerated", function (e) {
+      console.log("[PDF EVENT] hasGenerated", e);
+    });
+    window.addEventListener("pdfDownloaded", function (e) {
+      console.log("[PDF EVENT] pdfDownloaded", e);
+    });
   },
 
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-   // ambil detail event dari IPC
+
+    // ambil detail event dari IPC
     async loadEventById(eventId) {
       try {
         this.loading = true;
@@ -486,7 +574,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             if (res && typeof res === "object") {
-              this.eventInfo = res; // langsung simpan hasil ke data
+              this.eventInfo = res;
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -503,7 +591,7 @@ export default {
 
     officialKey() {
       const q = this.$route.query || {};
-      return `resultOfficialMode:${q.eventId || "global"}`;
+      return "resultOfficialMode:" + (q.eventId || "global");
     },
 
     toggleOfficial() {
@@ -511,127 +599,137 @@ export default {
       localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
     },
 
-    // NEW: toggle & persist
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
-    },
     openEdit(row) {
       this.$emit("edit-row", row);
     },
+
     getScoreByRanked(ranked) {
-      const m = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return m ? m.score : 0;
-    },
-
-    /** Normalisasi baris hasil; aman untuk 2 bentuk: flat atau r.result */
-    normalizeResult(raw) {
-      const base = {
-        startTime: "",
-        finishTime: "",
-        raceTime: "",
-        startPenalty: 0,
-        finishPenalty: 0,
-        penalty: 0,
-        totalPenalty: 0,
-        startPenaltyTime: "00:00:00.000",
-        finishPenaltyTime: "00:00:00.000",
-        totalPenaltyTime: "00:00:00.000",
-        penaltyTime: "",
-        totalTime: "",
-        ranked: "",
-        score: "",
-      };
-
-      // dukung schema lama/baru
-      const src =
-        raw && raw.result && typeof raw.result === "object"
-          ? { ...raw, ...raw.result } // flatten
-          : { ...raw };
-
-      const merged = {
-        ...base,
-        startTime: String(src.startTime || ""),
-        finishTime: String(src.finishTime || ""),
-        raceTime: String(src.raceTime || ""),
-        penalty: Number(src.penalty) || 0,
-        totalPenalty: Number(src.totalPenalty) || 0,
-        startPenalty: Number(src.startPenalty) || 0,
-        finishPenalty: Number(src.finishPenalty) || 0,
-        startPenaltyTime: String(src.startPenaltyTime || "00:00:00.000"),
-        finishPenaltyTime: String(src.finishPenaltyTime || "00:00:00.000"),
-        totalPenaltyTime: String(
-          src.totalPenaltyTime || src.penaltyTime || "00:00:00.000"
-        ),
-        penaltyTime: String(
-          src.penaltyTime || src.totalPenaltyTime || "00:00:00.000"
-        ),
-        totalTime: String(src.totalTime || ""),
-        ranked:
-          src.ranked === 0 || src.ranked === "0" ? 0 : Number(src.ranked) || "",
-        score:
-          src.score === 0 || src.score === "0" ? 0 : Number(src.score) || "",
-      };
-
-      // hitung totalPenalty jika belum ada
-      if (!merged.totalPenalty) {
-        merged.totalPenalty = merged.startPenalty + merged.finishPenalty;
+      let i = 0;
+      const r = Number(ranked);
+      while (i < this.dataScore.length) {
+        const row = this.dataScore[i];
+        if (row && row.ranking === r) return row.score;
+        i++;
       }
-
-      return merged;
+      return 0;
     },
 
-    /** "HH:MM:SS.mmm" -> ms (Infinity kalau kosong/tidak valid) */
+    /** Normalisasi DATAR untuk keperluan tabel (disimpan juga di top-level) */
+    normalizeResultFlat(raw) {
+      const r = raw && raw.result ? raw.result : {};
+
+      const startPenalty = Number(r.startPenalty) || 0;
+      const finishPenalty = Number(r.finishPenalty) || 0;
+      const sectionPenalty = Number(r.sectionPenalty) || 0;
+      const totalPenalty =
+        Number(r.totalPenalty) || startPenalty + finishPenalty + sectionPenalty;
+
+      const startTime = r.startTime ? String(r.startTime) : "";
+      const finishTime = r.finishTime ? String(r.finishTime) : "";
+      const raceTime = r.raceTime ? String(r.raceTime) : "";
+
+      const totalPenaltyTime =
+        r.totalPenaltyTime || r.penaltyTime || "00:00:00.000";
+      const totalTime = r.totalTime ? String(r.totalTime) : "";
+
+      let isZeroPenTime = false;
+      if (totalPenaltyTime === "00:00:00.000") {
+        if (!r.penaltyTime || r.penaltyTime === "00:00:00.000")
+          isZeroPenTime = true;
+      }
+      const resultTime = isZeroPenTime ? raceTime : totalTime || raceTime;
+
+      return {
+        startTime: startTime,
+        finishTime: finishTime,
+        raceTime: raceTime,
+        startPenalty: startPenalty,
+        finishPenalty: finishPenalty,
+        sectionPenalty: sectionPenalty,
+        totalPenalty: totalPenalty,
+        startPenaltyTime: r.startPenaltyTime || "00:00:00.000",
+        finishPenaltyTime: r.finishPenaltyTime || "00:00:00.000",
+        totalPenaltyTime: totalPenaltyTime,
+        penaltyTime: r.penaltyTime || totalPenaltyTime,
+        totalTime: totalTime,
+        ranked: Number(r.ranked) || 0,
+        score: Number(r.score) || 0,
+        resultTime: resultTime,
+      };
+    },
+
+    /** "HH:MM:SS.mmm" -> ms */
     timeToMs(str) {
       if (!str) return Number.POSITIVE_INFINITY;
-      const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
-      const [ss = "0", ms = "0"] = String(ssms).split(".");
-      const h = parseInt(hh, 10) || 0;
-      const m = parseInt(mm, 10) || 0;
-      const s = parseInt(ss, 10) || 0;
-      const mil = parseInt(ms, 10) || 0;
-      return h * 3600000 + m * 60000 + s * 1000 + mil;
+      const s = String(str);
+      const p = s.split(":");
+      const hh = p[0] || "0";
+      const mm = p[1] || "0";
+      const ssms = p[2] || "0";
+      const sp = String(ssms).split(".");
+      const ss = sp[0] || "0";
+      const ms = sp[1] || "0";
+      let h = parseInt(hh, 10);
+      let m = parseInt(mm, 10);
+      let si = parseInt(ss, 10);
+      let mi = parseInt(ms, 10);
+      if (!Number.isFinite(h)) h = 0;
+      if (!Number.isFinite(m)) m = 0;
+      if (!Number.isFinite(si)) si = 0;
+      if (!Number.isFinite(mi)) mi = 0;
+      return h * 3600000 + m * 60000 + si * 1000 + mi;
     },
 
-    /** Hitung rank & score otomatis */
-    computeRanksAndScores(rows) {
-      const withTime = rows
-        .map((r, i) => {
-          const t = r.resultTime || r.totalTime || r.raceTime || "";
-          return { i, ms: this.timeToMs(t) };
-        })
-        .filter(
-          (x) => Number.isFinite(x.ms) && x.ms !== Number.POSITIVE_INFINITY
-        );
+    /** Ranking + score (pakai result.__resultMs) */
+    rankAndScoreFullRows(rows) {
+      // kumpulkan indeks yang punya waktu valid
+      const idx = [];
+      let i = 0;
+      while (i < rows.length) {
+        const r = rows[i] && rows[i].result ? rows[i].result : null;
+        if (r && Number.isFinite(r.__resultMs)) idx.push(i);
+        i++;
+      }
 
-      withTime.sort((a, b) => a.ms - b.ms);
-
-      withTime.forEach((item, idx) => {
-        const rank = idx + 1;
-        rows[item.i].ranked = rank;
-        rows[item.i].score = this.getScoreByRanked(rank);
-      });
-
-      rows.forEach((r) => {
-        if (!r.ranked || r.ranked === "-" || Number(r.ranked) <= 0) {
-          r.ranked = r.ranked ? r.ranked : "-";
-          r.score =
-            r.score !== undefined && r.score !== null && r.score !== ""
-              ? Number(r.score) || 0
-              : 0;
+      // selection sort idx berdasarkan __resultMs
+      let a = 0;
+      while (a < idx.length - 1) {
+        let minPos = a;
+        let b = a + 1;
+        while (b < idx.length) {
+          const ia = idx[minPos];
+          const ib = idx[b];
+          const msa = rows[ia].result.__resultMs;
+          const msb = rows[ib].result.__resultMs;
+          if (msb < msa) minPos = b;
+          b++;
         }
-      });
+        if (minPos !== a) {
+          const tmp = idx[a];
+          idx[a] = idx[minPos];
+          idx[minPos] = tmp;
+        }
+        a++;
+      }
 
-      rows.sort((a, b) => {
-        const ra = Number(a.ranked) || Infinity;
-        const rb = Number(b.ranked) || Infinity;
-        return ra - rb;
-      });
-
-      return rows;
+      // assign rank + score
+      let rank = 1;
+      let k = 0;
+      while (k < idx.length) {
+        const irow = idx[k];
+        rows[irow].result.ranked = rank;
+        if (!rows[irow].result.score) {
+          rows[irow].result.score = this.getScoreByRanked(rank);
+        }
+        // sinkronkan field datar untuk tabel
+        rows[irow].ranked = rows[irow].result.ranked;
+        rows[irow].score = rows[irow].result.score;
+        k++;
+        rank++;
+      }
     },
 
-    async loadSprintResult() {
+    async loadDrrResult() {
       const q = this.$route.query || {};
       if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) {
         this.error = "Parameter hasil tidak lengkap.";
@@ -641,10 +739,8 @@ export default {
       this.loading = true;
       this.error = "";
 
-      // kirim permintaan
       ipcRenderer.send("get-drr-result", q);
 
-      // timeout failsafe supaya UI tidak menggantung
       let timeoutId;
       const TIMEOUT_MS = 8000;
 
@@ -657,50 +753,209 @@ export default {
 
         ipcRenderer.once("get-drr-result-reply", (_e, res) => {
           clearTimeout(timeoutId);
+
           try {
-            if (res && res.ok && Array.isArray(res.items)) {
-              const rows = [];
-              res.items.forEach((doc) => {
-                const arr = Array.isArray(doc.result)
-                ? doc.result
-                : [doc.result || {}];
-                arr.forEach((r) => {
-                  const R = this.normalizeResult(r);
-                  console.log(R,'<<<<<< cek')
-
-                  // rows.push({
-                  //   nameTeam: r.nameTeam || doc.nameTeam || "",
-                  //   bibTeam: r.bibTeam || doc.bibTeam || "",
-                  //   startTime: R.startTime || "",
-                  //   finishTime: R.finishTime || "",
-                  //   raceTime: R.raceTime || "",
-                  //   totalPenalty: Number(R.totalPenalty) || 0,
-                  //   penaltyTime:
-                  //     R.totalPenaltyTime || R.penaltyTime || "00:00:00.000",
-                  //   resultTime: R.penaltyTime
-                  //     ? R.totalTime || R.raceTime || ""
-                  //     : R.raceTime || "",
-                  //   totalTime: R.totalTime || "",
-                  //   ranked: Number(R.ranked) || 0,
-                  //   score:
-                  //     R.score !== undefined &&
-                  //     R.score !== null &&
-                  //     R.score !== ""
-                  //       ? Number(R.score)
-                  //       : 0,
-                  // });
-                });
-              });
-
-              this.results = this.computeRanksAndScores(rows);
-              this.loading = false;
-            } else {
+            if (!(res && res.ok && Array.isArray(res.items))) {
               this.results = [];
               this.error = (res && res.error) || "Gagal memuat hasil.";
               this.loading = false;
+              resolve();
+              return;
             }
+
+            // --- helper kecil ---
+            const self = this;
+            function asStr(v, d) {
+              if (d === undefined) d = "";
+              return v == null ? d : String(v);
+            }
+            function asNum(v, d) {
+              if (d === undefined) d = 0;
+              const n = Number(v);
+              return Number.isFinite(n) ? n : d;
+            }
+            function timeOrZero(t) {
+              const s = asStr(t, "");
+              return s ? s : "00:00:00.000";
+            }
+
+            // NORMALISASI PENUH satu tim (lengkap, plus field datar utk tabel)
+            function normalizeTeamFull(team) {
+              const rIn = (team && team.result) || {};
+
+              const startPenalty = asNum(rIn.startPenalty, 0);
+              const finishPenalty = asNum(rIn.finishPenalty, 0);
+              const sectionPenalty = asNum(rIn.sectionPenalty, 0);
+              const totalPenalty = asNum(
+                rIn.totalPenalty,
+                startPenalty + finishPenalty + sectionPenalty
+              );
+
+              const startPenaltyTime = timeOrZero(rIn.startPenaltyTime);
+              const finishPenaltyTime = timeOrZero(rIn.finishPenaltyTime);
+
+              // ATURAN BARU: kalau sectionPenalty = 0 → sectionPenaltyTime = []
+              let sectionPenaltyTime = [];
+              if (sectionPenalty > 0) {
+                const a = rIn.sectionPenaltyTime;
+                if (Array.isArray(a) && a.length > 0) {
+                  let ii = 0;
+                  while (ii < a.length) {
+                    sectionPenaltyTime.push(timeOrZero(a[ii]));
+                    ii++;
+                  }
+                } else {
+                  // kalau penalti ada tapi array kosong → isi default 3 nol
+                  sectionPenaltyTime = [
+                    "00:00:00.000",
+                    "00:00:00.000",
+                    "00:00:00.000",
+                  ];
+                }
+              } // else tetap []
+
+              const penaltyTimeSrc =
+                rIn.totalPenaltyTime != null
+                  ? rIn.totalPenaltyTime
+                  : rIn.penaltyTime;
+              const penaltyTime = timeOrZero(penaltyTimeSrc);
+
+              const raceTime = asStr(rIn.raceTime, "");
+              const totalTime = asStr(
+                rIn.totalTime != null ? rIn.totalTime : raceTime,
+                ""
+              );
+
+              let isZeroPen = false;
+              if (penaltyTime === "00:00:00.000") {
+                if (!rIn.penaltyTime || rIn.penaltyTime === "00:00:00.000")
+                  isZeroPen = true;
+              }
+              const resultTime = isZeroPen ? raceTime : totalTime || raceTime;
+
+              const resultObj = {
+                startTime: timeOrZero(rIn.startTime),
+                finishTime: timeOrZero(rIn.finishTime),
+                raceTime: raceTime,
+                startPenalty: startPenalty,
+                finishPenalty: finishPenalty,
+                sectionPenalty: sectionPenalty,
+                totalPenalty: totalPenalty,
+                startPenaltyTime: startPenaltyTime,
+                finishPenaltyTime: finishPenaltyTime,
+                sectionPenaltyTime: sectionPenaltyTime,
+                totalPenaltyTime: penaltyTime,
+                totalTime: totalTime,
+                ranked: asNum(rIn.ranked, 0),
+                score: asNum(rIn.score, 0),
+                judgesBy: asStr(rIn.judgesBy, ""),
+                judgesTime: asStr(rIn.judgesTime, ""),
+                __resultTime: resultTime,
+                __resultMs: self.timeToMs(resultTime),
+              };
+
+              const otrObj = {
+                startTime: asStr(team && team.otr && team.otr.startTime, ""),
+                finishTime: asStr(team && team.otr && team.otr.finishTime, ""),
+                raceTime: asStr(team && team.otr && team.otr.raceTime, ""),
+                penaltyStartTime: asStr(
+                  team && team.otr && team.otr.penaltyStartTime,
+                  ""
+                ),
+                penaltyFinishTime: asStr(
+                  team && team.otr && team.otr.penaltyFinishTime,
+                  ""
+                ),
+                penaltySection: (function () {
+                  const a = team && team.otr && team.otr.penaltySection;
+                  if (Array.isArray(a)) {
+                    const out = [];
+                    let i2 = 0;
+                    while (i2 < a.length) {
+                      out.push(asStr(a[i2], ""));
+                      i2++;
+                    }
+                    return out;
+                  }
+                  return ["", "", ""];
+                })(),
+                penaltyTime: asStr(
+                  team && team.otr && team.otr.penaltyTime,
+                  ""
+                ),
+                totalTime: asStr(team && team.otr && team.otr.totalTime, ""),
+                ranked: asStr(team && team.otr && team.otr.ranked, ""),
+                score: asStr(team && team.otr && team.otr.score, ""),
+                penalty: asStr(team && team.otr && team.otr.penalty, ""),
+              };
+
+              // objek akhir per tim (lengkap) + field datar untuk tabel
+              const flat = self.normalizeResultFlat({ result: resultObj });
+              const out = {
+                nameTeam: asStr(team && team.nameTeam, ""),
+                bibTeam: asStr(team && team.bibTeam, ""),
+                startOrder: asStr(team && team.startOrder, ""),
+                praStart: asStr(team && team.praStart, ""),
+                intervalRace: asStr(team && team.intervalRace, ""),
+                statusId: asNum(team && team.statusId, 0),
+
+                // hasil lengkap
+                result: resultObj,
+                otr: otrObj,
+
+                // field datar supaya tabel tetap jalan seperti sekarang
+                startTime: flat.startTime,
+                finishTime: flat.finishTime,
+                raceTime: flat.raceTime,
+                startPenalty: flat.startPenalty,
+                finishPenalty: flat.finishPenalty,
+                sectionPenalty: flat.sectionPenalty,
+                totalPenalty: flat.totalPenalty,
+                startPenaltyTime: flat.startPenaltyTime,
+                finishPenaltyTime: flat.finishPenaltyTime,
+                totalPenaltyTime: flat.totalPenaltyTime,
+                penaltyTime: flat.penaltyTime,
+                totalTime: flat.totalTime,
+                resultTime: flat.resultTime,
+                ranked: flat.ranked,
+                score: flat.score,
+                sectionPenaltyTime: resultObj.sectionPenaltyTime
+              };
+
+              return out;
+            }
+
+            // rakit rows penuh
+            const rows = [];
+            const items = Array.isArray(res.items) ? res.items : [res.items];
+            let di = 0;
+            while (di < items.length) {
+              const doc = items[di];
+              const teams = doc && Array.isArray(doc.result) ? doc.result : [];
+              let ti = 0;
+              while (ti < teams.length) {
+                rows.push(normalizeTeamFull(teams[ti]));
+                ti++;
+              }
+              di++;
+            }
+
+            // ranking + score, sinkronkan ke field datar
+            this.rankAndScoreFullRows(rows);
+
+            // bersihkan field internal
+            let ci = 0;
+            while (ci < rows.length) {
+              if (rows[ci] && rows[ci].result) {
+                delete rows[ci].result.__resultTime;
+                delete rows[ci].result.__resultMs;
+              }
+              ci++;
+            }
+
+            this.results = rows; // SIMPAN PENUH
+            this.loading = false;
           } catch (err) {
-            // jika parsing error, jangan biarkan UI menggantung
             this.results = [];
             this.error = "Terjadi kesalahan saat memproses data.";
             this.loading = false;
@@ -714,19 +969,17 @@ export default {
     // PDF
     async generatePdf() {
       try {
-        console.log("[PDF] klik tombol");
         this.showPdf = true;
         await this.$nextTick();
-
         const inst = this.$refs.html2Pdf;
-        if (!inst) return console.error("ref html2Pdf tidak ditemukan");
-
-        // Delay kecil supaya konten sempat render
-        await new Promise((r) => setTimeout(r, 200));
-
-        console.log("[PDF] memanggil generatePdf()…");
-        await inst.generatePdf(); // v1.8.0 akan otomatis trigger download
-        console.log("[PDF] generatePdf() selesai");
+        if (!inst) {
+          console.error("ref html2Pdf tidak ditemukan");
+          return;
+        }
+        await new Promise(function (r) {
+          setTimeout(r, 200);
+        });
+        await inst.generatePdf();
       } catch (e) {
         console.error("[PDF] gagal generate:", e);
         this.error = "Gagal membuat PDF";
@@ -734,11 +987,10 @@ export default {
     },
 
     onBeforeDownload() {
-      console.log("[PDF] sebelum download — siap generate PDF");
+      // hook opsional
     },
 
-    onPdfGenerated(pdf) {
-      console.log("[PDF] pdfGenerated terpanggil:", pdf);
+    onPdfGenerated() {
       this.showPdf = false;
     },
   },
@@ -806,12 +1058,6 @@ export default {
   color: #2d2d2d;
   margin: 0;
 }
-.event-location {
-  font-size: 18px;
-  font-weight: 700;
-  color: #444;
-  margin: 4px 0 0;
-}
 
 /* table */
 .table-wrap {
@@ -849,17 +1095,6 @@ export default {
 .text-center {
   text-align: center;
 }
-.empty {
-  text-align: center;
-  color: #9aa0aa;
-  padding: 16px;
-}
-
-/* buttons */
-.icon-btn {
-  border-radius: 10px;
-  padding: 6px 9px;
-}
 .loading-row {
   display: inline-flex;
   align-items: center;
@@ -867,34 +1102,23 @@ export default {
   color: #6a6f7a;
 }
 
-/* sr-only untuk html2pdf */
-.sr-only {
-  position: absolute !important;
-  left: -99999px !important;
-  top: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
 .unofficial-stamp {
-  color: #d9534f; /* merah */
+  color: #d9534f;
   font-weight: bold;
   text-transform: uppercase;
   border: 2px solid #d9534f;
   padding: 4px 10px;
   border-radius: 4px;
-  transform: rotate(5deg); /* sedikit miring biar mirip cap */
+  transform: rotate(5deg);
   opacity: 0.8;
   font-size: 1.3rem;
   letter-spacing: 1px;
   display: inline-block;
 }
-
 .official-stamp {
-  color: #148a3b; /* hijau */
+  color: #148a3b;
   border-color: #148a3b;
-  transform: rotate(0deg); /* lurus */
+  transform: rotate(0deg);
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
@@ -947,10 +1171,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
 }
-
 .event-logo-img {
   width: 140px;
   height: 140px;

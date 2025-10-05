@@ -1,0 +1,59 @@
+[
+  {
+    "eventId": "68b5bf07a338efc467bf4850",
+    "initialId": "6",
+    "raceId": "1",
+    "divisionId": "1",
+    "eventName": "DRR",
+    "initialName": "OPEN NATIONAL",
+    "raceName": "MEN",
+    "divisionName": "R4",
+    "nameTeam": "TIGARAKSA CLUB",
+    "bibTeam": "44",
+    "startOrder": "",
+    "praStart": "",
+    "intervalRace": "",
+    "statusId": 0,
+    "result": {
+      "startTime": "08:00:00.000",
+      "finishTime": "08:40:00.000",
+      "raceTime": "00:40:00.000",
+      "startPenalty": 0,
+      "finishPenalty": 0,
+      "sectionPenalty": 0,
+      "totalPenalty": 0,
+      "startPenaltyTime": "00:00:50.000",
+      "finishPenaltyTime": "00:00:50.000",
+      "sectionPenaltyTime": [
+        "00:00:00.000",
+        "00:00:00.000",
+        "00:00:00.000"
+      ],
+      "totalPenaltyTime": "00:01:40.000",
+      "totalTime": "00:41:40.000",
+      "ranked": 1,
+      "score": 0,
+      "judgesBy": "",
+      "judgesTime": ""
+    },
+    "otr": {
+      "startTime": "",
+      "finishTime": "",
+      "raceTime": "",
+      "penaltyStartTime": "",
+      "penaltyFinishTime": "",
+      "penaltySection": [
+        "",
+        "",
+        ""
+      ],
+      "penaltyTime": "",
+      "totalTime": "",
+      "ranked": "",
+      "score": "",
+      "penalty": ""
+    },
+    "createdAt": "2025-10-05T20:11:57.629Z",
+    "updatedAt": "2025-10-05T20:11:57.629Z"
+  }
+]

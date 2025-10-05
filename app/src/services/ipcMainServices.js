@@ -29,10 +29,14 @@ const {
 
 const {
   insertNewEvent,
-  insertSprintResult,
-  insertSlalomResult,
   updateEventPoster,
 } = require("../controllers/INSERT/insertNewEvent.js");
+
+const {
+  insertSprintResult,
+  insertSlalomResult,
+  insertDrrResult,
+} = require("../controllers/INSERT/insertResultEventByCategories.js");
 
 const {
   getTeamsRegistered,
@@ -56,7 +60,6 @@ const {
 
 const {
   getSprintResult,
-  existsSprintResult,
 } = require("../controllers/GET/getResult.js");
 
 const {

@@ -32,7 +32,7 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-             <template v-if="hasEventLogo">
+              <template v-if="hasEventLogo">
                 <img
                   :src="eventLogoUrl"
                   alt="Event Logo"
@@ -40,7 +40,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -211,6 +211,17 @@
               </b-form-group>
 
               <div class="drr-actionbar__buttons">
+                <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
+                <button
+                  type="button"
+                  class="btn-action btn-warning"
+                  @click="previewJson"
+                  :disabled="!currentBucket || !participantArr.length"
+                  title="Tampilkan JSON yang akan disimpan"
+                >
+                  <Icon icon="mdi:code-json" /> Preview JSON
+                </button>
+
                 <button
                   type="button"
                   class="btn-action btn-secondary"
@@ -412,6 +423,72 @@
         </b-button>
       </div>
     </div>
+
+    <!-- === NEW: MODAL PREVIEW JSON (TAMBAHAN) === -->
+    <b-modal
+      id="preview-json-modal"
+      title="Preview JSON – Down River Race"
+      size="xl"
+      hide-footer
+    >
+      <div class="mb-2 text-muted small">
+        <div><strong>Bucket</strong> : {{ titleCategories || "-" }}</div>
+        <div>
+          <strong>Total Teams</strong> :
+          {{ (previewDocs && previewDocs.length) || 0 }}
+        </div>
+      </div>
+
+      <b-form-group label="Pretty print:" label-cols-sm="2" class="mb-2">
+        <b-form-checkbox
+          v-model="prettyPrint"
+          switch
+          @change="refreshPreviewText"
+        >
+          {{ prettyPrint ? "ON" : "OFF" }}
+        </b-form-checkbox>
+      </b-form-group>
+
+      <div class="json-scroll">
+        <pre class="json-pre">{{ previewJsonText }}</pre>
+      </div>
+
+      <div class="d-flex justify-content-between mt-3">
+        <div class="d-flex">
+          <b-button
+            variant="outline-secondary"
+            class="mr-2 btn-action"
+            @click="copyPreview"
+          >
+            <Icon icon="mdi:content-copy" /> Copy JSON
+          </b-button>
+          <b-button
+            variant="outline-secondary"
+            class="btn-action"
+            @click="downloadPreview"
+          >
+            <Icon icon="mdi:download" /> Download JSON
+          </b-button>
+        </div>
+        <div class="d-flex">
+          <b-button
+            variant="secondary"
+            class="mr-2 btn-action"
+            @click="$bvModal.hide('preview-json-modal')"
+          >
+            Cancel
+          </b-button>
+          <b-button
+            variant="success"
+            class="btn-action"
+            @click="saveResultConfirmed"
+          >
+            <Icon icon="mdi:check-circle" /> Continue &amp; Save
+          </b-button>
+        </div>
+      </div>
+    </b-modal>
+    <!-- === END MODAL PREVIEW JSON === -->
   </div>
 </template>
 
@@ -454,54 +531,102 @@ function getBucket() {
 
 function buildResultDocs(participantArr, bucket) {
   const now = new Date();
+
+  const asStr = (v) => (v == null ? "" : String(v));
+  const asNum = (v, d = 0) =>
+    Number.isFinite(Number(v)) ? Number(v) : Number(d);
+  const timeOrZero = (t) => asStr(t) || "00:00:00.000";
+
   return participantArr.map((t) => {
     const team = {
-      nameTeam: String(t.nameTeam || ""),
-      bibTeam: String(t.bibTeam || ""),
-      startOrder: String(t.startOrder || ""),
-      praStart: String(t.praStart || ""),
-      intervalRace: String(t.intervalRace || ""),
-      statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+      nameTeam: asStr(t.nameTeam),
+      bibTeam: asStr(t.bibTeam),
+      startOrder: asStr(t.startOrder),
+      praStart: asStr(t.praStart),
+      intervalRace: asStr(t.intervalRace),
+      statusId: asNum(t.statusId, 0),
     };
 
-    const result = { ...(t.result || {}) };
-    const otr = { ...(t.otr || {}) };
+    const r = { ...(t.result || {}) };
+    const o = { ...(t.otr || {}) };
 
-    result.startTime = String(result.startTime || "");
-    result.finishTime = String(result.finishTime || "");
-    result.raceTime = String(result.raceTime || "");
-    result.penaltyStartTime = String(result.penaltyStartTime || "");
-    result.penaltyFinishTime = String(result.penaltyFinishTime || "");
-    result.penaltySection = Array.isArray(result.penaltySection)
-      ? result.penaltySection.map((x) => String(x || ""))
-      : [];
-    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
-    result.totalTime = String(result.totalTime || result.raceTime || "");
-    result.ranked = Number.isFinite(result.ranked)
-      ? Number(result.ranked)
-      : result.ranked
-      ? Number(result.ranked)
-      : 0;
-    result.score = Number.isFinite(result.score)
-      ? Number(result.score)
-      : result.score
-      ? Number(result.score)
-      : 0;
+    // ambil nilai penalti numerik
+    const startPenalty = asNum(r.startPenalty, 0);
+    const finishPenalty = asNum(r.finishPenalty, 0);
+    const sectionPenalty = asNum(r.sectionPenalty, 0);
+    const totalPenalty = startPenalty + finishPenalty + sectionPenalty;
+
+    // ambil waktu penalti (default “00:00:00.000”)
+    const startPenaltyTime = timeOrZero(
+      r.penaltyStartTime || r.startPenaltyTime
+    );
+    const finishPenaltyTime = timeOrZero(
+      r.penaltyFinishTime || r.finishPenaltyTime
+    );
+    const sectionPenaltyTime = Array.isArray(
+      r.penaltySectionTime || r.penaltySection
+    )
+      ? (r.penaltySectionTime || r.penaltySection).map(timeOrZero)
+      : ["00:00:00.000", "00:00:00.000", "00:00:00.000"];
+
+    // total penalty time (bisa dihitung otomatis atau pakai field dari UI)
+    const totalPenaltyTime = timeOrZero(r.penaltyTime || r.totalPenaltyTime);
+    const totalTime = timeOrZero(r.totalTime || r.raceTime);
+
+    const result = {
+      startTime: asStr(r.startTime),
+      finishTime: asStr(r.finishTime),
+      raceTime: asStr(r.raceTime),
+
+      startPenalty,
+      finishPenalty,
+      sectionPenalty,
+      totalPenalty,
+
+      startPenaltyTime,
+      finishPenaltyTime,
+      sectionPenaltyTime,
+      totalPenaltyTime,
+
+      totalTime,
+      ranked: asNum(r.ranked, 0),
+      score: asNum(r.score, 0),
+      judgesBy: asStr(r.judgesBy),
+      judgesTime: asStr(r.judgesTime),
+    };
+
+    const otr = {
+      startTime: asStr(o.startTime),
+      finishTime: asStr(o.finishTime),
+      raceTime: asStr(o.raceTime),
+      penaltyStartTime: asStr(o.penaltyStartTime),
+      penaltyFinishTime: asStr(o.penaltyFinishTime),
+      penaltySection: Array.isArray(o.penaltySection)
+        ? o.penaltySection.map(asStr)
+        : ["", "", ""],
+      penaltyTime: asStr(o.penaltyTime),
+      totalTime: asStr(o.totalTime),
+      ranked: asStr(o.ranked),
+      score: asStr(o.score),
+      penalty: asStr(o.penalty),
+    };
 
     return {
-      eventId: bucket.eventId,
-      initialId: bucket.initialId,
-      raceId: bucket.raceId,
-      divisionId: bucket.divisionId,
-      eventName: bucket.eventName,
-      initialName: bucket.initialName,
-      raceName: bucket.raceName,
-      divisionName: bucket.divisionName,
+      eventId: asStr(bucket.eventId),
+      initialId: asStr(bucket.initialId),
+      raceId: asStr(bucket.raceId),
+      divisionId: asStr(bucket.divisionId),
+      eventName: asStr(bucket.eventName || "DRR"),
+      initialName: asStr(bucket.initialName),
+      raceName: asStr(bucket.raceName),
+      divisionName: asStr(bucket.divisionName),
+
       ...team,
       result,
       otr,
-      createdAt: now,
-      updatedAt: now,
+
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
     };
   });
 }
@@ -525,6 +650,10 @@ function normalizeTeamForDRR(t = {}) {
     penaltySection: ["", "", ""],
     penaltyTime: "",
     totalTime: "",
+    startPenalty: 0,
+    finishPenalty: 0,
+    sectionPenalty: 0,
+    totalPenalty: 0,
     ranked: "",
     score: "",
   };
@@ -603,7 +732,7 @@ export default {
       dataPenalties: [
         { label: "0", value: 0, timePen: "00:00:00.000" },
         { label: "+ 10", value: 10, timePen: "00:00:10.000" },
-        { label: "- 10", value: 999, timePen: "-00:00:10.000" },
+        { label: "- 10", value: -10, timePen: "-00:00:10.000" },
         { label: "+ 50", value: 50, timePen: "00:00:50.000" },
       ],
       dataScore: [
@@ -647,6 +776,12 @@ export default {
       participant: [],
       dataEvent: {},
       titleCategories: "",
+
+      /* === NEW: State untuk Preview JSON (TAMBAHAN) === */
+
+      previewDocs: [],
+      previewJsonText: "",
+      prettyPrint: true,
     };
   },
   computed: {
@@ -871,6 +1006,10 @@ export default {
       item.result.startTime = "";
       item.result.finishTime = "";
       item.result.raceTime = "";
+      item.result.startPenalty = 0;
+      item.result.finishPenalty = 0;
+      item.result.sectionPenalty = 0;
+      item.result.totalPenalty = 0;
 
       // kosongkan penalti DRR
       item.result.penaltyStartTime = "";
@@ -1380,6 +1519,22 @@ export default {
         });
       }
     },
+
+    timeToPenaltyValue(timeStr) {
+      const p = String(timeStr || "");
+      // cari di dataPenalties by timePen
+      const found = this.dataPenalties.find((x) => x.timePen === p);
+      if (found) return Number(found.value) || 0;
+
+      // fallback: parse waktu jadi detik & pakai sebagai nilai (misal 00:00:50.000 → 50, tanda minus ikut)
+      const neg = p.startsWith("-");
+      const t = p.replace("-", "");
+      const [hh = "0", mm = "0", ssms = "0"] = t.split(":");
+      const ss = parseFloat(ssms) || 0; // boleh ada .ms, tetap aman
+      const val = +hh * 3600 + +mm * 60 + ss; // detik
+      return (neg ? -1 : 1) * Math.round(val); // bulatkan ke detik terdekat
+    },
+
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForDRR();
       if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
@@ -1459,17 +1614,39 @@ export default {
       penaltyType,
       sectionIndex = null
     ) {
+      // 1) set waktu penalti di field yang sesuai
       if (penaltyType === "penaltySection" && sectionIndex !== null) {
         item.result.penaltySection[sectionIndex] = selectedTimePen;
       } else {
-        item.result[penaltyType] = selectedTimePen;
+        item.result[penaltyType] = selectedTimePen; // "penaltyStartTime" / "penaltyFinishTime"
       }
 
+      // 2) hitung penalty numeric per bagian
+      const startPenalty = this.timeToPenaltyValue(
+        item.result.penaltyStartTime || "00:00:00.000"
+      );
+      const finishPenalty = this.timeToPenaltyValue(
+        item.result.penaltyFinishTime || "00:00:00.000"
+      );
+
+      let sectionPenalty = 0;
+      for (const s of item.result.penaltySection || []) {
+        sectionPenalty += this.timeToPenaltyValue(s || "00:00:00.000");
+      }
+      const totalPenalty = startPenalty + finishPenalty + sectionPenalty;
+
+      // 3) simpan angka ke result
+      item.result.startPenalty = startPenalty;
+      item.result.finishPenalty = finishPenalty;
+      item.result.sectionPenalty = sectionPenalty;
+      item.result.totalPenalty = totalPenalty;
+
+      // 4) hitung total penalty time (string HH:MM:SS.mmm) sesuai existing logic
       let totalPenaltyTime = "00:00:00.000";
       const fields = [
         item.result.penaltyStartTime || "00:00:00.000",
         item.result.penaltyFinishTime || "00:00:00.000",
-        ...item.result.penaltySection.map((x) => x || "00:00:00.000"),
+        ...(item.result.penaltySection || []).map((x) => x || "00:00:00.000"),
       ];
       for (const p of fields) {
         if (String(p).startsWith("-")) {
@@ -1481,14 +1658,17 @@ export default {
           totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, p);
         }
       }
-      item.result.penaltyTime = totalPenaltyTime;
+      item.result.penaltyTime = totalPenaltyTime; // tetap isi field lama
+      item.result.totalPenaltyTime = totalPenaltyTime; // kalau mau disimpan juga sesuai pattern baru
 
+      // 5) update totalTime bila raceTime ada
       if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
           totalPenaltyTime
         );
       }
+
       this.editResult = true;
       await this.assignRanks(this.participant);
     },
@@ -1653,6 +1833,129 @@ export default {
 
     handleScroll() {
       this.isScrolled = window.scrollY > 0;
+    },
+
+    /* === NEW: Helper membangun docs yang sama seperti saat Save (TAMBAHAN) === */
+    _buildDocsForSave() {
+      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+      return buildResultDocs(clean, this.currentBucket);
+    },
+
+    /* === NEW: Buka modal Preview JSON (TAMBAHAN) === */
+    async previewJson() {
+      try {
+        this.previewDocs = this._buildDocsForSave();
+        this.prettyPrint = true;
+        this.refreshPreviewText();
+        this.$bvModal &&
+          this.$bvModal.show &&
+          this.$bvModal.show("preview-json-modal");
+      } catch (e) {
+        console.error("openPreviewJson failed", e);
+      }
+    },
+
+    /* === NEW: Toggle pretty/compact (TAMBAHAN) === */
+    refreshPreviewText() {
+      try {
+        if (!Array.isArray(this.previewDocs)) return;
+        this.previewJsonText = JSON.stringify(
+          this.previewDocs,
+          null,
+          this.prettyPrint ? 2 : 0
+        );
+      } catch (err) {
+        // ignore
+      }
+    },
+
+    /* === NEW: Copy JSON ke clipboard (TAMBAHAN) === */
+    async copyPreview() {
+      try {
+        await navigator.clipboard.writeText(this.previewJsonText || "");
+        this.notify("success", "JSON copied to clipboard.", "Copied");
+      } catch (err) {
+        this.notifyError(err, "Copy Failed");
+      }
+    },
+
+    /* === NEW: Download JSON file (TAMBAHAN) === */
+    downloadPreview() {
+      try {
+        const fileName = `drr-preview-${Date.now()}.json`;
+        const blob = new Blob([this.previewJsonText || "[]"], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        this.notifyError(err, "Download Failed");
+      }
+    },
+
+    /* === NEW: Lanjutkan simpan dari modal (TAMBAHAN) === */
+    saveResultConfirmed() {
+      try {
+        this.$bvModal &&
+          this.$bvModal.hide &&
+          this.$bvModal.hide("preview-json-modal");
+
+        if (!this.currentBucket) {
+          this.notify(
+            "warning",
+            "Bucket tidak valid untuk penyimpanan.",
+            "Save"
+          );
+          return;
+        }
+        const must = ["eventId", "initialId", "raceId", "divisionId"];
+        const missing = must.filter((k) => !this.currentBucket[k]);
+        if (missing.length) {
+          this.notify(
+            "error",
+            `Bucket fields missing: ${missing.join(", ")}`,
+            "Save"
+          );
+          return;
+        }
+
+        const docs =
+          Array.isArray(this.previewDocs) && this.previewDocs.length
+            ? this.previewDocs
+            : this._buildDocsForSave();
+
+        if (!docs.length) {
+          this.notify(
+            "warning",
+            "Tidak ada dokumen yang akan disimpan.",
+            "Save"
+          );
+          return;
+        }
+
+        ipcRenderer.send("insert-drr-result", docs);
+        ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
+          if (res && res.ok) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "question",
+              detail: "Result data has been successfully saved",
+              message: "Successfully",
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Save failed",
+              message: "Failed",
+            });
+          }
+        });
+      } catch (err) {
+        this.notifyError(err, "Save Failed");
+      }
     },
   },
 };
@@ -1984,5 +2287,23 @@ td {
   .meta-panel {
     padding: 12px;
   }
+}
+
+/* === NEW: Styling area preview JSON (TAMBAHAN) === */
+.json-scroll {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #0b1020;
+  padding: 12px;
+}
+.json-pre {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e5e7eb;
+  white-space: pre-wrap; /* wrap kalau area sempit */
+  word-break: break-word;
 }
 </style>

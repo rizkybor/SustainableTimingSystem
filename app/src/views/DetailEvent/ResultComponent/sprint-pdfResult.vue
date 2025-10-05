@@ -13,7 +13,8 @@
           </span>
         </div>
         <div class="band-right">
-          <strong>SPRINT RESULT</strong>
+          <strong>{{ sprintCats.initial }} -
+            {{ sprintCats.division }} {{ sprintCats.race }}</strong>
           <span class="dot">•</span>
           <span>{{ today }}</span>
         </div>
@@ -165,6 +166,7 @@ export default {
     dataParticipant: { type: Array, required: true },
     categories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
+    sprintCats: { type: Object, required: true },
   },
   computed: {
     rows() {

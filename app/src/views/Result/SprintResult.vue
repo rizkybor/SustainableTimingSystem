@@ -209,6 +209,7 @@
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
           :isOfficial="isOfficial"
+          :sprintCats="sprintCats"
         />
       </section>
     </vue-html2pdf>
@@ -636,7 +637,7 @@ export default {
         this.error = "Parameter hasil tidak lengkap.";
         return;
       }
-      console.log(q, "<< cek");
+
       this.loading = true;
       this.error = "";
 

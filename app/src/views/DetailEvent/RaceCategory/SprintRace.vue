@@ -363,14 +363,6 @@
                     {{ getScoreByRanked(item.result.ranked) }}
                   </td>
                   <td v-if="endGame">
-                    <!-- <button
-                      type="button"
-                      class="btn-action btn-warning"
-                      @click="openModal(item, 'R4men')"
-                    >
-                      Edit
-                    </button> -->
-
                     <button
                       type="button"
                       class="btn-action btn-danger"
@@ -462,12 +454,10 @@ function buildResultDocs(participantArr, bucket) {
     const result = { ...(t.result || {}) };
     const otr = { ...(t.otr || {}) };
 
-    // pastikan string/angka aman
     result.startTime = String(result.startTime || "");
     result.finishTime = String(result.finishTime || "");
     result.raceTime = String(result.raceTime || "");
 
-    // normalisasi penalti (HANYA start & finish)
     result.startPenalty = Number.isFinite(result.startPenalty)
       ? Number(result.startPenalty)
       : 0;
@@ -475,7 +465,6 @@ function buildResultDocs(participantArr, bucket) {
       ? Number(result.finishPenalty)
       : 0;
 
-    // legacy middle penalty di-nolkan dan tidak digunakan
     result.penalty = 0;
 
     result.totalPenalty = Number.isFinite(result.totalPenalty)
@@ -490,7 +479,6 @@ function buildResultDocs(participantArr, bucket) {
       result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
     );
 
-    // sinkronisasi legacy
     result.penaltyTime = String(
       result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
     );
@@ -508,7 +496,6 @@ function buildResultDocs(participantArr, bucket) {
       : 0;
 
     return {
-      // === KUNCI RELASI (HARUS SAMA DGN TEAMS REGISTERED) ===
       eventId: bucket.eventId,
       initialId: bucket.initialId,
       raceId: bucket.raceId,
@@ -517,13 +504,9 @@ function buildResultDocs(participantArr, bucket) {
       initialName: bucket.initialName,
       raceName: bucket.raceName,
       divisionName: bucket.divisionName,
-
-      // === DATA TIM + HASIL ===
       ...team,
       result,
       otr,
-
-      // meta optional
       createdAt: now,
       updatedAt: now,
     };
@@ -545,25 +528,22 @@ function normalizeTeamForSprint(t = {}) {
     finishTime: "",
     raceTime: "",
 
-    // hanya 2 penalti aktif (start & finish)
     startPenalty: 0,
     finishPenalty: 0,
 
-    // legacy, dibiarkan ada tapi tidak dipakai
     penalty: 0,
 
     startPenaltyTime: "00:00:00.000",
     finishPenaltyTime: "00:00:00.000",
-    totalPenalty: 0, // angka detik (akumulasi)
+    totalPenalty: 0,
     totalPenaltyTime: "00:00:00.000",
 
-    penaltyTime: "", // legacy (diset = totalPenaltyTime)
+    penaltyTime: "",
     totalTime: "",
     ranked: "",
     score: "",
   };
 
-  // dukung format lama (array result)
   let result = t.result;
   if (Array.isArray(result)) result = result[0] || {};
   if (!result || typeof result !== "object") result = {};
@@ -627,8 +607,6 @@ export default {
       digitTimeFinish: null,
       currentPort: "",
       isRankedDescending: false,
-
-      /** penting: tipe konsisten */
       participant: [],
       dataEvent: {},
       titleCategories: "",
@@ -1188,8 +1166,6 @@ export default {
 
         this.selectedSprintKey = key;
         localStorage.setItem("currentSprintBucketKey", key);
-
-        // >>> gunakan channel yang benar: teams-sprint-registered <<<
         const res = await new Promise((resolve) => {
           ipcRenderer.once(
             "teams-sprint-registered:find-reply",
@@ -1199,7 +1175,6 @@ export default {
         });
 
         if (!res || !res.ok) {
-          // kalau gagal, tetap apply bucket agar judul/payload sinkron
           this.participant = [];
           this._useSprintBucket(key);
           return;
@@ -1210,11 +1185,7 @@ export default {
           doc && Array.isArray(doc.teams)
             ? doc.teams.map(normalizeTeamForSprint)
             : [];
-
-        // commit ke map agar _useSprintBucket dapat data
         this.sprintBucketMap[key] = { ...b, teams };
-
-        // apply
         this._useSprintBucket(key);
       } catch {
         this._useSprintBucket(key);
@@ -1233,11 +1204,9 @@ export default {
       item.result.totalTime = "";
       item.result.ranked = "";
       item.result.score = "";
-
-      // optional: langsung re-assign ranking lagi
       this.assignRanks(this.participantArr);
 
-      this.$forceUpdate(); // paksa refresh kalau kadang Vue reactivity lambat
+      this.$forceUpdate();
     },
 
     async calculateScore(ranked) {
@@ -1267,17 +1236,12 @@ export default {
       item.result.startPenaltyTime = sp.timePen;
       item.result.finishPenaltyTime = fp.timePen;
 
-      // total angka penalti (detik) hanya dari start+finish
       item.result.totalPenalty = Number(sp.value) + Number(fp.value);
 
-      // total waktu penalti = start + finish
       const totalPenaltyTime = await this.tambahWaktu(sp.timePen, fp.timePen);
       item.result.totalPenaltyTime = totalPenaltyTime;
 
-      // sinkron legacy
       item.result.penaltyTime = totalPenaltyTime;
-
-      // total lomba = raceTime + penaltyTime (jika raceTime ada)
       if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
@@ -1401,9 +1365,8 @@ export default {
       const hr = Math.floor(diff / (1000 * 60 * 60));
 
       const pad2 = (n) => String(n).padStart(2, "0");
-      const pad3 = (n) => String(n).padStart(3, "0"); // ⬅️ penting
-
-      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`; // ⬅️ 3 digit
+      const pad3 = (n) => String(n).padStart(3, "0"); 
+      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`;
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -1453,7 +1416,6 @@ export default {
         return;
       }
 
-      // Gunakan bucket dari raceStartPayload agar identik dengan Team Registered
       const bucket = getBucket();
       const must = ["eventId", "initialId", "raceId", "divisionId"];
       const missing = must.filter((k) => !bucket[k]);
@@ -1466,12 +1428,8 @@ export default {
         return;
       }
 
-      // Bangun dokumen yang siap disimpan
       const docs = buildResultDocs(clean, bucket);
-
-      // KIRIM ARRAY LANGSUNG (bukan objek)
       ipcRenderer.send("insert-sprint-result", docs);
-
       ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
         if (res && res.ok) {
           ipcRenderer.send("get-alert-saved", {
@@ -1529,7 +1487,7 @@ export default {
 /* Select block */
 .toolbar-select {
   min-width: 260px;
-  flex: 1 1 260px; /* bisa melebar di layar kecil */
+  flex: 1 1 260px;
 }
 .toolbar-select__control {
   border-radius: 10px;
@@ -1542,7 +1500,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  margin-bottom: 6px; /* jarak antar select */
+  margin-bottom: 6px;
 }
 
 .small-select:hover {
@@ -1699,7 +1657,7 @@ td {
 .path-pill {
   display: inline-flex;
   align-items: center;
-  max-width: 520px; /* sesuaikan */
+  max-width: 520px;
   background: #fff;
   color: #0f172a;
   border: 1px solid #e5e7eb;
@@ -1716,7 +1674,7 @@ td {
 }
 .path-pill .truncate {
   display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
+  max-width: 460px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1742,15 +1700,15 @@ td {
   padding-bottom: 0;
 }
 .meta-label {
-  min-width: 120px; /* lebar label tetap */
+  min-width: 120px; 
   font-weight: 800;
   letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
+  color: #334155;
   font-style: italic;
 }
 .meta-value {
   font-weight: 600;
-  color: #0f172a; /* slate-900 */
+  color: #0f172a;
 }
 .badge-chip {
   display: inline-block;

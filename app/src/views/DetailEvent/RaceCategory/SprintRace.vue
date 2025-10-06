@@ -311,7 +311,7 @@
                         :key="'sp' + p.value"
                         :value="p.value"
                       >
-                        {{ p.value }}
+                        {{ p.label }}
                       </option>
                     </b-select>
                   </td>
@@ -621,45 +621,8 @@ export default {
       digitId: [],
       digitTime: [],
       penTeam: "",
-      dataPenalties: [
-        { label: "clear", value: 0, timePen: "00:00:00.000" },
-        { label: "pen 1", value: 5, timePen: "00:00:05.000" },
-        { label: "pen 2", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 100 },
-        { ranking: 2, score: 92 },
-        { ranking: 3, score: 86 },
-        { ranking: 4, score: 82 },
-        { ranking: 5, score: 79 },
-        { ranking: 6, score: 76 },
-        { ranking: 7, score: 73 },
-        { ranking: 8, score: 70 },
-        { ranking: 9, score: 67 },
-        { ranking: 10, score: 64 },
-        { ranking: 11, score: 61 },
-        { ranking: 12, score: 58 },
-        { ranking: 13, score: 55 },
-        { ranking: 14, score: 52 },
-        { ranking: 15, score: 49 },
-        { ranking: 16, score: 46 },
-        { ranking: 17, score: 43 },
-        { ranking: 18, score: 40 },
-        { ranking: 19, score: 38 },
-        { ranking: 20, score: 36 },
-        { ranking: 21, score: 34 },
-        { ranking: 22, score: 32 },
-        { ranking: 23, score: 30 },
-        { ranking: 24, score: 28 },
-        { ranking: 25, score: 26 },
-        { ranking: 26, score: 24 },
-        { ranking: 27, score: 22 },
-        { ranking: 28, score: 20 },
-        { ranking: 29, score: 18 },
-        { ranking: 30, score: 16 },
-        { ranking: 31, score: 14 },
-        { ranking: 32, score: 12 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -795,32 +758,20 @@ export default {
     },
   },
 
-  // beforeRouteLeave(to, from, next) {
-  //   if (this.selectedSprintKey) {
-  //     saveLocalResults(this.selectedSprintKey, this.participantArr);
-  //   }
-  //   next();
-  // },
-
   async mounted() {
+    // TESTING SOCKET.IO
     const socket = getSocket();
-
-    // simpan id saat connect (atau reconnect)
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
     };
     socket.on("connect", onConnect);
-
-    // terima pesan: tampilkan toast hanya jika BUKAN dari diri sendiri
     const onMessage = (msg) => {
-      // safety: kalau server belum broadcast-only, tetap filter di client
       if (
         msg &&
         msg.senderId &&
         this.selfSocketId &&
         msg.senderId === this.selfSocketId
       ) {
-        // pesan pantulan dari diri sendiri → jangan tampilkan
         return;
       }
 
@@ -832,13 +783,12 @@ export default {
         });
       }
     };
-
     socket.on("custom:event", onMessage);
-
     this.$once("hook:beforeDestroy", () => {
       socket.off("connect", onConnect);
       socket.off("custom:event", onMessage);
     });
+    // TESTING SOCKET.IO
 
     try {
       const events = localStorage.getItem("eventDetails");
@@ -847,6 +797,8 @@ export default {
       this.dataEvent = {};
     }
 
+    await this.loadDataScore("SPRINT");
+    await this.loadDataPenalties("SPRINT");
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
@@ -878,6 +830,195 @@ export default {
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
+    // === END CONNECTION ===
+
+    // === NOTIFY ===
+    notify(type, detail, message = "Info") {
+      if (this.$ipc || (window && window.ipcRenderer)) {
+        const ir = this.$ipc || window.ipcRenderer;
+        ir.send && ir.send("get-alert", { type, detail, message });
+      }
+      // bisa juga set state:
+      this.lastErrorMessage = `${message}: ${detail}`;
+    },
+
+    notifyError(err, message = "Error") {
+      const detail =
+        (err && (err.message || err.toString())) || "Unknown error";
+      this.notify("error", detail, message);
+    },
+    // ======
+
+    /* =========================================================
+     * SOCKET / IPC (opsional)
+     * =======================================================*/
+    sendRealtimeMessage() {
+      const socket = getSocket();
+      socket.emit(
+        "custom:event",
+        {
+          senderId: socket.id,
+          from: "Sustainable Timing System",
+          text: "Terima kasih, udah gue teerima beks nilai penaltynya",
+          ts: new Date().toISOString(),
+        },
+        (ok) => {
+          if (!ok) {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal mengirim pesan realtime",
+              detail: "Silakan cek koneksi broker/socket.",
+            });
+          }
+        }
+      );
+    },
+
+    // === LOAD PAYLOAD ===
+    loadFromRaceStartPayload() {
+      const { bucket } = loadRaceStartPayloadForSprint();
+      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
+        return false;
+
+      this.participant = bucket.teams.slice();
+      this.titleCategories =
+        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
+
+      try {
+        const events = localStorage.getItem("eventDetails");
+        this.dataEvent = events ? JSON.parse(events) : {};
+      } catch {
+        this.dataEvent = {};
+      }
+      return true;
+    },
+
+    async checkValueStorage() {
+      let dataStorage = null,
+        events = null;
+      try {
+        dataStorage = localStorage.getItem("participantByCategories");
+        events = localStorage.getItem("eventDetails");
+      } catch (e) {
+        // fallback aman bila storage tidak tersedia / rusak
+        dataStorage = null;
+        events = null;
+      }
+
+      this.dataEvent = events ? JSON.parse(events) : {};
+
+      const raw = dataStorage ? JSON.parse(dataStorage) : [];
+      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+      arr.sort((a, b) =>
+        String(a.praStart || "").localeCompare(String(b.praStart || ""))
+      );
+
+      this.participant = arr;
+      this.titleCategories = String(
+        localStorage.getItem("currentCategories") || ""
+      ).trim();
+    },
+    // ======
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.dataPenalties = payload[0].data;
+          } else {
+            this.dataPenalties = [];
+          }
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
     _sprintBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
       const ii = b && b.initialId ? String(b.initialId) : "";
@@ -1080,164 +1221,6 @@ export default {
       }
       this.isLoading = false;
     },
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
-    // === NOTIFY ===
-    notify(type, detail, message = "Info") {
-      if (this.$ipc || (window && window.ipcRenderer)) {
-        const ir = this.$ipc || window.ipcRenderer;
-        ir.send && ir.send("get-alert", { type, detail, message });
-      }
-      // bisa juga set state:
-      this.lastErrorMessage = `${message}: ${detail}`;
-    },
-
-    notifyError(err, message = "Error") {
-      const detail =
-        (err && (err.message || err.toString())) || "Unknown error";
-      this.notify("error", detail, message);
-    },
-    // ======
-
-    /* =========================================================
-     * SOCKET / IPC (opsional)
-     * =======================================================*/
-    sendRealtimeMessage() {
-      const socket = getSocket();
-      socket.emit(
-        "custom:event",
-        {
-          senderId: socket.id,
-          from: "Sustainable Timing System",
-          text: "Terima kasih, udah gue teerima beks nilai penaltynya",
-          ts: new Date().toISOString(),
-        },
-        (ok) => {
-          if (!ok) {
-            ipcRenderer.send("get-alert", {
-              type: "error",
-              message: "Gagal mengirim pesan realtime",
-              detail: "Silakan cek koneksi broker/socket.",
-            });
-          }
-        }
-      );
-    },
-
-    // === LOAD PAYLOAD ===
-    loadFromRaceStartPayload() {
-      const { bucket } = loadRaceStartPayloadForSprint();
-      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
-        return false;
-
-      this.participant = bucket.teams.slice();
-      this.titleCategories =
-        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
-
-      try {
-        const events = localStorage.getItem("eventDetails");
-        this.dataEvent = events ? JSON.parse(events) : {};
-      } catch {
-        this.dataEvent = {};
-      }
-      return true;
-    },
-
-    async checkValueStorage() {
-      let dataStorage = null,
-        events = null;
-      try {
-        dataStorage = localStorage.getItem("participantByCategories");
-        events = localStorage.getItem("eventDetails");
-      } catch (e) {
-        // fallback aman bila storage tidak tersedia / rusak
-        dataStorage = null;
-        events = null;
-      }
-
-      this.dataEvent = events ? JSON.parse(events) : {};
-
-      const raw = dataStorage ? JSON.parse(dataStorage) : [];
-      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
-      arr.sort((a, b) =>
-        String(a.praStart || "").localeCompare(String(b.praStart || ""))
-      );
-
-      this.participant = arr;
-      this.titleCategories = String(
-        localStorage.getItem("currentCategories") || ""
-      ).trim();
-    },
-    // ======
 
     resetRow(item) {
       item.result.startTime = "";
@@ -1387,7 +1370,7 @@ export default {
           row.result.startTime,
           row.result.finishTime
         );
-        // panggil kalkulasi penalti agar totalTime langsung update
+
         await this.recalcPenalties(row);
       }
     },

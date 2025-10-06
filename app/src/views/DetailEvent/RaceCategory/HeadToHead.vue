@@ -53,7 +53,7 @@
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{
                 dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
+                "-"
               }}
             </h2>
             <div class="meta text-white-50">
@@ -899,23 +899,7 @@
               </table>
 
               <!-- EMPTY STATE -->
-              <div
-                v-else
-                class="bracket-empty d-flex align-items-center justify-content-center py-5"
-              >
-                <div class="text-center text-muted">
-                  <Icon
-                    icon="mdi:account-off-outline"
-                    width="36"
-                    height="36"
-                    class="mb-2"
-                  />
-                  <div><strong>Teams on this categories not found</strong></div>
-                  <small>
-                    Coba pilih kategori lain atau sinkronkan ulang data tim.
-                  </small>
-                </div>
-              </div>
+              <EmptyCard v-else />
             </div>
             <br />
           </b-col>
@@ -944,12 +928,13 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { Icon } from "@iconify/vue2";
+import EmptyCard from "@/components/cards/card-empty.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
+import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1169,7 +1154,7 @@ function seedGlobalHeatFromList(list, { reset = false } = {}) {
 
 export default {
   name: "SustainableTimingSystemH2HRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
       defaultImg,

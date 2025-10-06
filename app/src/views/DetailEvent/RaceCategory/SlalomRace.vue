@@ -32,7 +32,7 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-             <template v-if="hasEventLogo">
+              <template v-if="hasEventLogo">
                 <img
                   :src="eventLogoUrl"
                   alt="Event Logo"
@@ -40,7 +40,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3">
@@ -267,7 +264,16 @@
             </div>
           </div>
 
-          <table class="table">
+          <div
+            v-if="isLoading"
+            class="bracket-loading d-flex align-items-center justify-content-center py-5"
+          >
+            <div class="text-center">
+              <b-spinner label="Loading" class="mb-2"></b-spinner>
+              <div class="text-muted">Loading bracket & teams…</div>
+            </div>
+          </div>
+          <table v-else-if="visibleTeams && visibleTeams.length" class="table">
             <thead>
               <tr>
                 <th class="text-center" rowspan="2">No</th>
@@ -335,7 +341,9 @@
                       <div class="p-label">S</div>
                       <b-form-select
                         class="small-select"
-                       v-model="team.sessions[selectedSession[team._id]].startPenalty"
+                        v-model="
+                          team.sessions[selectedSession[team._id]].startPenalty
+                        "
                         :options="penaltyOptions"
                         size="sm"
                         @change="recalcTeam(team)"
@@ -499,6 +507,9 @@
               </tr>
             </tbody>
           </table>
+
+          <!-- EMPTY STATE -->
+          <EmptyCard v-else />
         </div>
 
         <b-button
@@ -514,12 +525,13 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { Icon } from "@iconify/vue2";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
 import { logger } from "@/utils/logger";
+import { Icon } from "@iconify/vue2";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -615,10 +627,11 @@ function loadFromRaceStartPayloadForSlalom() {
 
 export default {
   name: "SlalomRacePanel",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
 
   data() {
     return {
+      isLoading: false,
       defaultImg,
       slalomBucketOptions: [],
       slalomBucketMap: Object.create(null),
@@ -994,6 +1007,7 @@ export default {
     },
     async fetchSlalomTeamsByKey(key) {
       try {
+        this.isLoading = true;
         if (
           !key ||
           !this.slalomBucketMap[key] ||
@@ -1038,6 +1052,7 @@ export default {
       } catch {
         this._useSlalomBucket(key);
       }
+      this.isLoading = false;
     },
     _slalomBucketLabel(b) {
       const div = b && b.divisionName ? String(b.divisionName) : "";
@@ -1305,28 +1320,33 @@ export default {
       return team.sessions.map((_, i) => ({ text: `Run ${i + 1}`, value: i }));
     },
     // Modify currentSession to handle undefined cases
-   currentSession(team) {
-  const idx =
-    this.selectedSession[team._id] != null ? this.selectedSession[team._id] : 0;
+    currentSession(team) {
+      const idx =
+        this.selectedSession[team._id] != null
+          ? this.selectedSession[team._id]
+          : 0;
 
-  // Safeguard: Ensure the session is defined
-  const session = team.sessions && team.sessions[idx] ? team.sessions[idx] : {}; // Default to empty object if session is undefined
+      // Safeguard: Ensure the session is defined
+      const session =
+        team.sessions && team.sessions[idx] ? team.sessions[idx] : {}; // Default to empty object if session is undefined
 
-  // Ensure penalties is always an array
-  const need = this.SLALOM_GATES.length;
-  let penalties = Array.isArray(session.penalties) ? session.penalties : [];
-  while (penalties.length < need) penalties.push(0); // Ensure enough penalties
-  if (penalties.length > need) penalties.length = need; // Ensure no more penalties than needed
+      // Ensure penalties is always an array
+      const need = this.SLALOM_GATES.length;
+      let penalties = Array.isArray(session.penalties) ? session.penalties : [];
+      while (penalties.length < need) penalties.push(0); // Ensure enough penalties
+      if (penalties.length > need) penalties.length = need; // Ensure no more penalties than needed
 
-  // Safeguard: Ensure startPenalty and finishPenalty are defined
-  session.startPenalty = session.startPenalty != null ? session.startPenalty : 0;
-  session.finishPenalty = session.finishPenalty != null ? session.finishPenalty : 0;
+      // Safeguard: Ensure startPenalty and finishPenalty are defined
+      session.startPenalty =
+        session.startPenalty != null ? session.startPenalty : 0;
+      session.finishPenalty =
+        session.finishPenalty != null ? session.finishPenalty : 0;
 
-  // Set the penalties in the session object
-  session.penalties = penalties;
+      // Set the penalties in the session object
+      session.penalties = penalties;
 
-  return session;
-},
+      return session;
+    },
 
     /** === Perhitungan penalty/time === */
     recalcSession(s) {

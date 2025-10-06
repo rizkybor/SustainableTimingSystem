@@ -40,7 +40,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -241,7 +241,19 @@
 
         <b-row>
           <b-col>
-            <table class="table">
+            <div
+              v-if="isLoading"
+              class="bracket-loading d-flex align-items-center justify-content-center py-5"
+            >
+              <div class="text-center">
+                <b-spinner label="Loading" class="mb-2"></b-spinner>
+                <div class="text-muted">Loading bracket & teams…</div>
+              </div>
+            </div>
+            <table
+              v-else-if="participantArr && participantArr.length"
+              class="table"
+            >
               <thead>
                 <tr>
                   <th class="text-center">No</th>
@@ -370,6 +382,9 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- EMPTY STATE -->
+            <EmptyCard v-else />
             <br />
           </b-col>
         </b-row>
@@ -386,13 +401,14 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { Icon } from "@iconify/vue2";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
+import { Icon } from "@iconify/vue2";
 import {
   saveLocalResults,
   loadLocalResults,
@@ -584,10 +600,11 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
 
   data() {
     return {
+      isLoading: false,
       defaultImg,
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
@@ -1011,6 +1028,8 @@ export default {
     // --- fetch teams via IPC (khusus Sprint) ---
     async fetchSprintBucketTeamsByKey(key) {
       try {
+        this.isLoading = true;
+
         if (
           !key ||
           !this.sprintBucketMap[key] ||
@@ -1059,6 +1078,7 @@ export default {
       } catch {
         this._useSprintBucket(key);
       }
+      this.isLoading = false;
     },
     // === SERIAL CONNECTION ===
     async connectPort() {

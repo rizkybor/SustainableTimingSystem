@@ -25,6 +25,8 @@ const {
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
+  getOptionPenalties,
+  getOptionRanked
 } = require("../controllers/GET/getOptionEvent.js");
 
 const {
@@ -234,6 +236,24 @@ function setupIPCMainHandlers() {
       event.reply("option-categories-race-reply", data);
     } catch (error) {
       event.reply("option-categories-race-reply", []);
+    }
+  });
+
+    ipcMain.on("option-penalties", async (event, type = null) => {
+    try {
+      const data = await getOptionPenalties();
+      event.reply("option-penalties-reply", type);
+    } catch (error) {
+      event.reply("option-penalties-reply", []);
+    }
+  });
+
+    ipcMain.on("option-ranked", async (event, type = null) => {
+    try {
+      const data = await getOptionRanked(type);
+      event.reply("option-ranked-reply", data);
+    } catch (error) {
+      event.reply("option-ranked-reply", []);
     }
   });
 

@@ -37,7 +37,7 @@
           <!-- judul + meta -->
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ events.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025" }}
+              {{ events.eventName || "-" }}
             </h2>
             <div class="meta">
               <span class="mr-3" style="font-size: 18px"

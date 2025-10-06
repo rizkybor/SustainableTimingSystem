@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"
@@ -249,7 +246,20 @@
         <b-row>
           <b-col>
             <div class="table-wrapper">
-              <table class="table" aria-label="Scrollable results table">
+              <div
+                v-if="isLoading"
+                class="bracket-loading d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center">
+                  <b-spinner label="Loading" class="mb-2"></b-spinner>
+                  <div class="text-muted">Loading bracket & teams…</div>
+                </div>
+              </div>
+              <table
+                v-else-if="participantArr && participantArr.length"
+                class="table"
+                aria-label="Scrollable results table"
+              >
                 <thead>
                   <tr>
                     <th class="text-center">No</th>
@@ -413,6 +423,8 @@
                   </tr>
                 </tbody>
               </table>
+              <!-- EMPTY STATE -->
+              <EmptyCard v-else />
             </div>
             <br />
           </b-col>
@@ -493,10 +505,12 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
+import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -704,13 +718,12 @@ function readEventDetailsFromLS() {
   }
 }
 
-import { logger } from "@/utils/logger";
-
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
+      isLoading: false,
       defaultImg,
       selectPath: "",
       baudRate: 9600,
@@ -885,8 +898,6 @@ export default {
   },
   async mounted() {
     this.dataEvent = readEventDetailsFromLS();
-    window.addEventListener("scroll", this.handleScroll);
-
     this.buildStaticDrrOptions();
 
     if (this.drrBucketOptions.length) {
@@ -902,9 +913,6 @@ export default {
     }
 
     this.fetchDrrSectionCountFromSettings();
-  },
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
     // === SERIAL CONNECTION ===
@@ -1240,6 +1248,7 @@ export default {
     },
     loadAllDrrBucketsFromEvent() {
       try {
+        this.isLoading = true;
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
         const participant = Array.isArray(ev.participant) ? ev.participant : [];
@@ -1334,6 +1343,7 @@ export default {
       } catch {
         // biarkan fallback yang sudah ada (loadFromRaceStartPayload / checkValueStorage)
       }
+      this.isLoading = false;
     },
 
     _useDrrBucket(key) {
@@ -1385,6 +1395,8 @@ export default {
 
     async fetchBucketTeamsByKey(key) {
       try {
+        this.isLoading = true;
+
         if (
           !key ||
           !this.drrBucketMap[key] ||
@@ -1446,6 +1458,7 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
+      this.isLoading = false;
     },
     _bucketKey(b) {
       // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil
@@ -1831,10 +1844,6 @@ export default {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
-    },
-
     /* === NEW: Helper membangun docs yang sama seperti saat Save (TAMBAHAN) === */
     _buildDocsForSave() {
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
@@ -1851,7 +1860,7 @@ export default {
           this.$bvModal.show &&
           this.$bvModal.show("preview-json-modal");
       } catch (e) {
-        console.error("openPreviewJson failed", e);
+        logger.warn("❌ openPreviewJson failed", e);
       }
     },
 

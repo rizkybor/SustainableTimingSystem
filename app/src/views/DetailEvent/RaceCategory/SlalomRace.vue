@@ -189,6 +189,7 @@
 
     <!-- OPERATION TIME (reuse Sprint) -->
     <OperationTimePanel
+      v-if="visibleTeams && visibleTeams.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantsForPanel"
@@ -201,7 +202,10 @@
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="table-responsive">
-          <div class="d-flex justify-content-start mb-2">
+          <div
+            class="d-flex justify-content-start mb-2"
+            v-if="visibleTeams && visibleTeams.length"
+          >
             <div class="btn-group" role="group" aria-label="Run Switch">
               <button
                 type="button"
@@ -229,7 +233,10 @@
           </div>
 
           <!-- ACTION BAR: Save & Sort (mirip Sprint/DRR) -->
-          <div class="d-flex justify-content-between">
+          <div
+            class="d-flex justify-content-between"
+            v-if="visibleTeams && visibleTeams.length"
+          >
             <div class="racetime-header">
               <h4>Output Racetime :</h4>
               <small class="text-muted">
@@ -296,7 +303,7 @@
                   @click="penaltiesWrapped = true"
                   title="Klik untuk bungkus (wrap) penalties"
                 >
-                  Penalty Gates Run Session #{{ this.activeRun + 1 }}
+                  Gates Run Session #{{ this.activeRun + 1 }} Penalties
                 </th>
                 <!-- Mode wrapped: cuma 1 kolom -->
                 <th
@@ -306,7 +313,7 @@
                   @click="penaltiesWrapped = false"
                   title="Klik untuk tampilkan penuh (un-wrap) penalties"
                 >
-                  Penalty Gates Run Session #{{ this.activeRun + 1 }}
+                  Gates Run Session #{{ this.activeRun + 1 }} Penalties
                 </th>
 
                 <th class="text-center" rowspan="2">Penalty Total</th>
@@ -335,10 +342,16 @@
             <tbody>
               <tr v-for="(team, ti) in visibleTeams" :key="team._id">
                 <td class="text-center">{{ ti + 1 }}</td>
+
+                <!-- TEAM NAME  -->
                 <td class="large-bold text-strong max-char text-left">
                   {{ team.nameTeam }}
                 </td>
+
+                <!-- BIB NUMBER  -->
                 <td>{{ team.bibNumber }}</td>
+
+                <!-- START TIME  -->
                 <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).startTime || "-" }}
                 </td>
@@ -447,13 +460,17 @@
                 </template>
                 <!-- ========== /PENALTIES ========== -->
 
+                <!-- PENALTY TOTAL -->
                 <td class="text-center penalty-char" style="min-width: 120px">
                   {{ displayTotalPenalty(team) }}
                 </td>
 
+                <!-- FINISH TIME  -->
                 <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).finishTime || "-" }}
                 </td>
+
+                <!-- RACE TIME  -->
                 <td
                   class="text-center large-bold text-monospace"
                   style="min-width: 120px"
@@ -461,21 +478,20 @@
                   {{ currentSession(team).raceTime || "-" }}
                 </td>
 
+                <!-- PENALTY TOTAL TIME  -->
                 <td class="text-center penalty-char text-monospace">
                   {{ currentSession(team).penaltyTime || "-" }}
                 </td>
+
+                <!-- RESULT TIME  -->
                 <td
                   class="text-center large-bold result-char text-monospace"
                   style="min-width: 120px"
                 >
                   {{ currentSession(team).totalTime || "-" }}
                 </td>
-                <!-- <td
-                  class="text-center large-bold text-monospace best-time-cell"
-                  style="min-width: 120px"
-                >
-                  {{ calculateBestTime(team) || "-" }}
-                </td> -->
+
+                <!-- BEST TIME  -->
                 <td
                   class="text-center large-bold text-monospace best-time-cell"
                   style="min-width: 120px"
@@ -490,9 +506,13 @@
                   >
                   <div>{{ calculateBestTime(team) || "-" }}</div>
                 </td>
+
+                <!-- RANKED  -->
                 <td style="min-width: 120px" class="text-center large-bold">
                   {{ rankOf(team._id) }}
                 </td>
+
+                <!-- SCORED  -->
                 <td style="min-width: 120px" class="text-center large-bold">
                   {{ scoreOf(team._id) }}
                 </td>

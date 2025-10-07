@@ -205,12 +205,27 @@
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <h4 class="mb-0">Bracket Head to Head</h4>
+        <div class="racetime-header">
+              <h4>
+                Bracket Head To Head —
+                {{
+                  currentRound
+                    ? currentRound.bronze
+                      ? "Final B"
+                      : currentRound.name
+                    : "—"
+                }}
+              </h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
           <div class="toolbar-actions">
             <!-- Kelompok tombol -->
             <div
+              v-if="visibleParticipants && visibleParticipants.length"
               class="btn-group-actions"
               role="group"
               aria-label="Build actions"
@@ -511,7 +526,7 @@
                 Category active: {{ titleCategories || "-" }}
               </small>
             </div>
-          <div class="d-flex" style="gap: 8px">
+          <div class="d-flex" style="gap: 8px" v-if="visibleParticipants && visibleParticipants.length">
             <button
               class="btn-action btn-outline-success"
               @click="saveAllRoundsLocal"
@@ -561,8 +576,8 @@
                     <th rowspan="2">Start Time</th>
 
                     <!-- Grup Penalties -->
-                    <th colspan="9" class="text-center">Penalties</th>
-                    <th rowspan="2">Total Penalty</th>
+                    <th colspan="9" class="text-center">Penalties Group</th>
+                    <th rowspan="2">Penalty Total</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
                     <th class="text-center" rowspan="2">Penalty Time</th>
@@ -573,15 +588,15 @@
                     </th>
                   </tr>
                   <tr>
-                    <th class="text-center">S</th>
-                    <th class="text-center">CL</th>
+                    <th class="text-center">Pen. Start (PS)</th>
+                    <th class="text-center">Cut Line (CL)</th>
                     <th class="text-center">R1</th>
                     <th class="text-center">R2</th>
                     <th class="text-center">L1</th>
                     <th class="text-center">L2</th>
-                    <th class="text-center">PB</th>
-                    <th class="text-center">F</th>
-                    <th class="text-center">Others</th>
+                    <th class="text-center">Pen. Booyan (PB)</th>
+                    <th class="text-center">Pen. Finish (PF)</th>
+                    <th class="text-center">Pen. Others (PO)</th>
                   </tr>
                 </thead>
 
@@ -644,7 +659,7 @@
                       {{ item.result.startTime }}
                     </td>
 
-                    <!-- PEENALTY START -->
+                    <!-- PENALTY START -->
                     <td>
                       <b-form-select
                         class="small-select"
@@ -810,7 +825,7 @@
                       />
                     </td>
 
-                    <!-- JUMLAH PENALTY  -->
+                    <!-- PENALTY TOTAL  -->
                     <td class="large-bold">
                       {{ getTotalPenalty(item) }}
                       <small class="text-muted"
@@ -823,7 +838,7 @@
                       {{ item.result.finishTime }}
                     </td>
 
-                    <!-- RACETIME  -->
+                    <!-- RACE TIME  -->
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>

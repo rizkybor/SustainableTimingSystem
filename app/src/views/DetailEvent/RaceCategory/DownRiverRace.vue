@@ -270,30 +270,37 @@
                     <th class="text-left">Team Name</th>
                     <th class="text-center">BIB Number</th>
                     <th class="text-center">Start Time</th>
-                    <th class="text-center">Penalty Start</th>
-                    <th class="text-center">Penalty Section</th>
-                    <th class="text-center">Penalty Finish</th>
+                    <th class="text-center">Pen. Start</th>
+                    <th class="text-center">Pen. Section</th>
+                    <th class="text-center">Pen. Finish</th>
                     <th class="text-center">Penalty Total</th>
                     <th class="text-center">Finish Time</th>
                     <th class="text-center">Race Time</th>
                     <th class="text-center">Penalty Time</th>
                     <th class="text-center">Result</th>
                     <th class="text-center">Ranked</th>
-                    <th class="text-center">Score</th>
+                    <th class="text-center">Scored</th>
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
+                    
+                     <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
+
+                    <!-- BIB NUMBER  -->
                     <td class="text-center">{{ item.bibTeam }}</td>
+
+                    <!-- START TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.startTime }}
                     </td>
-                    <!-- Pen Start -->
+
+                    <!-- PENALTY START TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -317,7 +324,7 @@
                       </b-select>
                     </td>
 
-                    <!-- Pen Section -->
+                    <!-- PENALTY SECTION TIME -->
                     <td class="text-center">
                       <div class="pen-grid">
                         <b-select
@@ -347,7 +354,7 @@
                       </div>
                     </td>
 
-                    <!-- Pen Finish -->
+                    <!-- PENALTY FINISH TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -371,24 +378,29 @@
                       </b-select>
                     </td>
 
+                    <!-- PENALTY TOTAL  -->
                     <td class="text-center penalty-char">
                       {{ item.result.totalPenalty }}
                     </td>
 
+                    <!-- FINISH TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.finishTime }}
                     </td>
 
+                    <!-- RACE TIME  -->
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
                     </td>
 
+                    <!-- PENALTY TIME  -->
                     <td
                       class="text-center large-bold penalty-char text-monospace"
                     >
                       {{ item.result.penaltyTime }}
                     </td>
 
+                    <!-- RESULT TIME  -->
                     <td
                       class="text-center large-bold result-char text-monospace"
                     >
@@ -398,9 +410,13 @@
                           : item.result.raceTime
                       }}
                     </td>
+
+                    <!-- RANKED  -->
                     <td class="text-center large-bold">
                       {{ item.result.ranked }}
                     </td>
+
+                    <!-- SCORED  -->
                     <td class="text-center large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>

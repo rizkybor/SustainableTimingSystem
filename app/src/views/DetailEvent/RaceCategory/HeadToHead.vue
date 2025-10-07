@@ -496,21 +496,21 @@
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="py-3" style="display: flex; justify-content: space-between">
-          <div>
-            <h4>
-              Racetime Output —
-              {{
-                currentRound
-                  ? currentRound.bronze
-                    ? "Final B"
-                    : currentRound.name
-                  : "—"
-              }}
-            </h4>
-            <small class="text-muted">
-              Category active: {{ titleCategories || "-" }}
-            </small>
-          </div>
+            <div class="racetime-header">
+              <h4>
+                Output Racetime —
+                {{
+                  currentRound
+                    ? currentRound.bronze
+                      ? "Final B"
+                      : currentRound.name
+                    : "—"
+                }}
+              </h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
           <div class="d-flex" style="gap: 8px">
             <button
               class="btn-action btn-outline-success"
@@ -3627,6 +3627,23 @@ export default {
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
 /* ---- Styling utk Switch DRR Category select ---- */
 .h2h-actionbar__select {
   min-width: 260px;

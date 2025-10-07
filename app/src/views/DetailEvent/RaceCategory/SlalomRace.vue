@@ -230,7 +230,12 @@
 
           <!-- ACTION BAR: Save & Sort (mirip Sprint/DRR) -->
           <div class="d-flex justify-content-between">
-            <h4>Output Racetime :</h4>
+            <div class="racetime-header">
+              <h4>Output Racetime :</h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
             <div class="slalom-actionbar">
               <div class="slalom-actionbar__buttons">
                 <button
@@ -1557,6 +1562,23 @@ export default {
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
 /* ---- Styling utk Switch Slalom Category select ---- */
 .slalom-actionbar__select {
   min-width: 260px;
@@ -1579,7 +1601,6 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 /* ---- End styling utk Switch Slalom Category select ---- */
-
 
 /* ---- Styling utk penalty section select ---- */
 .small-select {
@@ -1623,7 +1644,7 @@ export default {
   border-radius: 10px;
   padding: 8px 14px;
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.5),
-              inset 0 0 4px rgba(255, 255, 255, 0.3);
+    inset 0 0 4px rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
   transition: all 0.3s ease;
 }
@@ -1632,7 +1653,7 @@ export default {
 .btn-action-active:hover {
   background: linear-gradient(135deg, #25b0eb, #267cb6);
   box-shadow: 0 0 60px rgba(0, 180, 255, 0.4),
-              inset 0 0 6px rgba(255, 255, 255, 0.4);
+    inset 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
 /* ===== STYLING BEST TIME RACETIME ===== */

@@ -204,15 +204,17 @@
       <div class="card-body">
         <b-row class="align-items-center py-2">
           <b-col>
-            <h4>Output Racetime :</h4>
-            <small class="text-muted">
-              Category active: {{ titleCategories || "-" }}
-            </small>
+            <div class="racetime-header">
+              <h4>Output Racetime :</h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
           </b-col>
           <b-col cols="6" md="6">
-              <div class="drr-actionbar__buttons">
-                <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
-                <!-- <button
+            <div class="drr-actionbar__buttons">
+              <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
+              <!-- <button
                   type="button"
                   class="btn-action btn-warning"
                   @click="previewJson"
@@ -222,27 +224,26 @@
                   <Icon icon="mdi:code-json" /> Preview JSON
                 </button> -->
 
-                <button
-                  type="button"
-                  class="btn-action btn-secondary"
-                  @click="saveResult"
-                  :disabled="!currentBucket || !participantArr.length"
-                  title="Simpan hasil untuk bucket yang dipilih"
-                >
-                  <Icon icon="icon-park-outline:save" /> Save Result
-                </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary"
+                @click="saveResult"
+                :disabled="!currentBucket || !participantArr.length"
+                title="Simpan hasil untuk bucket yang dipilih"
+              >
+                <Icon icon="icon-park-outline:save" /> Save Result
+              </button>
 
-                <button
-                  type="button"
-                  class="btn-action btn-info"
-                  @click="toggleSortRanked"
-                  :disabled="!participantArr.length"
-                  title="Urutkan berdasarkan rank naik/turun"
-                >
-                  <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-                </button>
-              </div>
-            
+              <button
+                type="button"
+                class="btn-action btn-info"
+                @click="toggleSortRanked"
+                :disabled="!participantArr.length"
+                title="Urutkan berdasarkan rank naik/turun"
+              >
+                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+              </button>
+            </div>
           </b-col>
         </b-row>
 
@@ -1970,6 +1971,23 @@ export default {
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
 /* --- DRR Action Bar --- */
 .drr-actionbar {
   display: flex;

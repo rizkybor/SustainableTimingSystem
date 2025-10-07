@@ -341,10 +341,10 @@
                       <div class="p-label">S</div>
                       <b-form-select
                         class="small-select"
-                        v-model="
-                          team.sessions[selectedSession[team._id]].startPenalty
-                        "
+                        v-model="currentSession(team).startPenalty"
                         :options="penaltyOptions"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="recalcTeam(team)"
                         style="border-radius: 12px"
@@ -360,10 +360,10 @@
                       <div class="p-label">{{ gi + 1 }}</div>
                       <b-form-select
                         class="small-select"
-                        v-model="
-                          team.sessions[selectedSession[team._id]].penalties[gi]
-                        "
+                        v-model="currentSession(team).penalties[gi]"
                         :options="penaltyOptions"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="recalcTeam(team)"
                         style="border-radius: 12px"
@@ -375,10 +375,10 @@
                       <div class="p-label">F</div>
                       <b-form-select
                         class="small-select"
-                        v-model="
-                          team.sessions[selectedSession[team._id]].finishPenalty
-                        "
+                        v-model="currentSession(team).finishPenalty"
                         :options="penaltyOptions"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="recalcTeam(team)"
                         style="border-radius: 12px"
@@ -392,12 +392,12 @@
                   <!-- S -->
                   <td>
                     <b-form-select
-                      style="min-width: 50px; border-radius: 12px"
+                      style="min-width: 70px; border-radius: 12px"
                       class="small-select"
-                      v-model="
-                        team.sessions[selectedSession[team._id]].startPenalty
-                      "
+                      v-model="currentSession(team).startPenalty"
                       :options="penaltyOptions"
+                      text-field="label"
+                      value-field="value"
                       size="sm"
                       @change="recalcTeam(team)"
                     />
@@ -410,11 +410,11 @@
                   >
                     <b-form-select
                       class="small-select"
-                      style="min-width: 50px; border-radius: 12px"
-                      v-model="
-                        team.sessions[selectedSession[team._id]].penalties[gi]
-                      "
+                      style="min-width: 70px; border-radius: 12px"
+                      v-model="currentSession(team).penalties[gi]"
                       :options="penaltyOptions"
+                      text-field="label"
+                      value-field="value"
                       size="sm"
                       @change="recalcTeam(team)"
                     />
@@ -424,11 +424,11 @@
                   <td>
                     <b-form-select
                       class="small-select"
-                      style="min-width: 50px; border-radius: 12px"
-                      v-model="
-                        team.sessions[selectedSession[team._id]].finishPenalty
-                      "
+                      style="min-width: 70px; border-radius: 12px"
+                      v-model="currentSession(team).finishPenalty"
                       :options="penaltyOptions"
+                      text-field="label"
+                      value-field="value"
                       size="sm"
                       @change="recalcTeam(team)"
                     />
@@ -655,45 +655,8 @@ export default {
       titleCategories: "",
       teams: [],
       selectedSession: {},
-      penaltyOptions: [
-        { text: "0", value: 0 },
-        { text: "5", value: 5 },
-        { text: "50", value: 50 },
-      ],
-      dataScore: [
-        { ranking: 1, score: 350 },
-        { ranking: 2, score: 322 },
-        { ranking: 3, score: 301 },
-        { ranking: 4, score: 287 },
-        { ranking: 5, score: 277 },
-        { ranking: 6, score: 266 },
-        { ranking: 7, score: 256 },
-        { ranking: 8, score: 245 },
-        { ranking: 9, score: 235 },
-        { ranking: 10, score: 224 },
-        { ranking: 11, score: 214 },
-        { ranking: 12, score: 203 },
-        { ranking: 13, score: 193 },
-        { ranking: 14, score: 182 },
-        { ranking: 15, score: 172 },
-        { ranking: 16, score: 161 },
-        { ranking: 17, score: 151 },
-        { ranking: 18, score: 140 },
-        { ranking: 19, score: 133 },
-        { ranking: 20, score: 126 },
-        { ranking: 21, score: 119 },
-        { ranking: 22, score: 112 },
-        { ranking: 23, score: 105 },
-        { ranking: 24, score: 98 },
-        { ranking: 25, score: 91 },
-        { ranking: 26, score: 84 },
-        { ranking: 27, score: 77 },
-        { ranking: 28, score: 70 },
-        { ranking: 29, score: 63 },
-        { ranking: 30, score: 56 },
-        { ranking: 31, score: 49 },
-        { ranking: 32, score: 42 },
-      ],
+      penaltyOptions: [],
+      dataScore: [],
       penaltiesWrapped: false,
     };
   },
@@ -892,6 +855,9 @@ export default {
       this.dataEvent = {};
     }
 
+    await this.loadDataScore("SLALOM");
+    await this.loadDataPenalties("SLALOM");
+
     // Coba muat data payload baru untuk Slalom
     const ok = this.loadFromRaceStartPayloadForSlalom();
     if (!ok) {
@@ -927,6 +893,35 @@ export default {
   },
 
   methods: {
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.penaltyOptions = payload[0].data;
+          } else {
+            this.penaltyOptions = [];
+          }
+        });
+      } catch (error) {
+        this.penaltyOptions = [];
+      }
+    },
     loadFromRaceStartPayloadForSlalom() {
       const obj = safeJSON(RACE_PAYLOAD_KEY, {});
       const b = obj.bucket || {};
@@ -1581,7 +1576,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  margin-bottom: 6px; /* jarak antar select */
+  margin-bottom: 6px;
 }
 
 .small-select:hover {

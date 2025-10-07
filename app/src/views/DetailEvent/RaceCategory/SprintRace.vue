@@ -189,6 +189,7 @@
 
     <!-- OPERATION TIME -->
     <OperationTimePanel
+      v-if="participantArr && participantArr.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"

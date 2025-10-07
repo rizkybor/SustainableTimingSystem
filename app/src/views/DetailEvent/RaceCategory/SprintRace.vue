@@ -515,6 +515,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForSprint(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),
@@ -737,22 +738,24 @@ export default {
   },
 
   async mounted() {
-    // TESTING SOCKET.IO
     const socket = getSocket();
+
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
     };
     socket.on("connect", onConnect);
-    const onMessage = (msg) => {
+
+    const onMessage = async (msg = {}) => {
+      // abaikan echo dari diri sendiri
       if (
         msg &&
         msg.senderId &&
         this.selfSocketId &&
         msg.senderId === this.selfSocketId
-      ) {
+      )
         return;
-      }
 
+      // tampilkan toast (opsional)
       if (this.$bvToast) {
         this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
           title: "Pesan Realtime",
@@ -760,13 +763,27 @@ export default {
           solid: true,
         });
       }
+
+      // === mapping pesan Judges Dashboard ===
+      // type: 'Start' | 'Finish', teamId: string, value: number
+      if (
+        msg &&
+        msg.teamId &&
+        (msg.type === "Start" || msg.type === "Finish")
+      ) {
+        await this.applyPenaltyFromSocket(msg);
+        return;
+      }
+
+      // fallback lain (abaikan / logic lainmu)
     };
+
     socket.on("custom:event", onMessage);
+
     this.$once("hook:beforeDestroy", () => {
       socket.off("connect", onConnect);
       socket.off("custom:event", onMessage);
     });
-    // TESTING SOCKET.IO
 
     try {
       const events = localStorage.getItem("eventDetails");
@@ -919,6 +936,49 @@ export default {
           }
         }
       );
+    },
+
+    async applyPenaltyFromSocket(payload = {}) {
+      const teamId = String(payload.teamId || "");
+      if (!teamId) return;
+
+      // cari tim lokal
+      const items = this.participantArr;
+      const idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      if (idx === -1) return;
+
+      const local = items[idx];
+
+      // tentukan field target dari msg.type
+      const kind = String(payload.type || "").toLowerCase(); // 'start' | 'finish'
+      const field =
+        kind === "start"
+          ? "startPenalty"
+          : kind === "finish"
+          ? "finishPenalty"
+          : null;
+
+      if (!field) return;
+
+      // normalisasi angka
+      const numVal =
+        payload.value === "" || payload.value == null
+          ? 0
+          : Number(payload.value);
+
+      // set nilai penalty → ini otomatis mengikat dengan v-model.number di <b-select>
+      this.$set(local.result, field, numVal);
+
+      // hitung ulang penalty utk baris ini
+      await this.recalcPenalties(local);
+
+      // tulis balik agar reaktif
+      if (Array.isArray(this.participant)) {
+        this.$set(this.participant, idx, { ...local });
+      }
+
+      // refresh ranking bila totalTime berubah
+      await this.assignRanks(this.participantArr);
     },
 
     // === LOAD PAYLOAD ===
@@ -1365,7 +1425,7 @@ export default {
       const hr = Math.floor(diff / (1000 * 60 * 60));
 
       const pad2 = (n) => String(n).padStart(2, "0");
-      const pad3 = (n) => String(n).padStart(3, "0"); 
+      const pad3 = (n) => String(n).padStart(3, "0");
       return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`;
     },
 
@@ -1700,7 +1760,7 @@ td {
   padding-bottom: 0;
 }
 .meta-label {
-  min-width: 120px; 
+  min-width: 120px;
   font-weight: 800;
   letter-spacing: 0.2px;
   color: #334155;

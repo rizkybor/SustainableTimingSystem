@@ -287,6 +287,7 @@
                 <th class="text-center" rowspan="2">No</th>
                 <th class="text-start" rowspan="2">Team Name</th>
                 <th class="text-center" rowspan="2">BIB Number</th>
+                <th class="text-center" rowspan="2">Start Time</th>
                 <!-- Judul grup penalties: S + 1..N + F -->
                 <th
                   v-if="!penaltiesWrapped"
@@ -310,10 +311,9 @@
 
                 <th class="text-center" rowspan="2">Penalty Total</th>
 
-                <th class="text-center" rowspan="2">Penalty Time</th>
-                <th class="text-center" rowspan="2">Start Time</th>
                 <th class="text-center" rowspan="2">Finish Time</th>
                 <th class="text-center" rowspan="2">Race Time</th>
+                <th class="text-center" rowspan="2">Penalty Time</th>
                 <th class="text-center" rowspan="2">Total Time</th>
                 <th class="text-center" rowspan="2">Best Time</th>
                 <th class="text-center" rowspan="2">Ranked</th>
@@ -339,6 +339,9 @@
                   {{ team.nameTeam }}
                 </td>
                 <td>{{ team.bibNumber }}</td>
+                <td class="text-center text-monospace" style="min-width: 120px">
+                  {{ currentSession(team).startTime || "-" }}
+                </td>
 
                 <!-- ========== PENALTIES ========== -->
                 <!-- Mode WRAPPED: 1 kolom berisi grid S,1..N,F -->
@@ -448,12 +451,6 @@
                   {{ displayTotalPenalty(team) }}
                 </td>
 
-                <td class="text-center penalty-char text-monospace">
-                  {{ currentSession(team).penaltyTime || "-" }}
-                </td>
-                <td class="text-center text-monospace" style="min-width: 120px">
-                  {{ currentSession(team).startTime || "-" }}
-                </td>
                 <td class="text-center text-monospace" style="min-width: 120px">
                   {{ currentSession(team).finishTime || "-" }}
                 </td>
@@ -462,6 +459,10 @@
                   style="min-width: 120px"
                 >
                   {{ currentSession(team).raceTime || "-" }}
+                </td>
+
+                <td class="text-center penalty-char text-monospace">
+                  {{ currentSession(team).penaltyTime || "-" }}
                 </td>
                 <td
                   class="text-center large-bold result-char text-monospace"

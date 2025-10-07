@@ -270,12 +270,13 @@
                     <th class="text-left">Team Name</th>
                     <th class="text-center">BIB Number</th>
                     <th class="text-center">Start Time</th>
-                    <th class="text-center">Finish Time</th>
-                    <th class="text-center">Race Time</th>
                     <th class="text-center">Penalty Start</th>
                     <th class="text-center">Penalty Section</th>
                     <th class="text-center">Penalty Finish</th>
                     <th class="text-center">Penalty Total</th>
+                    <th class="text-center">Finish Time</th>
+                    <th class="text-center">Race Time</th>
+                    <th class="text-center">Penalty Time</th>
                     <th class="text-center">Result</th>
                     <th class="text-center">Ranked</th>
                     <th class="text-center">Score</th>
@@ -292,13 +293,6 @@
                     <td class="text-center text-monospace">
                       {{ item.result.startTime }}
                     </td>
-                    <td class="text-center text-monospace">
-                      {{ item.result.finishTime }}
-                    </td>
-                    <td class="text-center large-bold text-monospace">
-                      {{ item.result.raceTime }}
-                    </td>
-
                     <!-- Pen Start -->
                     <td class="text-center">
                       <b-select
@@ -377,11 +371,24 @@
                       </b-select>
                     </td>
 
+                    <td class="text-center penalty-char">
+                      {{ item.result.totalPenalty }}
+                    </td>
+
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
+
+                    <td class="text-center large-bold text-monospace">
+                      {{ item.result.raceTime }}
+                    </td>
+
                     <td
                       class="text-center large-bold penalty-char text-monospace"
                     >
                       {{ item.result.penaltyTime }}
                     </td>
+
                     <td
                       class="text-center large-bold result-char text-monospace"
                     >

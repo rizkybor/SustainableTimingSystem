@@ -562,11 +562,10 @@
 
                     <!-- Grup Penalties -->
                     <th colspan="9" class="text-center">Penalties</th>
-
                     <th rowspan="2">Total Penalty</th>
-                    <th class="text-center" rowspan="2">Penalty Time</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
+                    <th class="text-center" rowspan="2">Penalty Time</th>
                     <th class="text-center" rowspan="2">Result</th>
                     <th class="text-center" rowspan="2">Win/Lose</th>
                     <th v-if="editResult" class="text-center" rowspan="2">
@@ -819,11 +818,6 @@
                       >
                     </td>
 
-                    <!-- PENALTY TIME -->
-                    <td class="text-center text-monospace penalty-char">
-                      {{ item.result.penaltyTime }}
-                    </td>
-
                     <!-- FINISH TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.finishTime }}
@@ -832,6 +826,11 @@
                     <!-- RACETIME  -->
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
+                    </td>
+
+                    <!-- PENALTY TIME -->
+                    <td class="text-center text-monospace penalty-char">
+                      {{ item.result.penaltyTime }}
                     </td>
 
                     <!-- RESULT  -->
@@ -931,7 +930,7 @@
       @update-time="updateTime"
     />
 
-    <div class="ml-5">
+    <div class="ml-5 mt-4">
       <b-button @click="goTo" variant="outline-info" class="btn-action">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
@@ -2965,14 +2964,8 @@ export default {
           this.fChoices = getChoices("FINISH");
           this.clChoices = getChoices("CLASSIC");
           this.ynChoices = getChoices("YESNO");
-
-          console.log("✅ START:", this.sChoices);
-          console.log("✅ FINISH:", this.fChoices);
-          console.log("✅ CLASSIC:", this.clChoices);
-          console.log("✅ YESNO:", this.ynChoices);
         });
       } catch (error) {
-        console.error("❌ Failed to load penalties:", error);
         this.sChoices = [];
         this.fChoices = [];
         this.clChoices = [];

@@ -212,7 +212,7 @@
                 }"
                 @click="setRun(0)"
               >
-                Run 1 Section
+                Run Session #1
               </button>
               <button
                 type="button"
@@ -223,7 +223,7 @@
                 }"
                 @click="setRun(1)"
               >
-                Run 2 Section
+                Run Session #2
               </button>
             </div>
           </div>
@@ -295,7 +295,7 @@
                   @click="penaltiesWrapped = true"
                   title="Klik untuk bungkus (wrap) penalties"
                 >
-                  Penalty Gates Run {{ this.activeRun + 1 }}
+                  Penalty Gates Run Session #{{ this.activeRun + 1 }}
                 </th>
                 <!-- Mode wrapped: cuma 1 kolom -->
                 <th
@@ -305,7 +305,7 @@
                   @click="penaltiesWrapped = false"
                   title="Klik untuk tampilkan penuh (un-wrap) penalties"
                 >
-                  Penalty Gates Run {{ this.activeRun + 1 }}
+                  Penalty Gates Run Session #{{ this.activeRun + 1 }}
                 </th>
 
                 <th class="text-center" rowspan="2">Penalty Total</th>

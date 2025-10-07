@@ -99,14 +99,13 @@
                 <b-form-group
                   label="Switch Sprint Category:"
                   label-for="sprintBucketSelect"
-                  class="mb-0 toolbar-select"
+                  class="mb-0 sprint-actionbar__select"
                 >
                   <b-form-select
                     id="sprintBucketSelect"
                     :options="sprintBucketOptions"
                     v-model="selectedSprintKey"
                     @change="onSelectSprintBucket"
-                    class="toolbar-select__control"
                   />
                 </b-form-group>
               </div>
@@ -202,9 +201,10 @@
     <div class="px-4 mt-2">
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
-          <!-- <div > -->
           <h4>Output Racetime :</h4>
-          <!-- </div> -->
+          <small class="text-muted">
+            Category active: {{ titleCategories || "-" }}
+          </small>
           <div>
             <!-- <button
               type="button"
@@ -261,16 +261,12 @@
                   <th class="text-left">Team Name</th>
                   <th class="text-center">BIB Number</th>
                   <th class="text-center">Start Time</th>
-                  <th class="text-center">Finish Time</th>
-                  <th class="text-center">Race Time</th>
-
-                  <!-- urutan baru -->
                   <th class="text-center">Penalty Start</th>
-                  <!-- REMOVED: Penalties (legacy/middle) column -->
                   <th class="text-center">Penalty Finish</th>
                   <th class="text-center">Penalty Total</th>
+                  <th class="text-center">Finish Time</th>
+                  <th class="text-center">Race Time</th>
                   <th class="text-center">Penalty Time</th>
-
                   <th class="text-center">Result</th>
                   <th class="text-center">Ranked</th>
                   <th class="text-center">Score</th>
@@ -290,12 +286,6 @@
                   <td class="text-center">{{ item.bibTeam }}</td>
                   <td class="text-center text-monospace">
                     {{ item.result.startTime }}
-                  </td>
-                  <td class="text-center text-monospace">
-                    {{ item.result.finishTime }}
-                  </td>
-                  <td class="text-center large-bold text-monospace">
-                    {{ item.result.raceTime }}
                   </td>
 
                   <!-- Start Penalties -->
@@ -317,12 +307,10 @@
                     </b-select>
                   </td>
 
-                  <!-- REMOVED: Penalties (legacy / middle) select -->
-
                   <!-- Finish Penalties -->
                   <td class="text-center">
                     <b-select
-                      v-if="item.result.finishTime"
+                      v-if="item.result.startTime"
                       v-model.number="item.result.finishPenalty"
                       @change="updateFinishPenalty(item)"
                       style="border-radius: 12px"
@@ -343,7 +331,15 @@
                     {{ item.result.totalPenalty }}
                   </td>
 
-                  <!-- Penalty Time total (format waktu) -->
+                  <td class="text-center text-monospace">
+                    {{ item.result.finishTime }}
+                  </td>
+
+                  <td class="text-center large-bold text-monospace">
+                    {{ item.result.raceTime }}
+                  </td>
+
+                   <!-- Penalty Time total (format waktu) -->
                   <td
                     class="text-center large-bold penalty-char text-monospace"
                   >
@@ -1508,15 +1504,28 @@ export default {
 </script>
 
 <style scoped>
-/* Select block */
-.toolbar-select {
+/* ---- Styling utk Switch DRR Category select ---- */
+.sprint-actionbar__select {
   min-width: 260px;
   flex: 1 1 260px;
 }
-.toolbar-select__control {
-  border-radius: 10px;
+
+.sprint-actionbar__select #sprintBucketSelect {
+  border-radius: 12px;
   cursor: pointer;
 }
+
+#sprintBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#sprintBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
 
 /* ---- Styling utk penalty section select ---- */
 .small-select {

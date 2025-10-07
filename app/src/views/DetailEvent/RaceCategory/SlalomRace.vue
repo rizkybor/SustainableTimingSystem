@@ -100,14 +100,13 @@
                 <b-form-group
                   label="Switch Slalom Category:"
                   label-for="sprintBucketSelect"
-                  class="mb-0 toolbar-select"
+                  class="mb-0 slalom-actionbar__select"
                 >
                   <b-form-select
                     id="slalomBucketSelect"
                     :options="slalomBucketOptions"
                     v-model="selectedSlalomKey"
                     @change="onSelectSlalomBucket"
-                    class="toolbar-select__control"
                   />
                 </b-form-group>
               </div>
@@ -206,30 +205,33 @@
             <div class="btn-group" role="group" aria-label="Run Switch">
               <button
                 type="button"
-                class="btn-action mr-2 btn"
-                :class="activeRun === 0 ? 'btn-primary' : 'btn-outline-primary'"
+                class="mr-2 btn"
+                :class="{
+                  'btn-action-active': activeRun === 0,
+                  'btn-action': activeRun !== 0,
+                }"
                 @click="setRun(0)"
               >
-                Run 1
+                Run 1 Section
               </button>
               <button
                 type="button"
-                class="btn-action btn"
-                :class="activeRun === 1 ? 'btn-primary' : 'btn-outline-primary'"
+                class="btn"
+                :class="{
+                  'btn-action-active': activeRun === 1,
+                  'btn-action': activeRun !== 1,
+                }"
                 @click="setRun(1)"
               >
-                Run 2
+                Run 2 Section
               </button>
             </div>
           </div>
 
           <!-- ACTION BAR: Save & Sort (mirip Sprint/DRR) -->
           <div class="d-flex justify-content-between">
-            <h4>Output Racetime Run {{ this.activeRun + 1 }}:</h4>
-
+            <h4>Output Racetime :</h4>
             <div class="slalom-actionbar">
-              <div class="slalom-actionbar__spacer"></div>
-
               <div class="slalom-actionbar__buttons">
                 <button
                   type="button"
@@ -273,6 +275,7 @@
               <div class="text-muted">Loading bracket & teams…</div>
             </div>
           </div>
+
           <table v-else-if="visibleTeams && visibleTeams.length" class="table">
             <thead>
               <tr>
@@ -287,7 +290,7 @@
                   @click="penaltiesWrapped = true"
                   title="Klik untuk bungkus (wrap) penalties"
                 >
-                  Penalty Gates
+                  Penalty Gates Run {{ this.activeRun + 1 }}
                 </th>
                 <!-- Mode wrapped: cuma 1 kolom -->
                 <th
@@ -297,7 +300,7 @@
                   @click="penaltiesWrapped = false"
                   title="Klik untuk tampilkan penuh (un-wrap) penalties"
                 >
-                  Penalty Gates
+                  Penalty Gates Run {{ this.activeRun + 1 }}
                 </th>
 
                 <th class="text-center" rowspan="2">Penalty Total</th>
@@ -310,7 +313,7 @@
                 <th class="text-center" rowspan="2">Best Time</th>
                 <th class="text-center" rowspan="2">Ranked</th>
                 <th class="text-center" rowspan="2">Score</th>
-                <th v-if="endGame">Action</th>
+                <th v-if="endGame" class="text-center" rowspan="2">Action</th>
               </tr>
               <tr v-if="!penaltiesWrapped">
                 <th class="text-center">Start</th>
@@ -342,7 +345,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).startPenalty"
-                        :options="penaltyOptions"
+                        :options="dataPenalties"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -361,7 +364,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).penalties[gi]"
-                        :options="penaltyOptions"
+                        :options="dataPenalties"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -376,7 +379,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).finishPenalty"
-                        :options="penaltyOptions"
+                        :options="dataPenalties"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -395,7 +398,7 @@
                       style="min-width: 70px; border-radius: 12px"
                       class="small-select"
                       v-model="currentSession(team).startPenalty"
-                      :options="penaltyOptions"
+                      :options="dataPenalties"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -412,7 +415,7 @@
                       class="small-select"
                       style="min-width: 70px; border-radius: 12px"
                       v-model="currentSession(team).penalties[gi]"
-                      :options="penaltyOptions"
+                      :options="dataPenalties"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -426,7 +429,7 @@
                       class="small-select"
                       style="min-width: 70px; border-radius: 12px"
                       v-model="currentSession(team).finishPenalty"
-                      :options="penaltyOptions"
+                      :options="dataPenalties"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -641,7 +644,6 @@ export default {
       baudOptions: [1200, 2400, 9600],
       serialCtrl: null,
       endGame: false,
-      isScrolled: false,
       activeRun: 0,
       sortBest: { enabled: false, desc: false },
       SLALOM_GATES: buildGates(DEFAULT_S16),
@@ -655,7 +657,7 @@ export default {
       titleCategories: "",
       teams: [],
       selectedSession: {},
-      penaltyOptions: [],
+      dataPenalties: [],
       dataScore: [],
       penaltiesWrapped: false,
     };
@@ -845,7 +847,9 @@ export default {
       return map;
     },
   },
-
+  created() {
+    this.activeRun = 0;
+  },
   async mounted() {
     // Ambil event info dari localStorage dengan aman
     try {
@@ -854,21 +858,14 @@ export default {
     } catch {
       this.dataEvent = {};
     }
-
     await this.loadDataScore("SLALOM");
     await this.loadDataPenalties("SLALOM");
 
-    // Coba muat data payload baru untuk Slalom
     const ok = this.loadFromRaceStartPayloadForSlalom();
     if (!ok) {
-      // Jika tidak berhasil, coba muat data dari penyimpanan lokal
       await this.checkValueStorage();
     }
-
-    // === SLALOM BUCKET: bangun opsi & muat tim terdaftar via DB ===
     this.buildSlalomOptions();
-
-    // Jika ada opsi slalom, ambil tim berdasarkan key yang tersimpan
     if (this.slalomBucketOptions.length) {
       const savedKey = localStorage.getItem("currentSlalomBucketKey");
       this.selectedSlalomKey =
@@ -913,13 +910,13 @@ export default {
         ipcRenderer.send("option-penalties", type);
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
           if (payload) {
-            this.penaltyOptions = payload[0].data;
+            this.dataPenalties = payload[0].data;
           } else {
-            this.penaltyOptions = [];
+            this.dataPenalties = [];
           }
         });
       } catch (error) {
-        this.penaltyOptions = [];
+        this.dataPenalties = [];
       }
     },
     loadFromRaceStartPayloadForSlalom() {
@@ -1560,15 +1557,29 @@ export default {
 </script>
 
 <style scoped>
-/* Select block */
-.toolbar-select {
+/* ---- Styling utk Switch Slalom Category select ---- */
+.slalom-actionbar__select {
   min-width: 260px;
-  flex: 1 1 260px; /* bisa melebar di layar kecil */
+  flex: 1 1 260px;
 }
-.toolbar-select__control {
-  border-radius: 10px;
+
+.slalom-actionbar__select #drrBucketSelect {
+  border-radius: 12px;
   cursor: pointer;
 }
+
+#slalomBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#slalomBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch Slalom Category select ---- */
+
 
 /* ---- Styling utk penalty section select ---- */
 .small-select {
@@ -1592,6 +1603,36 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+  transition: all 0.25s ease;
+}
+
+/* Saat hover */
+.btn-action:hover {
+  background: #eaf3ff;
+  border-color: #90c2ff;
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(0, 123, 255, 0.25);
+}
+
+/* === ACTIVE STATE === */
+.btn-action-active {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  border: 1px solid #267cb6;
+  color: #ffffff;
+  font-weight: 800;
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5),
+              inset 0 0 4px rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  transition: all 0.3s ease;
+}
+
+/* Saat tombol aktif dihover → makin terang */
+.btn-action-active:hover {
+  background: linear-gradient(135deg, #25b0eb, #267cb6);
+  box-shadow: 0 0 60px rgba(0, 180, 255, 0.4),
+              inset 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
 /* ===== STYLING BEST TIME RACETIME ===== */
@@ -1752,6 +1793,7 @@ export default {
 .table-responsive {
   overflow-x: auto;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;

@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "-"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"
@@ -103,14 +100,13 @@
                 <b-form-group
                   label="Switch Head to Head Category:"
                   label-for="h2hBucketSelect"
-                  class="mb-0 toolbar-select"
+                  class="mb-0 h2h-actionbar__select"
                 >
                   <b-form-select
                     id="h2hBucketSelect"
                     :options="h2hBucketOptions"
                     v-model="selectedH2HKey"
                     @change="onSelectH2HBucket"
-                    class="toolbar-select__control"
                   />
                 </b-form-group>
               </div>
@@ -511,6 +507,9 @@
                   : "—"
               }}
             </h4>
+            <small class="text-muted">
+              Category active: {{ titleCategories || "-" }}
+            </small>
           </div>
           <div class="d-flex" style="gap: 8px">
             <button
@@ -652,6 +651,8 @@
                         class="small-select"
                         v-model.number="item.result.penalties.s"
                         :options="sChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -667,6 +668,8 @@
                         class="small-select"
                         v-model.number="item.result.penalties.cl"
                         :options="clChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -682,6 +685,8 @@
                         class="small-select"
                         v-model="item.result.penalties.r1"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -698,6 +703,8 @@
                         class="small-select"
                         v-model="item.result.penalties.r2"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -714,6 +721,8 @@
                         class="small-select"
                         v-model="item.result.penalties.l1"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -730,6 +739,8 @@
                         class="small-select"
                         v-model="item.result.penalties.l2"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -769,6 +780,8 @@
                         class="small-select"
                         v-model.number="item.result.penalties.f"
                         :options="fChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -909,6 +922,7 @@
 
     <!-- OPERATION TIME (shared component) -->
     <OperationTimePanel
+      v-if="visibleParticipants && visibleParticipants.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="visibleParticipants"
@@ -1190,45 +1204,8 @@ export default {
       isPortConnected: false,
       digitId: [],
       digitTime: [],
-      dataPenalties: [
-        { label: "0", value: 0, timePen: "00:00:00.000" },
-        { label: "5", value: 5, timePen: "00:00:05.000" },
-        { label: "50", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 100 },
-        { ranking: 2, score: 92 },
-        { ranking: 3, score: 86 },
-        { ranking: 4, score: 82 },
-        { ranking: 5, score: 79 },
-        { ranking: 6, score: 76 },
-        { ranking: 7, score: 73 },
-        { ranking: 8, score: 70 },
-        { ranking: 9, score: 67 },
-        { ranking: 10, score: 64 },
-        { ranking: 11, score: 61 },
-        { ranking: 12, score: 58 },
-        { ranking: 13, score: 55 },
-        { ranking: 14, score: 52 },
-        { ranking: 15, score: 49 },
-        { ranking: 16, score: 46 },
-        { ranking: 17, score: 43 },
-        { ranking: 18, score: 40 },
-        { ranking: 19, score: 38 },
-        { ranking: 20, score: 36 },
-        { ranking: 21, score: 34 },
-        { ranking: 22, score: 32 },
-        { ranking: 23, score: 30 },
-        { ranking: 24, score: 28 },
-        { ranking: 25, score: 26 },
-        { ranking: 26, score: 24 },
-        { ranking: 27, score: 22 },
-        { ranking: 28, score: 20 },
-        { ranking: 29, score: 18 },
-        { ranking: 30, score: 16 },
-        { ranking: 31, score: 14 },
-        { ranking: 32, score: 12 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       isRankedDescending: false,
@@ -1358,33 +1335,33 @@ export default {
       }
       return [];
     },
-    sChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 50, text: "50 (50s)" },
-      ];
-    },
-    fChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 10, text: "10 (10s)" },
-        { value: 50, text: "50 (50s)" },
-      ];
-    },
-    clChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 10, text: "10 (10s)" },
-        { value: 20, text: "20 (20s)" },
-      ];
-    },
-    ynChoices() {
-      return [
-        { value: null, text: "-" },
-        { value: "N", text: "N" },
-        { value: "Y", text: "Y" },
-      ];
-    },
+    // sChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 50, text: "50 (50s)" },
+    //   ];
+    // },
+    // fChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 10, text: "10 (10s)" },
+    //     { value: 50, text: "50 (50s)" },
+    //   ];
+    // },
+    // clChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 10, text: "10 (10s)" },
+    //     { value: 20, text: "20 (20s)" },
+    //   ];
+    // },
+    // ynChoices() {
+    //   return [
+    //     { value: null, text: "-" },
+    //     { value: "N", text: "N" },
+    //     { value: "Y", text: "Y" },
+    //   ];
+    // },
     storedResultsByRound() {
       // baca semua yang sudah dipersist ke localStorage untuk bucket saat ini
       if (!this.roundResultsRootKey) return {};
@@ -1620,6 +1597,9 @@ export default {
     } catch {
       this.dataEvent = {};
     }
+
+    await this.loadDataScore("HEAD_TO_HEAD");
+    await this.loadDataPenalties("HEAD_TO_HEAD");
 
     // build opsi statik dari kategori event (fallback ke default bila kosong)
     this.buildStaticH2HOptions();
@@ -2940,6 +2920,65 @@ export default {
         (err && (err.message || err.toString())) || "Unknown error";
       this.notify("error", detail, message);
     },
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties() {
+      try {
+        ipcRenderer.send("option-penalties", "HEAD_TO_HEAD");
+
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (!payload || !payload[0] || !payload[0].data) {
+            this.sChoices = [];
+            this.fChoices = [];
+            this.clChoices = [];
+            this.ynChoices = [];
+            return;
+          }
+
+          const arr = payload[0].data; // semua kategori
+          if (!Array.isArray(arr)) return;
+
+          // helper untuk ambil kategori
+          const getChoices = (key) => {
+            const cat = arr.find(
+              (d) =>
+                d.category && d.category.toUpperCase() === key.toUpperCase()
+            );
+            return cat && Array.isArray(cat.choices) ? cat.choices : [];
+          };
+
+          this.sChoices = getChoices("START");
+          this.fChoices = getChoices("FINISH");
+          this.clChoices = getChoices("CLASSIC");
+          this.ynChoices = getChoices("YESNO");
+
+          console.log("✅ START:", this.sChoices);
+          console.log("✅ FINISH:", this.fChoices);
+          console.log("✅ CLASSIC:", this.clChoices);
+          console.log("✅ YESNO:", this.ynChoices);
+        });
+      } catch (error) {
+        console.error("❌ Failed to load penalties:", error);
+        this.sChoices = [];
+        this.fChoices = [];
+        this.clChoices = [];
+        this.ynChoices = [];
+      }
+    },
     /** Method podium config */
     /** Cari round final (size==2) dan bronze (round.bronze) */
     getFinalRound() {
@@ -3588,6 +3627,29 @@ export default {
 </script>
 
 <style scoped>
+/* ---- Styling utk Switch DRR Category select ---- */
+.h2h-actionbar__select {
+  min-width: 260px;
+  flex: 1 1 260px;
+}
+
+.h2h-actionbar__select #h2hBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+#h2hBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#h2hBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
+
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -3973,16 +4035,6 @@ thead th[colspan="8"] {
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap; /* biar responsif */
-}
-
-/* Select block */
-.toolbar-select {
-  min-width: 260px;
-  flex: 1 1 260px; /* bisa melebar di layar kecil */
-}
-.toolbar-select__control {
-  border-radius: 10px;
-  cursor: pointer;
 }
 
 /* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */

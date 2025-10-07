@@ -95,6 +95,22 @@
                   {{ titleCategories || "-" }}
                 </span>
               </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch DRR Category:"
+                  label-for="drrBucketSelect"
+                  class="mb-0 drr-actionbar__select"
+                >
+                  <b-form-select
+                    id="drrBucketSelect"
+                    :options="drrBucketOptions"
+                    v-model="selectedDrrKey"
+                    @change="onSelectDrrBucket"
+                  />
+                </b-form-group>
+              </div>
             </div>
           </b-col>
 
@@ -174,6 +190,7 @@
 
     <!-- OPERATION TIME (shared component like Sprint) -->
     <OperationTimePanel
+      v-if="participantArr && participantArr.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -192,24 +209,10 @@
               Category active: {{ titleCategories || "-" }}
             </small>
           </b-col>
-          <b-col cols="12" md="6">
-            <div class="drr-actionbar">
-              <b-form-group
-                label="Switch DRR Category:"
-                label-for="drrBucketSelect"
-                class="mb-0 drr-actionbar__select"
-              >
-                <b-form-select
-                  id="drrBucketSelect"
-                  :options="drrBucketOptions"
-                  v-model="selectedDrrKey"
-                  @change="onSelectDrrBucket"
-                />
-              </b-form-group>
-
+          <b-col cols="6" md="6">
               <div class="drr-actionbar__buttons">
                 <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
-                <button
+                <!-- <button
                   type="button"
                   class="btn-action btn-warning"
                   @click="previewJson"
@@ -217,7 +220,7 @@
                   title="Tampilkan JSON yang akan disimpan"
                 >
                   <Icon icon="mdi:code-json" /> Preview JSON
-                </button>
+                </button> -->
 
                 <button
                   type="button"
@@ -239,7 +242,7 @@
                   <Icon icon="icon-park-outline:ranking" /> Sort Ranked
                 </button>
               </div>
-            </div>
+            
           </b-col>
         </b-row>
 
@@ -742,46 +745,8 @@ export default {
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
-      dataPenalties: [
-        { label: "0", value: 0, timePen: "00:00:00.000" },
-        { label: "+ 10", value: 10, timePen: "00:00:10.000" },
-        { label: "- 10", value: -10, timePen: "-00:00:10.000" },
-        { label: "+ 50", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 350 },
-        { ranking: 2, score: 322 },
-        { ranking: 3, score: 301 },
-        { ranking: 4, score: 287 },
-        { ranking: 5, score: 277 },
-        { ranking: 6, score: 266 },
-        { ranking: 7, score: 256 },
-        { ranking: 8, score: 245 },
-        { ranking: 9, score: 235 },
-        { ranking: 10, score: 224 },
-        { ranking: 11, score: 214 },
-        { ranking: 12, score: 203 },
-        { ranking: 13, score: 193 },
-        { ranking: 14, score: 182 },
-        { ranking: 15, score: 172 },
-        { ranking: 16, score: 161 },
-        { ranking: 17, score: 151 },
-        { ranking: 18, score: 140 },
-        { ranking: 19, score: 133 },
-        { ranking: 20, score: 126 },
-        { ranking: 21, score: 119 },
-        { ranking: 22, score: 112 },
-        { ranking: 23, score: 105 },
-        { ranking: 24, score: 98 },
-        { ranking: 25, score: 91 },
-        { ranking: 26, score: 84 },
-        { ranking: 27, score: 77 },
-        { ranking: 28, score: 70 },
-        { ranking: 29, score: 63 },
-        { ranking: 30, score: 56 },
-        { ranking: 31, score: 49 },
-        { ranking: 32, score: 42 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -897,6 +862,9 @@ export default {
     },
   },
   async mounted() {
+    await this.loadDataScore("DRR");
+    await this.loadDataPenalties("DRR");
+
     this.dataEvent = readEventDetailsFromLS();
     this.buildStaticDrrOptions();
 
@@ -1001,6 +969,37 @@ export default {
       this.notify("error", detail, message);
     },
     // ======
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.dataPenalties = payload[0].data;
+          } else {
+            this.dataPenalties = [];
+          }
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
     resetRow(item) {
       if (!item || !item.result) return;
 
@@ -1977,9 +1976,10 @@ export default {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap; /* biar rapi saat layar kecil */
+  flex-wrap: wrap;
 }
 
+/* ---- Styling utk Switch DRR Category select ---- */
 .drr-actionbar__select {
   min-width: 260px;
   flex: 1 1 260px;
@@ -1990,19 +1990,42 @@ export default {
   cursor: pointer;
 }
 
-.drr-actionbar__buttons {
-  display: inline-flex;
-  gap: 8px;
-  flex: 0 0 auto;
+#drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
+#drrBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
+
+.drr-actionbar {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.drr-actionbar__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Pastikan tombol tidak nempel terlalu rapat ke tepi kanan */
+.drr-actionbar__buttons .btn-action {
+  margin-right: 0;
+}
+
+/* Responsif: tetap kanan, tapi biar wrap rapi */
 @media (max-width: 767.98px) {
-  .drr-actionbar {
-    align-items: stretch;
-  }
   .drr-actionbar__buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
     width: 100%;
-    justify-content: flex-end; /* tombol rata kanan saat turun ke baris baru */
   }
 }
 
@@ -2174,18 +2197,6 @@ td {
 .table-wrapper th,
 .table-wrapper td {
   white-space: nowrap; /* prevent wrapping */
-}
-
-/* ---- Styling utk Switch DRR Category select ---- */
-#drrBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-#drrBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
 /* ---- Styling utk penalty section select ---- */

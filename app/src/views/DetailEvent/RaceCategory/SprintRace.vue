@@ -205,7 +205,7 @@
           <h4>Output Racetime :</h4>
           <!-- </div> -->
           <div>
-            <button
+            <!-- <button
               type="button"
               class="btn-action btn-secondary mr-2"
               @click="sendRealtimeMessage"
@@ -219,7 +219,7 @@
               @click="previewResult"
             >
               <Icon icon="icon-park-outline:save" /> Preview JSON
-            </button>
+            </button> -->
 
             <button
               type="button"
@@ -812,10 +812,6 @@ export default {
     }
   },
 
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
-  },
-
   beforeRouteLeave(to, from, next) {
     localStorage.removeItem("raceStartPayload");
     localStorage.removeItem("participantByCategories");
@@ -916,27 +912,27 @@ export default {
     /* =========================================================
      * SOCKET / IPC (opsional)
      * =======================================================*/
-    sendRealtimeMessage() {
-      const socket = getSocket();
-      socket.emit(
-        "custom:event",
-        {
-          senderId: socket.id,
-          from: "Sustainable Timing System",
-          text: "Terima kasih, udah gue teerima beks nilai penaltynya",
-          ts: new Date().toISOString(),
-        },
-        (ok) => {
-          if (!ok) {
-            ipcRenderer.send("get-alert", {
-              type: "error",
-              message: "Gagal mengirim pesan realtime",
-              detail: "Silakan cek koneksi broker/socket.",
-            });
-          }
-        }
-      );
-    },
+    // sendRealtimeMessage() {
+    //   const socket = getSocket();
+    //   socket.emit(
+    //     "custom:event",
+    //     {
+    //       senderId: socket.id,
+    //       from: "Sustainable Timing System",
+    //       text: "Terima kasih, udah gue teerima beks nilai penaltynya",
+    //       ts: new Date().toISOString(),
+    //     },
+    //     (ok) => {
+    //       if (!ok) {
+    //         ipcRenderer.send("get-alert", {
+    //           type: "error",
+    //           message: "Gagal mengirim pesan realtime",
+    //           detail: "Silakan cek koneksi broker/socket.",
+    //         });
+    //       }
+    //     }
+    //   );
+    // },
 
     async applyPenaltyFromSocket(payload = {}) {
       const teamId = String(payload.teamId || "");
@@ -980,6 +976,7 @@ export default {
       // refresh ranking bila totalTime berubah
       await this.assignRanks(this.participantArr);
     },
+    /* =========================================================*/
 
     // === LOAD PAYLOAD ===
     loadFromRaceStartPayload() {
@@ -1025,7 +1022,6 @@ export default {
         localStorage.getItem("currentCategories") || ""
       ).trim();
     },
-    // ======
 
     async loadDataScore(type) {
       try {
@@ -1056,6 +1052,102 @@ export default {
         this.dataPenalties = [];
       }
     },
+
+    loadAllSprintBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+        const sprintBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
+        );
+
+        const map = Object.create(null);
+        const opts = [];
+
+        sprintBuckets.forEach((b) => {
+          const key = this._sprintBucketKey(b);
+          const label = this._sprintBucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForSprint)
+            : [];
+
+          map[key] = { ...b, teams: normalizedTeams };
+          opts.push({ value: key, text: label });
+        });
+
+        this.sprintBucketMap = map;
+        this.sprintBucketOptions = opts;
+
+        const savedKey = localStorage.getItem("currentSprintBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useSprintBucket(savedKey);
+          this.selectedSprintKey = savedKey;
+        } else if (opts.length) {
+          this._useSprintBucket(opts[0].value);
+          this.selectedSprintKey = opts[0].value;
+        }
+      } catch {
+        /* noop */
+      }
+    },
+    // ======
+
+    // === ON SELECT LOAD PAYLOAD ===
+    async onSelectSprintBucket(key) {
+      await this.fetchSprintBucketTeamsByKey(key);
+    },
+
+    // --- fetch teams via IPC (khusus Sprint) ---
+    async fetchSprintBucketTeamsByKey(key) {
+      try {
+        this.isLoading = true;
+
+        if (
+          !key ||
+          !this.sprintBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.sprintBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        this.selectedSprintKey = key;
+        localStorage.setItem("currentSprintBucketKey", key);
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once(
+            "teams-sprint-registered:find-reply",
+            (_e, payload) => resolve(payload)
+          );
+          ipcRenderer.send("teams-sprint-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          this.participant = [];
+          this._useSprintBucket(key);
+          return;
+        }
+
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForSprint)
+            : [];
+        this.sprintBucketMap[key] = { ...b, teams };
+        this._useSprintBucket(key);
+      } catch {
+        this._useSprintBucket(key);
+      }
+      this.isLoading = false;
+    },
+
+    // ======
 
     _sprintBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
@@ -1163,96 +1255,6 @@ export default {
       this.sprintBucketMap = map;
     },
 
-    loadAllSprintBucketsFromEvent() {
-      try {
-        const raw = localStorage.getItem("eventDetails");
-        const ev = raw ? JSON.parse(raw) : {};
-        const participant = Array.isArray(ev.participant) ? ev.participant : [];
-        const sprintBuckets = participant.filter(
-          (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
-        );
-
-        const map = Object.create(null);
-        const opts = [];
-
-        sprintBuckets.forEach((b) => {
-          const key = this._sprintBucketKey(b);
-          const label = this._sprintBucketLabel(b);
-          const normalizedTeams = Array.isArray(b.teams)
-            ? b.teams.map(normalizeTeamForSprint)
-            : [];
-
-          map[key] = { ...b, teams: normalizedTeams };
-          opts.push({ value: key, text: label });
-        });
-
-        this.sprintBucketMap = map;
-        this.sprintBucketOptions = opts;
-
-        const savedKey = localStorage.getItem("currentSprintBucketKey");
-        if (savedKey && map[savedKey]) {
-          this._useSprintBucket(savedKey);
-          this.selectedSprintKey = savedKey;
-        } else if (opts.length) {
-          this._useSprintBucket(opts[0].value);
-          this.selectedSprintKey = opts[0].value;
-        }
-      } catch {
-        /* noop */
-      }
-    },
-    async onSelectSprintBucket(key) {
-      await this.fetchSprintBucketTeamsByKey(key);
-    },
-    // --- fetch teams via IPC (khusus Sprint) ---
-    async fetchSprintBucketTeamsByKey(key) {
-      try {
-        this.isLoading = true;
-
-        if (
-          !key ||
-          !this.sprintBucketMap[key] ||
-          typeof ipcRenderer === "undefined"
-        )
-          return;
-
-        const b = this.sprintBucketMap[key];
-        const filters = {
-          eventId: String(b.eventId),
-          initialId: String(b.initialId),
-          raceId: String(b.raceId),
-          divisionId: String(b.divisionId),
-        };
-
-        this.selectedSprintKey = key;
-        localStorage.setItem("currentSprintBucketKey", key);
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once(
-            "teams-sprint-registered:find-reply",
-            (_e, payload) => resolve(payload)
-          );
-          ipcRenderer.send("teams-sprint-registered:find", filters);
-        });
-
-        if (!res || !res.ok) {
-          this.participant = [];
-          this._useSprintBucket(key);
-          return;
-        }
-
-        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
-        const teams =
-          doc && Array.isArray(doc.teams)
-            ? doc.teams.map(normalizeTeamForSprint)
-            : [];
-        this.sprintBucketMap[key] = { ...b, teams };
-        this._useSprintBucket(key);
-      } catch {
-        this._useSprintBucket(key);
-      }
-      this.isLoading = false;
-    },
-
     resetRow(item) {
       item.result.startTime = "";
       item.result.finishTime = "";
@@ -1269,24 +1271,11 @@ export default {
       this.$forceUpdate();
     },
 
-    async calculateScore(ranked) {
-      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
-      return scoreData ? scoreData.score : 0;
-    },
-
     parsesTime(timeStr) {
       const [hours, minutes, seconds] = String(timeStr || "0:0:0")
         .split(":")
         .map(parseFloat);
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
-    },
-
-    async parseTimeResult(timeResult) {
-      const parts = String(timeResult || "00:00:00:000").split(":");
-      const [hours, minutes, seconds, milliseconds] = parts.map(
-        (p) => parseInt(p, 10) || 0
-      );
-      return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
     },
 
     async recalcPenalties(item) {
@@ -1330,18 +1319,6 @@ export default {
       await this.recalcPenalties(item);
     },
 
-    async resetRace() {
-      this.endGame = false;
-    },
-
-    async checkingPenalties() {
-      for (let i = 0; i < this.participant.length; i++) {
-        await this.recalcPenalties(this.participant[i]);
-      }
-      this.endGame = true;
-      await this.assignRanks(this.participant);
-    },
-
     async assignRanks(items) {
       const itemsWithTimeResult = items.filter((item) => item.result.totalTime);
       itemsWithTimeResult.sort(
@@ -1368,16 +1345,6 @@ export default {
           : a.result.ranked - b.result.ranked
       );
       this.participant = arr;
-    },
-
-    formatTime(inputTime) {
-      const hours = String(inputTime).substr(0, 2);
-      const minutes = String(inputTime).substr(2, 2);
-      const seconds = String(inputTime).substr(4, 2);
-      const milliseconds = String(inputTime).substr(6);
-      const correctedMinutes = Math.min(parseInt(minutes, 10) || 0, 59);
-      const correctedSeconds = Math.min(parseInt(seconds, 10) || 0, 59);
-      return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
     },
 
     async updateTime(val, id, title) {
@@ -1451,20 +1418,6 @@ export default {
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
 
-    goTo() {
-      localStorage.removeItem("raceStartPayload");
-      localStorage.removeItem("participantByCategories");
-      localStorage.removeItem("currentCategories");
-
-      this.participant = [];
-      this.titleCategories = "";
-      this.$router.push(`/event-detail/${this.$route.params.id}`);
-    },
-
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
-    },
-
     saveResult() {
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
       if (!Array.isArray(clean) || clean.length === 0) {
@@ -1507,38 +1460,48 @@ export default {
       });
     },
 
-    previewResult() {
-      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
-      if (!Array.isArray(clean) || clean.length === 0) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-      const bucket = getBucket();
-      const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
-      if (missing.length) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: `Bucket fields missing: ${missing.join(", ")}`,
-          message: "Failed",
-        });
-        return;
-      }
+    goTo() {
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
 
-      const docs = buildResultDocs(clean, bucket);
-      const jsonStr = JSON.stringify(docs, null, 2);
-
-      const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
-  <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
-  pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
-  <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
-      const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
-      window.open(url, "_blank", "width=980,height=700");
+      this.participant = [];
+      this.titleCategories = "";
+      this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
+
+    //   previewResult() {
+    //     const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+    //     if (!Array.isArray(clean) || clean.length === 0) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "warning",
+    //         detail: "Belum ada data.",
+    //         message: "Ups Sorry",
+    //       });
+    //       return;
+    //     }
+    //     const bucket = getBucket();
+    //     const must = ["eventId", "initialId", "raceId", "divisionId"];
+    //     const missing = must.filter((k) => !bucket[k]);
+    //     if (missing.length) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "error",
+    //         detail: `Bucket fields missing: ${missing.join(", ")}`,
+    //         message: "Failed",
+    //       });
+    //       return;
+    //     }
+
+    //     const docs = buildResultDocs(clean, bucket);
+    //     const jsonStr = JSON.stringify(docs, null, 2);
+
+    //     const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
+    // <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
+    // pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
+    // <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
+    //     const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+    //     window.open(url, "_blank", "width=980,height=700");
+    //   },
   },
 };
 </script>

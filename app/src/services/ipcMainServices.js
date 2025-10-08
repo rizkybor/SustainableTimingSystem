@@ -63,6 +63,7 @@ const {
 const {
   getSprintResult,
   getDrrResult,
+  getSlalomResult
 } = require("../controllers/GET/getResult.js");
 
 const {
@@ -330,6 +331,7 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-slalom-result", async (event, query = {}) => {
     try {
       const data = await getSlalomResult(query.eventId);
+      console.log(data,'<<< CEK DATA')
       event.reply("get-slalom-result-reply", { ok: true, items: data });
     } catch (error) {
       event.reply("get-slalom-result-reply", {

@@ -196,7 +196,7 @@
 
 <script>
 export default {
-  name: "SprintPdfResult",
+  name: "DrrPdfResult",
   props: {
     data: { type: Object, required: true },
     dataParticipant: { type: Array, required: true },

@@ -40,5 +40,24 @@ async function getDrrResult(identity = {}) {
   return docs;
 }
 
+async function getSlalomResult(identity = {}) {
+  const db = await getDb();
+  const col = db.collection("temporarySlalomResult");
 
-module.exports = { getSprintResult, getDrrResult };
+  const filter = {};
+  if (identity.eventId) filter.eventId = String(identity.eventId);
+  if (identity.initialId) filter.initialId = String(identity.initialId);
+  if (identity.raceId) filter.raceId = String(identity.raceId);
+  if (identity.divisionId) filter.divisionId = String(identity.divisionId);
+
+  if (identity.raceName)
+    filter.raceName = String(identity.raceName).toUpperCase();
+  if (identity.divisionName)
+    filter.divisionName = String(identity.divisionName).toUpperCase();
+
+  const docs = await col.find(filter).sort({ createdAt: -1 }).toArray();
+  return docs;
+}
+
+
+module.exports = { getSprintResult, getDrrResult, getSlalomResult };

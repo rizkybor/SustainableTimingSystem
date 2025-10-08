@@ -58,66 +58,107 @@
             <td class="text-strong">{{ p.nameTeam || "-" }}</td>
             <td class="text-center">{{ p.bibTeam || "-" }}</td>
 
-            <!-- Start -->
-            <td class="right">
-              {{ p.result && p.result.penaltyTotal ? p.result.penaltyTotal.start : 0 }}
-            </td>
+            <!-- Ambil session pertama -->
+            <template v-if="Array.isArray(p.result) && p.result.length">
+              <td class="right">
+                {{
+                  p.result[0] &&
+                  p.result[0].penaltyTotal &&
+                  p.result[0].penaltyTotal.start
+                    ? p.result[0].penaltyTotal.start
+                    : 0
+                }}
+              </td>
 
-            <!-- Gates list -->
-            <td class="right">
-              <div
-                v-if="
-                  p.result &&
-                  p.result.penaltyTotal &&
-                  Array.isArray(p.result.penaltyTotal.gates) &&
-                  p.result.penaltyTotal.gates.length
-                "
-              >
-                <ul class="penalty-list">
-                  <li
-                    v-for="(pen, idx) in p.result.penaltyTotal.gates"
-                    :key="idx"
-                  >
-                    Gate {{ idx + 1 }}: <strong>{{ pen }}</strong>
-                  </li>
-                </ul>
-                <div class="penalty-sum">
-                  Σ Gates =
-                  <strong>
-                    {{
-                      p.result.penaltyTotal.gates.reduce(function (a, v) {
-                        return a + Number(v || 0);
-                      }, 0)
-                    }}
-                  </strong>
+              <!-- Gates list -->
+              <td class="right">
+                <div
+                  v-if="
+                    p.result[0] &&
+                    p.result[0].penaltyTotal &&
+                    Array.isArray(p.result[0].penaltyTotal.gates) &&
+                    p.result[0].penaltyTotal.gates.length
+                  "
+                >
+                  <ul class="penalty-list">
+                    <li
+                      v-for="(pen, idx) in p.result[0].penaltyTotal.gates"
+                      :key="idx"
+                    >
+                      Gate {{ idx + 1 }}: <strong>{{ pen }}</strong>
+                    </li>
+                  </ul>
+                  <div class="penalty-sum">
+                    Σ Gates =
+                    <strong>
+                      {{
+                        p.result[0].penaltyTotal.gates.reduce(function (a, v) {
+                          return a + Number(v || 0);
+                        }, 0)
+                      }}
+                    </strong>
+                  </div>
                 </div>
-              </div>
-              <div v-else>0</div>
-            </td>
+                <div v-else>0</div>
+              </td>
 
-            <!-- Finish -->
-            <td class="right">
-              {{ p.result && p.result.penaltyTotal ? p.result.penaltyTotal.finish : 0 }}
-            </td>
+              <td class="right">
+                {{
+                  p.result[0] &&
+                  p.result[0].penaltyTotal &&
+                  p.result[0].penaltyTotal.finish
+                    ? p.result[0].penaltyTotal.finish
+                    : 0
+                }}
+              </td>
 
-            <!-- Total Penalty (Start + Gates + Finish) -->
-            <td class="right">
-              {{
-                p.result && p.result.penaltyTotal
-                  ? Number(p.result.penaltyTotal.start || 0) +
-                    p.result.penaltyTotal.gates.reduce(function (a, v) {
-                      return a + Number(v || 0);
-                    }, 0) +
-                    Number(p.result.penaltyTotal.finish || 0)
-                  : 0
-              }}
-            </td>
+              <!-- Total Penalty -->
+              <td class="right">
+                {{
+                  p.result[0] && p.result[0].penaltyTotal
+                    ? Number(p.result[0].penaltyTotal.start || 0) +
+                      p.result[0].penaltyTotal.gates.reduce(function (a, v) {
+                        return a + Number(v || 0);
+                      }, 0) +
+                      Number(p.result[0].penaltyTotal.finish || 0)
+                    : 0
+                }}
+              </td>
 
-            <!-- Race / Penalty / Total / Rank -->
-            <td class="center">{{ p.result ? p.result.raceTime : "00:00:00.000" }}</td>
-            <td class="center">{{ p.result ? p.result.penaltyTime : "00:00:00.000" }}</td>
-            <td class="center text-strong">{{ p.result ? p.result.totalTime : "00:00:00.000" }}</td>
-            <td class="center">{{ p.result ? p.result.ranked : "-" }}</td>
+              <!-- Race / Penalty / Total / Rank -->
+              <td class="center">
+                {{
+                  p.result[0] && p.result[0].raceTime
+                    ? p.result[0].raceTime
+                    : "00:00:00.000"
+                }}
+              </td>
+              <td class="center">
+                {{
+                  p.result[0] && p.result[0].penaltyTime
+                    ? p.result[0].penaltyTime
+                    : "00:00:00.000"
+                }}
+              </td>
+              <td class="center text-strong">
+                {{
+                  p.result[0] && p.result[0].totalTime
+                    ? p.result[0].totalTime
+                    : "00:00:00.000"
+                }}
+              </td>
+              <td class="center">
+                {{
+                  p.result[0] && p.result[0].ranked
+                    ? p.result[0].ranked
+                    : p.ranked || "-"
+                }}
+              </td>
+            </template>
+
+            <template v-else>
+              <td colspan="8" class="empty">No Result</td>
+            </template>
           </tr>
 
           <tr v-if="pdfParticipantsSession1.length === 0">

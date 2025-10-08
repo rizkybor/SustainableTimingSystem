@@ -806,6 +806,7 @@ export default {
 
   data() {
     return {
+      pdfParticipantsSession1: [],
       localShow: true,
       showSession1Modal: false,
       loadingSession1: false,
@@ -848,74 +849,6 @@ export default {
           : "";
       var cats = this.titleCategories ? this.titleCategories : "SLALOM";
       return eventSafe + cats + " - Session 1";
-    },
-
-    pdfParticipantsSession1() {
-      var rows = [];
-
-      if (Array.isArray(this.session1Rows)) {
-        for (var i = 0; i < this.session1Rows.length; i++) {
-          var t = this.session1Rows[i];
-          if (!t || !Array.isArray(t.result) || t.result.length === 0) continue;
-
-          // ambil hanya Session 1 (Run 1)
-          var r = t.result[0];
-
-          // pastikan gates selalu array
-          var gatesArray = [];
-          if (
-            r.penaltyTotal &&
-            Array.isArray(r.penaltyTotal.gates) &&
-            r.penaltyTotal.gates.length > 0
-          ) {
-            gatesArray = r.penaltyTotal.gates;
-          } else if (Array.isArray(r.gates)) {
-            gatesArray = r.gates;
-          } else {
-            // fallback default 14 gate
-            gatesArray = new Array(14).fill(0);
-          }
-
-          var startVal =
-            r.penaltyTotal && typeof r.penaltyTotal.start !== "undefined"
-              ? Number(r.penaltyTotal.start)
-              : Number(r.startPenalty || 0);
-          var finishVal =
-            r.penaltyTotal && typeof r.penaltyTotal.finish !== "undefined"
-              ? Number(r.penaltyTotal.finish)
-              : Number(r.finishPenalty || 0);
-
-          var res = {
-            session: r.session ? r.session : "Run 1",
-            startTime: r.startTime ? r.startTime : "",
-            finishTime: r.finishTime ? r.finishTime : "",
-            raceTime: r.raceTime ? r.raceTime : "00:00:00.000",
-            penaltyTime: r.penaltyTime ? r.penaltyTime : "00:00:00.000",
-            penaltyTotal: {
-              start: startVal,
-              gates: gatesArray.map(function (v) {
-                return Number(v || 0);
-              }),
-              finish: finishVal,
-            },
-            penalty: typeof r.penalty !== "undefined" ? Number(r.penalty) : 0,
-            totalTime: r.totalTime ? r.totalTime : "00:00:00.000",
-            ranked: typeof r.ranked !== "undefined" ? Number(r.ranked) : 0,
-            score: typeof r.score !== "undefined" ? Number(r.score) : 0,
-            judgesBy: r.judgesBy ? r.judgesBy : "",
-            judgesTime: r.judgesTime ? r.judgesTime : "",
-          };
-
-          rows.push({
-            nameTeam: t.nameTeam ? t.nameTeam : "-",
-            bibTeam: t.bibTeam ? t.bibTeam : "-",
-            statusId: typeof t.statusId !== "undefined" ? t.statusId : 0,
-            result: res,
-          });
-        }
-      }
-
-      return rows;
     },
     getBucket() {
       const obj = safeJSON(RACE_PAYLOAD_KEY, {});
@@ -2086,38 +2019,69 @@ export default {
       this.loadingSession1 = false;
     },
 
-    // ===== PDF SESSION 1 =====
+    // ===== PDF SESSION 1 (ambil data dari DB seperti openSession1Modal) =====
     async printPdfSession1() {
-      // pastikan source data ada (fallback dari UI kalau perlu)
-      if (!this.session1Rows.length) {
-        this.session1Rows = this.teams.map((t) => {
-          const s1 =
-            Array.isArray(t.sessions) && t.sessions[0] ? t.sessions[0] : {};
-          const gates = Array.isArray(s1.penalties) ? s1.penalties : [];
-          const gsum = gates.reduce((a, v) => a + (Number(v) || 0), 0);
-          const start = Number(s1.startPenalty || 0);
-          const finish = Number(s1.finishPenalty || 0);
-          return {
-            nameTeam: String(t.nameTeam || ""),
-            bibTeam: String(t.bibNumber || t.bibTeam || ""),
-            startPenalty: start,
-            gatesSum: gsum,
-            finishPenalty: finish,
-            totalPenalty: start + gsum + finish,
-            raceTime: String(s1.raceTime || ""),
-            penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
-            totalTime: String(s1.totalTime || s1.raceTime || ""),
-            ranked: Number(s1.ranked || 0),
-            score: Number(s1.score || 0),
-          };
+      console.log("🔍 [printPdfSession1] Fetching data from DB...");
+      this.loadingSession1 = true;
+      try {
+        const key = this.selectedSlalomKey;
+        const b = this.slalomBucketMap[key] || {};
+        const filters = {
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+        };
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("get-slalom-result-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("get-slalom-result", filters);
         });
+
+        if (res && res.ok && Array.isArray(res.items)) {
+          const doc = res.items[0] || {};
+          const teams = Array.isArray(doc.teams) ? doc.teams : [];
+
+          // ✅ ini yang penting → langsung kirim ke komponen PDF
+          this.pdfParticipantsSession1 = teams;
+          // this.dataEventSafe = doc;
+          this.titleCategories =
+            (doc.divisionName || "") +
+            " " +
+            (doc.initialName || "") +
+            " " +
+            (doc.raceName || "");
+        } else {
+          this.pdfParticipantsSession1 = [];
+        }
+
+        await this.$nextTick();
+
+        const pdf = this.$refs.html2PdfS1;
+        if (pdf && typeof pdf.generatePdf === "function") {
+          console.log("🧾 Generating PDF Session 1...");
+          await pdf.generatePdf();
+        } else {
+          ipcRenderer &&
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              detail: "Komponen PDF belum siap. Coba lagi.",
+              message: "PDF belum siap",
+            });
+        }
+      } catch (err) {
+        console.error("❌ Error generating PDF:", err);
+        ipcRenderer &&
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: err.message || "Gagal membuat PDF Session 1",
+            message: "Failed",
+          });
       }
 
-      // panggil komponen PDF wrapper (vue-html2pdf)
-      const pdf = this.$refs.html2PdfS1;
-      if (pdf && typeof pdf.generatePdf === "function") {
-        await pdf.generatePdf();
-      }
+      this.loadingSession1 = false;
     },
     onPdfGeneratedS1() {
       console.log("✅ PDF Slalom Session 1 berhasil di-generate!");
@@ -2130,52 +2094,6 @@ export default {
             message: "Download Selesai",
           });
       } catch (_) {}
-    },
-    async printPdfSession1() {
-      // 1) Siapkan data fallback bila modal belum pernah dibuka
-      if (!this.session1Rows.length) {
-        this.session1Rows = this.teams.map((t) => {
-          const s1 =
-            Array.isArray(t.sessions) && t.sessions[0] ? t.sessions[0] : {};
-          const gates = Array.isArray(s1.penalties) ? s1.penalties : [];
-          const gsum = gates.reduce((a, v) => a + (Number(v) || 0), 0);
-          const start = Number(s1.startPenalty || 0);
-          const finish = Number(s1.finishPenalty || 0);
-          return {
-            nameTeam: String(t.nameTeam || ""),
-            bibTeam: String(t.bibNumber || t.bibTeam || ""),
-            startPenalty: start,
-            gatesSum: gsum,
-            finishPenalty: finish,
-            totalPenalty: start + gsum + finish,
-            raceTime: String(s1.raceTime || ""),
-            penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
-            totalTime: String(s1.totalTime || s1.raceTime || ""),
-            ranked: Number(s1.ranked || 0),
-            score: Number(s1.score || 0),
-          };
-        });
-      }
-
-      // 2) Pastikan komponen sudah ter-render sebelum panggil generate
-      await this.$nextTick();
-
-      const pdf = this.$refs.html2PdfS1;
-      if (pdf && typeof pdf.generatePdf === "function") {
-        await pdf.generatePdf();
-      } else {
-        // fallback notifikasi jika ref belum ketemu
-        try {
-          ipcRenderer &&
-            ipcRenderer.send("get-alert", {
-              type: "warning",
-              detail: "Komponen PDF belum siap. Coba lagi.",
-              message: "PDF belum siap",
-            });
-        } catch (_) {}
-      }
-
-      console.log(this.pdfParticipantsSession1, "<<< CEK");
     },
   },
 };

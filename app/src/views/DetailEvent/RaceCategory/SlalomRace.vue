@@ -824,9 +824,10 @@ export default {
     /** Mapping untuk OperationTimePanel (1 sesi aktif per tim) */
     participantsForPanel() {
       return this.teams.map((t) => {
-        const idx = this.selectedSession[String(t._id)] != null
-     ? this.selectedSession[String(t._id)]
-    : 0;
+        const idx =
+          this.selectedSession[String(t._id)] != null
+            ? this.selectedSession[String(t._id)]
+            : 0;
         const s = t.sessions[idx] || {};
         return {
           nameTeam: t.nameTeam,
@@ -1115,14 +1116,12 @@ export default {
       //   const bestTime = this.calculateBestTime(team);
       //   team.bestTime = bestTime; // Store the best time in the team object
       // });
-
       // // Sort teams by best time in ascending order (lower time is better)
       // teams.sort((a, b) => {
       //   const timeA = hmsToMs(a.bestTime); // Convert best time to milliseconds for comparison
       //   const timeB = hmsToMs(b.bestTime);
       //   return timeA - timeB; // Sort from fastest to slowest
       // });
-
       // // Assign ranks based on sorted order
       // teams.forEach((team, index) => {
       //   team.rank = index + 1; // Rank starts from 1, hence add 1
@@ -1410,7 +1409,9 @@ export default {
       return Number(s.totalPenalty) || 0;
     },
     calculateBestTime(team) {
-const times = (team.sessions || []).map((s) => s && s.totalTime).filter(Boolean);
+      const times = (team.sessions || [])
+        .map((s) => s && s.totalTime)
+        .filter(Boolean);
       if (!times.length) return "";
       const best = times
         .map(hmsToMs)
@@ -1638,37 +1639,41 @@ const times = (team.sessions || []).map((s) => s && s.totalTime).filter(Boolean)
     /** === Save (parity dengan Sprint) === */
     saveResult() {
       try {
-        const docs = this.buildDocs();
-        // Debug optional
+        const docs = this.buildDocs(); // hasilnya object tunggal
         console.log(docs, "<< cek");
-        // if (!Array.isArray(docs) || docs.length === 0) {
-        //   ipcRenderer.send("get-alert", {
-        //     type: "warning",
-        //     detail: "Belum ada data yang bisa disimpan.",
-        //     message: "Ups Sorry",
-        //   });
-        //   return;
-        // }
 
-        // // Kirim ARRAY langsung (bukan objek) — sama seperti Sprint
-        // ipcRenderer.send("insert-slalom-result", docs);
+        // Jika bukan object valid → hentikan
+        if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            detail: "Belum ada data yang bisa disimpan.",
+            message: "Ups Sorry",
+          });
+          return;
+        }
 
-        // // Tunggu balasan — pola sama dengan Sprint
-        // ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
-        //   if (res && res.ok) {
-        //     ipcRenderer.send("get-alert-saved", {
-        //       type: "question",
-        //       detail: "Result data has been successfully saved",
-        //       message: "Successfully",
-        //     });
-        //   } else {
-        //     ipcRenderer.send("get-alert", {
-        //       type: "error",
-        //       detail: (res && res.error) || "Save failed",
-        //       message: "Failed",
-        //     });
-        //   }
-        // });
+        // Bungkus ke array agar konsisten dengan format insert-sprint-result
+        const payload = [docs];
+
+        // Kirim ARRAY langsung (paritas dengan Sprint)
+        ipcRenderer.send("insert-slalom-result", payload);
+
+        // Tunggu balasan — pola sama seperti Sprint
+        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+          if (res && res.ok) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "question",
+              detail: "Result data has been successfully saved",
+              message: "Successfully",
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Save failed",
+              message: "Failed",
+            });
+          }
+        });
       } catch (e) {
         ipcRenderer.send("get-alert", {
           type: "error",

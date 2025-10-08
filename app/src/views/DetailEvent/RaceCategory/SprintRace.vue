@@ -40,7 +40,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -99,14 +99,13 @@
                 <b-form-group
                   label="Switch Sprint Category:"
                   label-for="sprintBucketSelect"
-                  class="mb-0 toolbar-select"
+                  class="mb-0 sprint-actionbar__select"
                 >
                   <b-form-select
                     id="sprintBucketSelect"
                     :options="sprintBucketOptions"
                     v-model="selectedSprintKey"
                     @change="onSelectSprintBucket"
-                    class="toolbar-select__control"
                   />
                 </b-form-group>
               </div>
@@ -189,6 +188,7 @@
 
     <!-- OPERATION TIME -->
     <OperationTimePanel
+      v-if="participantArr && participantArr.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -201,11 +201,14 @@
     <div class="px-4 mt-2">
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
-          <!-- <div > -->
-          <h4>Output Racetime :</h4>
-          <!-- </div> -->
-          <div>
-            <button
+          <div class="racetime-header">
+            <h4>Output Racetime :</h4>
+            <small class="text-muted">
+              Category active: {{ titleCategories || "-" }}
+            </small>
+          </div>
+          <div v-if="participantArr && participantArr.length">
+            <!-- <button
               type="button"
               class="btn-action btn-secondary mr-2"
               @click="sendRealtimeMessage"
@@ -219,7 +222,7 @@
               @click="previewResult"
             >
               <Icon icon="icon-park-outline:save" /> Preview JSON
-            </button>
+            </button> -->
 
             <button
               type="button"
@@ -241,26 +244,34 @@
 
         <b-row>
           <b-col>
-            <table class="table">
+            <div
+              v-if="isLoading"
+              class="bracket-loading d-flex align-items-center justify-content-center py-5"
+            >
+              <div class="text-center">
+                <b-spinner label="Loading" class="mb-2"></b-spinner>
+                <div class="text-muted">Loading bracket & teams…</div>
+              </div>
+            </div>
+            <table
+              v-else-if="participantArr && participantArr.length"
+              class="table"
+            >
               <thead>
                 <tr>
                   <th class="text-center">No</th>
                   <th class="text-left">Team Name</th>
                   <th class="text-center">BIB Number</th>
                   <th class="text-center">Start Time</th>
+                  <th class="text-center">Pen. Start (PS)</th>
+                  <th class="text-center">Pen. Finish (PF)</th>
+                  <th class="text-center">Penalty Total</th>
                   <th class="text-center">Finish Time</th>
                   <th class="text-center">Race Time</th>
-
-                  <!-- urutan baru -->
-                  <th class="text-center">Penalty Start</th>
-                  <!-- REMOVED: Penalties (legacy/middle) column -->
-                  <th class="text-center">Penalty Finish</th>
-                  <th class="text-center">Penalty Total</th>
                   <th class="text-center">Penalty Time</th>
-
                   <th class="text-center">Result</th>
                   <th class="text-center">Ranked</th>
-                  <th class="text-center">Score</th>
+                  <th class="text-center">Scored</th>
                   <th v-if="endGame">Action</th>
                 </tr>
               </thead>
@@ -268,24 +279,24 @@
               <tbody>
                 <tr v-for="(item, index) in participantArr" :key="index">
                   <td class="text-center">{{ index + 1 }}</td>
+
+                  <!-- TEAM NAME  -->
                   <td
                     style="text-align: start"
                     class="large-bold text-strong max-char"
                   >
                     {{ item.nameTeam }}
                   </td>
+
+                  <!-- BIB NUMBER  -->
                   <td class="text-center">{{ item.bibTeam }}</td>
+
+                  <!-- START TIME  -->
                   <td class="text-center text-monospace">
                     {{ item.result.startTime }}
                   </td>
-                  <td class="text-center text-monospace">
-                    {{ item.result.finishTime }}
-                  </td>
-                  <td class="text-center large-bold text-monospace">
-                    {{ item.result.raceTime }}
-                  </td>
 
-                  <!-- Start Penalties -->
+                  <!-- PENALTY START -->
                   <td class="text-center">
                     <b-select
                       v-if="item.result.startTime"
@@ -299,17 +310,15 @@
                         :key="'sp' + p.value"
                         :value="p.value"
                       >
-                        {{ p.value }}
+                        {{ p.label }}
                       </option>
                     </b-select>
                   </td>
 
-                  <!-- REMOVED: Penalties (legacy / middle) select -->
-
-                  <!-- Finish Penalties -->
+                  <!-- PENALTY FINISH -->
                   <td class="text-center">
                     <b-select
-                      v-if="item.result.finishTime"
+                      v-if="item.result.startTime"
                       v-model.number="item.result.finishPenalty"
                       @change="updateFinishPenalty(item)"
                       style="border-radius: 12px"
@@ -325,18 +334,29 @@
                     </b-select>
                   </td>
 
-                  <!-- Total Penalties (detik) -->
+                  <!-- PENALTY TOTAL -->
                   <td class="text-center penalty-char">
                     {{ item.result.totalPenalty }}
                   </td>
 
-                  <!-- Penalty Time total (format waktu) -->
+                  <!-- FINISH TIME  -->
+                  <td class="text-center text-monospace">
+                    {{ item.result.finishTime }}
+                  </td>
+
+                  <!-- RACE TIME  -->
+                  <td class="text-center large-bold text-monospace">
+                    {{ item.result.raceTime }}
+                  </td>
+
+                  <!-- PENALTY TOTAL TIME -->
                   <td
                     class="text-center large-bold penalty-char text-monospace"
                   >
                     {{ item.result.penaltyTime }}
                   </td>
 
+                  <!-- RESULT TIME  -->
                   <td class="text-center large-bold result-char text-monospace">
                     {{
                       item.result.penaltyTime
@@ -344,21 +364,17 @@
                         : item.result.raceTime
                     }}
                   </td>
+
+                  <!-- RANKED  -->
                   <td class="text-center large-bold">
                     {{ item.result.ranked }}
                   </td>
+
+                  <!-- SCORED  -->
                   <td class="text-center large-bold">
                     {{ getScoreByRanked(item.result.ranked) }}
                   </td>
                   <td v-if="endGame">
-                    <!-- <button
-                      type="button"
-                      class="btn-action btn-warning"
-                      @click="openModal(item, 'R4men')"
-                    >
-                      Edit
-                    </button> -->
-
                     <button
                       type="button"
                       class="btn-action btn-danger"
@@ -370,6 +386,9 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- EMPTY STATE -->
+            <EmptyCard v-else />
             <br />
           </b-col>
         </b-row>
@@ -386,13 +405,14 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { Icon } from "@iconify/vue2";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
+import { Icon } from "@iconify/vue2";
 import {
   saveLocalResults,
   loadLocalResults,
@@ -446,12 +466,10 @@ function buildResultDocs(participantArr, bucket) {
     const result = { ...(t.result || {}) };
     const otr = { ...(t.otr || {}) };
 
-    // pastikan string/angka aman
     result.startTime = String(result.startTime || "");
     result.finishTime = String(result.finishTime || "");
     result.raceTime = String(result.raceTime || "");
 
-    // normalisasi penalti (HANYA start & finish)
     result.startPenalty = Number.isFinite(result.startPenalty)
       ? Number(result.startPenalty)
       : 0;
@@ -459,7 +477,6 @@ function buildResultDocs(participantArr, bucket) {
       ? Number(result.finishPenalty)
       : 0;
 
-    // legacy middle penalty di-nolkan dan tidak digunakan
     result.penalty = 0;
 
     result.totalPenalty = Number.isFinite(result.totalPenalty)
@@ -474,7 +491,6 @@ function buildResultDocs(participantArr, bucket) {
       result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
     );
 
-    // sinkronisasi legacy
     result.penaltyTime = String(
       result.totalPenaltyTime || result.penaltyTime || "00:00:00.000"
     );
@@ -492,7 +508,6 @@ function buildResultDocs(participantArr, bucket) {
       : 0;
 
     return {
-      // === KUNCI RELASI (HARUS SAMA DGN TEAMS REGISTERED) ===
       eventId: bucket.eventId,
       initialId: bucket.initialId,
       raceId: bucket.raceId,
@@ -501,13 +516,9 @@ function buildResultDocs(participantArr, bucket) {
       initialName: bucket.initialName,
       raceName: bucket.raceName,
       divisionName: bucket.divisionName,
-
-      // === DATA TIM + HASIL ===
       ...team,
       result,
       otr,
-
-      // meta optional
       createdAt: now,
       updatedAt: now,
     };
@@ -516,6 +527,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForSprint(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),
@@ -529,35 +541,28 @@ function normalizeTeamForSprint(t = {}) {
     finishTime: "",
     raceTime: "",
 
-    // hanya 2 penalti aktif (start & finish)
     startPenalty: 0,
     finishPenalty: 0,
 
-    // legacy, dibiarkan ada tapi tidak dipakai
     penalty: 0,
 
     startPenaltyTime: "00:00:00.000",
     finishPenaltyTime: "00:00:00.000",
-    totalPenalty: 0, // angka detik (akumulasi)
+    totalPenalty: 0,
     totalPenaltyTime: "00:00:00.000",
 
-    penaltyTime: "", // legacy (diset = totalPenaltyTime)
+    penaltyTime: "",
     totalTime: "",
     ranked: "",
     score: "",
   };
 
-  // dukung format lama (array result)
   let result = t.result;
   if (Array.isArray(result)) result = result[0] || {};
   if (!result || typeof result !== "object") result = {};
   result = { ...emptyRes, ...result };
 
-  let otr = t.otr;
-  if (!otr || typeof otr !== "object") otr = {};
-  otr = { ...emptyRes, ...otr };
-
-  return { ...base, result, otr };
+  return { ...base, result };
 }
 
 function loadRaceStartPayloadForSprint() {
@@ -584,10 +589,11 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
 
   data() {
     return {
+      isLoading: false,
       defaultImg,
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
@@ -604,51 +610,12 @@ export default {
       digitId: [],
       digitTime: [],
       penTeam: "",
-      dataPenalties: [
-        { label: "clear", value: 0, timePen: "00:00:00.000" },
-        { label: "pen 1", value: 5, timePen: "00:00:05.000" },
-        { label: "pen 2", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 100 },
-        { ranking: 2, score: 92 },
-        { ranking: 3, score: 86 },
-        { ranking: 4, score: 82 },
-        { ranking: 5, score: 79 },
-        { ranking: 6, score: 76 },
-        { ranking: 7, score: 73 },
-        { ranking: 8, score: 70 },
-        { ranking: 9, score: 67 },
-        { ranking: 10, score: 64 },
-        { ranking: 11, score: 61 },
-        { ranking: 12, score: 58 },
-        { ranking: 13, score: 55 },
-        { ranking: 14, score: 52 },
-        { ranking: 15, score: 49 },
-        { ranking: 16, score: 46 },
-        { ranking: 17, score: 43 },
-        { ranking: 18, score: 40 },
-        { ranking: 19, score: 38 },
-        { ranking: 20, score: 36 },
-        { ranking: 21, score: 34 },
-        { ranking: 22, score: 32 },
-        { ranking: 23, score: 30 },
-        { ranking: 24, score: 28 },
-        { ranking: 25, score: 26 },
-        { ranking: 26, score: 24 },
-        { ranking: 27, score: 22 },
-        { ranking: 28, score: 20 },
-        { ranking: 29, score: 18 },
-        { ranking: 30, score: 16 },
-        { ranking: 31, score: 14 },
-        { ranking: 32, score: 12 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
       isRankedDescending: false,
-
-      /** penting: tipe konsisten */
       participant: [],
       dataEvent: {},
       titleCategories: "",
@@ -778,35 +745,25 @@ export default {
     },
   },
 
-  // beforeRouteLeave(to, from, next) {
-  //   if (this.selectedSprintKey) {
-  //     saveLocalResults(this.selectedSprintKey, this.participantArr);
-  //   }
-  //   next();
-  // },
-
   async mounted() {
     const socket = getSocket();
 
-    // simpan id saat connect (atau reconnect)
     const onConnect = () => {
       this.selfSocketId = socket.id || null;
     };
     socket.on("connect", onConnect);
 
-    // terima pesan: tampilkan toast hanya jika BUKAN dari diri sendiri
-    const onMessage = (msg) => {
-      // safety: kalau server belum broadcast-only, tetap filter di client
+    const onMessage = async (msg = {}) => {
+      // abaikan echo dari diri sendiri
       if (
         msg &&
         msg.senderId &&
         this.selfSocketId &&
         msg.senderId === this.selfSocketId
-      ) {
-        // pesan pantulan dari diri sendiri → jangan tampilkan
+      )
         return;
-      }
 
+      // tampilkan toast (opsional)
       if (this.$bvToast) {
         this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
           title: "Pesan Realtime",
@@ -814,6 +771,19 @@ export default {
           solid: true,
         });
       }
+
+      // === mapping pesan Judges Dashboard ===
+      // type: 'Start' | 'Finish', teamId: string, value: number
+      if (
+        msg &&
+        msg.teamId &&
+        (msg.type === "Start" || msg.type === "Finish")
+      ) {
+        await this.applyPenaltyFromSocket(msg);
+        return;
+      }
+
+      // fallback lain (abaikan / logic lainmu)
     };
 
     socket.on("custom:event", onMessage);
@@ -830,6 +800,8 @@ export default {
       this.dataEvent = {};
     }
 
+    await this.loadDataScore("SPRINT");
+    await this.loadDataPenalties("SPRINT");
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
@@ -848,10 +820,6 @@ export default {
     }
   },
 
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
-  },
-
   beforeRouteLeave(to, from, next) {
     localStorage.removeItem("raceStartPayload");
     localStorage.removeItem("participantByCategories");
@@ -861,6 +829,334 @@ export default {
   },
 
   methods: {
+    // === SERIAL CONNECTION ===
+    async connectPort() {
+      if (!this.isPortConnected) {
+        const PREFERRED_PATH = "/dev/tty.usbserial-120";
+        const ports = await listPorts();
+        this.currentPort = ports;
+        const portIndex = ports.findIndex(
+          (p) => String(p.path) === PREFERRED_PATH
+        );
+
+        if (portIndex === -1) {
+          this.notify(
+            "warning",
+            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Device"
+          );
+          alert("Preferred port not found");
+          return;
+        }
+
+        this.selectPath = ports[portIndex].path;
+
+        this.serialCtrl = createSerialReader({
+          baudRate: this.baudRate,
+          portIndex: portIndex,
+          onNotify: (type, detail, message) =>
+            this.notify(type, detail, message),
+          onData: (a, b) => {
+            this.digitId.unshift(a);
+            this.digitTime.unshift(b);
+          },
+          onStart: (formatted /*, a, b*/) => {
+            this.digitTimeStart = formatted;
+          },
+          onFinish: (formatted /*, a, b*/) => {
+            this.digitTimeFinish = formatted;
+          },
+        });
+
+        const res = await this.serialCtrl.connect();
+        if (res.ok) {
+          this.isPortConnected = true;
+          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          alert("Connected");
+        } else {
+          this.isPortConnected = false;
+          alert("No valid serial port found / failed to open.");
+        }
+      } else {
+        await this.disconnected();
+        this.isPortConnected = false;
+        alert("Disconnected");
+      }
+    },
+
+    async disconnected() {
+      try {
+        if (this.serialCtrl) await this.serialCtrl.disconnect();
+      } finally {
+        this.port = null;
+        this.serialCtrl = null;
+        this.isPortConnected = false;
+        this.selectPath = null;
+      }
+    },
+
+    setBaud(br) {
+      this.baudRate = br;
+    },
+    // === END CONNECTION ===
+
+    // === NOTIFY ===
+    notify(type, detail, message = "Info") {
+      if (this.$ipc || (window && window.ipcRenderer)) {
+        const ir = this.$ipc || window.ipcRenderer;
+        ir.send && ir.send("get-alert", { type, detail, message });
+      }
+      // bisa juga set state:
+      this.lastErrorMessage = `${message}: ${detail}`;
+    },
+
+    notifyError(err, message = "Error") {
+      const detail =
+        (err && (err.message || err.toString())) || "Unknown error";
+      this.notify("error", detail, message);
+    },
+    // ======
+
+    /* =========================================================
+     * SOCKET / IPC (opsional)
+     * =======================================================*/
+    // sendRealtimeMessage() {
+    //   const socket = getSocket();
+    //   socket.emit(
+    //     "custom:event",
+    //     {
+    //       senderId: socket.id,
+    //       from: "Sustainable Timing System",
+    //       text: "Terima kasih, udah gue teerima beks nilai penaltynya",
+    //       ts: new Date().toISOString(),
+    //     },
+    //     (ok) => {
+    //       if (!ok) {
+    //         ipcRenderer.send("get-alert", {
+    //           type: "error",
+    //           message: "Gagal mengirim pesan realtime",
+    //           detail: "Silakan cek koneksi broker/socket.",
+    //         });
+    //       }
+    //     }
+    //   );
+    // },
+
+    async applyPenaltyFromSocket(payload = {}) {
+      const teamId = String(payload.teamId || "");
+      if (!teamId) return;
+
+      // cari tim lokal
+      const items = this.participantArr;
+      const idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      if (idx === -1) return;
+
+      const local = items[idx];
+
+      // tentukan field target dari msg.type
+      const kind = String(payload.type || "").toLowerCase(); // 'start' | 'finish'
+      const field =
+        kind === "start"
+          ? "startPenalty"
+          : kind === "finish"
+          ? "finishPenalty"
+          : null;
+
+      if (!field) return;
+
+      // normalisasi angka
+      const numVal =
+        payload.value === "" || payload.value == null
+          ? 0
+          : Number(payload.value);
+
+      // set nilai penalty → ini otomatis mengikat dengan v-model.number di <b-select>
+      this.$set(local.result, field, numVal);
+
+      // hitung ulang penalty utk baris ini
+      await this.recalcPenalties(local);
+
+      // tulis balik agar reaktif
+      if (Array.isArray(this.participant)) {
+        this.$set(this.participant, idx, { ...local });
+      }
+
+      // refresh ranking bila totalTime berubah
+      await this.assignRanks(this.participantArr);
+    },
+    /* =========================================================*/
+
+    // === LOAD PAYLOAD ===
+    loadFromRaceStartPayload() {
+      const { bucket } = loadRaceStartPayloadForSprint();
+      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
+        return false;
+
+      this.participant = bucket.teams.slice();
+      this.titleCategories =
+        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
+
+      try {
+        const events = localStorage.getItem("eventDetails");
+        this.dataEvent = events ? JSON.parse(events) : {};
+      } catch {
+        this.dataEvent = {};
+      }
+      return true;
+    },
+
+    async checkValueStorage() {
+      let dataStorage = null,
+        events = null;
+      try {
+        dataStorage = localStorage.getItem("participantByCategories");
+        events = localStorage.getItem("eventDetails");
+      } catch (e) {
+        // fallback aman bila storage tidak tersedia / rusak
+        dataStorage = null;
+        events = null;
+      }
+
+      this.dataEvent = events ? JSON.parse(events) : {};
+
+      const raw = dataStorage ? JSON.parse(dataStorage) : [];
+      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+      arr.sort((a, b) =>
+        String(a.praStart || "").localeCompare(String(b.praStart || ""))
+      );
+
+      this.participant = arr;
+      this.titleCategories = String(
+        localStorage.getItem("currentCategories") || ""
+      ).trim();
+    },
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.dataPenalties = payload[0].data;
+          } else {
+            this.dataPenalties = [];
+          }
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
+    loadAllSprintBucketsFromEvent() {
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+        const sprintBuckets = participant.filter(
+          (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
+        );
+
+        const map = Object.create(null);
+        const opts = [];
+
+        sprintBuckets.forEach((b) => {
+          const key = this._sprintBucketKey(b);
+          const label = this._sprintBucketLabel(b);
+          const normalizedTeams = Array.isArray(b.teams)
+            ? b.teams.map(normalizeTeamForSprint)
+            : [];
+
+          map[key] = { ...b, teams: normalizedTeams };
+          opts.push({ value: key, text: label });
+        });
+
+        this.sprintBucketMap = map;
+        this.sprintBucketOptions = opts;
+
+        const savedKey = localStorage.getItem("currentSprintBucketKey");
+        if (savedKey && map[savedKey]) {
+          this._useSprintBucket(savedKey);
+          this.selectedSprintKey = savedKey;
+        } else if (opts.length) {
+          this._useSprintBucket(opts[0].value);
+          this.selectedSprintKey = opts[0].value;
+        }
+      } catch {
+        /* noop */
+      }
+    },
+    // ======
+
+    // === ON SELECT LOAD PAYLOAD ===
+    async onSelectSprintBucket(key) {
+      await this.fetchSprintBucketTeamsByKey(key);
+    },
+
+    // --- fetch teams via IPC (khusus Sprint) ---
+    async fetchSprintBucketTeamsByKey(key) {
+      try {
+        this.isLoading = true;
+
+        if (
+          !key ||
+          !this.sprintBucketMap[key] ||
+          typeof ipcRenderer === "undefined"
+        )
+          return;
+
+        const b = this.sprintBucketMap[key];
+        const filters = {
+          eventId: String(b.eventId),
+          initialId: String(b.initialId),
+          raceId: String(b.raceId),
+          divisionId: String(b.divisionId),
+        };
+
+        this.selectedSprintKey = key;
+        localStorage.setItem("currentSprintBucketKey", key);
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once(
+            "teams-sprint-registered:find-reply",
+            (_e, payload) => resolve(payload)
+          );
+          ipcRenderer.send("teams-sprint-registered:find", filters);
+        });
+
+        if (!res || !res.ok) {
+          this.participant = [];
+          this._useSprintBucket(key);
+          return;
+        }
+
+        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        const teams =
+          doc && Array.isArray(doc.teams)
+            ? doc.teams.map(normalizeTeamForSprint)
+            : [];
+        this.sprintBucketMap[key] = { ...b, teams };
+        this._useSprintBucket(key);
+      } catch {
+        this._useSprintBucket(key);
+      }
+      this.isLoading = false;
+    },
+
+    // ======
+
     _sprintBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
       const ii = b && b.initialId ? String(b.initialId) : "";
@@ -967,258 +1263,6 @@ export default {
       this.sprintBucketMap = map;
     },
 
-    loadAllSprintBucketsFromEvent() {
-      try {
-        const raw = localStorage.getItem("eventDetails");
-        const ev = raw ? JSON.parse(raw) : {};
-        const participant = Array.isArray(ev.participant) ? ev.participant : [];
-        const sprintBuckets = participant.filter(
-          (b) => String(b.eventName || "").toUpperCase() === "SPRINT"
-        );
-
-        const map = Object.create(null);
-        const opts = [];
-
-        sprintBuckets.forEach((b) => {
-          const key = this._sprintBucketKey(b);
-          const label = this._sprintBucketLabel(b);
-          const normalizedTeams = Array.isArray(b.teams)
-            ? b.teams.map(normalizeTeamForSprint)
-            : [];
-
-          map[key] = { ...b, teams: normalizedTeams };
-          opts.push({ value: key, text: label });
-        });
-
-        this.sprintBucketMap = map;
-        this.sprintBucketOptions = opts;
-
-        const savedKey = localStorage.getItem("currentSprintBucketKey");
-        if (savedKey && map[savedKey]) {
-          this._useSprintBucket(savedKey);
-          this.selectedSprintKey = savedKey;
-        } else if (opts.length) {
-          this._useSprintBucket(opts[0].value);
-          this.selectedSprintKey = opts[0].value;
-        }
-      } catch {
-        /* noop */
-      }
-    },
-    async onSelectSprintBucket(key) {
-      await this.fetchSprintBucketTeamsByKey(key);
-    },
-    // --- fetch teams via IPC (khusus Sprint) ---
-    async fetchSprintBucketTeamsByKey(key) {
-      try {
-        if (
-          !key ||
-          !this.sprintBucketMap[key] ||
-          typeof ipcRenderer === "undefined"
-        )
-          return;
-
-        const b = this.sprintBucketMap[key];
-        const filters = {
-          eventId: String(b.eventId),
-          initialId: String(b.initialId),
-          raceId: String(b.raceId),
-          divisionId: String(b.divisionId),
-        };
-
-        this.selectedSprintKey = key;
-        localStorage.setItem("currentSprintBucketKey", key);
-
-        // >>> gunakan channel yang benar: teams-sprint-registered <<<
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once(
-            "teams-sprint-registered:find-reply",
-            (_e, payload) => resolve(payload)
-          );
-          ipcRenderer.send("teams-sprint-registered:find", filters);
-        });
-
-        if (!res || !res.ok) {
-          // kalau gagal, tetap apply bucket agar judul/payload sinkron
-          this.participant = [];
-          this._useSprintBucket(key);
-          return;
-        }
-
-        const doc = Array.isArray(res.items) ? res.items[0] : res.items;
-        const teams =
-          doc && Array.isArray(doc.teams)
-            ? doc.teams.map(normalizeTeamForSprint)
-            : [];
-
-        // commit ke map agar _useSprintBucket dapat data
-        this.sprintBucketMap[key] = { ...b, teams };
-
-        // apply
-        this._useSprintBucket(key);
-      } catch {
-        this._useSprintBucket(key);
-      }
-    },
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
-    // === NOTIFY ===
-    notify(type, detail, message = "Info") {
-      if (this.$ipc || (window && window.ipcRenderer)) {
-        const ir = this.$ipc || window.ipcRenderer;
-        ir.send && ir.send("get-alert", { type, detail, message });
-      }
-      // bisa juga set state:
-      this.lastErrorMessage = `${message}: ${detail}`;
-    },
-
-    notifyError(err, message = "Error") {
-      const detail =
-        (err && (err.message || err.toString())) || "Unknown error";
-      this.notify("error", detail, message);
-    },
-    // ======
-
-    /* =========================================================
-     * SOCKET / IPC (opsional)
-     * =======================================================*/
-    sendRealtimeMessage() {
-      const socket = getSocket();
-      socket.emit(
-        "custom:event",
-        {
-          senderId: socket.id,
-          from: "Sustainable Timing System",
-          text: "Terima kasih, udah gue teerima beks nilai penaltynya",
-          ts: new Date().toISOString(),
-        },
-        (ok) => {
-          if (!ok) {
-            ipcRenderer.send("get-alert", {
-              type: "error",
-              message: "Gagal mengirim pesan realtime",
-              detail: "Silakan cek koneksi broker/socket.",
-            });
-          }
-        }
-      );
-    },
-
-    // === LOAD PAYLOAD ===
-    loadFromRaceStartPayload() {
-      const { bucket } = loadRaceStartPayloadForSprint();
-      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
-        return false;
-
-      this.participant = bucket.teams.slice();
-      this.titleCategories =
-        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
-
-      try {
-        const events = localStorage.getItem("eventDetails");
-        this.dataEvent = events ? JSON.parse(events) : {};
-      } catch {
-        this.dataEvent = {};
-      }
-      return true;
-    },
-
-    async checkValueStorage() {
-      let dataStorage = null,
-        events = null;
-      try {
-        dataStorage = localStorage.getItem("participantByCategories");
-        events = localStorage.getItem("eventDetails");
-      } catch (e) {
-        // fallback aman bila storage tidak tersedia / rusak
-        dataStorage = null;
-        events = null;
-      }
-
-      this.dataEvent = events ? JSON.parse(events) : {};
-
-      const raw = dataStorage ? JSON.parse(dataStorage) : [];
-      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
-      arr.sort((a, b) =>
-        String(a.praStart || "").localeCompare(String(b.praStart || ""))
-      );
-
-      this.participant = arr;
-      this.titleCategories = String(
-        localStorage.getItem("currentCategories") || ""
-      ).trim();
-    },
-    // ======
-
     resetRow(item) {
       item.result.startTime = "";
       item.result.finishTime = "";
@@ -1230,16 +1274,9 @@ export default {
       item.result.totalTime = "";
       item.result.ranked = "";
       item.result.score = "";
-
-      // optional: langsung re-assign ranking lagi
       this.assignRanks(this.participantArr);
 
-      this.$forceUpdate(); // paksa refresh kalau kadang Vue reactivity lambat
-    },
-
-    async calculateScore(ranked) {
-      const scoreData = this.dataScore.find((d) => d.ranking === ranked);
-      return scoreData ? scoreData.score : 0;
+      this.$forceUpdate();
     },
 
     parsesTime(timeStr) {
@@ -1249,14 +1286,6 @@ export default {
       return hours * 3600 * 1000 + minutes * 60 * 1000 + seconds * 1000;
     },
 
-    async parseTimeResult(timeResult) {
-      const parts = String(timeResult || "00:00:00:000").split(":");
-      const [hours, minutes, seconds, milliseconds] = parts.map(
-        (p) => parseInt(p, 10) || 0
-      );
-      return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
-    },
-
     async recalcPenalties(item) {
       const sp = this.findPenalty(item.result.startPenalty);
       const fp = this.findPenalty(item.result.finishPenalty);
@@ -1264,17 +1293,12 @@ export default {
       item.result.startPenaltyTime = sp.timePen;
       item.result.finishPenaltyTime = fp.timePen;
 
-      // total angka penalti (detik) hanya dari start+finish
       item.result.totalPenalty = Number(sp.value) + Number(fp.value);
 
-      // total waktu penalti = start + finish
       const totalPenaltyTime = await this.tambahWaktu(sp.timePen, fp.timePen);
       item.result.totalPenaltyTime = totalPenaltyTime;
 
-      // sinkron legacy
       item.result.penaltyTime = totalPenaltyTime;
-
-      // total lomba = raceTime + penaltyTime (jika raceTime ada)
       if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
@@ -1301,18 +1325,6 @@ export default {
 
     async updateFinishPenalty(item) {
       await this.recalcPenalties(item);
-    },
-
-    async resetRace() {
-      this.endGame = false;
-    },
-
-    async checkingPenalties() {
-      for (let i = 0; i < this.participant.length; i++) {
-        await this.recalcPenalties(this.participant[i]);
-      }
-      this.endGame = true;
-      await this.assignRanks(this.participant);
     },
 
     async assignRanks(items) {
@@ -1343,16 +1355,6 @@ export default {
       this.participant = arr;
     },
 
-    formatTime(inputTime) {
-      const hours = String(inputTime).substr(0, 2);
-      const minutes = String(inputTime).substr(2, 2);
-      const seconds = String(inputTime).substr(4, 2);
-      const milliseconds = String(inputTime).substr(6);
-      const correctedMinutes = Math.min(parseInt(minutes, 10) || 0, 59);
-      const correctedSeconds = Math.min(parseInt(seconds, 10) || 0, 59);
-      return `${hours}:${correctedMinutes}:${correctedSeconds}.${milliseconds}`;
-    },
-
     async updateTime(val, id, title) {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
       const row = this.participant[id];
@@ -1367,7 +1369,7 @@ export default {
           row.result.startTime,
           row.result.finishTime
         );
-        // panggil kalkulasi penalti agar totalTime langsung update
+
         await this.recalcPenalties(row);
       }
     },
@@ -1398,9 +1400,8 @@ export default {
       const hr = Math.floor(diff / (1000 * 60 * 60));
 
       const pad2 = (n) => String(n).padStart(2, "0");
-      const pad3 = (n) => String(n).padStart(3, "0"); // ⬅️ penting
-
-      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`; // ⬅️ 3 digit
+      const pad3 = (n) => String(n).padStart(3, "0");
+      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`;
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -1425,20 +1426,6 @@ export default {
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
 
-    goTo() {
-      localStorage.removeItem("raceStartPayload");
-      localStorage.removeItem("participantByCategories");
-      localStorage.removeItem("currentCategories");
-
-      this.participant = [];
-      this.titleCategories = "";
-      this.$router.push(`/event-detail/${this.$route.params.id}`);
-    },
-
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
-    },
-
     saveResult() {
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
       if (!Array.isArray(clean) || clean.length === 0) {
@@ -1450,7 +1437,6 @@ export default {
         return;
       }
 
-      // Gunakan bucket dari raceStartPayload agar identik dengan Team Registered
       const bucket = getBucket();
       const must = ["eventId", "initialId", "raceId", "divisionId"];
       const missing = must.filter((k) => !bucket[k]);
@@ -1463,12 +1449,8 @@ export default {
         return;
       }
 
-      // Bangun dokumen yang siap disimpan
       const docs = buildResultDocs(clean, bucket);
-
-      // KIRIM ARRAY LANGSUNG (bukan objek)
       ipcRenderer.send("insert-sprint-result", docs);
-
       ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
         if (res && res.ok) {
           ipcRenderer.send("get-alert-saved", {
@@ -1486,52 +1468,92 @@ export default {
       });
     },
 
-    previewResult() {
-      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
-      if (!Array.isArray(clean) || clean.length === 0) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-      const bucket = getBucket();
-      const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
-      if (missing.length) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: `Bucket fields missing: ${missing.join(", ")}`,
-          message: "Failed",
-        });
-        return;
-      }
+    goTo() {
+      localStorage.removeItem("raceStartPayload");
+      localStorage.removeItem("participantByCategories");
+      localStorage.removeItem("currentCategories");
 
-      const docs = buildResultDocs(clean, bucket);
-      const jsonStr = JSON.stringify(docs, null, 2);
-
-      const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
-  <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
-  pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
-  <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
-      const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
-      window.open(url, "_blank", "width=980,height=700");
+      this.participant = [];
+      this.titleCategories = "";
+      this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
+
+    //   previewResult() {
+    //     const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+    //     if (!Array.isArray(clean) || clean.length === 0) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "warning",
+    //         detail: "Belum ada data.",
+    //         message: "Ups Sorry",
+    //       });
+    //       return;
+    //     }
+    //     const bucket = getBucket();
+    //     const must = ["eventId", "initialId", "raceId", "divisionId"];
+    //     const missing = must.filter((k) => !bucket[k]);
+    //     if (missing.length) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "error",
+    //         detail: `Bucket fields missing: ${missing.join(", ")}`,
+    //         message: "Failed",
+    //       });
+    //       return;
+    //     }
+
+    //     const docs = buildResultDocs(clean, bucket);
+    //     const jsonStr = JSON.stringify(docs, null, 2);
+
+    //     const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
+    // <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
+    // pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
+    // <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
+    //     const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+    //     window.open(url, "_blank", "width=980,height=700");
+    //   },
   },
 };
 </script>
 
 <style scoped>
-/* Select block */
-.toolbar-select {
-  min-width: 260px;
-  flex: 1 1 260px; /* bisa melebar di layar kecil */
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
 }
-.toolbar-select__control {
-  border-radius: 10px;
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+/* ---- Styling utk Switch DRR Category select ---- */
+.sprint-actionbar__select {
+  min-width: 260px;
+  flex: 1 1 260px;
+}
+
+.sprint-actionbar__select #sprintBucketSelect {
+  border-radius: 12px;
   cursor: pointer;
 }
+
+#sprintBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#sprintBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
 
 /* ---- Styling utk penalty section select ---- */
 .small-select {
@@ -1539,7 +1561,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  margin-bottom: 6px; /* jarak antar select */
+  margin-bottom: 6px;
 }
 
 .small-select:hover {
@@ -1696,7 +1718,7 @@ td {
 .path-pill {
   display: inline-flex;
   align-items: center;
-  max-width: 520px; /* sesuaikan */
+  max-width: 520px;
   background: #fff;
   color: #0f172a;
   border: 1px solid #e5e7eb;
@@ -1713,7 +1735,7 @@ td {
 }
 .path-pill .truncate {
   display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
+  max-width: 460px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1739,15 +1761,15 @@ td {
   padding-bottom: 0;
 }
 .meta-label {
-  min-width: 120px; /* lebar label tetap */
+  min-width: 120px;
   font-weight: 800;
   letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
+  color: #334155;
   font-style: italic;
 }
 .meta-value {
   font-weight: 600;
-  color: #0f172a; /* slate-900 */
+  color: #0f172a;
 }
 .badge-chip {
   display: inline-block;

@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"
@@ -97,6 +94,22 @@
                 >
                   {{ titleCategories || "-" }}
                 </span>
+              </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch DRR Category:"
+                  label-for="drrBucketSelect"
+                  class="mb-0 drr-actionbar__select"
+                >
+                  <b-form-select
+                    id="drrBucketSelect"
+                    :options="drrBucketOptions"
+                    v-model="selectedDrrKey"
+                    @change="onSelectDrrBucket"
+                  />
+                </b-form-group>
               </div>
             </div>
           </b-col>
@@ -177,6 +190,7 @@
 
     <!-- OPERATION TIME (shared component like Sprint) -->
     <OperationTimePanel
+      v-if="participantArr && participantArr.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -190,29 +204,17 @@
       <div class="card-body">
         <b-row class="align-items-center py-2">
           <b-col>
-            <h4>Output Racetime :</h4>
-            <small class="text-muted">
-              Category active: {{ titleCategories || "-" }}
-            </small>
+            <div class="racetime-header">
+              <h4>Output Racetime :</h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
           </b-col>
-          <b-col cols="12" md="6">
-            <div class="drr-actionbar">
-              <b-form-group
-                label="Switch DRR Category:"
-                label-for="drrBucketSelect"
-                class="mb-0 drr-actionbar__select"
-              >
-                <b-form-select
-                  id="drrBucketSelect"
-                  :options="drrBucketOptions"
-                  v-model="selectedDrrKey"
-                  @change="onSelectDrrBucket"
-                />
-              </b-form-group>
-
-              <div class="drr-actionbar__buttons">
-                <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
-                <button
+          <b-col cols="6" md="6">
+            <div class="drr-actionbar__buttons">
+              <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
+              <!-- <button
                   type="button"
                   class="btn-action btn-warning"
                   @click="previewJson"
@@ -220,28 +222,27 @@
                   title="Tampilkan JSON yang akan disimpan"
                 >
                   <Icon icon="mdi:code-json" /> Preview JSON
-                </button>
+                </button> -->
 
-                <button
-                  type="button"
-                  class="btn-action btn-secondary"
-                  @click="saveResult"
-                  :disabled="!currentBucket || !participantArr.length"
-                  title="Simpan hasil untuk bucket yang dipilih"
-                >
-                  <Icon icon="icon-park-outline:save" /> Save Result
-                </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary"
+                @click="saveResult"
+                :disabled="!currentBucket || !participantArr.length"
+                title="Simpan hasil untuk bucket yang dipilih"
+              >
+                <Icon icon="icon-park-outline:save" /> Save Result
+              </button>
 
-                <button
-                  type="button"
-                  class="btn-action btn-info"
-                  @click="toggleSortRanked"
-                  :disabled="!participantArr.length"
-                  title="Urutkan berdasarkan rank naik/turun"
-                >
-                  <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-                </button>
-              </div>
+              <button
+                type="button"
+                class="btn-action btn-info"
+                @click="toggleSortRanked"
+                :disabled="!participantArr.length"
+                title="Urutkan berdasarkan rank naik/turun"
+              >
+                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+              </button>
             </div>
           </b-col>
         </b-row>
@@ -249,43 +250,57 @@
         <b-row>
           <b-col>
             <div class="table-wrapper">
-              <table class="table" aria-label="Scrollable results table">
+              <div
+                v-if="isLoading"
+                class="bracket-loading d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center">
+                  <b-spinner label="Loading" class="mb-2"></b-spinner>
+                  <div class="text-muted">Loading bracket & teams…</div>
+                </div>
+              </div>
+              <table
+                v-else-if="participantArr && participantArr.length"
+                class="table"
+                aria-label="Scrollable results table"
+              >
                 <thead>
                   <tr>
                     <th class="text-center">No</th>
                     <th class="text-left">Team Name</th>
                     <th class="text-center">BIB Number</th>
                     <th class="text-center">Start Time</th>
+                    <th class="text-center">Pen. Start</th>
+                    <th class="text-center">Pen. Section</th>
+                    <th class="text-center">Pen. Finish</th>
+                    <th class="text-center">Penalty Total</th>
                     <th class="text-center">Finish Time</th>
                     <th class="text-center">Race Time</th>
-                    <th class="text-center">Penalty Start</th>
-                    <th class="text-center">Penalty Section</th>
-                    <th class="text-center">Penalty Finish</th>
-                    <th class="text-center">Penalty Total</th>
+                    <th class="text-center">Penalty Time</th>
                     <th class="text-center">Result</th>
                     <th class="text-center">Ranked</th>
-                    <th class="text-center">Score</th>
+                    <th class="text-center">Scored</th>
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
+                    
+                     <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
+
+                    <!-- BIB NUMBER  -->
                     <td class="text-center">{{ item.bibTeam }}</td>
+
+                    <!-- START TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.startTime }}
                     </td>
-                    <td class="text-center text-monospace">
-                      {{ item.result.finishTime }}
-                    </td>
-                    <td class="text-center large-bold text-monospace">
-                      {{ item.result.raceTime }}
-                    </td>
 
-                    <!-- Pen Start -->
+                    <!-- PENALTY START TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -309,7 +324,7 @@
                       </b-select>
                     </td>
 
-                    <!-- Pen Section -->
+                    <!-- PENALTY SECTION TIME -->
                     <td class="text-center">
                       <div class="pen-grid">
                         <b-select
@@ -339,7 +354,7 @@
                       </div>
                     </td>
 
-                    <!-- Pen Finish -->
+                    <!-- PENALTY FINISH TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -363,11 +378,29 @@
                       </b-select>
                     </td>
 
+                    <!-- PENALTY TOTAL  -->
+                    <td class="text-center penalty-char">
+                      {{ item.result.totalPenalty }}
+                    </td>
+
+                    <!-- FINISH TIME  -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
+
+                    <!-- RACE TIME  -->
+                    <td class="text-center large-bold text-monospace">
+                      {{ item.result.raceTime }}
+                    </td>
+
+                    <!-- PENALTY TIME  -->
                     <td
                       class="text-center large-bold penalty-char text-monospace"
                     >
                       {{ item.result.penaltyTime }}
                     </td>
+
+                    <!-- RESULT TIME  -->
                     <td
                       class="text-center large-bold result-char text-monospace"
                     >
@@ -377,9 +410,13 @@
                           : item.result.raceTime
                       }}
                     </td>
+
+                    <!-- RANKED  -->
                     <td class="text-center large-bold">
                       {{ item.result.ranked }}
                     </td>
+
+                    <!-- SCORED  -->
                     <td class="text-center large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>
@@ -413,6 +450,8 @@
                   </tr>
                 </tbody>
               </table>
+              <!-- EMPTY STATE -->
+              <EmptyCard v-else />
             </div>
             <br />
           </b-col>
@@ -493,10 +532,12 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
+import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -633,6 +674,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForDRR(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),
@@ -704,13 +746,12 @@ function readEventDetailsFromLS() {
   }
 }
 
-import { logger } from "@/utils/logger";
-
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
+      isLoading: false,
       defaultImg,
       selectPath: "",
       baudRate: 9600,
@@ -729,46 +770,8 @@ export default {
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
-      dataPenalties: [
-        { label: "0", value: 0, timePen: "00:00:00.000" },
-        { label: "+ 10", value: 10, timePen: "00:00:10.000" },
-        { label: "- 10", value: -10, timePen: "-00:00:10.000" },
-        { label: "+ 50", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 350 },
-        { ranking: 2, score: 322 },
-        { ranking: 3, score: 301 },
-        { ranking: 4, score: 287 },
-        { ranking: 5, score: 277 },
-        { ranking: 6, score: 266 },
-        { ranking: 7, score: 256 },
-        { ranking: 8, score: 245 },
-        { ranking: 9, score: 235 },
-        { ranking: 10, score: 224 },
-        { ranking: 11, score: 214 },
-        { ranking: 12, score: 203 },
-        { ranking: 13, score: 193 },
-        { ranking: 14, score: 182 },
-        { ranking: 15, score: 172 },
-        { ranking: 16, score: 161 },
-        { ranking: 17, score: 151 },
-        { ranking: 18, score: 140 },
-        { ranking: 19, score: 133 },
-        { ranking: 20, score: 126 },
-        { ranking: 21, score: 119 },
-        { ranking: 22, score: 112 },
-        { ranking: 23, score: 105 },
-        { ranking: 24, score: 98 },
-        { ranking: 25, score: 91 },
-        { ranking: 26, score: 84 },
-        { ranking: 27, score: 77 },
-        { ranking: 28, score: 70 },
-        { ranking: 29, score: 63 },
-        { ranking: 30, score: 56 },
-        { ranking: 31, score: 49 },
-        { ranking: 32, score: 42 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -884,9 +887,10 @@ export default {
     },
   },
   async mounted() {
-    this.dataEvent = readEventDetailsFromLS();
-    window.addEventListener("scroll", this.handleScroll);
+    await this.loadDataScore("DRR");
+    await this.loadDataPenalties("DRR");
 
+    this.dataEvent = readEventDetailsFromLS();
     this.buildStaticDrrOptions();
 
     if (this.drrBucketOptions.length) {
@@ -902,9 +906,6 @@ export default {
     }
 
     this.fetchDrrSectionCountFromSettings();
-  },
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
     // === SERIAL CONNECTION ===
@@ -993,6 +994,37 @@ export default {
       this.notify("error", detail, message);
     },
     // ======
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.dataPenalties = payload[0].data;
+          } else {
+            this.dataPenalties = [];
+          }
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
     resetRow(item) {
       if (!item || !item.result) return;
 
@@ -1240,6 +1272,7 @@ export default {
     },
     loadAllDrrBucketsFromEvent() {
       try {
+        this.isLoading = true;
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
         const participant = Array.isArray(ev.participant) ? ev.participant : [];
@@ -1334,6 +1367,7 @@ export default {
       } catch {
         // biarkan fallback yang sudah ada (loadFromRaceStartPayload / checkValueStorage)
       }
+      this.isLoading = false;
     },
 
     _useDrrBucket(key) {
@@ -1385,6 +1419,8 @@ export default {
 
     async fetchBucketTeamsByKey(key) {
       try {
+        this.isLoading = true;
+
         if (
           !key ||
           !this.drrBucketMap[key] ||
@@ -1446,6 +1482,7 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
+      this.isLoading = false;
     },
     _bucketKey(b) {
       // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil
@@ -1831,10 +1868,6 @@ export default {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
-    },
-
     /* === NEW: Helper membangun docs yang sama seperti saat Save (TAMBAHAN) === */
     _buildDocsForSave() {
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
@@ -1851,7 +1884,7 @@ export default {
           this.$bvModal.show &&
           this.$bvModal.show("preview-json-modal");
       } catch (e) {
-        console.error("openPreviewJson failed", e);
+        logger.warn("❌ openPreviewJson failed", e);
       }
     },
 
@@ -1962,15 +1995,33 @@ export default {
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
 /* --- DRR Action Bar --- */
 .drr-actionbar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap; /* biar rapi saat layar kecil */
+  flex-wrap: wrap;
 }
 
+/* ---- Styling utk Switch DRR Category select ---- */
 .drr-actionbar__select {
   min-width: 260px;
   flex: 1 1 260px;
@@ -1981,19 +2032,42 @@ export default {
   cursor: pointer;
 }
 
-.drr-actionbar__buttons {
-  display: inline-flex;
-  gap: 8px;
-  flex: 0 0 auto;
+#drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
+#drrBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
+
+.drr-actionbar {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.drr-actionbar__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Pastikan tombol tidak nempel terlalu rapat ke tepi kanan */
+.drr-actionbar__buttons .btn-action {
+  margin-right: 0;
+}
+
+/* Responsif: tetap kanan, tapi biar wrap rapi */
 @media (max-width: 767.98px) {
-  .drr-actionbar {
-    align-items: stretch;
-  }
   .drr-actionbar__buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
     width: 100%;
-    justify-content: flex-end; /* tombol rata kanan saat turun ke baris baru */
   }
 }
 
@@ -2165,18 +2239,6 @@ td {
 .table-wrapper th,
 .table-wrapper td {
   white-space: nowrap; /* prevent wrapping */
-}
-
-/* ---- Styling utk Switch DRR Category select ---- */
-#drrBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-#drrBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
 /* ---- Styling utk penalty section select ---- */

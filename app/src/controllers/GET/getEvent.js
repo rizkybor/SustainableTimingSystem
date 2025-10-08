@@ -2,7 +2,6 @@ const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 
 // get All Events
-// get All Events
 async function getAllEvents() {
   try {
     const database = await getDb();

@@ -1,0 +1,57 @@
+{
+  "eventId": "",
+  "initialId": "",
+  "raceId": "",
+  "divisionId": "",
+  "eventName": "",
+  "initialName": "",
+  "raceName": "",
+  "divisionName": "",
+  "overallPosition": [
+    {
+      "teamId": "",
+      "teamName": "",
+      "position": ""
+    }
+  ],
+  "savedAt": "",
+  "rounds": [
+    {
+      "roundId": "",
+      "roundName": "",
+      "items": [
+        {
+          "teamId": "",
+          "nameTeam": "",
+          "bibTeam": "",
+          "result": {
+            "startTime": "",
+            "finishTime": "",
+            "raceTime": "",
+            "penaltyTime": "",
+            "penaltyTotal": null,
+            "penalties": {
+              "s": null,
+              "cl": null,
+              "r1": null,
+              "r2": null,
+              "l1": null,
+              "l2": null,
+              "pb": null,
+              "f": null,
+              "o": null
+            },
+            "totalTime": "",
+            "ranked": "",
+            "score": "",
+            "winLose": "",
+            "heat": null
+          }
+        }
+      ],
+      "winPositionByRound": [],
+      "losePositionByRound": [],
+      "overallByRound": []
+    }
+  ]
+}

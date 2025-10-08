@@ -29,7 +29,7 @@
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
               {{
-                eventInfo.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025"
+                eventInfo.eventName || "-"
               }}
             </h2>
             <div class="meta text-white-50">
@@ -217,16 +217,17 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
-import EmptyStateFull from "@/components/EmptyStateFull.vue";
-import VueHtml2pdf from "vue-html2pdf";
-import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
 import { ipcRenderer } from "electron";
+import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
+import EmptyStateFull from "@/components/EmptyStateFull.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import VueHtml2pdf from "vue-html2pdf";
+import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
-const EVENT_DETAILS_KEY = "eventDetails";
+// const EVENT_DETAILS_KEY = "eventDetails";
 
 function safeParse(str, fallback) {
   try {
@@ -235,45 +236,45 @@ function safeParse(str, fallback) {
     return fallback;
   }
 }
-function evIdToString(ev) {
-  if (ev && ev._id) {
-    if (typeof ev._id === "object" && ev._id.$oid) return String(ev._id.$oid);
-    return String(ev._id);
-  }
-  return "";
-}
-function currentEventIdFromBucket() {
-  const payload = safeParse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}", {});
-  const b = payload && payload.bucket ? payload.bucket : {};
-  return String(b.eventId || "");
-}
-function pickEventFromStore() {
-  const store = safeParse(
-    localStorage.getItem(EVENT_DETAILS_KEY) || "null",
-    null
-  );
-  if (!store) return {};
-  const activeId = currentEventIdFromBucket();
+// function evIdToString(ev) {
+//   if (ev && ev._id) {
+//     if (typeof ev._id === "object" && ev._id.$oid) return String(ev._id.$oid);
+//     return String(ev._id);
+//   }
+//   return "";
+// }
+// function currentEventIdFromBucket() {
+//   const payload = safeParse(localStorage.getItem(RACE_PAYLOAD_KEY) || "{}", {});
+//   const b = payload && payload.bucket ? payload.bucket : {};
+//   return String(b.eventId || "");
+// }
+// function pickEventFromStore() {
+//   const store = safeParse(
+//     localStorage.getItem(EVENT_DETAILS_KEY) || "null",
+//     null
+//   );
+//   if (!store) return {};
+//   const activeId = currentEventIdFromBucket();
 
-  const isDict =
-    typeof store === "object" &&
-    !Array.isArray(store) &&
-    !store.eventName &&
-    !store._id;
-  if (isDict) {
-    return activeId && store[activeId]
-      ? store[activeId]
-      : Object.values(store)[0] || {};
-  }
-  if (Array.isArray(store)) {
-    if (activeId) {
-      const found = store.find((ev) => evIdToString(ev) === activeId);
-      if (found) return found;
-    }
-    return store[0] || {};
-  }
-  return store; // single object
-}
+//   const isDict =
+//     typeof store === "object" &&
+//     !Array.isArray(store) &&
+//     !store.eventName &&
+//     !store._id;
+//   if (isDict) {
+//     return activeId && store[activeId]
+//       ? store[activeId]
+//       : Object.values(store)[0] || {};
+//   }
+//   if (Array.isArray(store)) {
+//     if (activeId) {
+//       const found = store.find((ev) => evIdToString(ev) === activeId);
+//       if (found) return found;
+//     }
+//     return store[0] || {};
+//   }
+//   return store; // single object
+// }
 
 export default {
   name: "SprintResult",
@@ -383,34 +384,30 @@ export default {
         division: b.divisionName || q.divisionName || "-",
       };
     },
-    // Info event dari localStorage (fallback ke query)
-    eventInfo() {
-      const ev = pickEventFromStore();
-      const q = this.$route.query || {};
-      console.log(q, ev,'<<< MINGGU')
-      return {
-        eventName: ev.eventName || q.eventName || "",
-        addressCity:
-          ev.addressCity || ev.location || q.addressCity || q.location || "",
-        riverName: ev.riverName || q.riverName || "",
-        levelName: ev.levelName || q.levelName || "",
-        startDateEvent: ev.startDateEvent || q.startDateEvent || "",
-        endDateEvent: ev.endDateEvent || q.endDateEvent || "",
-        addressVillage: ev.addressVillage || "",
-        addressDistrict: ev.addressDistrict || "",
-        addressSubDistrict: ev.addressSubDistrict || "",
-        addressProvince: ev.addressProvince || "",
-        addressState: ev.addressState || "",
-        addressZipCode: ev.addressZipCode || "",
-        raceDirector: ev.raceDirector || "",
-        chiefJudge: ev.chiefJudge || "",
-      };
-    },
+    // eventInfo() {
+    //   const ev = pickEventFromStore();
+    //   const q = this.$route.query || {};
+    //   return {
+    //     eventName: ev.eventName || q.eventName || "",
+    //     addressCity:
+    //       ev.addressCity || ev.location || q.addressCity || q.location || "",
+    //     riverName: ev.riverName || q.riverName || "",
+    //     levelName: ev.levelName || q.levelName || "",
+    //     startDateEvent: ev.startDateEvent || q.startDateEvent || "",
+    //     endDateEvent: ev.endDateEvent || q.endDateEvent || "",
+    //     addressVillage: ev.addressVillage || "",
+    //     addressDistrict: ev.addressDistrict || "",
+    //     addressSubDistrict: ev.addressSubDistrict || "",
+    //     addressProvince: ev.addressProvince || "",
+    //     addressState: ev.addressState || "",
+    //     addressZipCode: ev.addressZipCode || "",
+    //     raceDirector: ev.raceDirector || "",
+    //     chiefJudge: ev.chiefJudge || "",
+    //   };
+    // },
 
     // Data untuk komponen PDF
     pdfEventData() {
-      let a ={ ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
-      console.log(a,'<<<<')
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
     pdfParticipants() {
@@ -460,17 +457,7 @@ export default {
     this.loadSprintResult();
   },
 
-  mounted() {
-    window.addEventListener("pdf-generated", (e) =>
-      console.log("[PDF EVENT] pdf-generated", e)
-    );
-    window.addEventListener("hasGenerated", (e) =>
-      console.log("[PDF EVENT] hasGenerated", e)
-    );
-    window.addEventListener("pdfDownloaded", (e) =>
-      console.log("[PDF EVENT] pdfDownloaded", e)
-    );
-  },
+  mounted() {},
 
   methods: {
     goBack() {
@@ -511,11 +498,6 @@ export default {
       localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
     },
 
-    // NEW: toggle & persist
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
-    },
     openEdit(row) {
       this.$emit("edit-row", row);
     },
@@ -712,31 +694,23 @@ export default {
     // PDF
     async generatePdf() {
       try {
-        console.log("[PDF] klik tombol");
         this.showPdf = true;
         await this.$nextTick();
 
         const inst = this.$refs.html2Pdf;
-        if (!inst) return console.error("ref html2Pdf tidak ditemukan");
-
-        // Delay kecil supaya konten sempat render
+        if (!inst) return logger.warn("ref html2Pdf tidak ditemukan");
         await new Promise((r) => setTimeout(r, 200));
-
-        console.log("[PDF] memanggil generatePdf()…");
-        await inst.generatePdf(); // v1.8.0 akan otomatis trigger download
-        console.log("[PDF] generatePdf() selesai");
+        await inst.generatePdf();
       } catch (e) {
-        console.error("[PDF] gagal generate:", e);
         this.error = "Gagal membuat PDF";
       }
     },
 
     onBeforeDownload() {
-      console.log("[PDF] sebelum download — siap generate PDF");
+      //
     },
 
-    onPdfGenerated(pdf) {
-      console.log("[PDF] pdfGenerated terpanggil:", pdf);
+    onPdfGenerated() {
       this.showPdf = false;
     },
   },

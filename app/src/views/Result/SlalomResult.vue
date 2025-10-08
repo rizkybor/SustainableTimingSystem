@@ -60,23 +60,28 @@
       </div>
 
       <div class="right-actions">
-        <b-button-group class="mr-3">
+        <b-button-group class="mr-3 custom-btn-group">
           <b-button
             size="sm"
             :variant="sessionMode === 'all' ? 'primary' : 'outline-primary'"
             @click="changeSessionMode('all')"
+            class="custom-btn"
             >All</b-button
           >
+
           <b-button
             size="sm"
             :variant="sessionMode === 's1' ? 'primary' : 'outline-primary'"
             @click="changeSessionMode('s1')"
+            class="custom-btn"
             >Session 1</b-button
           >
+
           <b-button
             size="sm"
             :variant="sessionMode === 's2' ? 'primary' : 'outline-primary'"
             @click="changeSessionMode('s2')"
+            class="custom-btn"
             >Session 2</b-button
           >
         </b-button-group>
@@ -117,7 +122,8 @@
         <h2 class="event-name">
           <span class="muted">
             SLALOM RESULT | {{ slalomCats.initial }} -
-            {{ slalomCats.division }} {{ slalomCats.race }}
+            {{ slalomCats.division }} {{ slalomCats.race }} | Session :
+            {{ sessionMode }}
           </span>
         </h2>
       </div>
@@ -157,8 +163,8 @@
               <th>Penalty Time</th>
               <th>Result</th>
               <th>Ranked</th>
-              <th>Score</th>
-              <th v-if="!isOfficial">Action</th>
+              <th v-if="sessionMode === 'all'">Score</th>
+              <th v-if="!isOfficial && sessionMode === 'all'">Action</th>
             </tr>
           </thead>
 
@@ -172,7 +178,11 @@
               <td>
                 <div class="team">
                   {{ r.nameTeam || "-" }}
-                  <span v-if="r.isBest && sessionMode === 'all'" class="best-badge">BEST</span>
+                  <span
+                    v-if="r.isBest && sessionMode === 'all'"
+                    class="best-badge"
+                    >BEST</span
+                  >
                 </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
@@ -190,14 +200,17 @@
               <td>{{ r.penaltyTime || "00:00:00.000" }}</td>
               <td class="bold">{{ r.resultTime || "00:00:00.000" }}</td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
-              <td class="text-center">
+              <td v-if="sessionMode === 'all'" class="text-center">
                 {{
                   r.score !== undefined && r.score !== null && r.score !== ""
                     ? r.score
                     : getScoreByRanked(r.ranked) || 0
                 }}
               </td>
-              <td class="text-center" v-if="!isOfficial">
+              <td
+                class="text-center"
+                v-if="!isOfficial && sessionMode === 'all'"
+              >
                 <b-button
                   size="sm"
                   variant="warning"
@@ -820,6 +833,41 @@ export default {
 </script>
 
 <style scoped>
+.custom-btn-group .custom-btn {
+  border-radius: 9999px; /* fully rounded pill shape */
+  padding: 0.35rem 1rem;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  border: none;
+}
+
+/* Gradient background when active */
+.custom-btn-group .custom-btn.btn-primary {
+  background: linear-gradient(135deg, #007bff, #00b4d8);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+
+/* Gradient hover for outline buttons */
+.custom-btn-group .custom-btn.btn-outline-primary:hover {
+  background: linear-gradient(135deg, #007bff, #00b4d8);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Active hover effect for solid button */
+.custom-btn-group .custom-btn.btn-primary:hover {
+  background: linear-gradient(135deg, #0066d3, #0096c7);
+  box-shadow: 0 3px 10px rgba(0, 123, 255, 0.4);
+}
+
+/* Optional focus/active animation */
+.custom-btn-group .custom-btn:active,
+.custom-btn-group .custom-btn:focus {
+  transform: scale(0.96);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
 .best-row {
   background: #f2fff5 !important; /* hijau sangat muda */
 }

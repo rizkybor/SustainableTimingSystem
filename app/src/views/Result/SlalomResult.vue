@@ -60,6 +60,27 @@
       </div>
 
       <div class="right-actions">
+        <b-button-group class="mr-3">
+          <b-button
+            size="sm"
+            :variant="sessionMode === 'all' ? 'primary' : 'outline-primary'"
+            @click="changeSessionMode('all')"
+            >All</b-button
+          >
+          <b-button
+            size="sm"
+            :variant="sessionMode === 's1' ? 'primary' : 'outline-primary'"
+            @click="changeSessionMode('s1')"
+            >Session 1</b-button
+          >
+          <b-button
+            size="sm"
+            :variant="sessionMode === 's2' ? 'primary' : 'outline-primary'"
+            @click="changeSessionMode('s2')"
+            >Session 2</b-button
+          >
+        </b-button-group>
+
         <b-button
           :disabled="results.length === 0 || loading"
           variant="primary"
@@ -145,13 +166,13 @@
             <tr
               v-for="(r, idx) in results"
               :key="idx"
-              :class="{ 'best-row': r.isBest }"
+              :class="{ 'best-row': r.isBest && sessionMode === 'all' }"
             >
               <td class="text-center">{{ r.teamIndex }}</td>
               <td>
                 <div class="team">
                   {{ r.nameTeam || "-" }}
-                  <span v-if="r.isBest" class="best-badge">BEST</span>
+                  <span v-if="r.isBest && sessionMode === 'all'" class="best-badge">BEST</span>
                 </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
@@ -305,6 +326,8 @@ export default {
   components: { Icon, EmptyStateFull, SlalomPdf, VueHtml2pdf },
   data() {
     return {
+      sessionMode: "all", // nilai default
+      rawResultItems: [],
       defaultImg,
       isOfficial: false,
       loading: false,
@@ -459,6 +482,139 @@ export default {
   },
 
   methods: {
+    buildResultRows(mode) {
+      const items = this.rawResultItems || [];
+      if (!Array.isArray(items) || items.length === 0) return [];
+
+      const teamsObj = {};
+      let d, t, r;
+
+      for (d = 0; d < items.length; d++) {
+        const doc = items[d];
+        if (!doc || !Array.isArray(doc.teams)) continue;
+
+        for (t = 0; t < doc.teams.length; t++) {
+          const team = doc.teams[t] || {};
+          const nameTeam = team.nameTeam ? String(team.nameTeam) : "";
+          const bibTeam = team.bibTeam ? String(team.bibTeam) : "";
+          const result = Array.isArray(team.result) ? team.result : [];
+          if (result.length === 0) continue;
+
+          const key = nameTeam + "##" + bibTeam;
+          if (!teamsObj[key]) {
+            teamsObj[key] = {
+              nameTeam,
+              bibTeam,
+              runs: [],
+              bestIdx: -1,
+              bestMs: Number.POSITIVE_INFINITY,
+              bestRank: 0,
+            };
+          }
+
+          // ambil index sesuai filter mode
+          const runIndexes = [];
+          if (mode === "all") {
+            for (r = 0; r < result.length; r++) runIndexes.push(r);
+          } else if (mode === "s1" && result[0]) {
+            runIndexes.push(0);
+          } else if (mode === "s2" && result[1]) {
+            runIndexes.push(1);
+          }
+
+          for (const ridx of runIndexes) {
+            const run = result[ridx] || {};
+            const R = this.normalizeResult(run);
+            const item = {
+              nameTeam,
+              bibTeam,
+              session: run.session || `Run ${ridx + 1}`,
+              raceTime: R.raceTime,
+              startPenalty: R.startPenalty,
+              finishPenalty: R.finishPenalty,
+              sectionPenalty: R.sectionPenalty,
+              totalPenalty: R.totalPenalty,
+              penaltyTime: R.penaltyTime,
+              totalTime: R.totalTime,
+              resultTime: R.resultTime,
+              isBest: false,
+              ranked: 0,
+              score: 0,
+              gatesDetail:
+                run.penaltyTotal && Array.isArray(run.penaltyTotal.gates)
+                  ? run.penaltyTotal.gates
+                  : [],
+            };
+
+            teamsObj[key].runs.push(item);
+            const ms = this.timeToMs(
+              item.resultTime || item.totalTime || item.raceTime
+            );
+            if (ms < teamsObj[key].bestMs) {
+              teamsObj[key].bestMs = ms;
+              teamsObj[key].bestIdx = ridx;
+            }
+          }
+        }
+      }
+
+      // urutkan per best time antar tim
+      const bestArray = [];
+      for (const k in teamsObj) {
+        if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
+        bestArray.push({ key: k, ms: teamsObj[k].bestMs });
+      }
+      bestArray.sort((a, b) => a.ms - b.ms);
+
+      // assign rank & score
+      let rankCounter = 1;
+      for (const b of bestArray) {
+        const pack = teamsObj[b.key];
+        pack.bestRank = rankCounter;
+        const idx = pack.bestIdx;
+        if (idx >= 0 && idx < pack.runs.length) {
+          pack.runs[idx].isBest = true;
+          pack.runs[idx].ranked = rankCounter;
+          pack.runs[idx].score = this.getScoreByRanked(rankCounter);
+        }
+        rankCounter++;
+      }
+
+      // susun finalRows
+      const orderedKeys = Object.keys(teamsObj).sort((ka, kb) => {
+        const ra = teamsObj[ka].bestRank || Infinity;
+        const rb = teamsObj[kb].bestRank || Infinity;
+        return ra - rb;
+      });
+
+      const finalRows = [];
+      let teamCounter = 1;
+      for (const k of orderedKeys) {
+        const pack = teamsObj[k];
+        const localRuns = pack.runs.slice();
+        localRuns.sort((a, b) =>
+          String(a.session).localeCompare(String(b.session))
+        );
+
+        for (let j = 0; j < localRuns.length; j++) {
+          const row = localRuns[j];
+          finalRows.push({
+            ...row,
+            ranked: row.isBest ? row.ranked || "-" : "-",
+            score: row.isBest ? row.score || 0 : 0,
+            teamIndex: teamCounter,
+          });
+        }
+        teamCounter++;
+      }
+
+      return finalRows;
+    },
+    changeSessionMode(mode) {
+      if (!["all", "s1", "s2"].includes(mode)) return;
+      this.sessionMode = mode;
+      this.results = this.buildResultRows(mode);
+    },
     openGateModal(row) {
       this.gateModal.team = row && row.nameTeam ? row.nameTeam : "";
       this.gateModal.bib = row && row.bibTeam ? row.bibTeam : "";
@@ -616,7 +772,6 @@ export default {
 
         ipcRenderer.once("get-slalom-result-reply", (_e, res) => {
           clearTimeout(timeoutId);
-
           try {
             if (!(res && res.ok && Array.isArray(res.items))) {
               this.results = [];
@@ -626,160 +781,10 @@ export default {
               return;
             }
 
-            // 1) Kumpulkan run per tim + tentukan bestIdx
-            const teamsObj = {}; // key: "name##bib" -> { nameTeam,bibTeam,runs:[],bestIdx,bestMs,bestRank }
-            let d, t, r;
-            for (d = 0; d < res.items.length; d++) {
-              const doc = res.items[d];
-              if (!doc || !Array.isArray(doc.teams)) continue;
-
-              for (t = 0; t < doc.teams.length; t++) {
-                const team = doc.teams[t] || {};
-                const nameTeam = team.nameTeam ? String(team.nameTeam) : "";
-                const bibTeam = team.bibTeam ? String(team.bibTeam) : "";
-                const result = Array.isArray(team.result) ? team.result : [];
-
-                if (result.length === 0) continue;
-
-                const key = nameTeam + "##" + bibTeam;
-                if (!teamsObj[key]) {
-                  teamsObj[key] = {
-                    nameTeam: nameTeam,
-                    bibTeam: bibTeam,
-                    runs: [],
-                    bestIdx: -1,
-                    bestMs: Number.POSITIVE_INFINITY,
-                    bestRank: 0,
-                  };
-                }
-
-                // simpan semua run + cari best berdasarkan totalTime (paling kecil)
-                for (r = 0; r < result.length; r++) {
-                  const run = result[r] || {};
-                  const R = this.normalizeResult(run);
-
-                  const item = {
-                    nameTeam: nameTeam,
-                    bibTeam: bibTeam,
-                    session:
-                      run && run.session
-                        ? String(run.session)
-                        : "Run " + (r + 1),
-                    raceTime: R.raceTime,
-                    startPenalty: R.startPenalty,
-                    finishPenalty: R.finishPenalty,
-                    sectionPenalty: R.sectionPenalty,
-                    totalPenalty: R.totalPenalty,
-                    penaltyTime: R.penaltyTime,
-                    totalTime: R.totalTime,
-                    resultTime: R.resultTime,
-                    isBest: false,
-                    ranked: 0,
-                    score: 0,
-                    gatesDetail:
-                      run &&
-                      run.penaltyTotal &&
-                      Array.isArray(run.penaltyTotal.gates)
-                        ? run.penaltyTotal.gates
-                        : [],
-                  };
-
-                  teamsObj[key].runs.push(item);
-
-                  const ms = this.timeToMs(
-                    item.resultTime || item.totalTime || item.raceTime
-                  );
-                  if (ms < teamsObj[key].bestMs) {
-                    teamsObj[key].bestMs = ms;
-                    teamsObj[key].bestIdx = r;
-                  }
-                }
-              }
-            }
-
-            // 2) Hitung ranking antar tim berdasar bestMs
-            const bestArray = [];
-            // build array (tanpa .map)
-            for (const k in teamsObj) {
-              if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
-              bestArray.push({ key: k, ms: teamsObj[k].bestMs });
-            }
-            // sort sederhana (pakai sort tunggal, tidak chaining)
-            bestArray.sort(function (a, b) {
-              return a.ms - b.ms;
-            });
-            // set rank + score hanya untuk baris best
-            let i,
-              rankCounter = 1;
-            for (i = 0; i < bestArray.length; i++) {
-              const pack = teamsObj[bestArray[i].key];
-              pack.bestRank = rankCounter;
-              const bIdx = pack.bestIdx;
-              if (bIdx >= 0 && bIdx < pack.runs.length) {
-                pack.runs[bIdx].isBest = true;
-                pack.runs[bIdx].ranked = rankCounter;
-                pack.runs[bIdx].score = this.getScoreByRanked(rankCounter);
-              }
-              rankCounter++;
-            }
-
-            // 3) Susun finalRows: urutkan tim berdasarkan bestRank, lalu tampilkan 2 run per tim
-            //    urutan run dalam tim: berdasarkan nama session (Run 1, Run 2)
-            const orderedTeamKeys = [];
-            for (const k in teamsObj) {
-              if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
-              orderedTeamKeys.push(k);
-            }
-            orderedTeamKeys.sort((ka, kb) => {
-              const ra = teamsObj[ka].bestRank || Number.POSITIVE_INFINITY;
-              const rb = teamsObj[kb].bestRank || Number.POSITIVE_INFINITY;
-              if (ra !== rb) return ra - rb;
-              const na = teamsObj[ka].nameTeam || "";
-              const nb = teamsObj[kb].nameTeam || "";
-              return String(na).localeCompare(String(nb));
-            });
-
-            const finalRows = [];
-            let teamCounter = 1;
-            for (i = 0; i < orderedTeamKeys.length; i++) {
-              const k = orderedTeamKeys[i];
-              const pack = teamsObj[k];
-
-              // urutkan run per tim berdasar session string (Run 1 dulu)
-              const localRuns = pack.runs.slice(); // copy tanpa chaining
-              localRuns.sort(function (a, b) {
-                return String(a.session).localeCompare(String(b.session));
-              });
-
-              // pastikan hanya 2 baris per tim
-              const limit = localRuns.length >= 2 ? 2 : localRuns.length;
-              let j;
-              for (j = 0; j < limit; j++) {
-                const row = localRuns[j];
-                finalRows.push({
-                  nameTeam: row.nameTeam,
-                  bibTeam: row.bibTeam,
-                  session: row.session,
-                  raceTime: row.raceTime,
-                  startPenalty: row.startPenalty,
-                  finishPenalty: row.finishPenalty,
-                  sectionPenalty: row.sectionPenalty,
-                  totalPenalty: row.totalPenalty,
-                  penaltyTime: row.penaltyTime,
-                  totalTime: row.totalTime,
-                  resultTime: row.resultTime,
-                  isBest: row.isBest,
-                  ranked: row.isBest ? row.ranked || "-" : "-",
-                  score: row.isBest ? row.score || 0 : 0,
-                  gatesDetail: row.gatesDetail,
-                  teamIndex: teamCounter,
-                });
-              }
-
-              teamCounter++;
-            }
-
-            this.results = finalRows;
+            // simpan mentah
+            this.rawResultItems = res.items;
+            // bangun tampilan awal (All)
+            this.results = this.buildResultRows("all");
             this.loading = false;
           } catch (err) {
             console.error(err);

@@ -562,11 +562,7 @@ function normalizeTeamForSprint(t = {}) {
   if (!result || typeof result !== "object") result = {};
   result = { ...emptyRes, ...result };
 
-  let otr = t.otr;
-  if (!otr || typeof otr !== "object") otr = {};
-  otr = { ...emptyRes, ...otr };
-
-  return { ...base, result, otr };
+  return { ...base, result };
 }
 
 function loadRaceStartPayloadForSprint() {

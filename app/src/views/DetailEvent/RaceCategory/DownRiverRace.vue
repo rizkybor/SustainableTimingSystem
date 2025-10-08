@@ -674,6 +674,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForDRR(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),

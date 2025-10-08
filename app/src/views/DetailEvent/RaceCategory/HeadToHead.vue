@@ -1108,6 +1108,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForH2H(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),

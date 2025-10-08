@@ -58,6 +58,8 @@ async function insertSprintResult(payload) {
         totalTime: toStr(r.totalTime != null ? r.totalTime : r.raceTime, ""),
         ranked: Number.isFinite(r.ranked) ? Number(r.ranked) : 0,
         score: Number.isFinite(r.score) ? Number(r.score) : 0,
+        judgesBy: toStr(r.judgesBy, ""),
+        judgesTime: toStr(r.judgesTime, ""),
       };
 
       // jika totalPenaltyTime kosong tapi ada start/finishPenaltyTime → jumlahkan string tak mudah;
@@ -83,6 +85,8 @@ async function insertSprintResult(payload) {
         totalTime: "",
         ranked: 0,
         score: 0,
+        judgesBy: toStr(r.judgesBy, ""),
+        judgesTime: toStr(r.judgesTime, ""),
       };
       return { ...base, ...normalizeResultObj(otr) };
     }
@@ -265,7 +269,10 @@ async function insertSlalomResult(payload) {
 
     // === Validasi payload ===
     if (!Array.isArray(payload)) {
-      return { ok: false, error: "insertSlalomResult: payload must be an array" };
+      return {
+        ok: false,
+        error: "insertSlalomResult: payload must be an array",
+      };
     }
     if (payload.length === 0) {
       return { ok: true, upsertedCount: 0 };
@@ -307,8 +314,12 @@ async function insertSlalomResult(payload) {
       const rem2 = rem1 % 60000;
       const sec = Math.floor(rem2 / 1000);
       const mss = rem2 % 1000;
-      function pad(n, w) { return String(n).padStart(w, "0"); }
-      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
+      function pad(n, w) {
+        return String(n).padStart(w, "0");
+      }
+      return (
+        pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3)
+      );
     }
     function pruneEmpty(obj) {
       if (!obj || typeof obj !== "object") return obj;
@@ -326,7 +337,10 @@ async function insertSlalomResult(payload) {
       const run = r || {};
 
       // penaltyTotal
-      var ptRaw = run.penaltyTotal && typeof run.penaltyTotal === "object" ? run.penaltyTotal : {};
+      var ptRaw =
+        run.penaltyTotal && typeof run.penaltyTotal === "object"
+          ? run.penaltyTotal
+          : {};
       var gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
       var gates = [];
       for (var gi = 0; gi < gatesRaw.length; gi++) {
@@ -341,7 +355,9 @@ async function insertSlalomResult(payload) {
       // jumlah penalty numeric (optional)
       var penaltySum = pt.start + pt.finish;
       for (var pi = 0; pi < pt.gates.length; pi++) penaltySum += pt.gates[pi];
-      var penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
+      var penaltyNum = Number.isFinite(run.penalty)
+        ? Number(run.penalty)
+        : penaltySum;
 
       // JANGAN dipruning supaya kosong "" tetap tersimpan (sesuai contohmu)
       return {
@@ -353,8 +369,12 @@ async function insertSlalomResult(payload) {
         penaltyTotal: pt,
         penalty: penaltyNum,
         totalTime: String(run.totalTime || run.raceTime || ""),
-        ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
-        score: Number.isFinite(run.score) ? Number(run.score) : Number(run.score) || 0,
+        ranked: Number.isFinite(run.ranked)
+          ? Number(run.ranked)
+          : Number(run.ranked) || 0,
+        score: Number.isFinite(run.score)
+          ? Number(run.score)
+          : Number(run.score) || 0,
         judgesBy: String(run.judgesBy || ""),
         judgesTime: String(run.judgesTime || ""),
       };
@@ -454,14 +474,27 @@ async function insertSlalomResult(payload) {
           raceName: toStr(item.raceName, ""),
           divisionName: toStr(item.divisionName, ""),
         };
-        if (!meta.eventId || !meta.initialId || !meta.raceId || !meta.divisionId) {
+        if (
+          !meta.eventId ||
+          !meta.initialId ||
+          !meta.raceId ||
+          !meta.divisionId
+        ) {
           console.warn("[DAO] Skip bucket, meta tidak lengkap:", meta);
           continue;
         }
-        const key = meta.eventId + "|" + meta.initialId + "|" + meta.raceId + "|" + meta.divisionId;
+        const key =
+          meta.eventId +
+          "|" +
+          meta.initialId +
+          "|" +
+          meta.raceId +
+          "|" +
+          meta.divisionId;
 
         const teamsArr = [];
-        for (let j = 0; j < item.teams.length; j++) teamsArr.push(normTeamFromBucketTeam(item.teams[j]));
+        for (let j = 0; j < item.teams.length; j++)
+          teamsArr.push(normTeamFromBucketTeam(item.teams[j]));
 
         if (!groups.has(key)) groups.set(key, { meta: meta, teams: teamsArr });
         else {
@@ -480,11 +513,23 @@ async function insertSlalomResult(payload) {
           raceName: toStr(item.raceName, ""),
           divisionName: toStr(item.divisionName, ""),
         };
-        if (!meta.eventId || !meta.initialId || !meta.raceId || !meta.divisionId) {
+        if (
+          !meta.eventId ||
+          !meta.initialId ||
+          !meta.raceId ||
+          !meta.divisionId
+        ) {
           console.warn("[DAO] Skip flat item, meta tidak lengkap:", meta);
           continue;
         }
-        const key = meta.eventId + "|" + meta.initialId + "|" + meta.raceId + "|" + meta.divisionId;
+        const key =
+          meta.eventId +
+          "|" +
+          meta.initialId +
+          "|" +
+          meta.raceId +
+          "|" +
+          meta.divisionId;
 
         const cleanJson = JSON.stringify(item);
         const clean = JSON.parse(cleanJson);
@@ -492,7 +537,8 @@ async function insertSlalomResult(payload) {
 
         const teamEntry = normTeamFromFlat(clean);
 
-        if (!groups.has(key)) groups.set(key, { meta: meta, teams: [teamEntry] });
+        if (!groups.has(key))
+          groups.set(key, { meta: meta, teams: [teamEntry] });
         else groups.get(key).teams.push(teamEntry);
       }
     }
@@ -517,7 +563,8 @@ async function insertSlalomResult(payload) {
     const existingMap = new Map();
     for (let i = 0; i < existingDocs.length; i++) {
       const ex = existingDocs[i];
-      const k = ex.eventId + "|" + ex.initialId + "|" + ex.raceId + "|" + ex.divisionId;
+      const k =
+        ex.eventId + "|" + ex.initialId + "|" + ex.raceId + "|" + ex.divisionId;
       existingMap.set(k, ex);
     }
 
@@ -554,7 +601,10 @@ async function insertSlalomResult(payload) {
         for (let i = 0; i < existing.teams.length; i++) {
           const t = existing.teams[i];
           if (!t) continue;
-          const k = (toStr(t.bibTeam, "").trim() || "NO-BIB") + "|" + toStr(t.nameTeam, "").trim();
+          const k =
+            (toStr(t.bibTeam, "").trim() || "NO-BIB") +
+            "|" +
+            toStr(t.nameTeam, "").trim();
           if (!mergedByKey.has(k)) mergedByKey.set(k, t);
         }
       }
@@ -582,7 +632,8 @@ async function insertSlalomResult(payload) {
               if (Number.isFinite(ms)) valsMs.push(ms);
             }
           }
-          if (valsMs.length > 0) tm.bestTime = msToHMSms(Math.min.apply(Math, valsMs));
+          if (valsMs.length > 0)
+            tm.bestTime = msToHMSms(Math.min.apply(Math, valsMs));
         }
       }
 

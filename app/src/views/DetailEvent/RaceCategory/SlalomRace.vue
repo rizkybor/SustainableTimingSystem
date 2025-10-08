@@ -245,6 +245,40 @@
             </div>
             <div class="slalom-actionbar">
               <div class="slalom-actionbar__buttons">
+                <!-- SAVE ONLY SESSION 1 -->
+                <button
+                  type="button"
+                  class="btn-action btn-success"
+                  @click="saveSession1"
+                  :disabled="!teams.length"
+                  title="Simpan hanya run/session #1"
+                >
+                  <Icon icon="mdi:content-save-outline" />
+                  Save Session 1
+                </button>
+
+                <!-- SHOW RESULT SESSION 1 (MODAL) -->
+                <button
+                  type="button"
+                  class="btn-action btn-primary"
+                  @click="openSession1Modal"
+                  title="Tampilkan Result Session 1 dari database"
+                >
+                  <Icon icon="mdi:table-eye" />
+                  Result Session 1
+                </button>
+
+                <!-- PRINT PDF SESSION 1 -->
+                <button
+                  type="button"
+                  class="btn-action btn-warning"
+                  @click="printPdfSession1"
+                  title="Download PDF khusus Session 1"
+                >
+                  <Icon icon="mdi:download" />
+                  PDF Session 1
+                </button>
+
                 <button
                   type="button"
                   class="btn-action btn-secondary"
@@ -539,6 +573,109 @@
 
           <!-- EMPTY STATE -->
           <EmptyCard v-else />
+
+          <!-- START SESSION 1  -->
+          <b-modal
+            v-model="showSession1Modal"
+            title="Slalom - Result Session 1"
+            size="xl"
+            hide-footer
+            centered
+          >
+            <div v-if="loadingSession1" class="text-center py-5">
+              <b-spinner class="mb-2" /> Memuat result…
+            </div>
+
+            <div v-else>
+              <div class="mb-2 text-muted small">
+                Ditampilkan dari <code>teams.result[0]</code> (Session 1) —
+                sumber: <strong>get-result-slalom</strong>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Team</th>
+                      <th>BIB</th>
+                      <th>Start</th>
+                      <th>Gates Σ</th>
+                      <th>Finish</th>
+                      <th>Total Pen.</th>
+                      <th>Race Time</th>
+                      <th>Penalty Time</th>
+                      <th>Total Time</th>
+                      <th>Ranked*</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(r, i) in session1Rows" :key="i">
+                      <td>{{ i + 1 }}</td>
+                      <td class="text-left">{{ r.nameTeam }}</td>
+                      <td>{{ r.bibTeam }}</td>
+                      <td>{{ r.startPenalty }}</td>
+                      <td>{{ r.gatesSum }}</td>
+                      <td>{{ r.finishPenalty }}</td>
+                      <td>{{ r.totalPenalty }}</td>
+                      <td class="text-monospace">{{ r.raceTime }}</td>
+                      <td class="text-monospace">{{ r.penaltyTime }}</td>
+                      <td class="text-monospace font-weight-bold">
+                        {{ r.totalTime }}
+                      </td>
+                      <td>{{ r.ranked || "-" }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <small class="text-muted">
+                *Rank/Score diambil dari dokumen (jika tersedia). Jika tidak
+                ada, tampil “- / 0”.
+              </small>
+
+              <div class="text-right mt-3">
+                <b-button variant="secondary" @click="showSession1Modal = false"
+                  >Close</b-button
+                >
+              </div>
+            </div>
+          </b-modal>
+
+          <vue-html2pdf
+            v-show="true"
+            ref="html2PdfS1"
+            :show-layout="false"
+            :float-layout="false"
+            :enable-download="true"
+            :preview-modal="false"
+            :paginate-elements-by-height="1400"
+            :pdf-quality="2"
+            :filename="pdfFilenameSession1"
+            pdf-format="a4"
+            pdf-orientation="landscape"
+            pdf-content-width="100%"
+            style="
+              position: absolute;
+              left: -99999px;
+              top: 0;
+              width: 0;
+              height: 0;
+              overflow: hidden;
+            "
+            @pdfGenerated="onPdfGeneratedS1"
+          >
+            <section slot="pdf-content">
+              <SlalomSession1PdfResult
+                :data="dataEventSafe"
+                :pdf-participants-session1="pdfParticipantsSession1"
+                :title-categories="titleCategories"
+                :is-official="true"
+              />
+            </section>
+          </vue-html2pdf>
+
+          <!-- END SESSION 1  -->
         </div>
 
         <b-button
@@ -554,11 +691,14 @@
 </template>
 
 <script>
+import SlalomSession1PdfResult from "../ResultComponent/slalom-session1-pdfResult.vue";
+
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
+import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 
@@ -656,10 +796,21 @@ function loadFromRaceStartPayloadForSlalom() {
 
 export default {
   name: "SlalomRacePanel",
-  components: { OperationTimePanel, EmptyCard, Icon },
+  components: {
+    OperationTimePanel,
+    EmptyCard,
+    VueHtml2pdf,
+    SlalomSession1PdfResult,
+    Icon,
+  },
 
   data() {
     return {
+      localShow: true,
+      showSession1Modal: false,
+      loadingSession1: false,
+      session1Rows: [],
+      showPdfS1: false,
       isLoading: false,
       defaultImg,
       slalomBucketOptions: [],
@@ -690,6 +841,82 @@ export default {
   },
 
   computed: {
+    pdfFilenameSession1: function () {
+      var eventSafe =
+        this.dataEventSafe && this.dataEventSafe.eventName
+          ? this.dataEventSafe.eventName + " - "
+          : "";
+      var cats = this.titleCategories ? this.titleCategories : "SLALOM";
+      return eventSafe + cats + " - Session 1";
+    },
+
+    pdfParticipantsSession1() {
+      var rows = [];
+
+      if (Array.isArray(this.session1Rows)) {
+        for (var i = 0; i < this.session1Rows.length; i++) {
+          var t = this.session1Rows[i];
+          if (!t || !Array.isArray(t.result) || t.result.length === 0) continue;
+
+          // ambil hanya Session 1 (Run 1)
+          var r = t.result[0];
+
+          // pastikan gates selalu array
+          var gatesArray = [];
+          if (
+            r.penaltyTotal &&
+            Array.isArray(r.penaltyTotal.gates) &&
+            r.penaltyTotal.gates.length > 0
+          ) {
+            gatesArray = r.penaltyTotal.gates;
+          } else if (Array.isArray(r.gates)) {
+            gatesArray = r.gates;
+          } else {
+            // fallback default 14 gate
+            gatesArray = new Array(14).fill(0);
+          }
+
+          var startVal =
+            r.penaltyTotal && typeof r.penaltyTotal.start !== "undefined"
+              ? Number(r.penaltyTotal.start)
+              : Number(r.startPenalty || 0);
+          var finishVal =
+            r.penaltyTotal && typeof r.penaltyTotal.finish !== "undefined"
+              ? Number(r.penaltyTotal.finish)
+              : Number(r.finishPenalty || 0);
+
+          var res = {
+            session: r.session ? r.session : "Run 1",
+            startTime: r.startTime ? r.startTime : "",
+            finishTime: r.finishTime ? r.finishTime : "",
+            raceTime: r.raceTime ? r.raceTime : "00:00:00.000",
+            penaltyTime: r.penaltyTime ? r.penaltyTime : "00:00:00.000",
+            penaltyTotal: {
+              start: startVal,
+              gates: gatesArray.map(function (v) {
+                return Number(v || 0);
+              }),
+              finish: finishVal,
+            },
+            penalty: typeof r.penalty !== "undefined" ? Number(r.penalty) : 0,
+            totalTime: r.totalTime ? r.totalTime : "00:00:00.000",
+            ranked: typeof r.ranked !== "undefined" ? Number(r.ranked) : 0,
+            score: typeof r.score !== "undefined" ? Number(r.score) : 0,
+            judgesBy: r.judgesBy ? r.judgesBy : "",
+            judgesTime: r.judgesTime ? r.judgesTime : "",
+          };
+
+          rows.push({
+            nameTeam: t.nameTeam ? t.nameTeam : "-",
+            bibTeam: t.bibTeam ? t.bibTeam : "-",
+            statusId: typeof t.statusId !== "undefined" ? t.statusId : 0,
+            result: res,
+          });
+        }
+      }
+
+      return rows;
+    },
     getBucket() {
       const obj = safeJSON(RACE_PAYLOAD_KEY, {});
       return obj.bucket || {};
@@ -1681,6 +1908,274 @@ export default {
           message: "Failed",
         });
       }
+    },
+
+    // 1 ONLY
+    // ===== SAVE ONLY SESSION 1 =====
+    saveSession1() {
+      try {
+        const doc = this.buildDocsSession1Only(); // object
+        if (!doc || typeof doc !== "object" || !Array.isArray(doc.teams)) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            detail: "Belum ada data yang bisa disimpan (Sesi 1).",
+            message: "Ups Sorry",
+          });
+          return;
+        }
+        const payload = [doc];
+        ipcRenderer.send("insert-slalom-result", payload);
+        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+          if (res && res.ok) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "question",
+              detail: "Session 1 berhasil disimpan.",
+              message: "Successfully",
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Save Session 1 failed",
+              message: "Failed",
+            });
+          }
+        });
+      } catch (e) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: e && e.message ? e.message : "Save Session 1 failed",
+          message: "Failed",
+        });
+      }
+    },
+
+    buildDocsSession1Only() {
+      // Ambil bucket dari localStorage
+      const payload = this.loadFromRaceStartPayloadForSlalom();
+      const b = (payload && payload.bucket) || {};
+
+      const must = ["eventId", "initialId", "raceId", "divisionId"];
+      const miss = must.filter((k) => !b[k]);
+      if (miss.length)
+        throw new Error("Bucket fields missing: " + miss.join(", "));
+
+      const out = {
+        eventId: String(b.eventId || this.$route.params.id || ""),
+        initialId: String(b.initialId || ""),
+        raceId: String(b.raceId || ""),
+        divisionId: String(b.divisionId || ""),
+        eventName: String(b.eventName || "SLALOM").toUpperCase(),
+        initialName: String(b.initialName || "").toUpperCase(),
+        raceName: String(b.raceName || "").toUpperCase(),
+        divisionName: String(b.divisionName || "").toUpperCase(),
+        teams: [],
+      };
+
+      // Ambil dari UI (this.teams) → ambil sessions[0] saja
+      const gatesCount = this.SLALOM_GATES.length || 14;
+
+      const fixGates = (arr) => {
+        const a = Array.isArray(arr) ? arr.slice() : [];
+        const out = [];
+        for (let i = 0; i < gatesCount; i++) out.push(Number(a[i] || 0));
+        return out;
+      };
+
+      for (let i = 0; i < this.teams.length; i++) {
+        const t = this.teams[i] || {};
+        const s1 =
+          Array.isArray(t.sessions) && t.sessions[0] ? t.sessions[0] : {};
+
+        const r1 = {
+          session: "Run 1",
+          startTime: String(s1.startTime || ""),
+          finishTime: String(s1.finishTime || ""),
+          raceTime: String(s1.raceTime || ""),
+          penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
+          penaltyTotal: {
+            start: Number(s1.startPenalty || 0),
+            finish: Number(s1.finishPenalty || 0),
+            gates: fixGates(s1.penalties),
+          },
+          totalTime: String(s1.totalTime || s1.raceTime || ""),
+          ranked: Number(s1.ranked || 0),
+          score: Number(s1.score || 0),
+          judgesBy: String(s1.judgesBy || ""),
+          judgesTime: String(s1.judgesTime || ""),
+        };
+
+        out.teams.push({
+          teamId: String(t.teamId || ""),
+          nameTeam: String(t.nameTeam || ""),
+          bibTeam: String(t.bibNumber || t.bibTeam || ""),
+          startOrder: String(t.startOrder || ""),
+          praStart: String(t.praStart || ""),
+          intervalRace: String(t.intervalRace || ""),
+          statusId: Number(t.statusId || 0),
+          result: [r1], // HANYA SESSION 1
+        });
+      }
+
+      return out;
+    },
+
+    // ===== MODAL RESULT SESSION 1 (GET dari DB) =====
+    async openSession1Modal() {
+      this.showSession1Modal = true;
+      this.loadingSession1 = true;
+      try {
+        const key = this.selectedSlalomKey;
+        const b = this.slalomBucketMap[key] || {};
+        const filters = {
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+        };
+
+        // Ambil dari DB result slalom
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("get-slalom-result-reply", (_e, payload) =>
+            resolve(payload)
+          );
+          ipcRenderer.send("get-slalom-result", filters);
+        });
+
+        const rows = [];
+        if (res && res.ok && Array.isArray(res.items)) {
+          // Ambil doc pertama yang match bucket
+          const doc = res.items[0] || {};
+          const teams = Array.isArray(doc.teams) ? doc.teams : [];
+          for (let i = 0; i < teams.length; i++) {
+            const t = teams[i] || {};
+            const s1 = Array.isArray(t.result) ? t.result[0] : null; // === SESSION 1
+            if (!s1) continue;
+
+            const g =
+              s1.penaltyTotal && Array.isArray(s1.penaltyTotal.gates)
+                ? s1.penaltyTotal.gates
+                : [];
+            const gsum = g.reduce((a, v) => a + (Number(v) || 0), 0);
+            const start = Number(
+              (s1.penaltyTotal && s1.penaltyTotal.start) || 0
+            );
+            const finish = Number(
+              (s1.penaltyTotal && s1.penaltyTotal.finish) || 0
+            );
+            const totalPen = start + gsum + finish;
+
+            rows.push({
+              nameTeam: String(t.nameTeam || ""),
+              bibTeam: String(t.bibTeam || t.bibNumber || ""),
+              startPenalty: start,
+              gatesSum: gsum,
+              finishPenalty: finish,
+              totalPenalty: totalPen,
+              raceTime: String(s1.raceTime || ""),
+              penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
+              totalTime: String(s1.totalTime || s1.raceTime || ""),
+              ranked: Number(t.ranked || s1.ranked || 0),
+              score: Number(t.score || s1.score || 0),
+            });
+          }
+        }
+        this.session1Rows = rows;
+      } catch {
+        this.session1Rows = [];
+      }
+      this.loadingSession1 = false;
+    },
+
+    // ===== PDF SESSION 1 =====
+    async printPdfSession1() {
+      // pastikan source data ada (fallback dari UI kalau perlu)
+      if (!this.session1Rows.length) {
+        this.session1Rows = this.teams.map((t) => {
+          const s1 =
+            Array.isArray(t.sessions) && t.sessions[0] ? t.sessions[0] : {};
+          const gates = Array.isArray(s1.penalties) ? s1.penalties : [];
+          const gsum = gates.reduce((a, v) => a + (Number(v) || 0), 0);
+          const start = Number(s1.startPenalty || 0);
+          const finish = Number(s1.finishPenalty || 0);
+          return {
+            nameTeam: String(t.nameTeam || ""),
+            bibTeam: String(t.bibNumber || t.bibTeam || ""),
+            startPenalty: start,
+            gatesSum: gsum,
+            finishPenalty: finish,
+            totalPenalty: start + gsum + finish,
+            raceTime: String(s1.raceTime || ""),
+            penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
+            totalTime: String(s1.totalTime || s1.raceTime || ""),
+            ranked: Number(s1.ranked || 0),
+            score: Number(s1.score || 0),
+          };
+        });
+      }
+
+      // panggil komponen PDF wrapper (vue-html2pdf)
+      const pdf = this.$refs.html2PdfS1;
+      if (pdf && typeof pdf.generatePdf === "function") {
+        await pdf.generatePdf();
+      }
+    },
+    onPdfGeneratedS1() {
+      console.log("✅ PDF Slalom Session 1 berhasil di-generate!");
+      // optional: tampilkan notifikasi
+      try {
+        ipcRenderer &&
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: "PDF Slalom Session 1 telah berhasil diunduh.",
+            message: "Download Selesai",
+          });
+      } catch (_) {}
+    },
+    async printPdfSession1() {
+      // 1) Siapkan data fallback bila modal belum pernah dibuka
+      if (!this.session1Rows.length) {
+        this.session1Rows = this.teams.map((t) => {
+          const s1 =
+            Array.isArray(t.sessions) && t.sessions[0] ? t.sessions[0] : {};
+          const gates = Array.isArray(s1.penalties) ? s1.penalties : [];
+          const gsum = gates.reduce((a, v) => a + (Number(v) || 0), 0);
+          const start = Number(s1.startPenalty || 0);
+          const finish = Number(s1.finishPenalty || 0);
+          return {
+            nameTeam: String(t.nameTeam || ""),
+            bibTeam: String(t.bibNumber || t.bibTeam || ""),
+            startPenalty: start,
+            gatesSum: gsum,
+            finishPenalty: finish,
+            totalPenalty: start + gsum + finish,
+            raceTime: String(s1.raceTime || ""),
+            penaltyTime: String(s1.penaltyTime || "00:00:00.000"),
+            totalTime: String(s1.totalTime || s1.raceTime || ""),
+            ranked: Number(s1.ranked || 0),
+            score: Number(s1.score || 0),
+          };
+        });
+      }
+
+      // 2) Pastikan komponen sudah ter-render sebelum panggil generate
+      await this.$nextTick();
+
+      const pdf = this.$refs.html2PdfS1;
+      if (pdf && typeof pdf.generatePdf === "function") {
+        await pdf.generatePdf();
+      } else {
+        // fallback notifikasi jika ref belum ketemu
+        try {
+          ipcRenderer &&
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              detail: "Komponen PDF belum siap. Coba lagi.",
+              message: "PDF belum siap",
+            });
+        } catch (_) {}
+      }
+
+      console.log(this.pdfParticipantsSession1, "<<< CEK");
     },
   },
 };

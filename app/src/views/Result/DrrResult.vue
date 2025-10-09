@@ -124,18 +124,21 @@
         <table class="result-table">
           <thead>
             <tr>
-              <th>No</th>
-              <th>Team Name</th>
-              <th>BIB</th>
-              <th>Start Time</th>
-              <th>Finish Time</th>
-              <th>Race Time</th>
-              <th>Penalty Total</th>
-              <th>Penalty Time</th>
-              <th>Result</th>
-              <th>Ranked</th>
-              <th>Score</th>
-              <th v-if="!isOfficial">Action</th>
+              <th class="text-center">No</th>
+              <th class="text-start">Team Name</th>
+              <th class="text-center">BIB</th>
+              <th class="text-center">Penalty Start</th>
+              <th class="text-center">Penalty Section</th>
+              <th class="text-center">Penalty Finish</th>
+              <th class="text-center">Penalty Total</th>
+              <th class="text-center">Penalty Time</th>
+              <th class="text-center">Start Time</th>
+              <th class="text-center">Finish Time</th>
+              <th class="text-center">Race Time</th>
+              <th class="text-center">Result</th>
+              <th class="text-center">Ranked</th>
+              <th class="text-center">Score</th>
+              <th class="text-center" v-if="!isOfficial">Action</th>
             </tr>
           </thead>
 
@@ -146,12 +149,42 @@
                 <div class="team">{{ r.nameTeam || "-" }}</div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td>{{ r.startTime || "00:00:00.000" }}</td>
-              <td>{{ r.finishTime || "00:00:00.000" }}</td>
-              <td>{{ r.raceTime || "00:00:00.000" }}</td>
-              <td>{{ r.totalPenalty || "0" }}</td>
-              <td>{{ r.penaltyTime || "00:00:00.000" }}</td>
-              <td class="bold">{{ r.resultTime || "00:00:00.000" }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.startPenalty || "-" }}
+              </td>
+              <td class="text-center">
+                <span
+                  class="section-modal-trigger"
+                  role="button"
+                  tabindex="0"
+                  @click="openSectionModal(r)"
+                  @keyup.enter="openSectionModal(r)"
+                  title="Lihat detail Section Penalty Time"
+                >
+                  {{
+                    Array.isArray(r.sectionPenaltyTime)
+                      ? r.sectionPenaltyTime.length
+                      : 0
+                  }}
+                </span>
+              </td>
+              <td class="text-center" style="color: red">
+                {{ r.finishPenalty || "-" }}
+              </td>
+              <td class="text-center" style="color: red">
+                {{ r.totalPenalty || "0" }}
+              </td>
+              <td class="text-center" style="color: red">
+                {{ r.penaltyTime || "00:00:00.000" }}
+              </td>
+              <td class="text-center">{{ r.startTime || "00:00:00.000" }}</td>
+              <td class="text-center">{{ r.finishTime || "00:00:00.000" }}</td>
+              <td class="bold text-center">
+                {{ r.raceTime || "00:00:00.000" }}
+              </td>
+              <td class="bold text-center" style="color: green">
+                {{ r.resultTime || "00:00:00.000" }}
+              </td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
               <td class="text-center">
                 {{
@@ -175,6 +208,50 @@
         </table>
       </div>
     </div>
+
+    <b-modal
+      v-model="showSectionModal"
+      title="Section Penalty Time Detail"
+      size="lg"
+      hide-footer
+      centered
+    >
+      <div class="mb-2">
+        <div class="text-sm text-muted">
+          <strong>Team:</strong> {{ sectionModal.team || "-" }} &nbsp; | &nbsp;
+          <strong>BIB:</strong> {{ sectionModal.bib || "-" }}
+        </div>
+      </div>
+
+      <div class="section-time-list">
+        <div class="section-time-row section-time-head">
+          <div class="text-center">Section</div>
+          <div class="text-start">Penalty Section Time</div>
+        </div>
+
+        <div
+          v-for="(t, i) in sectionModal.times"
+          :key="i"
+          class="section-time-row"
+        >
+          <div class="text-center">{{ i + 1 }}</div>
+          <div class="mono" style="color: red">{{ t }}</div>
+        </div>
+
+        <div
+          v-if="!sectionModal.times || sectionModal.times.length === 0"
+          class="empty-section-times"
+        >
+          No section penalty time
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <b-button variant="secondary" @click="closeSectionModal"
+          >Close</b-button
+        >
+      </div>
+    </b-modal>
 
     <!-- Komponen PDF (disembunyikan dari layar, tapi ada di DOM) -->
     <vue-html2pdf
@@ -287,6 +364,12 @@ export default {
 
   data() {
     return {
+      showSectionModal: false,
+      sectionModal: {
+        team: "",
+        bib: "",
+        times: [],
+      },
       defaultImg,
       isOfficial: false,
       loading: false,
@@ -547,19 +630,51 @@ export default {
     this.loadDrrResult();
   },
 
-  mounted() {
-    window.addEventListener("pdf-generated", function (e) {
-      console.log("[PDF EVENT] pdf-generated", e);
-    });
-    window.addEventListener("hasGenerated", function (e) {
-      console.log("[PDF EVENT] hasGenerated", e);
-    });
-    window.addEventListener("pdfDownloaded", function (e) {
-      console.log("[PDF EVENT] pdfDownloaded", e);
-    });
-  },
+  mounted() {},
 
   methods: {
+    // Validasi sederhana HH:MM:SS.mmm → return true/false
+    isValidHMSms(str) {
+      if (!str || typeof str !== "string") return false;
+      // HH:MM:SS.mmm, HH 0-99, MM 0-59, SS 0-59, mmm 0-999
+      const m = str.match(/^(\d{1,2}):([0-5]?\d):([0-5]?\d)\.(\d{1,3})$/);
+      if (!m) return false;
+      // Normalisasi angka agar tidak lewat batas (MM/SS < 60, mmm < 1000 sudah di-regex)
+      const hh = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      const ss = parseInt(m[3], 10);
+      const ms = parseInt(m[4], 10);
+      return Number.isFinite(hh) && mm < 60 && ss < 60 && ms < 1000;
+    },
+
+    // Normalisasi → selalu "HH:MM:SS.mmm" dengan zero-padding
+    normalizeHMSms(str) {
+      const pad2 = (n) => String(n).padStart(2, "0");
+      const pad3 = (n) => String(n).padStart(3, "0");
+      if (!this.isValidHMSms(str)) return "00:00:00.000";
+      const [hh, mm, ssms] = str.split(":");
+      const [ss, ms] = ssms.split(".");
+      return `${pad2(parseInt(hh, 10) || 0)}:${pad2(
+        parseInt(mm, 10) || 0
+      )}:${pad2(parseInt(ss, 10) || 0)}.${pad3(parseInt(ms, 10) || 0)}`;
+    },
+
+    openSectionModal(row) {
+      this.sectionModal.team = row && row.nameTeam ? row.nameTeam : "";
+      this.sectionModal.bib = row && row.bibTeam ? row.bibTeam : "";
+      const raw = Array.isArray(row && row.sectionPenaltyTime)
+        ? row.sectionPenaltyTime
+        : [];
+      // validasi + normalisasi setiap entri
+      this.sectionModal.times = raw
+        .map((v) => this.normalizeHMSms(String(v || "")))
+        .filter((v) => v); // hasil selalu valid string
+      this.showSectionModal = true;
+    },
+
+    closeSectionModal() {
+      this.showSectionModal = false;
+    },
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
@@ -764,23 +879,21 @@ export default {
             }
 
             // --- helper kecil ---
-            const self = this;
-            function asStr(v, d) {
-              if (d === undefined) d = "";
-              return v == null ? d : String(v);
-            }
-            function asNum(v, d) {
-              if (d === undefined) d = 0;
+            // --- helper kecil (pakai function expression agar lolos no-inner-declarations) ---
+            const asStr = (v, d = "") => (v == null ? d : String(v));
+
+            const asNum = (v, d = 0) => {
               const n = Number(v);
               return Number.isFinite(n) ? n : d;
-            }
-            function timeOrZero(t) {
+            };
+
+            const timeOrZero = (t) => {
               const s = asStr(t, "");
               return s ? s : "00:00:00.000";
-            }
+            };
 
             // NORMALISASI PENUH satu tim (lengkap, plus field datar utk tabel)
-            function normalizeTeamFull(team) {
+            const normalizeTeamFull = (team) => {
               const rIn = (team && team.result) || {};
 
               const startPenalty = asNum(rIn.startPenalty, 0);
@@ -851,7 +964,7 @@ export default {
                 judgesBy: asStr(rIn.judgesBy, ""),
                 judgesTime: asStr(rIn.judgesTime, ""),
                 __resultTime: resultTime,
-                __resultMs: self.timeToMs(resultTime),
+                __resultMs: this.timeToMs(resultTime), // langsung pakai this
               };
 
               const otrObj = {
@@ -866,7 +979,7 @@ export default {
                   team && team.otr && team.otr.penaltyFinishTime,
                   ""
                 ),
-                penaltySection: (function () {
+                penaltySection: (() => {
                   const a = team && team.otr && team.otr.penaltySection;
                   if (Array.isArray(a)) {
                     const out = [];
@@ -890,8 +1003,8 @@ export default {
               };
 
               // objek akhir per tim (lengkap) + field datar untuk tabel
-              const flat = self.normalizeResultFlat({ result: resultObj });
-              const out = {
+              const flat = this.normalizeResultFlat({ result: resultObj });
+              return {
                 nameTeam: asStr(team && team.nameTeam, ""),
                 bibTeam: asStr(team && team.bibTeam, ""),
                 startOrder: asStr(team && team.startOrder, ""),
@@ -919,25 +1032,20 @@ export default {
                 resultTime: flat.resultTime,
                 ranked: flat.ranked,
                 score: flat.score,
-                sectionPenaltyTime: resultObj.sectionPenaltyTime
+                sectionPenaltyTime: resultObj.sectionPenaltyTime,
               };
-
-              return out;
-            }
+            };
 
             // rakit rows penuh
             const rows = [];
-            const items = Array.isArray(res.items) ? res.items : [res.items];
-            let di = 0;
-            while (di < items.length) {
-              const doc = items[di];
+            const items = Array.isArray(res.items)
+              ? res.items
+              : res.items
+              ? [res.items]
+              : [];
+            for (const doc of items) {
               const teams = doc && Array.isArray(doc.result) ? doc.result : [];
-              let ti = 0;
-              while (ti < teams.length) {
-                rows.push(normalizeTeamFull(teams[ti]));
-                ti++;
-              }
-              di++;
+              for (const team of teams) rows.push(normalizeTeamFull(team));
             }
 
             // ranking + score, sinkronkan ke field datar
@@ -973,7 +1081,6 @@ export default {
         await this.$nextTick();
         const inst = this.$refs.html2Pdf;
         if (!inst) {
-          console.error("ref html2Pdf tidak ditemukan");
           return;
         }
         await new Promise(function (r) {
@@ -981,7 +1088,6 @@ export default {
         });
         await inst.generatePdf();
       } catch (e) {
-        console.error("[PDF] gagal generate:", e);
         this.error = "Gagal membuat PDF";
       }
     },
@@ -1178,5 +1284,82 @@ export default {
   height: 140px;
   object-fit: contain;
   border-radius: 10px;
+}
+
+.section-modal-trigger {
+  cursor: pointer;
+  color: red;
+  font-weight: 600;
+  text-decoration: underline dotted #8ab4f8;
+}
+
+.section-time-list {
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.section-time-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #f1f3f7;
+  align-items: center;
+  font-size: 14px;
+}
+.section-time-row:first-child {
+  border-top: none;
+}
+.section-time-head {
+  background: #f7fbff;
+  font-weight: 700;
+  color: #194c7b;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+.empty-section-times {
+  padding: 16px;
+  text-align: center;
+  color: #8b8d97;
+  font-style: italic;
+}
+.modal-actions {
+  margin-top: 14px;
+  text-align: right;
+}
+
+.modal-actions .btn {
+  border-radius: 0.75rem; /* 3/4 rounded */
+  background: linear-gradient(135deg, #007bff, #00b4d8);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 18px;
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 3px 6px rgba(0, 123, 255, 0.3);
+}
+
+.modal-actions .btn:hover {
+  background: linear-gradient(135deg, #0066d3, #0096c7);
+  box-shadow: 0 5px 10px rgba(0, 123, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.text-penalty {
+  color: #e03131;
+  font-weight: 600;
+}
+
+.section-time-row {
+  display: grid;
+  grid-template-columns: 80px 1fr; /* <— atur lebar kolom di sini */
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #f1f3f7;
+  align-items: center;
+  font-size: 14px;
 }
 </style>

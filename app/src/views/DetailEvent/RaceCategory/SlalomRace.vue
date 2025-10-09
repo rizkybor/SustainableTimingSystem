@@ -1687,8 +1687,8 @@ export default {
       }
 
       // Jumlah gate dari setting, fallback 14
-      const gatesCount = this.SLALOM_GATES.length || 14;
-      
+      var gatesCount = this.SLALOM_GATES.length || 14;
+
       if (
         this.raceSettings &&
         this.raceSettings.slalom &&
@@ -1799,7 +1799,6 @@ export default {
 
         tIndex = tIndex + 1;
       }
-      console.log(doc, "<< cek");
       return doc;
     },
     /** === Save (parity dengan Sprint) === */

@@ -70,9 +70,9 @@
 
         <!-- Satu <tbody> per tim (boleh banyak tbody di dalam table) -->
         <tbody
-  v-for="(t, i) in sortedParticipantsSession1"
-  :key="t && t.bibTeam ? 'team-' + t.bibTeam : 'idx-' + i"
->
+          v-for="(t, i) in sortedParticipantsSession1"
+          :key="t && t.bibTeam ? 'team-' + t.bibTeam : 'idx-' + i"
+        >
           <!-- RUN 1 -->
           <tr>
             <td class="center" :rowspan="2">{{ i + 1 }}</td>
@@ -128,8 +128,10 @@
 
         <!-- Tampil bila tidak ada data -->
         <tbody
-  v-if="!sortedParticipantsSession1 || !sortedParticipantsSession1.length"
->
+          v-if="
+            !sortedParticipantsSession1 || !sortedParticipantsSession1.length
+          "
+        >
           <tr>
             <td class="empty" colspan="999">No data</td>
           </tr>
@@ -147,7 +149,9 @@
         </div>
       </div>
       <div class="sign-col stamp-col">
-        <span class="unofficial-stamp"> "UNOFFICIAL" </span>
+        <span :class="[isOfficial ? 'official-stamp' : 'unofficial-stamp']">
+          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+        </span>
       </div>
     </footer>
   </div>
@@ -269,26 +273,18 @@ export default {
 
         // keduanya <2 run: pakai ranked run-1 kalau ada
         const ar1 =
-          (a &&
-            a.result &&
-            a.result[0] &&
-            Number(a.result[0].ranked)) ||
-          0;
+          (a && a.result && a.result[0] && Number(a.result[0].ranked)) || 0;
         const br1 =
-          (b &&
-            b.result &&
-            b.result[0] &&
-            Number(b.result[0].ranked)) ||
-          0;
+          (b && b.result && b.result[0] && Number(b.result[0].ranked)) || 0;
         if (ar1 && br1 && ar1 !== br1) return ar1 - br1;
 
         // fallback stabil
-        const abib = (a && a.bibTeam ? String(a.bibTeam) : "");
-        const bbib = (b && b.bibTeam ? String(b.bibTeam) : "");
+        const abib = a && a.bibTeam ? String(a.bibTeam) : "";
+        const bbib = b && b.bibTeam ? String(b.bibTeam) : "";
         if (abib !== bbib) return abib.localeCompare(bbib);
 
-        const aname = (a && a.nameTeam ? String(a.nameTeam) : "");
-        const bname = (b && b.nameTeam ? String(b.nameTeam) : "");
+        const aname = a && a.nameTeam ? String(a.nameTeam) : "";
+        const bname = b && b.nameTeam ? String(b.nameTeam) : "";
         return aname.localeCompare(bname);
       });
 
@@ -527,6 +523,13 @@ export default {
   display: inline-block;
   letter-spacing: 0.8px;
 }
+.official-stamp {
+  color: #148a3b;
+  border-color: #148a3b;
+  transform: rotate(0);
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
+}
 .trademark {
   position: absolute;
   top: 0;
@@ -720,13 +723,13 @@ export default {
 }
 
 .wrap-title {
-  white-space: normal; 
-  word-wrap: break-word; 
-  overflow-wrap: anywhere; 
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
   max-width: 80px;
-  text-align: center; 
-  vertical-align: middle; 
-  line-height: 1.2; 
-  padding: 2px 4px; 
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.2;
+  padding: 2px 4px;
 }
 </style>

@@ -669,7 +669,7 @@
                 :data="dataEventSafe"
                 :pdf-participants-session1="pdfParticipantsSession1"
                 :title-categories="titleCategories"
-                :is-official="true"
+                :is-official="false"
               />
             </section>
           </vue-html2pdf>

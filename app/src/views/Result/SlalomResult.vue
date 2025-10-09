@@ -80,18 +80,18 @@
 
           <b-button
             size="sm"
-            :variant="sessionMode === 's1' ? 'primary' : 'outline-primary'"
-            @click="changeSessionMode('s1')"
+            :variant="sessionMode === '1' ? 'primary' : 'outline-primary'"
+            @click="changeSessionMode('1')"
             class="custom-btn"
-            >Session 1</b-button
+            >Run 1</b-button
           >
 
           <b-button
             size="sm"
-            :variant="sessionMode === 's2' ? 'primary' : 'outline-primary'"
-            @click="changeSessionMode('s2')"
+            :variant="sessionMode === '2' ? 'primary' : 'outline-primary'"
+            @click="changeSessionMode('2')"
             class="custom-btn"
-            >Session 2</b-button
+            >Run 2</b-button
           >
         </b-button-group>
       </div>
@@ -122,7 +122,7 @@
         <h2 class="event-name">
           <span class="muted">
             SLALOM RESULT | {{ slalomCats.initial }} -
-            {{ slalomCats.division }} {{ slalomCats.race }} | Session :
+            {{ slalomCats.division }} {{ slalomCats.race }} | RUN :
             {{ sessionMode }}
           </span>
         </h2>
@@ -152,17 +152,17 @@
             <tr>
               <th>No</th>
               <th>Team Name</th>
-              <th>BIB</th>
-              <th>Session</th>
+              <th class="text-center">BIB</th>
+              <th class="text-center">Run</th>
               <!-- NEW -->
-              <th>Start Pen.</th>
-              <th>Finish Pen.</th>
-              <th>Gate Pen.</th>
-              <th>Total Pen.</th>
-              <th>Race Time</th>
-              <th>Penalty Time</th>
-              <th>Result</th>
-              <th>Ranked</th>
+              <th class="text-center">Start Pen.</th>
+              <th class="text-center">Finish Pen.</th>
+              <th class="text-center">Gate Pen.</th>
+              <th class="text-center">Total Pen.</th>
+              <th class="text-center">Race Time</th>
+              <th class="text-center">Penalty Time</th>
+              <th class="text-center">Result</th>
+              <th class="text-center">Ranked</th>
               <th v-if="sessionMode === 'all'">Score</th>
               <th v-if="!isOfficial && sessionMode === 'all'">Action</th>
             </tr>
@@ -174,20 +174,37 @@
               :key="idx"
               :class="{ 'best-row': r.isBest && sessionMode === 'all' }"
             >
-              <td class="text-center">{{ r.teamIndex }}</td>
-              <td>
+              <!-- No -->
+              <td
+                v-if="sessionMode !== 'all' || r.__groupStart"
+                class="text-center no-cell"
+                :rowspan="sessionMode === 'all' ? r.__groupSize : 1"
+              >
+                {{ r.teamIndex }}
+              </td>
+
+              <!-- Team Name -->
+              <td
+                v-if="sessionMode !== 'all' || r.__groupStart"
+                :rowspan="sessionMode === 'all' ? r.__groupSize : 1"
+                class="team-cell"
+              >
                 <div class="team">
                   {{ r.nameTeam || "-" }}
-                  <span
-                    v-if="r.isBest && sessionMode === 'all'"
-                    class="best-badge"
-                    >BEST</span
-                  >
                 </div>
               </td>
-              <td class="text-center">{{ r.bibTeam || "-" }}</td>
+
+              <!-- BIB -->
+              <td
+                v-if="sessionMode !== 'all' || r.__groupStart"
+                class="text-center bib-cell"
+                :rowspan="sessionMode === 'all' ? r.__groupSize : 1"
+              >
+                {{ r.bibTeam || "-" }}
+              </td>
+
+              <!-- Session-specific columns (tetap per baris) -->
               <td class="text-center">{{ r.session || "-" }}</td>
-              <!-- NEW -->
               <td class="text-center">{{ r.startPenalty || 0 }}</td>
               <td class="text-center">{{ r.finishPenalty || 0 }}</td>
               <td class="text-center">
@@ -196,10 +213,23 @@
                 </span>
               </td>
               <td class="text-center">{{ r.totalPenalty || 0 }}</td>
-              <td>{{ r.raceTime || "00:00:00.000" }}</td>
-              <td>{{ r.penaltyTime || "00:00:00.000" }}</td>
-              <td class="bold">{{ r.resultTime || "00:00:00.000" }}</td>
-              <td class="text-center">{{ r.ranked || "-" }}</td>
+              <td class="text-center">{{ r.raceTime || "00:00:00.000" }}</td>
+              <td class="text-center">{{ r.penaltyTime || "00:00:00.000" }}</td>
+              <td class="bold text-center">
+                {{ r.resultTime || "00:00:00.000" }}
+              </td>
+
+              <!-- Ranked Overall -->
+              <td v-if="sessionMode === 'all'" class="text-center">
+                {{ r.ranked || "-" }}
+              </td>
+
+              <!-- Ranked Run 1 & 2 -->
+              <td v-if="sessionMode !== 'all'" class="text-center">
+                {{ r.teamIndex }}
+              </td>
+
+              <!-- Score (ikut aturan Anda: hanya isi di BEST) -->
               <td v-if="sessionMode === 'all'" class="text-center">
                 {{
                   r.score !== undefined && r.score !== null && r.score !== ""
@@ -207,6 +237,8 @@
                     : getScoreByRanked(r.ranked) || 0
                 }}
               </td>
+
+              <!-- Action (tetap hanya sekali per run; kalau mau sekali per grup, bisa dipindah ke sel merged juga) -->
               <td
                 class="text-center"
                 v-if="!isOfficial && sessionMode === 'all'"
@@ -628,9 +660,9 @@ export default {
           const runIndexes = [];
           if (mode === "all") {
             for (r = 0; r < result.length; r++) runIndexes.push(r);
-          } else if (mode === "s1" && result[0]) {
+          } else if (mode === "1" && result[0]) {
             runIndexes.push(0);
-          } else if (mode === "s2" && result[1]) {
+          } else if (mode === "2" && result[1]) {
             runIndexes.push(1);
           }
 
@@ -720,10 +752,31 @@ export default {
         teamCounter++;
       }
 
+      // ...setelah Anda menyusun finalRows
+      if (mode === "all") {
+        // hitung ukuran grup per teamIndex
+        const groupCount = new Map();
+        for (const r of finalRows) {
+          groupCount.set(r.teamIndex, (groupCount.get(r.teamIndex) || 0) + 1);
+        }
+        // tandai baris awal & size
+        const seenFirst = new Set();
+        for (const r of finalRows) {
+          if (!seenFirst.has(r.teamIndex)) {
+            r.__groupStart = true;
+            r.__groupSize = groupCount.get(r.teamIndex) || 1;
+            seenFirst.add(r.teamIndex);
+          } else {
+            r.__groupStart = false;
+            r.__groupSize = 0;
+          }
+        }
+      }
+
       return finalRows;
     },
     changeSessionMode(mode) {
-      if (!["all", "s1", "s2"].includes(mode)) return;
+      if (!["all", "1", "2"].includes(mode)) return;
       this.sessionMode = mode;
       this.results = this.buildResultRows(mode);
     },
@@ -900,6 +953,13 @@ export default {
 </script>
 
 <style scoped>
+/* Nonaktifkan highlight hijau pada 3 kolom ini saja */
+.best-row .no-cell,
+.best-row .team-cell,
+.best-row .bib-cell {
+  background: #fff !important; /* samakan dengan warna sel normal */
+}
+
 .custom-btn-group .custom-btn {
   border-radius: 9999px; /* fully rounded pill shape */
   padding: 0.35rem 1rem;

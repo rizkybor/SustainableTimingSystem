@@ -128,17 +128,17 @@
         <table class="result-table">
           <thead>
             <tr>
-              <th>No</th>
-              <th>Team Name</th>
-              <th>BIB</th>
-              <th>Start Time</th>
-              <th>Finish Time</th>
-              <th>Race Time</th>
-              <th>Penalty Time</th>
-              <th>Result</th>
-              <th>Ranked</th>
-              <th>Score</th>
-              <th v-if="!isOfficial">Action</th>
+              <th class="text-center">No</th>
+              <th class="text-start">Team Name</th>
+              <th class="text-center">BIB</th>
+              <th class="text-center">Penalty Time</th>
+              <th class="text-center">Start Time</th>
+              <th class="text-center">Finish Time</th>
+              <th class="text-center">Race Time</th>
+              <th class="text-center">Result</th>
+              <th class="text-center">Ranked</th>
+              <th class="text-center">Score</th>
+              <th class="text-center" v-if="!isOfficial">Action</th>
             </tr>
           </thead>
 
@@ -146,14 +146,14 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
-                <div class="team">{{ r.nameTeam || "-" }}</div>
-              </td>
+                  <div class="team">{{ r.nameTeam || "-" }}</div>
+                  </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td>{{ r.startTime || "00:00:000" }}</td>
-              <td>{{ r.finishTime || "00:00:000" }}</td>
-              <td>{{ r.raceTime || "00:00:000" }}</td>
-              <td>{{ r.penaltyTime || "00:00:000" }}</td>
-              <td class="bold">{{ r.resultTime || "00:00:000" }}</td>
+              <td class="text-center" style="color: red;">{{ r.penaltyTime || "00:00:000" }}</td>
+              <td class="text-center">{{ r.startTime || "00:00:000" }}</td>
+              <td class="text-center">{{ r.finishTime || "00:00:000" }}</td>
+              <td class="bold text-center">{{ r.raceTime || "00:00:000" }}</td>
+              <td class="bold text-center"  style="color: green;">{{ r.resultTime || "00:00:000" }}</td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
               <td class="text-center">
                 {{

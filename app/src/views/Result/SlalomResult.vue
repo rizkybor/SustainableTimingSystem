@@ -976,6 +976,7 @@ export default {
 </script>
 
 <style scoped>
+
 /* Nonaktifkan highlight hijau pada 3 kolom ini saja */
 .best-row .no-cell,
 .best-row .team-cell,
@@ -1084,6 +1085,23 @@ export default {
 .modal-actions {
   margin-top: 14px;
   text-align: right;
+}
+
+.modal-actions .btn {
+  border-radius: 0.75rem; /* 3/4 rounded */
+  background: linear-gradient(135deg, #007bff, #00b4d8);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 18px;
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 3px 6px rgba(0, 123, 255, 0.3);
+}
+
+.modal-actions .btn:hover {
+  background: linear-gradient(135deg, #0066d3, #0096c7);
+  box-shadow: 0 5px 10px rgba(0, 123, 255, 0.45);
+  transform: translateY(-1px);
 }
 /* ===== Page/Layout/Styles sama seperti Sprint untuk konsistensi ===== */
 .result-wrap {

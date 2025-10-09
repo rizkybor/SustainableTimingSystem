@@ -5,6 +5,7 @@
       <div class="trademark">
         @STiming.System.424.Timestamp {{ timestamp }} #-
       </div>
+      
       <div class="band">
         <div class="band-left">
           <strong>SCORE BOARD</strong>

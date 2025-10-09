@@ -10,25 +10,51 @@
         <div class="band-left">
           <strong>SCORE BOARD</strong>
           <span class="dot">•</span>
-          <span class="cat">{{ titleCategories || "SLALOM" }}</span>
+          <span class="cat">{{ categories || "SLALOM" }}</span>
           <span class="dot">•</span>
-          <span class="cat">Session 1</span>
+          <span class="cat">
+            {{ data && data.levelName ? data.levelName : "Classification" }}
+          </span>
         </div>
         <div class="band-right">
-          <strong>Slalom Session 1 Result</strong>
+          <strong
+            >{{ slalomCats.initial }} - {{ slalomCats.division }}
+            {{ slalomCats.race }}</strong
+          >
           <span class="dot">•</span>
           <span>{{ today }}</span>
+        </div>
+      </div>
+
+      <!-- TOP LOGO(S) -->
+      <div
+        class="mid-image-row"
+        v-if="data && data.event_logo && data.event_logo.length > 0"
+      >
+        <div
+          v-for="(url, index) in data.event_logo"
+          :key="index"
+          class="mid-image py-4"
+        >
+          <img :src="url" alt="Event Poster" />
         </div>
       </div>
 
       <!-- EVENT INFO -->
       <div class="event">
         <div class="event-name">
-          {{ data && data.eventName ? data.eventName : "—" }}
+          {{ data && data.eventName ? data.eventName : "-" }} | {{ flaggingSession1 ? "Final" : "Run 1" }}
         </div>
         <div class="event-meta">
-          {{ data && data.addressCity ? data.addressCity : "-" }},
-          {{ data && data.addressProvince ? data.addressProvince : "-" }}
+          Kp/Ds. {{ data && data.addressVillage ? data.addressVillage : "-" }},
+          Kel. {{ data && data.addressDistrict ? data.addressDistrict : "-" }},
+          Kec.
+          {{ data && data.addressSubDistrict ? data.addressSubDistrict : "-" }},
+          Kota {{ data && data.addressCity ? data.addressCity : "-" }},
+          {{ data && data.addressProvince ? data.addressProvince : "-" }} –
+          {{ data && data.addressState ? data.addressState : "-" }}
+          ({{ data && data.addressZipCode ? data.addressZipCode : "-" }}) •
+          {{ data && data.riverName ? data.riverName : "-" }}
         </div>
       </div>
     </header>
@@ -149,11 +175,28 @@
         </div>
       </div>
       <div class="sign-col stamp-col">
-        <span :class="[isOfficial ? 'official-stamp' : 'unofficial-stamp']">
+        <span
+          class="unofficial-stamp"
+          :class="{ 'official-stamp': isOfficial }"
+        >
           {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
         </span>
       </div>
     </footer>
+
+    <!-- SPONSOR LOGO(S) -->
+    <div
+      class="mid-image-sponsor-row"
+      v-if="data && data.event_logo && data.event_logo.length > 0"
+    >
+      <div
+        v-for="(url, index) in data.event_logo"
+        :key="index"
+        class="mid-image-sponsor py-4"
+      >
+        <img :src="url" alt="Event Sponsor" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -170,6 +213,7 @@ export default {
     pdfParticipantsSession1: { type: Array, required: true },
     titleCategories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
+    slalomCats: { type: Object, required: false },
   },
   computed: {
     maxGates() {
@@ -304,6 +348,14 @@ export default {
     },
     bib(t) {
       return (t && t.bibTeam) || "-";
+    },
+
+    flaggingSession1() {
+      if (t && Array.isArray(t.result) && t.result.length === 2) {
+        return false;
+      } else {
+        return true;
+      }
     },
 
     // tampilkan bestTime hanya jika tim sudah punya 2 run
@@ -530,6 +582,39 @@ export default {
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
+
+.mid-image-row,
+.mid-image-sponsor-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2mm;
+  margin: 2mm 0;
+}
+.mid-image img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+.mid-image-sponsor-row {
+  margin-top: auto;
+  margin-bottom: 0;
+}
+.mid-image-sponsor img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+header,
+.band,
+.mid-image-row,
+.mid-image-sponsor-row {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
 .trademark {
   position: absolute;
   top: 0;

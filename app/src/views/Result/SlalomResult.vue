@@ -309,6 +309,7 @@
           :pdfParticipantsSession1="pdfParticipants"
           :titleCategories="pdfCategories"
           :isOfficial="isOfficial"
+          :slalomCats="slalomCats"
         />
       </section>
     </vue-html2pdf>

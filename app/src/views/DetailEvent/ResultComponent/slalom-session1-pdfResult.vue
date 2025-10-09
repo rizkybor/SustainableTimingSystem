@@ -40,19 +40,20 @@
           <tr>
             <th rowspan="2">No</th>
             <th rowspan="2">Team</th>
-            <th rowspan="2">BIB</th>
-            <th rowspan="2">Start Time</th>
+            <th rowspan="2">1st Run Rank</th>
 
-            <th :colspan="maxGates + 2" class="pen-group text-center">
+            <th rowspan="2">BIB</th>
+
+            <th :colspan="maxGates + 2" class="pen-group text-center py-2">
               Penalties
             </th>
 
+            <th rowspan="2" class="col-total-penalty text-center">Total</th>
             <th rowspan="2">Penalty Time</th>
-            <th rowspan="2">Total Penalty</th>
+            <th rowspan="2">Start Time</th>
             <th rowspan="2">Finish Time</th>
             <th rowspan="2">Race Time</th>
             <th rowspan="2">Total</th>
-            <th rowspan="2">Rank</th>
           </tr>
           <tr>
             <th class="pen-head start">S</th>
@@ -67,8 +68,14 @@
           <tr v-for="(p, i) in pdfParticipantsSession1" :key="i">
             <td class="text-center">{{ i + 1 }}</td>
             <td class="text-strong">{{ p.nameTeam || "-" }}</td>
+            <td class="center">
+              {{
+                p && p.result && p.result[0] && p.result[0].ranked
+                  ? p.result[0].ranked
+                  : p.ranked || "-"
+              }}
+            </td>
             <td class="text-center">{{ p.bibTeam || "-" }}</td>
-            <td class="text-center">{{ p.result[0].startTime || "-" }}</td>
 
             <!-- Start -->
             <td class="right">
@@ -90,7 +97,7 @@
             </td>
 
             <!-- Total Penalty -->
-            <td class="right">
+            <td class="col-total-penalty right text-center">
               {{
                 hasGates(p)
                   ? toNum(p.result[0].penaltyTotal.start) +
@@ -114,6 +121,8 @@
               }}
             </td>
 
+            <td class="text-center">{{ p.result[0].startTime || "-" }}</td>
+
             <td class="text-center">{{ p.result[0].finishTime || "-" }}</td>
 
             <!-- Race / Penalty / Total / Rank -->
@@ -132,13 +141,6 @@
                   : "00:00:00.000"
               }}
             </td>
-            <td class="center">
-              {{
-                p && p.result && p.result[0] && p.result[0].ranked
-                  ? p.result[0].ranked
-                  : p.ranked || "-"
-              }}
-            </td>
           </tr>
         </tbody>
       </table>
@@ -154,12 +156,7 @@
         </div>
       </div>
       <div class="sign-col stamp-col">
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
+        <span class="unofficial-stamp"> "UNOFFICIAL" </span>
       </div>
     </footer>
   </div>
@@ -278,8 +275,8 @@ export default {
   color: #17202a;
 }
 .table-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
+  overflow-x: auto;
+  width: 100%;
 }
 .band {
   display: flex;
@@ -310,31 +307,7 @@ export default {
   font-size: 9.5px;
   color: rgb(24, 116, 165);
 }
-.score-table {
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid #dde6ee;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.score-table th,
-.score-table td {
-  border-bottom: 1px solid #f1f4f8;
-  padding: 6px 8px;
-}
-.score-table thead th {
-  background: rgb(240, 250, 255);
-  text-transform: uppercase;
-  font-size: 11px;
-  font-weight: 800;
-  text-align: start;
-}
-.score-table tbody td {
-  font-size: 12px;
-}
-.score-table tbody tr:nth-child(odd) {
-  background: #fafcff;
-}
+
 .text-center {
   text-align: center;
 }
@@ -413,13 +386,6 @@ export default {
   display: inline-block;
   letter-spacing: 0.8px;
 }
-.official-stamp {
-  color: #148a3b;
-  border-color: #148a3b;
-  transform: rotate(0deg);
-  opacity: 1;
-  box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
-}
 .trademark {
   position: absolute;
   top: 0;
@@ -441,7 +407,7 @@ export default {
 }
 .mini-penalty th,
 .mini-penalty td {
-  border: 1px solid #dde6ee;
+  border: 0.6px solid #dde6ee;
   text-align: center;
   padding: 3px 4px;
   line-height: 1.2;
@@ -462,5 +428,135 @@ export default {
   font-weight: 700;
   color: #111;
   background: #fff;
+}
+
+/* --- table sizing umum --- */
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* kolom proporsional */
+  border: 0.6px solid #dde6ee;
+  border-radius: 6px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.score-table th,
+.score-table td {
+  border: 0.6px solid #e0e6eb;
+  padding: 3px 4px; /* lebih kecil */
+  font-size: 9.5px; /* kecilkan keseluruhan */
+  line-height: 1.15; /* rapat biar gak “tumpah” */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* cegah teks keluar border */
+}
+
+/* --- header (thead) lebih kecil lagi --- */
+.score-table thead th {
+  background: rgb(240, 250, 255);
+  text-transform: uppercase;
+  font-size: 8.8px; /* kecilkan header */
+  font-weight: 800;
+  text-align: center;
+  padding: 2px 3px; /* header padding kecil */
+}
+
+/* --- kolom penting diberi lebar agar stabil --- */
+.score-table th:nth-child(1),
+.score-table td:nth-child(1) {
+  width: 28px;
+} /* No */
+
+.score-table th:nth-child(2),
+.score-table td:nth-child(2) {
+  width: 100px;
+} /* Team */
+
+.score-table th:nth-child(3),
+.score-table td:nth-child(3) {
+  width: 80px;
+} /* 1st Run Rank */
+
+.score-table th:nth-child(4),
+.score-table td:nth-child(4) {
+  width: 44px;
+} /* BIB */
+
+/* kolom-kolom di ujung */
+.score-table th:nth-last-child(6),
+.score-table td:nth-last-child(6) {
+  width: 80px;
+} /* Total Penalty */
+
+.score-table th:nth-child(7),
+.score-table td:nth-child(7) {
+  width: 80px;
+} /* Start Time */
+
+.score-table th:nth-last-child(4),
+.score-table td:nth-last-child(4) {
+  width: 80px;
+} /* Penalty Time */
+.score-table th:nth-last-child(3),
+.score-table td:nth-last-child(3) {
+  width: 80px;
+} /* Finish Time */
+.score-table th:nth-last-child(2),
+.score-table td:nth-last-child(2) {
+  width: 80px;
+} /* Race Time */
+.score-table th:nth-last-child(1),
+.score-table td:nth-last-child(1) {
+  width: 80px;
+} /* Total (waktu) */
+
+/* --- heading untuk grup penalties & cell gates lebih rapat --- */
+.pen-group {
+  font-size: 9.5px;
+  padding: 2px 0;
+}
+.pen-head {
+  background: #f2f6fb;
+  font-size: 8px;
+  padding: 2px 0;
+}
+
+/* --- gaya angka gates (start, gates v-for, finish) --- */
+.gate-cell {
+  font-size: 9.5px;
+  padding: 2px 2px; /* super rapat agar muat */
+  text-align: center; /* angka di tengah */
+}
+
+/* cetak: perkecil sedikit biar aman di A4 landscape */
+@media print {
+  .score-table,
+  .score-table th,
+  .score-table td,
+  .mini-penalty th,
+  .mini-penalty td {
+    border-width: 0.35pt; /* ~0.47px, tipis & konsisten di PDF */
+  }
+}
+
+/* ==== Total Penalty column width ==== */
+.score-table th.col-total-penalty,
+.score-table td.col-total-penalty {
+  width: 50px; /* atur sesuai selera: 110–140px */
+  min-width: 120px;
+  max-width: 140px; /* cegah melebar berlebihan */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* kalau mau sedikit lebih lega saat print */
+@media print {
+  .score-table th.col-total-penalty,
+  .score-table td.col-total-penalty {
+    width: 130px;
+    min-width: 130px;
+  }
 }
 </style>

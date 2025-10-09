@@ -690,7 +690,7 @@
 </template>
 
 <script>
-import SlalomSession1PdfResult from "../ResultComponent/slalom-session1-pdfResult.vue";
+import SlalomSession1PdfResult from "../ResultComponent/slalom-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";

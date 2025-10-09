@@ -778,9 +778,7 @@ async function insertSlalomResult(payload) {
     try {
       const optCol = db.collection("optionRanked");
 
-      // dukung skema baru & lama
-      // - baru: { type: "SLALOM", data: [{ ranking, score }, ...] }
-      // - lama: { name: "SLALOM", data: { score: [num, ...] } } atau score di root
+      // dukung dua skema dokumen
       const slalomDoc =
         (await optCol.findOne({ type: "SLALOM" })) ||
         (await optCol.findOne({ name: "SLALOM" }));
@@ -789,48 +787,52 @@ async function insertSlalomResult(payload) {
         const d = slalomDoc.data;
 
         if (Array.isArray(d)) {
-          // skema BARU
+          // skema baru: data: [{ranking, score}]
           const cleaned = d
-            .filter(
-              (x) =>
+            .filter(function (x) {
+              return (
                 x &&
                 Number.isFinite(Number(x.ranking)) &&
                 Number.isFinite(Number(x.score))
-            )
-            .map((x) => ({
-              ranking: Number(x.ranking),
-              score: Number(x.score),
-            }))
-            .sort((a, b) => a.ranking - b.ranking);
+              );
+            })
+            .map(function (x) {
+              return { ranking: Number(x.ranking), score: Number(x.score) };
+            })
+            .sort(function (a, b) {
+              return a.ranking - b.ranking;
+            });
 
           if (cleaned.length > 0) {
             const maxRank = cleaned[cleaned.length - 1].ranking;
-            const table = new Array(maxRank).fill(0);
-            for (const { ranking, score } of cleaned) {
-              table[ranking - 1] = score; // 1-based → 0-based
+            const table = new Array(maxRank);
+            for (let i = 0; i < table.length; i++) table[i] = 0;
+            for (let i = 0; i < cleaned.length; i++) {
+              const r = cleaned[i].ranking;
+              const s = cleaned[i].score;
+              table[r - 1] = s; // 1-based -> 0-based
             }
             SCORE_TABLE = table;
           }
         } else if (d && Array.isArray(d.score)) {
-          // variasi skema LAMA
+          // skema lama: data.score = [..]
           const arr = [];
-          for (const v of d.score) {
-            const n = Number(v);
+          for (let i = 0; i < d.score.length; i++) {
+            const n = Number(d.score[i]);
             if (Number.isFinite(n)) arr.push(n);
           }
           SCORE_TABLE = arr;
         } else if (Array.isArray(slalomDoc.score)) {
-          // fallback lain
           const arr = [];
-          for (const v of slalomDoc.score) {
-            const n = Number(v);
+          for (let i = 0; i < slalomDoc.score.length; i++) {
+            const n = Number(slalomDoc.score[i]);
             if (Number.isFinite(n)) arr.push(n);
           }
           SCORE_TABLE = arr;
         }
       }
     } catch (eFetch) {
-      const msg = eFetch?.message ? eFetch.message : String(eFetch);
+      const msg = eFetch && eFetch.message ? eFetch.message : String(eFetch);
       console.error("[DAO] optionRanked fetch failed (SLALOM):", msg);
     }
 
@@ -902,8 +904,8 @@ async function insertSlalomResult(payload) {
       const rem2 = rem1 % 60000;
       const sec = Math.floor(rem2 / 1000);
       const mss = rem2 % 1000;
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${String(mss).padStart(3, "0")}`;
+      function pad(n, w) { return String(n).padStart(w, "0"); }
+      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
     }
     function pruneEmpty(obj) {
       if (!obj || typeof obj !== "object") return obj;
@@ -928,7 +930,7 @@ async function insertSlalomResult(payload) {
       const pt = {
         start: Number(ptRaw.start) || 0,
         gates: gates,
-        finish: Number(ptRaw.finish) || 0,
+        finish: Number(ptRaw.finish) || 0
       };
 
       let penaltySum = pt.start + pt.finish;
@@ -946,7 +948,7 @@ async function insertSlalomResult(payload) {
         totalTime: String(run.totalTime || run.raceTime || ""),
         ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
         judgesBy: String(run.judgesBy || ""),
-        judgesTime: String(run.judgesTime || ""),
+        judgesTime: String(run.judgesTime || "")
       };
     }
 
@@ -972,7 +974,7 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {}),
+        otr: pruneEmpty(clean.otr || {})
       });
     }
 
@@ -999,7 +1001,7 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {}),
+        otr: pruneEmpty(clean.otr || {})
       });
     }
 
@@ -1018,13 +1020,13 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, ""),
+          divisionName: toStr(item.divisionName, "")
         };
         if (!metaB.eventId || !metaB.initialId || !metaB.raceId || !metaB.divisionId) {
           console.warn("[DAO] Skip bucket, meta tidak lengkap:", metaB);
           continue;
         }
-        const keyB = `${metaB.eventId}|${metaB.initialId}|${metaB.raceId}|${metaB.divisionId}`;
+        const keyB = metaB.eventId + "|" + metaB.initialId + "|" + metaB.raceId + "|" + metaB.divisionId;
 
         const teamsArrB = [];
         for (let tb = 0; tb < item.teams.length; tb++) {
@@ -1035,7 +1037,8 @@ async function insertSlalomResult(payload) {
           groups.set(keyB, { meta: metaB, teams: teamsArrB });
         } else {
           const exB = groups.get(keyB);
-          exB.teams.push(...teamsArrB);
+          // hindari spread (kompat ES5)
+          for (let i = 0; i < teamsArrB.length; i++) exB.teams.push(teamsArrB[i]);
         }
       } else {
         const metaF = {
@@ -1046,13 +1049,13 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, ""),
+          divisionName: toStr(item.divisionName, "")
         };
         if (!metaF.eventId || !metaF.initialId || !metaF.raceId || !metaF.divisionId) {
           console.warn("[DAO] Skip flat item, meta tidak lengkap:", metaF);
           continue;
         }
-        const keyF = `${metaF.eventId}|${metaF.initialId}|${metaF.raceId}|${metaF.divisionId}`;
+        const keyF = metaF.eventId + "|" + metaF.initialId + "|" + metaF.raceId + "|" + metaF.divisionId;
 
         const cleanJson = JSON.stringify(item);
         const cleanAny = JSON.parse(cleanJson);
@@ -1081,14 +1084,14 @@ async function insertSlalomResult(payload) {
         eventId: m.eventId,
         initialId: m.initialId,
         raceId: m.raceId,
-        divisionId: m.divisionId,
+        divisionId: m.divisionId
       });
     }
     const existingDocs = await col.find({ $or: filterOr }).toArray();
     const existingMap = new Map();
     for (let ei = 0; ei < existingDocs.length; ei++) {
       const exDoc = existingDocs[ei];
-      const ek = `${exDoc.eventId}|${exDoc.initialId}|${exDoc.raceId}|${exDoc.divisionId}`;
+      const ek = exDoc.eventId + "|" + exDoc.initialId + "|" + exDoc.raceId + "|" + exDoc.divisionId;
       existingMap.set(ek, exDoc);
     }
 
@@ -1096,7 +1099,12 @@ async function insertSlalomResult(payload) {
     const now = new Date();
     let upsertedCount = 0;
 
-    for (const [bucketKey, entryObj] of groups.entries()) {
+    const ge = groups.entries();
+    let step = ge.next();
+    while (!step.done) {
+      const bucketKey = step.value[0];
+      const entryObj = step.value[1];
+
       const meta = entryObj.meta;
       const incomingTeams = entryObj.teams;
 
@@ -1104,7 +1112,7 @@ async function insertSlalomResult(payload) {
         eventId: meta.eventId,
         initialId: meta.initialId,
         raceId: meta.raceId,
-        divisionId: meta.divisionId,
+        divisionId: meta.divisionId
       };
 
       let existing = existingMap.get(bucketKey);
@@ -1142,7 +1150,7 @@ async function insertSlalomResult(payload) {
         const nname = toStr(nt.nameTeam, "").trim();
         const kIn = (nbib || "NO-BIB") + "|" + nname;
 
-        const exTeam = mergedByKey.get(kIn);
+        const exTeam = mergedByKey.get(kIn); // bisa undefined
 
         if (!exTeam) {
           mergedByKey.set(kIn, JSON.parse(JSON.stringify(nt)));
@@ -1160,15 +1168,18 @@ async function insertSlalomResult(payload) {
 
           // build mergedTeam
           const mergedTeam = {};
-          // copy exTeam → mergedTeam
           const exKeys = Object.keys(exTeam);
           for (let exi = 0; exi < exKeys.length; exi++) {
-            mergedTeam[exKeys[exi]] = exTeam[exKeys[exi]];
+            mergedTeam[exKeys[exi]] = exTeam[exi];
           }
-          // override by nt
+          for (let exi = 0; exi < exKeys.length; exi++) {
+            const k = exKeys[exi];
+            mergedTeam[k] = exTeam[k];
+          }
           const ntKeys = Object.keys(nt);
           for (let nti = 0; nti < ntKeys.length; nti++) {
-            mergedTeam[ntKeys[nti]] = nt[ntKeys[nti]];
+            const k = ntKeys[nti];
+            mergedTeam[k] = nt[k];
           }
           mergedTeam.nameTeam = toStr(nname, exTeam.nameTeam);
           mergedTeam.bibTeam = toStr(nbib, exTeam.bibTeam);
@@ -1210,10 +1221,10 @@ async function insertSlalomResult(payload) {
           const r = Array.isArray(t.result) ? t.result[sessionIdx] : null;
           const ms = r && r.totalTime ? hmsToMs(r.totalTime) : Infinity;
           if (Number.isFinite(ms)) {
-            candidates.push({ t, r, ms });
+            candidates.push({ t: t, r: r, ms: ms });
           }
         }
-        candidates.sort((a, b) => a.ms - b.ms);
+        candidates.sort(function (a, b) { return a.ms - b.ms; });
         let rankCounter = 0;
         let last = null;
         let disp = 0;
@@ -1261,7 +1272,7 @@ async function insertSlalomResult(payload) {
       }
 
       if (eligibleTeams.length > 0) {
-        eligibleTeams.sort((a, b) => {
+        eligibleTeams.sort(function (a, b) {
           const am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
           const bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
           return am - bm;
@@ -1297,18 +1308,20 @@ async function insertSlalomResult(payload) {
           divisionName: meta.divisionName,
           teams: mergedArray,
           updatedAt: now,
-          _lastRevision: now.getTime(),
+          _lastRevision: now.getTime()
         },
-        $setOnInsert: { createdAt: now },
+        $setOnInsert: { createdAt: now }
       };
 
       const res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+
+      step = ge.next();
     }
 
-    return { ok: true, upsertedCount };
+    return { ok: true, upsertedCount: upsertedCount };
   } catch (err) {
-    const message = err?.message ? err.message : String(err);
+    const message = err && err.message ? err.message : String(err);
     console.error("Error insertSlalomResult:", message);
     return { ok: false, error: message };
   }

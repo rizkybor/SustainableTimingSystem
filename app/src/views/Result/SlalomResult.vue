@@ -317,7 +317,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import SlalomPdf from "../DetailEvent/ResultComponent/slalom-session1-pdfResult.vue";
+import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
 
 // import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";

@@ -1033,6 +1033,11 @@ export default {
   created() {
     this.activeRun = 0;
   },
+  watch: {
+    "$route.query.eventId"() {
+      this.fetchSlalomGateCountFromSettings();
+    },
+  },
   async mounted() {
     try {
       const events = localStorage.getItem("eventDetails");
@@ -1267,6 +1272,9 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
+
+      this.fetchSlalomGateCountFromSettings();
+      this.refreshSlalomCats();
     },
     // === SERIAL CONNECTION ===
     async connectPort() {
@@ -1429,6 +1437,7 @@ export default {
         this.$set(this.selectedSession, String(t._id), idx)
       );
       this.checkEndGameStatus();
+      this.fetchSlalomGateCountFromSettings();
     },
     async fetchSlalomGateCountFromSettings() {
       try {

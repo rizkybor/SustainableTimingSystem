@@ -1129,6 +1129,7 @@ export default {
       const teams = Array.isArray(b.teams)
         ? b.teams.map(normalizeTeamFromBucketForSlalom)
         : [];
+
       return { bucket, teams };
     },
     buildSlalomOptions() {
@@ -1676,9 +1677,6 @@ export default {
         teams: [],
       };
 
-      // Sumber data tim:
-      // - prioritas UI aktif (this.teams) karena memuat waktu & penalties hasil input panel,
-      // - kalau kosong, fallback ke payload.teams (jaga-jaga).
       var sourceTeams;
       if (Array.isArray(this.teams) && this.teams.length > 0) {
         sourceTeams = this.teams;
@@ -1689,7 +1687,8 @@ export default {
       }
 
       // Jumlah gate dari setting, fallback 14
-      var gatesCount = 14;
+      const gatesCount = this.SLALOM_GATES.length || 14;
+      
       if (
         this.raceSettings &&
         this.raceSettings.slalom &&
@@ -1800,7 +1799,7 @@ export default {
 
         tIndex = tIndex + 1;
       }
-
+      console.log(doc, "<< cek");
       return doc;
     },
     /** === Save (parity dengan Sprint) === */

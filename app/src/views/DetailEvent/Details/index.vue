@@ -1063,7 +1063,7 @@ export default {
       if (!d || !d.teamId || !d.bib) return;
 
       // ✅ Ambil eventId dari route params
-      const eventId = String(this.$route.params.id || "");
+      // const eventId = String(this.$route.params.id || "");
 
       const evName = this.raceActive.selected.name;
       const init =

@@ -1419,24 +1419,41 @@ export default {
     },
     async fetchSlalomGateCountFromSettings() {
       try {
-        if (typeof ipcRenderer === "undefined" || !this._eventId) return;
-        ipcRenderer.send("race-settings:get", this._eventId);
-        ipcRenderer.once("race-settings:get-reply", (_e, res) => {
-          const n =
-            res && res.ok && res.settings && res.settings.slalom
-              ? parseInt(res.settings.slalom.totalGate, 10)
-              : DEFAULT_S16;
-
-          // set array gates
-          this.SLALOM_GATES = buildGates(n);
-
-          // pastikan panjang penalties di tiap sesi = jumlah gate baru
+        var evId = this.currentSlalomEventId
+          ? String(this.currentSlalomEventId)
+          : "";
+        if (typeof ipcRenderer === "undefined" || !evId) {
+          this.SLALOM_GATES = buildGates(DEFAULT_S16);
           this.syncAllTeamsPenaltiesLength();
+          return this.SLALOM_GATES;
+        }
+
+        // bungkus ke Promise supaya bisa di-await dan mengembalikan gates
+        const gates = await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            var n = DEFAULT_S16;
+            if (
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.slalom &&
+              res.settings.slalom.totalGate
+            ) {
+              var parsed = parseInt(res.settings.slalom.totalGate, 10);
+              if (Number.isFinite(parsed) && parsed > 0) n = parsed;
+            }
+            this.SLALOM_GATES = buildGates(n);
+            this.syncAllTeamsPenaltiesLength();
+            resolve(this.SLALOM_GATES);
+          });
+          ipcRenderer.send("race-settings:get", evId);
         });
+
+        return gates; // array angka [1..N]
       } catch (err) {
-        // fallback: tetap pakai default
         this.SLALOM_GATES = buildGates(DEFAULT_S16);
         this.syncAllTeamsPenaltiesLength();
+        return this.SLALOM_GATES;
       }
     },
 
@@ -1812,8 +1829,7 @@ export default {
     // ===== SAVE ONLY SESSION 1 =====
     saveSession1() {
       try {
-        const doc = this.buildDocsSession1Only(); // object
-        console.log(doc,'<<<< CEK DOC')
+        const doc = this.buildDocsSession1Only();
         if (!doc || typeof doc !== "object" || !Array.isArray(doc.teams)) {
           ipcRenderer.send("get-alert", {
             type: "warning",

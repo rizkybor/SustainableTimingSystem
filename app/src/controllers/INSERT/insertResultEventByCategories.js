@@ -237,17 +237,24 @@ async function insertSlalomResult(payload) {
       if (slalomDoc && typeof slalomDoc === "object") {
         const dataObj = slalomDoc.data;
         if (dataObj && Array.isArray(dataObj.score)) {
-          const arr = [];
-          for (let i = 0; i < dataObj.score.length; i++) {
-            const v = Number(dataObj.score[i]);
+          var arr = [];
+          var si = 0;
+          for (si = 0; si < dataObj.score.length; si++) {
+            var v = Number(dataObj.score[si]);
             if (Number.isFinite(v)) arr.push(v);
           }
           SCORE_TABLE = arr;
         }
       }
     } catch (eFetch) {
-      const msg = eFetch && eFetch.message ? eFetch.message : String(eFetch);
+      var msg = eFetch && eFetch.message ? eFetch.message : String(eFetch);
       console.error("[DAO] optionRanked fetch failed (SLALOM):", msg);
+    }
+
+    // Fallback jika kosong
+    if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) {
+      console.warn("[DAO] SCORE_TABLE empty; using default fallback.");
+      SCORE_TABLE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
     }
 
     // === Unique index per bucket ===
@@ -258,8 +265,8 @@ async function insertSlalomResult(payload) {
           { unique: true, name: "uniq_bucket" }
         );
       } catch (eIdx) {
-        const codeName = eIdx && eIdx.codeName ? eIdx.codeName : "";
-        const message = eIdx && eIdx.message ? eIdx.message : String(eIdx);
+        var codeName = eIdx && eIdx.codeName ? eIdx.codeName : "";
+        var message = eIdx && eIdx.message ? eIdx.message : String(eIdx);
         if (!eIdx || codeName !== "IndexOptionsConflict") {
           console.warn("[DAO] createIndex warning:", message);
         }
@@ -269,10 +276,7 @@ async function insertSlalomResult(payload) {
 
     // === Validasi payload ===
     if (!Array.isArray(payload)) {
-      return {
-        ok: false,
-        error: "insertSlalomResult: payload must be an array",
-      };
+      return { ok: false, error: "insertSlalomResult: payload must be an array" };
     }
     if (payload.length === 0) {
       return { ok: true, upsertedCount: 0 };
@@ -281,9 +285,10 @@ async function insertSlalomResult(payload) {
     // === Helpers ===
     function scoreForRank(rank) {
       if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) return 0;
-      const idx = rank - 1;
-      if (idx < 0 || idx >= SCORE_TABLE.length) return 0;
-      return SCORE_TABLE[idx];
+      var idx = rank - 1;
+      if (idx < 0) return 0;
+      var v = SCORE_TABLE[idx];
+      return Number(v) || 0;
     }
     function toStr(v, d) {
       if (v === null || v === undefined) return String(d || "");
@@ -291,75 +296,70 @@ async function insertSlalomResult(payload) {
     }
     function toInt(v, d) {
       if (Number.isFinite(v)) return Number(v);
-      const n = Number(v);
+      var n = Number(v);
       if (Number.isFinite(n)) return n;
       return d || 0;
     }
     function hmsToMs(str) {
-      const txt = String(str || "");
-      const parts = txt.split(":");
-      const h = parts.length > 0 ? Number(parts[0]) || 0 : 0;
-      const m = parts.length > 1 ? Number(parts[1]) || 0 : 0;
-      const sMs = parts.length > 2 ? parts[2] : "0.000";
-      const sSplit = String(sMs).split(".");
-      const s = sSplit.length > 0 ? Number(sSplit[0]) || 0 : 0;
-      const ms = sSplit.length > 1 ? Number(sSplit[1]) || 0 : 0;
+      var txt = String(str || "");
+      var parts = txt.split(":");
+      var h = parts.length > 0 ? Number(parts[0]) || 0 : 0;
+      var m = parts.length > 1 ? Number(parts[1]) || 0 : 0;
+      var sMs = parts.length > 2 ? parts[2] : "0.000";
+      var sSplit = String(sMs).split(".");
+      var s = sSplit.length > 0 ? Number(sSplit[0]) || 0 : 0;
+      var ms = sSplit.length > 1 ? Number(sSplit[1]) || 0 : 0;
       return h * 3600000 + m * 60000 + s * 1000 + ms;
     }
     function msToHMSms(ms) {
       if (!Number.isFinite(ms)) return "";
-      const hr = Math.floor(ms / 3600000);
-      const rem1 = ms % 3600000;
-      const min = Math.floor(rem1 / 60000);
-      const rem2 = rem1 % 60000;
-      const sec = Math.floor(rem2 / 1000);
-      const mss = rem2 % 1000;
-      function pad(n, w) {
-        return String(n).padStart(w, "0");
-      }
-      return (
-        pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3)
-      );
+      var hr = Math.floor(ms / 3600000);
+      var rem1 = ms % 3600000;
+      var min = Math.floor(rem1 / 60000);
+      var rem2 = rem1 % 60000;
+      var sec = Math.floor(rem2 / 1000);
+      var mss = rem2 % 1000;
+      function pad(n, w) { return String(n).padStart(w, "0"); }
+      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
     }
     function pruneEmpty(obj) {
       if (!obj || typeof obj !== "object") return obj;
-      const keys = Object.keys(obj);
-      for (let i = 0; i < keys.length; i++) {
-        const k = keys[i];
-        const v = obj[k];
+      var keys = Object.keys(obj);
+      var i = 0;
+      for (i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var v = obj[k];
         if (v === "" || v === null) delete obj[k];
       }
       return obj;
     }
 
-    // === NORMALISASI RUN: simpan semua field yang kamu minta ===
+    // === Normalisasi Run (tanpa "score" di run) ===
     function normRun(r) {
-      const run = r || {};
+      var run = r || {};
 
-      // penaltyTotal
-      var ptRaw =
-        run.penaltyTotal && typeof run.penaltyTotal === "object"
-          ? run.penaltyTotal
-          : {};
+      var ptRaw = (run.penaltyTotal && typeof run.penaltyTotal === "object")
+        ? run.penaltyTotal
+        : {};
       var gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
       var gates = [];
-      for (var gi = 0; gi < gatesRaw.length; gi++) {
+      var gi = 0;
+      for (gi = 0; gi < gatesRaw.length; gi++) {
         gates.push(Number(gatesRaw[gi]) || 0);
       }
       var pt = {
         start: Number(ptRaw.start) || 0,
         gates: gates,
-        finish: Number(ptRaw.finish) || 0,
+        finish: Number(ptRaw.finish) || 0
       };
 
-      // jumlah penalty numeric (optional)
       var penaltySum = pt.start + pt.finish;
-      for (var pi = 0; pi < pt.gates.length; pi++) penaltySum += pt.gates[pi];
-      var penaltyNum = Number.isFinite(run.penalty)
-        ? Number(run.penalty)
-        : penaltySum;
+      var pi = 0;
+      for (pi = 0; pi < pt.gates.length; pi++) {
+        penaltySum += pt.gates[pi];
+      }
+      var penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
 
-      // JANGAN dipruning supaya kosong "" tetap tersimpan (sesuai contohmu)
       return {
         session: String(run.session || ""),
         startTime: String(run.startTime || ""),
@@ -369,39 +369,23 @@ async function insertSlalomResult(payload) {
         penaltyTotal: pt,
         penalty: penaltyNum,
         totalTime: String(run.totalTime || run.raceTime || ""),
-        ranked: Number.isFinite(run.ranked)
-          ? Number(run.ranked)
-          : Number(run.ranked) || 0,
-        score: Number.isFinite(run.score)
-          ? Number(run.score)
-          : Number(run.score) || 0,
+        ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
         judgesBy: String(run.judgesBy || ""),
-        judgesTime: String(run.judgesTime || ""),
+        judgesTime: String(run.judgesTime || "")
       };
     }
 
-    // Tim (payload flat)
     function normTeamFromFlat(clean) {
-      const arr = Array.isArray(clean.result) ? clean.result : [];
-      const resultArr = [];
-      for (let i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+      var arr = Array.isArray(clean.result) ? clean.result : [];
+      var resultArr = [];
+      var i = 0;
+      for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
 
-      let bestTime = "";
+      var bestTime = "";
       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
         bestTime = clean.bestTime;
-      } else if (resultArr.length > 0) {
-        const vals = [];
-        for (let j = 0; j < resultArr.length; j++) {
-          const rt = resultArr[j];
-          if (rt && rt.totalTime) {
-            const ms = hmsToMs(rt.totalTime);
-            if (Number.isFinite(ms)) vals.push(ms);
-          }
-        }
-        if (vals.length > 0) bestTime = msToHMSms(Math.min.apply(Math, vals));
       }
 
-      // Boleh prune field kosong DI LEVEL TIM (bukan di level run)
       return pruneEmpty({
         nameTeam: toStr(clean.nameTeam, ""),
         bibTeam: toStr(clean.bibTeam, ""),
@@ -414,30 +398,20 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {}),
+        otr: pruneEmpty(clean.otr || {})
       });
     }
 
-    // Tim (payload bucket: item.teams[])
     function normTeamFromBucketTeam(t) {
-      const clean = t || {};
-      const arr = Array.isArray(clean.result) ? clean.result : [];
-      const resultArr = [];
-      for (let i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+      var clean = t || {};
+      var arr = Array.isArray(clean.result) ? clean.result : [];
+      var resultArr = [];
+      var i = 0;
+      for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
 
-      let bestTime = "";
+      var bestTime = "";
       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
         bestTime = clean.bestTime;
-      } else if (resultArr.length > 0) {
-        const vals = [];
-        for (let j = 0; j < resultArr.length; j++) {
-          const rt = resultArr[j];
-          if (rt && rt.totalTime) {
-            const ms = hmsToMs(rt.totalTime);
-            if (Number.isFinite(ms)) vals.push(ms);
-          }
-        }
-        if (vals.length > 0) bestTime = msToHMSms(Math.min.apply(Math, vals));
       }
 
       return pruneEmpty({
@@ -452,19 +426,19 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {}),
+        otr: pruneEmpty(clean.otr || {})
       });
     }
 
-    // === Group payload per bucket; dukung bentuk BUCKET & FLAT ===
-    const groups = new Map();
-    for (let i = 0; i < payload.length; i++) {
-      const item = payload[i];
+    // === Group payload per bucket ===
+    var groups = new Map();
+    var pIdx = 0;
+    for (pIdx = 0; pIdx < payload.length; pIdx++) {
+      var item = payload[pIdx];
       if (!item || typeof item !== "object") continue;
 
       if (Array.isArray(item.teams)) {
-        // BUCKET
-        const meta = {
+        var metaB = {
           eventId: toStr(item.eventId, ""),
           initialId: toStr(item.initialId, ""),
           raceId: toStr(item.raceId, ""),
@@ -472,38 +446,31 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, ""),
+          divisionName: toStr(item.divisionName, "")
         };
-        if (
-          !meta.eventId ||
-          !meta.initialId ||
-          !meta.raceId ||
-          !meta.divisionId
-        ) {
-          console.warn("[DAO] Skip bucket, meta tidak lengkap:", meta);
+        if (!metaB.eventId || !metaB.initialId || !metaB.raceId || !metaB.divisionId) {
+          console.warn("[DAO] Skip bucket, meta tidak lengkap:", metaB);
           continue;
         }
-        const key =
-          meta.eventId +
-          "|" +
-          meta.initialId +
-          "|" +
-          meta.raceId +
-          "|" +
-          meta.divisionId;
+        var keyB = metaB.eventId + "|" + metaB.initialId + "|" + metaB.raceId + "|" + metaB.divisionId;
 
-        const teamsArr = [];
-        for (let j = 0; j < item.teams.length; j++)
-          teamsArr.push(normTeamFromBucketTeam(item.teams[j]));
+        var teamsArrB = [];
+        var tb = 0;
+        for (tb = 0; tb < item.teams.length; tb++) {
+          teamsArrB.push(normTeamFromBucketTeam(item.teams[tb]));
+        }
 
-        if (!groups.has(key)) groups.set(key, { meta: meta, teams: teamsArr });
-        else {
-          const ex = groups.get(key);
-          ex.teams = ex.teams.concat(teamsArr);
+        if (!groups.has(keyB)) {
+          groups.set(keyB, { meta: metaB, teams: teamsArrB });
+        } else {
+          var exB = groups.get(keyB);
+          var ca = exB.teams;
+          var kx = 0;
+          for (kx = 0; kx < teamsArrB.length; kx++) ca.push(teamsArrB[kx]);
+          exB.teams = ca;
         }
       } else {
-        // FLAT
-        const meta = {
+        var metaF = {
           eventId: toStr(item.eventId, ""),
           initialId: toStr(item.initialId, ""),
           raceId: toStr(item.raceId, ""),
@@ -511,35 +478,25 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, ""),
+          divisionName: toStr(item.divisionName, "")
         };
-        if (
-          !meta.eventId ||
-          !meta.initialId ||
-          !meta.raceId ||
-          !meta.divisionId
-        ) {
-          console.warn("[DAO] Skip flat item, meta tidak lengkap:", meta);
+        if (!metaF.eventId || !metaF.initialId || !metaF.raceId || !metaF.divisionId) {
+          console.warn("[DAO] Skip flat item, meta tidak lengkap:", metaF);
           continue;
         }
-        const key =
-          meta.eventId +
-          "|" +
-          meta.initialId +
-          "|" +
-          meta.raceId +
-          "|" +
-          meta.divisionId;
+        var keyF = metaF.eventId + "|" + metaF.initialId + "|" + metaF.raceId + "|" + metaF.divisionId;
 
-        const cleanJson = JSON.stringify(item);
-        const clean = JSON.parse(cleanJson);
-        if (clean && clean._id) delete clean._id;
+        var cleanJson = JSON.stringify(item);
+        var cleanAny = JSON.parse(cleanJson);
+        if (cleanAny && cleanAny._id) delete cleanAny._id;
 
-        const teamEntry = normTeamFromFlat(clean);
+        var teamEntry = normTeamFromFlat(cleanAny);
 
-        if (!groups.has(key))
-          groups.set(key, { meta: meta, teams: [teamEntry] });
-        else groups.get(key).teams.push(teamEntry);
+        if (!groups.has(keyF)) {
+          groups.set(keyF, { meta: metaF, teams: [teamEntry] });
+        } else {
+          groups.get(keyF).teams.push(teamEntry);
+        }
       }
     }
 
@@ -548,45 +505,50 @@ async function insertSlalomResult(payload) {
     }
 
     // === Ambil existing per semua bucket ===
-    const filterOr = [];
-    const vals = Array.from(groups.values());
-    for (let i = 0; i < vals.length; i++) {
-      const m = vals[i].meta;
+    var filterOr = [];
+    var vals = Array.from(groups.values());
+    var vi = 0;
+    for (vi = 0; vi < vals.length; vi++) {
+      var m = vals[vi].meta;
       filterOr.push({
         eventId: m.eventId,
         initialId: m.initialId,
         raceId: m.raceId,
-        divisionId: m.divisionId,
+        divisionId: m.divisionId
       });
     }
-    const existingDocs = await col.find({ $or: filterOr }).toArray();
-    const existingMap = new Map();
-    for (let i = 0; i < existingDocs.length; i++) {
-      const ex = existingDocs[i];
-      const k =
-        ex.eventId + "|" + ex.initialId + "|" + ex.raceId + "|" + ex.divisionId;
-      existingMap.set(k, ex);
+    var existingDocs = await col.find({ $or: filterOr }).toArray();
+    var existingMap = new Map();
+    var ei = 0;
+    for (ei = 0; ei < existingDocs.length; ei++) {
+      var exDoc = existingDocs[ei];
+      var ek = exDoc.eventId + "|" + exDoc.initialId + "|" + exDoc.raceId + "|" + exDoc.divisionId;
+      existingMap.set(ek, exDoc);
     }
 
     // === Proses per bucket ===
-    const now = new Date();
-    let upsertedCount = 0;
+    var now = new Date();
+    var upsertedCount = 0;
 
-    for (const entry of groups.entries()) {
-      const bucketKey = entry[0];
-      const meta = entry[1].meta;
-      const incomingTeams = entry[1].teams;
+    var ge = groups.entries();
+    var step = ge.next();
+    while (!step.done) {
+      var bucketKey = step.value[0];
+      var entryObj = step.value[1];
 
-      const filter = {
+      var meta = entryObj.meta;
+      var incomingTeams = entryObj.teams;
+
+      var filter = {
         eventId: meta.eventId,
         initialId: meta.initialId,
         raceId: meta.raceId,
-        divisionId: meta.divisionId,
+        divisionId: meta.divisionId
       };
 
-      let existing = existingMap.get(bucketKey);
+      var existing = existingMap.get(bucketKey);
       if (existing) {
-        const dup = await col.countDocuments(filter);
+        var dup = await col.countDocuments(filter);
         if (dup > 1) {
           console.warn("[DAO] Found >1 doc, cleanup:", filter);
           await col.deleteMany(filter);
@@ -594,75 +556,188 @@ async function insertSlalomResult(payload) {
         }
       }
 
-      // Merge by (bibTeam|nameTeam)
-      const mergedByKey = new Map();
+      // Merge by (bibTeam|nameTeam) DENGAN MERGE PER-RUN
+      var mergedByKey = new Map();
 
+      // Seed dari existing
       if (existing && Array.isArray(existing.teams)) {
-        for (let i = 0; i < existing.teams.length; i++) {
-          const t = existing.teams[i];
-          if (!t) continue;
-          const k =
-            (toStr(t.bibTeam, "").trim() || "NO-BIB") +
-            "|" +
-            toStr(t.nameTeam, "").trim();
-          if (!mergedByKey.has(k)) mergedByKey.set(k, t);
+        var st = 0;
+        for (st = 0; st < existing.teams.length; st++) {
+          var tSeed = existing.teams[st];
+          if (!tSeed) continue;
+          var kSeed = (toStr(tSeed.bibTeam, "").trim() || "NO-BIB") + "|" + toStr(tSeed.nameTeam, "").trim();
+          if (!mergedByKey.has(kSeed)) {
+            // deep copy sederhana
+            mergedByKey.set(kSeed, JSON.parse(JSON.stringify(tSeed)));
+          }
         }
       }
 
-      for (let i = 0; i < incomingTeams.length; i++) {
-        const nt = incomingTeams[i];
-        const nbib = toStr(nt.bibTeam, "").trim();
-        const nname = toStr(nt.nameTeam, "").trim();
-        const k = (nbib || "NO-BIB") + "|" + nname;
-        mergedByKey.set(k, nt);
+      // Merge dengan incoming
+      var it = 0;
+      for (it = 0; it < incomingTeams.length; it++) {
+        var nt = incomingTeams[it];
+        var nbib = toStr(nt.bibTeam, "").trim();
+        var nname = toStr(nt.nameTeam, "").trim();
+        var kIn = (nbib || "NO-BIB") + "|" + nname;
+
+        var exTeam = mergedByKey.get(kIn); // bisa undefined
+
+        if (!exTeam) {
+          mergedByKey.set(kIn, JSON.parse(JSON.stringify(nt)));
+        } else {
+          var exRes = Array.isArray(exTeam.result) ? exTeam.result.slice() : [];
+          var ntRes = Array.isArray(nt.result) ? nt.result : [];
+
+          // outRes: pertahankan run-1 lama; gunakan run-2 dari nt jika ada
+          var outRes = [];
+          if (exRes[0]) outRes[0] = exRes[0];
+          else if (ntRes[0]) outRes[0] = ntRes[0];
+
+          if (ntRes[1]) outRes[1] = ntRes[1];
+          else if (exRes[1]) outRes[1] = exRes[1];
+
+          // build mergedTeam (tanpa spread)
+          var mergedTeam = {};
+          // copy semua field exTeam
+          var exKeys = Object.keys(exTeam);
+          var exi = 0;
+          for (exi = 0; exi < exKeys.length; exi++) {
+            mergedTeam[exKeys[exi]] = exTeam[exKeys[exi]];
+          }
+          // override dengan nt
+          var ntKeys = Object.keys(nt);
+          var nti = 0;
+          for (nti = 0; nti < ntKeys.length; nti++) {
+            mergedTeam[ntKeys[nti]] = nt[ntKeys[nti]];
+          }
+          mergedTeam.nameTeam = toStr(nname, exTeam.nameTeam);
+          mergedTeam.bibTeam = toStr(nbib, exTeam.bibTeam);
+
+          // norm run hasil gabung
+          var resOutFinal = [];
+          var rfi = 0;
+          for (rfi = 0; rfi < outRes.length; rfi++) {
+            resOutFinal.push(normRun(outRes[rfi]));
+          }
+          mergedTeam.result = resOutFinal;
+
+          // Jika data baru belum lengkap (<2 run), jangan timpa bestTime/ranked/score lama
+          var newRuns = outRes.length;
+          if (newRuns < 2) {
+            if (!(typeof mergedTeam.bestTime === "string" && mergedTeam.bestTime.trim() !== "")) {
+              mergedTeam.bestTime = exTeam.bestTime;
+            }
+            if (!Number.isFinite(mergedTeam.ranked)) mergedTeam.ranked = exTeam.ranked;
+            if (!Number.isFinite(mergedTeam.score)) mergedTeam.score = exTeam.score;
+          }
+
+          mergedByKey.set(kIn, mergedTeam);
+        }
       }
 
-      const mergedArray = Array.from(mergedByKey.values());
+      var mergedArray = Array.from(mergedByKey.values());
 
-      // Lengkapi bestTime bila kosong
-      for (let i = 0; i < mergedArray.length; i++) {
-        const tm = mergedArray[i];
-        if (!tm.bestTime) {
-          const valsMs = [];
-          const resArr = Array.isArray(tm.result) ? tm.result : [];
-          for (let j = 0; j < resArr.length; j++) {
-            const x = resArr[j];
-            if (x && x.totalTime) {
-              const ms = hmsToMs(x.totalTime);
+      // ====== RUN-LEVEL RANKING ======
+      var maxRuns = 0;
+      var mri = 0;
+      for (mri = 0; mri < mergedArray.length; mri++) {
+        var rr = Array.isArray(mergedArray[mri].result) ? mergedArray[mri].result : [];
+        if (rr.length > maxRuns) maxRuns = rr.length;
+      }
+
+      function rankPerSession(sessionIdx) {
+        var candidates = [];
+        var ci = 0;
+        for (ci = 0; ci < mergedArray.length; ci++) {
+          var t = mergedArray[ci];
+          var r = Array.isArray(t.result) ? t.result[sessionIdx] : null;
+          var ms = r && r.totalTime ? hmsToMs(r.totalTime) : Infinity;
+          if (Number.isFinite(ms)) {
+            candidates.push({ t: t, r: r, ms: ms });
+          }
+        }
+        // sort by ms asc
+        candidates.sort(function (a, b) { return a.ms - b.ms; });
+        var rankCounter = 0;
+        var last = null;
+        var disp = 0;
+        var cj = 0;
+        for (cj = 0; cj < candidates.length; cj++) {
+          var item = candidates[cj];
+          rankCounter++;
+          if (last === null || item.ms !== last) disp = rankCounter;
+          last = item.ms;
+          if (Array.isArray(item.t.result) && item.t.result[sessionIdx]) {
+            item.t.result[sessionIdx].ranked = disp;
+          }
+        }
+      }
+
+      if (maxRuns === 1) {
+        rankPerSession(0);
+      } else if (maxRuns >= 2) {
+        rankPerSession(0);
+        rankPerSession(1);
+      }
+
+      // ====== TEAM-LEVEL (≥2 run valid) ======
+      var eligibleTeams = [];
+      var et = 0;
+      for (et = 0; et < mergedArray.length; et++) {
+        var tm = mergedArray[et];
+        var resArr = Array.isArray(tm.result) ? tm.result : [];
+        if (resArr.length >= 2) {
+          var valsMs = [];
+          var vj = 0;
+          for (vj = 0; vj < resArr.length; vj++) {
+            var x = resArr[vj];
+            if (x && typeof x.totalTime === "string" && x.totalTime.trim() !== "") {
+              var ms = hmsToMs(x.totalTime);
               if (Number.isFinite(ms)) valsMs.push(ms);
             }
           }
-          if (valsMs.length > 0)
-            tm.bestTime = msToHMSms(Math.min.apply(Math, valsMs));
+          if (valsMs.length > 0) {
+            // cari min manual
+            var minMs = valsMs[0];
+            var mi = 1;
+            for (mi = 1; mi < valsMs.length; mi++) {
+              if (valsMs[mi] < minMs) minMs = valsMs[mi];
+            }
+            tm.bestTime = msToHMSms(minMs);
+            eligibleTeams.push(tm);
+          }
         }
       }
 
-      // Sort & ranking kompetisi
-      mergedArray.sort(function (a, b) {
-        const am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
-        const bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
-        return am - bm;
-      });
-
-      let rankCounter = 0;
-      let lastTime = null;
-      let rankDisplay = 0;
-      for (let i = 0; i < mergedArray.length; i++) {
-        const t = mergedArray[i];
-        const best = t && t.bestTime ? hmsToMs(t.bestTime) : Infinity;
-        rankCounter++;
-        if (!Number.isFinite(best)) {
-          t.ranked = 0;
-          t.score = 0;
-        } else {
-          if (lastTime === null || best !== lastTime) rankDisplay = rankCounter;
-          lastTime = best;
-          t.ranked = rankDisplay;
-          t.score = scoreForRank(rankDisplay);
+      if (eligibleTeams.length > 0) {
+        // sort eligible by bestTime asc
+        eligibleTeams.sort(function (a, b) {
+          var am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
+          var bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
+          return am - bm;
+        });
+        var rc = 0;
+        var lastBest = null;
+        var dispBest = 0;
+        var ei2 = 0;
+        for (ei2 = 0; ei2 < eligibleTeams.length; ei2++) {
+          var tt = eligibleTeams[ei2];
+          var best = tt && tt.bestTime ? hmsToMs(tt.bestTime) : Infinity;
+          rc++;
+          if (!Number.isFinite(best)) {
+            tt.ranked = 0;
+            tt.score = 0;
+          } else {
+            if (lastBest === null || best !== lastBest) dispBest = rc;
+            lastBest = best;
+            tt.ranked = dispBest;
+            tt.score = scoreForRank(dispBest); // ← skor dari table/fallback
+          }
         }
       }
 
-      const update = {
+      var update = {
         $set: {
           eventId: meta.eventId,
           initialId: meta.initialId,
@@ -674,18 +749,20 @@ async function insertSlalomResult(payload) {
           divisionName: meta.divisionName,
           teams: mergedArray,
           updatedAt: now,
-          _lastRevision: now.getTime(),
+          _lastRevision: now.getTime()
         },
-        $setOnInsert: { createdAt: now },
+        $setOnInsert: { createdAt: now }
       };
 
-      const res = await col.updateOne(filter, update, { upsert: true });
+      var res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+
+      step = ge.next();
     }
 
     return { ok: true, upsertedCount: upsertedCount };
   } catch (err) {
-    const message = err && err.message ? err.message : String(err);
+    var message = err && err.message ? err.message : String(err);
     console.error("Error insertSlalomResult:", message);
     return { ok: false, error: message };
   }

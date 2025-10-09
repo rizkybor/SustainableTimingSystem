@@ -630,17 +630,7 @@ export default {
     this.loadDrrResult();
   },
 
-  mounted() {
-    window.addEventListener("pdf-generated", function (e) {
-      console.log("[PDF EVENT] pdf-generated", e);
-    });
-    window.addEventListener("hasGenerated", function (e) {
-      console.log("[PDF EVENT] hasGenerated", e);
-    });
-    window.addEventListener("pdfDownloaded", function (e) {
-      console.log("[PDF EVENT] pdfDownloaded", e);
-    });
-  },
+  mounted() {},
 
   methods: {
     // Validasi sederhana HH:MM:SS.mmm → return true/false
@@ -889,23 +879,21 @@ export default {
             }
 
             // --- helper kecil ---
-            const self = this;
-            function asStr(v, d) {
-              if (d === undefined) d = "";
-              return v == null ? d : String(v);
-            }
-            function asNum(v, d) {
-              if (d === undefined) d = 0;
+            // --- helper kecil (pakai function expression agar lolos no-inner-declarations) ---
+            const asStr = (v, d = "") => (v == null ? d : String(v));
+
+            const asNum = (v, d = 0) => {
               const n = Number(v);
               return Number.isFinite(n) ? n : d;
-            }
-            function timeOrZero(t) {
+            };
+
+            const timeOrZero = (t) => {
               const s = asStr(t, "");
               return s ? s : "00:00:00.000";
-            }
+            };
 
             // NORMALISASI PENUH satu tim (lengkap, plus field datar utk tabel)
-            function normalizeTeamFull(team) {
+            const normalizeTeamFull = (team) => {
               const rIn = (team && team.result) || {};
 
               const startPenalty = asNum(rIn.startPenalty, 0);
@@ -976,7 +964,7 @@ export default {
                 judgesBy: asStr(rIn.judgesBy, ""),
                 judgesTime: asStr(rIn.judgesTime, ""),
                 __resultTime: resultTime,
-                __resultMs: self.timeToMs(resultTime),
+                __resultMs: this.timeToMs(resultTime), // langsung pakai this
               };
 
               const otrObj = {
@@ -991,7 +979,7 @@ export default {
                   team && team.otr && team.otr.penaltyFinishTime,
                   ""
                 ),
-                penaltySection: (function () {
+                penaltySection: (() => {
                   const a = team && team.otr && team.otr.penaltySection;
                   if (Array.isArray(a)) {
                     const out = [];
@@ -1015,8 +1003,8 @@ export default {
               };
 
               // objek akhir per tim (lengkap) + field datar untuk tabel
-              const flat = self.normalizeResultFlat({ result: resultObj });
-              const out = {
+              const flat = this.normalizeResultFlat({ result: resultObj });
+              return {
                 nameTeam: asStr(team && team.nameTeam, ""),
                 bibTeam: asStr(team && team.bibTeam, ""),
                 startOrder: asStr(team && team.startOrder, ""),
@@ -1046,23 +1034,18 @@ export default {
                 score: flat.score,
                 sectionPenaltyTime: resultObj.sectionPenaltyTime,
               };
-
-              return out;
-            }
+            };
 
             // rakit rows penuh
             const rows = [];
-            const items = Array.isArray(res.items) ? res.items : [res.items];
-            let di = 0;
-            while (di < items.length) {
-              const doc = items[di];
+            const items = Array.isArray(res.items)
+              ? res.items
+              : res.items
+              ? [res.items]
+              : [];
+            for (const doc of items) {
               const teams = doc && Array.isArray(doc.result) ? doc.result : [];
-              let ti = 0;
-              while (ti < teams.length) {
-                rows.push(normalizeTeamFull(teams[ti]));
-                ti++;
-              }
-              di++;
+              for (const team of teams) rows.push(normalizeTeamFull(team));
             }
 
             // ranking + score, sinkronkan ke field datar
@@ -1098,7 +1081,6 @@ export default {
         await this.$nextTick();
         const inst = this.$refs.html2Pdf;
         if (!inst) {
-          console.error("ref html2Pdf tidak ditemukan");
           return;
         }
         await new Promise(function (r) {
@@ -1106,7 +1088,6 @@ export default {
         });
         await inst.generatePdf();
       } catch (e) {
-        console.error("[PDF] gagal generate:", e);
         this.error = "Gagal membuat PDF";
       }
     },
@@ -1366,7 +1347,6 @@ export default {
   box-shadow: 0 5px 10px rgba(0, 123, 255, 0.45);
   transform: translateY(-1px);
 }
-
 
 .text-penalty {
   color: #e03131;

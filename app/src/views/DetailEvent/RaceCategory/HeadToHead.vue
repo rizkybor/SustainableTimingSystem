@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"
@@ -103,14 +100,13 @@
                 <b-form-group
                   label="Switch Head to Head Category:"
                   label-for="h2hBucketSelect"
-                  class="mb-0 toolbar-select"
+                  class="mb-0 h2h-actionbar__select"
                 >
                   <b-form-select
                     id="h2hBucketSelect"
                     :options="h2hBucketOptions"
                     v-model="selectedH2HKey"
                     @change="onSelectH2HBucket"
-                    class="toolbar-select__control"
                   />
                 </b-form-group>
               </div>
@@ -209,12 +205,27 @@
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <h4 class="mb-0">Bracket Head to Head</h4>
+        <div class="racetime-header">
+              <h4>
+                Bracket Head To Head —
+                {{
+                  currentRound
+                    ? currentRound.bronze
+                      ? "Final B"
+                      : currentRound.name
+                    : "—"
+                }}
+              </h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
           <div class="toolbar-actions">
             <!-- Kelompok tombol -->
             <div
+              v-if="visibleParticipants && visibleParticipants.length"
               class="btn-group-actions"
               role="group"
               aria-label="Build actions"
@@ -500,19 +511,22 @@
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="py-3" style="display: flex; justify-content: space-between">
-          <div>
-            <h4>
-              Racetime Output —
-              {{
-                currentRound
-                  ? currentRound.bronze
-                    ? "Final B"
-                    : currentRound.name
-                  : "—"
-              }}
-            </h4>
-          </div>
-          <div class="d-flex" style="gap: 8px">
+            <div class="racetime-header">
+              <h4>
+                Output Racetime —
+                {{
+                  currentRound
+                    ? currentRound.bronze
+                      ? "Final B"
+                      : currentRound.name
+                    : "—"
+                }}
+              </h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
+          <div class="d-flex" style="gap: 8px" v-if="visibleParticipants && visibleParticipants.length">
             <button
               class="btn-action btn-outline-success"
               @click="saveAllRoundsLocal"
@@ -562,12 +576,11 @@
                     <th rowspan="2">Start Time</th>
 
                     <!-- Grup Penalties -->
-                    <th colspan="9" class="text-center">Penalties</th>
-
-                    <th rowspan="2">Total Penalty</th>
-                    <th class="text-center" rowspan="2">Penalty Time</th>
+                    <th colspan="9" class="text-center">Penalties Group</th>
+                    <th rowspan="2">Penalty Total</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
+                    <th class="text-center" rowspan="2">Penalty Time</th>
                     <th class="text-center" rowspan="2">Result</th>
                     <th class="text-center" rowspan="2">Win/Lose</th>
                     <th v-if="editResult" class="text-center" rowspan="2">
@@ -575,15 +588,15 @@
                     </th>
                   </tr>
                   <tr>
-                    <th class="text-center">S</th>
-                    <th class="text-center">CL</th>
+                    <th class="text-center">Pen. Start (PS)</th>
+                    <th class="text-center">Cut Line (CL)</th>
                     <th class="text-center">R1</th>
                     <th class="text-center">R2</th>
                     <th class="text-center">L1</th>
                     <th class="text-center">L2</th>
-                    <th class="text-center">PB</th>
-                    <th class="text-center">F</th>
-                    <th class="text-center">Others</th>
+                    <th class="text-center">Pen. Booyan (PB)</th>
+                    <th class="text-center">Pen. Finish (PF)</th>
+                    <th class="text-center">Pen. Others (PO)</th>
                   </tr>
                 </thead>
 
@@ -646,12 +659,14 @@
                       {{ item.result.startTime }}
                     </td>
 
-                    <!-- PEENALTY START -->
+                    <!-- PENALTY START -->
                     <td>
                       <b-form-select
                         class="small-select"
                         v-model.number="item.result.penalties.s"
                         :options="sChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -667,6 +682,8 @@
                         class="small-select"
                         v-model.number="item.result.penalties.cl"
                         :options="clChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -682,6 +699,8 @@
                         class="small-select"
                         v-model="item.result.penalties.r1"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -698,6 +717,8 @@
                         class="small-select"
                         v-model="item.result.penalties.r2"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -714,6 +735,8 @@
                         class="small-select"
                         v-model="item.result.penalties.l1"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -730,6 +753,8 @@
                         class="small-select"
                         v-model="item.result.penalties.l2"
                         :options="ynChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -769,6 +794,8 @@
                         class="small-select"
                         v-model.number="item.result.penalties.f"
                         :options="fChoices"
+                        text-field="label"
+                        value-field="value"
                         size="sm"
                         @change="onPenaltyChange(item)"
                         :disabled="
@@ -798,7 +825,7 @@
                       />
                     </td>
 
-                    <!-- JUMLAH PENALTY  -->
+                    <!-- PENALTY TOTAL  -->
                     <td class="large-bold">
                       {{ getTotalPenalty(item) }}
                       <small class="text-muted"
@@ -806,19 +833,19 @@
                       >
                     </td>
 
-                    <!-- PENALTY TIME -->
-                    <td class="text-center text-monospace penalty-char">
-                      {{ item.result.penaltyTime }}
-                    </td>
-
                     <!-- FINISH TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.finishTime }}
                     </td>
 
-                    <!-- RACETIME  -->
+                    <!-- RACE TIME  -->
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
+                    </td>
+
+                    <!-- PENALTY TIME -->
+                    <td class="text-center text-monospace penalty-char">
+                      {{ item.result.penaltyTime }}
                     </td>
 
                     <!-- RESULT  -->
@@ -899,23 +926,7 @@
               </table>
 
               <!-- EMPTY STATE -->
-              <div
-                v-else
-                class="bracket-empty d-flex align-items-center justify-content-center py-5"
-              >
-                <div class="text-center text-muted">
-                  <Icon
-                    icon="mdi:account-off-outline"
-                    width="36"
-                    height="36"
-                    class="mb-2"
-                  />
-                  <div><strong>Teams on this categories not found</strong></div>
-                  <small>
-                    Coba pilih kategori lain atau sinkronkan ulang data tim.
-                  </small>
-                </div>
-              </div>
+              <EmptyCard v-else />
             </div>
             <br />
           </b-col>
@@ -925,6 +936,7 @@
 
     <!-- OPERATION TIME (shared component) -->
     <OperationTimePanel
+      v-if="visibleParticipants && visibleParticipants.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="visibleParticipants"
@@ -933,7 +945,7 @@
       @update-time="updateTime"
     />
 
-    <div class="ml-5">
+    <div class="ml-5 mt-4">
       <b-button @click="goTo" variant="outline-info" class="btn-action">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
@@ -944,12 +956,13 @@
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { Icon } from "@iconify/vue2";
+import EmptyCard from "@/components/cards/card-empty.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
+import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1095,6 +1108,7 @@ function buildResultDocs(participantArr, bucket) {
 
 function normalizeTeamForH2H(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),
@@ -1169,7 +1183,7 @@ function seedGlobalHeatFromList(list, { reset = false } = {}) {
 
 export default {
   name: "SustainableTimingSystemH2HRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
       defaultImg,
@@ -1205,45 +1219,8 @@ export default {
       isPortConnected: false,
       digitId: [],
       digitTime: [],
-      dataPenalties: [
-        { label: "0", value: 0, timePen: "00:00:00.000" },
-        { label: "5", value: 5, timePen: "00:00:05.000" },
-        { label: "50", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 100 },
-        { ranking: 2, score: 92 },
-        { ranking: 3, score: 86 },
-        { ranking: 4, score: 82 },
-        { ranking: 5, score: 79 },
-        { ranking: 6, score: 76 },
-        { ranking: 7, score: 73 },
-        { ranking: 8, score: 70 },
-        { ranking: 9, score: 67 },
-        { ranking: 10, score: 64 },
-        { ranking: 11, score: 61 },
-        { ranking: 12, score: 58 },
-        { ranking: 13, score: 55 },
-        { ranking: 14, score: 52 },
-        { ranking: 15, score: 49 },
-        { ranking: 16, score: 46 },
-        { ranking: 17, score: 43 },
-        { ranking: 18, score: 40 },
-        { ranking: 19, score: 38 },
-        { ranking: 20, score: 36 },
-        { ranking: 21, score: 34 },
-        { ranking: 22, score: 32 },
-        { ranking: 23, score: 30 },
-        { ranking: 24, score: 28 },
-        { ranking: 25, score: 26 },
-        { ranking: 26, score: 24 },
-        { ranking: 27, score: 22 },
-        { ranking: 28, score: 20 },
-        { ranking: 29, score: 18 },
-        { ranking: 30, score: 16 },
-        { ranking: 31, score: 14 },
-        { ranking: 32, score: 12 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       isRankedDescending: false,
@@ -1373,33 +1350,33 @@ export default {
       }
       return [];
     },
-    sChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 50, text: "50 (50s)" },
-      ];
-    },
-    fChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 10, text: "10 (10s)" },
-        { value: 50, text: "50 (50s)" },
-      ];
-    },
-    clChoices() {
-      return [
-        { value: 0, text: "0 (0s)" },
-        { value: 10, text: "10 (10s)" },
-        { value: 20, text: "20 (20s)" },
-      ];
-    },
-    ynChoices() {
-      return [
-        { value: null, text: "-" },
-        { value: "N", text: "N" },
-        { value: "Y", text: "Y" },
-      ];
-    },
+    // sChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 50, text: "50 (50s)" },
+    //   ];
+    // },
+    // fChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 10, text: "10 (10s)" },
+    //     { value: 50, text: "50 (50s)" },
+    //   ];
+    // },
+    // clChoices() {
+    //   return [
+    //     { value: 0, text: "0 (0s)" },
+    //     { value: 10, text: "10 (10s)" },
+    //     { value: 20, text: "20 (20s)" },
+    //   ];
+    // },
+    // ynChoices() {
+    //   return [
+    //     { value: null, text: "-" },
+    //     { value: "N", text: "N" },
+    //     { value: "Y", text: "Y" },
+    //   ];
+    // },
     storedResultsByRound() {
       // baca semua yang sudah dipersist ke localStorage untuk bucket saat ini
       if (!this.roundResultsRootKey) return {};
@@ -1635,6 +1612,9 @@ export default {
     } catch {
       this.dataEvent = {};
     }
+
+    await this.loadDataScore("HEAD_TO_HEAD");
+    await this.loadDataPenalties("HEAD_TO_HEAD");
 
     // build opsi statik dari kategori event (fallback ke default bila kosong)
     this.buildStaticH2HOptions();
@@ -2955,6 +2935,59 @@ export default {
         (err && (err.message || err.toString())) || "Unknown error";
       this.notify("error", detail, message);
     },
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties() {
+      try {
+        ipcRenderer.send("option-penalties", "HEAD_TO_HEAD");
+
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (!payload || !payload[0] || !payload[0].data) {
+            this.sChoices = [];
+            this.fChoices = [];
+            this.clChoices = [];
+            this.ynChoices = [];
+            return;
+          }
+
+          const arr = payload[0].data; // semua kategori
+          if (!Array.isArray(arr)) return;
+
+          // helper untuk ambil kategori
+          const getChoices = (key) => {
+            const cat = arr.find(
+              (d) =>
+                d.category && d.category.toUpperCase() === key.toUpperCase()
+            );
+            return cat && Array.isArray(cat.choices) ? cat.choices : [];
+          };
+
+          this.sChoices = getChoices("START");
+          this.fChoices = getChoices("FINISH");
+          this.clChoices = getChoices("CLASSIC");
+          this.ynChoices = getChoices("YESNO");
+        });
+      } catch (error) {
+        this.sChoices = [];
+        this.fChoices = [];
+        this.clChoices = [];
+        this.ynChoices = [];
+      }
+    },
     /** Method podium config */
     /** Cari round final (size==2) dan bronze (round.bronze) */
     getFinalRound() {
@@ -3603,6 +3636,46 @@ export default {
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+/* ---- Styling utk Switch DRR Category select ---- */
+.h2h-actionbar__select {
+  min-width: 260px;
+  flex: 1 1 260px;
+}
+
+.h2h-actionbar__select #h2hBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+#h2hBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+#h2hBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
+
 .btn-action {
   background: #ffffff;
   border: 1px solid #cfd8e6;
@@ -3988,16 +4061,6 @@ thead th[colspan="8"] {
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap; /* biar responsif */
-}
-
-/* Select block */
-.toolbar-select {
-  min-width: 260px;
-  flex: 1 1 260px; /* bisa melebar di layar kecil */
-}
-.toolbar-select__control {
-  border-radius: 10px;
-  cursor: pointer;
 }
 
 /* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */

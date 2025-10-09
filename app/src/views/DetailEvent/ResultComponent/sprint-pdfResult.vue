@@ -2,7 +2,9 @@
   <div class="page">
     <!-- HEADER -->
     <header class="head">
-              <!-- TRADEMARK -->
+
+
+    <!-- TRADEMARK -->
     <div class="trademark">@STiming.System.424.Timestamp {{ timestamp }} #-</div>
       <div class="band">
         <div class="band-left">

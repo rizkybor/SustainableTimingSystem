@@ -202,10 +202,9 @@ export default {
 }
 
 .race-window {
-  background: #2f2f2f; /* dark base biar glowing keliatan */
+  background: #2f2f2f; 
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  
   transition: all 0.3s ease;
 }
 
@@ -243,13 +242,11 @@ export default {
   border: 1px solid #e6ebf4;
   border-radius: 20px;
   overflow: hidden;
-  /* jaga radius */
 }
 
 /* Tinggi SELALU tetap; scroll jika konten lebih */
 .feed-scroll {
   height: 500px;
-  /* <- atur tinggi tetap di sini */
   overflow: auto;
 }
 

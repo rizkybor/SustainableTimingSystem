@@ -25,14 +25,20 @@ const {
   getOptionCategoriesDivision,
   getOptionCategoriesInitial,
   getOptionCategoriesRace,
+  getOptionPenalties,
+  getOptionRanked,
 } = require("../controllers/GET/getOptionEvent.js");
 
 const {
   insertNewEvent,
-  insertSprintResult,
-  insertSlalomResult,
   updateEventPoster,
 } = require("../controllers/INSERT/insertNewEvent.js");
+
+const {
+  insertSprintResult,
+  insertSlalomResult,
+  insertDrrResult,
+} = require("../controllers/INSERT/insertResultEventByCategories.js");
 
 const {
   getTeamsRegistered,
@@ -56,7 +62,8 @@ const {
 
 const {
   getSprintResult,
-  existsSprintResult,
+  getDrrResult,
+  getSlalomResult
 } = require("../controllers/GET/getResult.js");
 
 const {
@@ -230,6 +237,24 @@ function setupIPCMainHandlers() {
       event.reply("option-categories-race-reply", data);
     } catch (error) {
       event.reply("option-categories-race-reply", []);
+    }
+  });
+
+  ipcMain.on("option-penalties", async (event, type) => {
+    try {
+      const data = await getOptionPenalties(type);
+      event.reply("option-penalties-reply", data);
+    } catch (error) {
+      event.reply("option-penalties-reply", []);
+    }
+  });
+
+  ipcMain.on("option-ranked", async (event, type) => {
+    try {
+      const data = await getOptionRanked(type);
+      event.reply("option-ranked-reply", data);
+    } catch (error) {
+      event.reply("option-ranked-reply", []);
     }
   });
 

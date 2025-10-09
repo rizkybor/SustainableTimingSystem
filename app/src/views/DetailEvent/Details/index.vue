@@ -25,7 +25,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -37,7 +37,7 @@
           <!-- judul + meta -->
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ events.eventName || "Kejurnas Arung Jeram DKI Jakarta 2025" }}
+              {{ events.eventName || "-" }}
             </h2>
             <div class="meta">
               <span class="mr-3" style="font-size: 18px"
@@ -517,6 +517,54 @@ export default {
       };
     },
 
+    deleteRow(div, race, row) {
+      const evName = this.raceActive.selected.name;
+      const init =
+        (this.initialActive.selected && this.initialActive.selected.name) || "";
+
+      // 1) Hapus dari state lokal
+      const bucket = this._getBucket(evName, div, race, init);
+      if (!bucket) return;
+      bucket.teams = (bucket.teams || []).filter(
+        (t) =>
+          String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
+          String(t.nameTeam).trim().toUpperCase() !==
+          String(row.nameTeam).trim().toUpperCase()
+      );
+      this.dataTeams = this.dataTeams.slice();
+      this.persistParticipants();
+
+      // 2) Hapus di DB
+      ipcRenderer.send("delete-team-in-bucket", {
+        identity: {
+          eventId: bucket.eventId,
+          initialId: bucket.initialId,
+          raceId: bucket.raceId,
+          divisionId: bucket.divisionId,
+          eventName: bucket.eventName,
+          initialName: bucket.initialName,
+          raceName: bucket.raceName,
+          divisionName: bucket.divisionName,
+        },
+        team: {
+          nameTeam: row.nameTeam,
+          bibTeam: row.bibTeam,
+        },
+      });
+
+      ipcRenderer.once("delete-team-in-bucket-reply", (_e, res) => {
+        if (res && res.ok) {
+          // optional toast
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: (res && res.error) || "Gagal menghapus team di database.",
+            message: "Failed",
+          });
+        }
+      });
+    },
+
     showResult(div, race) {
       const idt = this._buildIdentity(div, race);
       if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
@@ -830,7 +878,15 @@ export default {
       );
 
       const bucket = {
-        eventId: evCfg ? String(evCfg.value) : "",
+        // 🔧 DITAMBAH
+        eventId:
+          this.$route && this.$route.params && this.$route.params.id
+            ? String(this.$route.params.id)
+            : evCfg
+            ? String(evCfg.value)
+            : "",
+        // 🔧 sampai sini
+
         initialId: iniCfg ? String(iniCfg.value) : "",
         raceId: racCfg ? String(racCfg.value) : "",
         divisionId: divCfg ? String(divCfg.value) : "",
@@ -897,13 +953,19 @@ export default {
               finishTime: "",
               raceTime: "",
               penaltyTime: "",
-              penalty: "",
-              totalTime: "",
-              ranked: "",
-              score: "",
-              bracket: 16,
+              penaltyTotal: null,
+              penalties: {},
             },
           ],
+          roundId: "",
+          roundName: "",
+          totalTime: "",
+          ranked: "",
+          score: "",
+          winLose: "",
+          heat: null,
+          judgesBy: "",
+          judgesTime: "",
         };
       }
       if (ev === "SLALOM") {
@@ -911,29 +973,71 @@ export default {
           ...base,
           result: [
             {
+              session: "",
               startTime: "",
               finishTime: "",
               raceTime: "",
               penaltyTime: "",
-              penalty: "",
+              penaltyTotal: {
+                start: null,
+                finish: null,
+                gates: [],
+              },
               totalTime: "",
-              ranked: "",
-              score: "",
+              ranked: null,
+              score: null,
+              judgesBy: "",
+              judgesTime: "",
             },
             {
+              session: "",
               startTime: "",
               finishTime: "",
               raceTime: "",
               penaltyTime: "",
-              penalty: "",
+              penaltyTotal: {
+                start: null,
+                finish: null,
+                gates: [],
+              },
               totalTime: "",
-              ranked: "",
-              score: "",
+              ranked: null,
+              score: null,
+              judgesBy: "",
+              judgesTime: "",
             },
           ],
         };
       }
-      // SPRINT / DRR
+
+      // DRR
+      if (ev === "DRR") {
+        return {
+          ...base,
+          result: [
+            {
+              startTime: "",
+              finishTime: "",
+              raceTime: "",
+              startPenalty: null,
+              finishPenalty: null,
+              sectionPenalty: null,
+              totalPenalty: null,
+              startPenaltyTime: "",
+              finishPenaltyTime: "",
+              sectionPenaltyTime: [],
+              totalPenaltyTime: "",
+              totalTime: "",
+              ranked: null,
+              score: null,
+              judgesBy: "",
+              judgesTime: "",
+            },
+          ],
+        };
+      }
+
+      // SPRINT
       return {
         ...base,
         result: {
@@ -950,16 +1054,6 @@ export default {
           judgesBy: "",
           judgesTime: "",
         },
-        otr: {
-          startTime: "",
-          finishTime: "",
-          raceTime: "",
-          penaltyTime: "",
-          penalty: "",
-          totalTime: "",
-          ranked: "",
-          score: "",
-        },
       };
     },
 
@@ -967,6 +1061,9 @@ export default {
       const k = this.keyOf(div, race);
       const d = this.draftMap[k];
       if (!d || !d.teamId || !d.bib) return;
+
+      // ✅ Ambil eventId dari route params
+      const eventId = String(this.$route.params.id || "");
 
       const evName = this.raceActive.selected.name;
       const init =
@@ -1283,7 +1380,7 @@ export default {
         });
       }
 
-      const path = this._mapRaceToPath(bucket.eventName);
+      const path = this._mapRaceToPath(this.raceActive.selected.name);
       this.$router.push("/event-detail/" + this.$route.params.id + "/" + path);
     },
   },

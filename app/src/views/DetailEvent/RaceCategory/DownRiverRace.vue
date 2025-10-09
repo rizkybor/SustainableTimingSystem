@@ -32,7 +32,7 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-             <template v-if="hasEventLogo">
+              <template v-if="hasEventLogo">
                 <img
                   :src="eventLogoUrl"
                   alt="Event Logo"
@@ -40,7 +40,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -51,10 +51,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                dataEventSafe.eventName ||
-                "Kejurnas Arung Jeram DKI Jakarta 2025"
-              }}
+              {{ dataEventSafe.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3"
@@ -97,6 +94,22 @@
                 >
                   {{ titleCategories || "-" }}
                 </span>
+              </div>
+
+              <div class="meta-row">
+                <!-- Select category -->
+                <b-form-group
+                  label="Switch DRR Category:"
+                  label-for="drrBucketSelect"
+                  class="mb-0 drr-actionbar__select"
+                >
+                  <b-form-select
+                    id="drrBucketSelect"
+                    :options="drrBucketOptions"
+                    v-model="selectedDrrKey"
+                    @change="onSelectDrrBucket"
+                  />
+                </b-form-group>
               </div>
             </div>
           </b-col>
@@ -177,6 +190,7 @@
 
     <!-- OPERATION TIME (shared component like Sprint) -->
     <OperationTimePanel
+      v-if="participantArr && participantArr.length"
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -190,47 +204,45 @@
       <div class="card-body">
         <b-row class="align-items-center py-2">
           <b-col>
-            <h4>Output Racetime :</h4>
-            <small class="text-muted">
-              Category active: {{ titleCategories || "-" }}
-            </small>
+            <div class="racetime-header">
+              <h4>Output Racetime :</h4>
+              <small class="text-muted">
+                Category active: {{ titleCategories || "-" }}
+              </small>
+            </div>
           </b-col>
-          <b-col cols="12" md="6">
-            <div class="drr-actionbar">
-              <b-form-group
-                label="Switch DRR Category:"
-                label-for="drrBucketSelect"
-                class="mb-0 drr-actionbar__select"
-              >
-                <b-form-select
-                  id="drrBucketSelect"
-                  :options="drrBucketOptions"
-                  v-model="selectedDrrKey"
-                  @change="onSelectDrrBucket"
-                />
-              </b-form-group>
-
-              <div class="drr-actionbar__buttons">
-                <button
+          <b-col cols="6" md="6">
+            <div class="drr-actionbar__buttons">
+              <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
+              <!-- <button
                   type="button"
-                  class="btn-action btn-secondary"
-                  @click="saveResult"
+                  class="btn-action btn-warning"
+                  @click="previewJson"
                   :disabled="!currentBucket || !participantArr.length"
-                  title="Simpan hasil untuk bucket yang dipilih"
+                  title="Tampilkan JSON yang akan disimpan"
                 >
-                  <Icon icon="icon-park-outline:save" /> Save Result
-                </button>
+                  <Icon icon="mdi:code-json" /> Preview JSON
+                </button> -->
 
-                <button
-                  type="button"
-                  class="btn-action btn-info"
-                  @click="toggleSortRanked"
-                  :disabled="!participantArr.length"
-                  title="Urutkan berdasarkan rank naik/turun"
-                >
-                  <Icon icon="icon-park-outline:ranking" /> Sort Ranked
-                </button>
-              </div>
+              <button
+                type="button"
+                class="btn-action btn-secondary"
+                @click="saveResult"
+                :disabled="!currentBucket || !participantArr.length"
+                title="Simpan hasil untuk bucket yang dipilih"
+              >
+                <Icon icon="icon-park-outline:save" /> Save Result
+              </button>
+
+              <button
+                type="button"
+                class="btn-action btn-info"
+                @click="toggleSortRanked"
+                :disabled="!participantArr.length"
+                title="Urutkan berdasarkan rank naik/turun"
+              >
+                <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+              </button>
             </div>
           </b-col>
         </b-row>
@@ -238,43 +250,57 @@
         <b-row>
           <b-col>
             <div class="table-wrapper">
-              <table class="table" aria-label="Scrollable results table">
+              <div
+                v-if="isLoading"
+                class="bracket-loading d-flex align-items-center justify-content-center py-5"
+              >
+                <div class="text-center">
+                  <b-spinner label="Loading" class="mb-2"></b-spinner>
+                  <div class="text-muted">Loading bracket & teams…</div>
+                </div>
+              </div>
+              <table
+                v-else-if="participantArr && participantArr.length"
+                class="table"
+                aria-label="Scrollable results table"
+              >
                 <thead>
                   <tr>
                     <th class="text-center">No</th>
                     <th class="text-left">Team Name</th>
                     <th class="text-center">BIB Number</th>
                     <th class="text-center">Start Time</th>
+                    <th class="text-center">Pen. Start</th>
+                    <th class="text-center">Pen. Section</th>
+                    <th class="text-center">Pen. Finish</th>
+                    <th class="text-center">Penalty Total</th>
                     <th class="text-center">Finish Time</th>
                     <th class="text-center">Race Time</th>
-                    <th class="text-center">Penalty Start</th>
-                    <th class="text-center">Penalty Section</th>
-                    <th class="text-center">Penalty Finish</th>
-                    <th class="text-center">Penalty Total</th>
+                    <th class="text-center">Penalty Time</th>
                     <th class="text-center">Result</th>
                     <th class="text-center">Ranked</th>
-                    <th class="text-center">Score</th>
+                    <th class="text-center">Scored</th>
                     <th v-if="editResult">Action</th>
                   </tr>
                 </thead>
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
+                    
+                     <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
+
+                    <!-- BIB NUMBER  -->
                     <td class="text-center">{{ item.bibTeam }}</td>
+
+                    <!-- START TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.startTime }}
                     </td>
-                    <td class="text-center text-monospace">
-                      {{ item.result.finishTime }}
-                    </td>
-                    <td class="text-center large-bold text-monospace">
-                      {{ item.result.raceTime }}
-                    </td>
 
-                    <!-- Pen Start -->
+                    <!-- PENALTY START TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -298,7 +324,7 @@
                       </b-select>
                     </td>
 
-                    <!-- Pen Section -->
+                    <!-- PENALTY SECTION TIME -->
                     <td class="text-center">
                       <div class="pen-grid">
                         <b-select
@@ -328,7 +354,7 @@
                       </div>
                     </td>
 
-                    <!-- Pen Finish -->
+                    <!-- PENALTY FINISH TIME -->
                     <td class="text-center">
                       <b-select
                         class="small-select"
@@ -352,11 +378,29 @@
                       </b-select>
                     </td>
 
+                    <!-- PENALTY TOTAL  -->
+                    <td class="text-center penalty-char">
+                      {{ item.result.totalPenalty }}
+                    </td>
+
+                    <!-- FINISH TIME  -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.finishTime }}
+                    </td>
+
+                    <!-- RACE TIME  -->
+                    <td class="text-center large-bold text-monospace">
+                      {{ item.result.raceTime }}
+                    </td>
+
+                    <!-- PENALTY TIME  -->
                     <td
                       class="text-center large-bold penalty-char text-monospace"
                     >
                       {{ item.result.penaltyTime }}
                     </td>
+
+                    <!-- RESULT TIME  -->
                     <td
                       class="text-center large-bold result-char text-monospace"
                     >
@@ -366,9 +410,13 @@
                           : item.result.raceTime
                       }}
                     </td>
+
+                    <!-- RANKED  -->
                     <td class="text-center large-bold">
                       {{ item.result.ranked }}
                     </td>
+
+                    <!-- SCORED  -->
                     <td class="text-center large-bold">
                       {{ getScoreByRanked(item.result.ranked) }}
                     </td>
@@ -402,6 +450,8 @@
                   </tr>
                 </tbody>
               </table>
+              <!-- EMPTY STATE -->
+              <EmptyCard v-else />
             </div>
             <br />
           </b-col>
@@ -412,14 +462,82 @@
         </b-button>
       </div>
     </div>
+
+    <!-- === NEW: MODAL PREVIEW JSON (TAMBAHAN) === -->
+    <b-modal
+      id="preview-json-modal"
+      title="Preview JSON – Down River Race"
+      size="xl"
+      hide-footer
+    >
+      <div class="mb-2 text-muted small">
+        <div><strong>Bucket</strong> : {{ titleCategories || "-" }}</div>
+        <div>
+          <strong>Total Teams</strong> :
+          {{ (previewDocs && previewDocs.length) || 0 }}
+        </div>
+      </div>
+
+      <b-form-group label="Pretty print:" label-cols-sm="2" class="mb-2">
+        <b-form-checkbox
+          v-model="prettyPrint"
+          switch
+          @change="refreshPreviewText"
+        >
+          {{ prettyPrint ? "ON" : "OFF" }}
+        </b-form-checkbox>
+      </b-form-group>
+
+      <div class="json-scroll">
+        <pre class="json-pre">{{ previewJsonText }}</pre>
+      </div>
+
+      <div class="d-flex justify-content-between mt-3">
+        <div class="d-flex">
+          <b-button
+            variant="outline-secondary"
+            class="mr-2 btn-action"
+            @click="copyPreview"
+          >
+            <Icon icon="mdi:content-copy" /> Copy JSON
+          </b-button>
+          <b-button
+            variant="outline-secondary"
+            class="btn-action"
+            @click="downloadPreview"
+          >
+            <Icon icon="mdi:download" /> Download JSON
+          </b-button>
+        </div>
+        <div class="d-flex">
+          <b-button
+            variant="secondary"
+            class="mr-2 btn-action"
+            @click="$bvModal.hide('preview-json-modal')"
+          >
+            Cancel
+          </b-button>
+          <b-button
+            variant="success"
+            class="btn-action"
+            @click="saveResultConfirmed"
+          >
+            <Icon icon="mdi:check-circle" /> Continue &amp; Save
+          </b-button>
+        </div>
+      </div>
+    </b-modal>
+    <!-- === END MODAL PREVIEW JSON === -->
   </div>
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import defaultImg from "@/assets/images/default-second.jpeg";
+import EmptyCard from "@/components/cards/card-empty.vue";
+import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -454,60 +572,109 @@ function getBucket() {
 
 function buildResultDocs(participantArr, bucket) {
   const now = new Date();
+
+  const asStr = (v) => (v == null ? "" : String(v));
+  const asNum = (v, d = 0) =>
+    Number.isFinite(Number(v)) ? Number(v) : Number(d);
+  const timeOrZero = (t) => asStr(t) || "00:00:00.000";
+
   return participantArr.map((t) => {
     const team = {
-      nameTeam: String(t.nameTeam || ""),
-      bibTeam: String(t.bibTeam || ""),
-      startOrder: String(t.startOrder || ""),
-      praStart: String(t.praStart || ""),
-      intervalRace: String(t.intervalRace || ""),
-      statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
+      nameTeam: asStr(t.nameTeam),
+      bibTeam: asStr(t.bibTeam),
+      startOrder: asStr(t.startOrder),
+      praStart: asStr(t.praStart),
+      intervalRace: asStr(t.intervalRace),
+      statusId: asNum(t.statusId, 0),
     };
 
-    const result = { ...(t.result || {}) };
-    const otr = { ...(t.otr || {}) };
+    const r = { ...(t.result || {}) };
+    const o = { ...(t.otr || {}) };
 
-    result.startTime = String(result.startTime || "");
-    result.finishTime = String(result.finishTime || "");
-    result.raceTime = String(result.raceTime || "");
-    result.penaltyStartTime = String(result.penaltyStartTime || "");
-    result.penaltyFinishTime = String(result.penaltyFinishTime || "");
-    result.penaltySection = Array.isArray(result.penaltySection)
-      ? result.penaltySection.map((x) => String(x || ""))
-      : [];
-    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
-    result.totalTime = String(result.totalTime || result.raceTime || "");
-    result.ranked = Number.isFinite(result.ranked)
-      ? Number(result.ranked)
-      : result.ranked
-      ? Number(result.ranked)
-      : 0;
-    result.score = Number.isFinite(result.score)
-      ? Number(result.score)
-      : result.score
-      ? Number(result.score)
-      : 0;
+    // ambil nilai penalti numerik
+    const startPenalty = asNum(r.startPenalty, 0);
+    const finishPenalty = asNum(r.finishPenalty, 0);
+    const sectionPenalty = asNum(r.sectionPenalty, 0);
+    const totalPenalty = startPenalty + finishPenalty + sectionPenalty;
+
+    // ambil waktu penalti (default “00:00:00.000”)
+    const startPenaltyTime = timeOrZero(
+      r.penaltyStartTime || r.startPenaltyTime
+    );
+    const finishPenaltyTime = timeOrZero(
+      r.penaltyFinishTime || r.finishPenaltyTime
+    );
+    const sectionPenaltyTime = Array.isArray(
+      r.penaltySectionTime || r.penaltySection
+    )
+      ? (r.penaltySectionTime || r.penaltySection).map(timeOrZero)
+      : ["00:00:00.000", "00:00:00.000", "00:00:00.000"];
+
+    // total penalty time (bisa dihitung otomatis atau pakai field dari UI)
+    const totalPenaltyTime = timeOrZero(r.penaltyTime || r.totalPenaltyTime);
+    const totalTime = timeOrZero(r.totalTime || r.raceTime);
+
+    const result = {
+      startTime: asStr(r.startTime),
+      finishTime: asStr(r.finishTime),
+      raceTime: asStr(r.raceTime),
+
+      startPenalty,
+      finishPenalty,
+      sectionPenalty,
+      totalPenalty,
+
+      startPenaltyTime,
+      finishPenaltyTime,
+      sectionPenaltyTime,
+      totalPenaltyTime,
+
+      totalTime,
+      ranked: asNum(r.ranked, 0),
+      score: asNum(r.score, 0),
+      judgesBy: asStr(r.judgesBy),
+      judgesTime: asStr(r.judgesTime),
+    };
+
+    const otr = {
+      startTime: asStr(o.startTime),
+      finishTime: asStr(o.finishTime),
+      raceTime: asStr(o.raceTime),
+      penaltyStartTime: asStr(o.penaltyStartTime),
+      penaltyFinishTime: asStr(o.penaltyFinishTime),
+      penaltySection: Array.isArray(o.penaltySection)
+        ? o.penaltySection.map(asStr)
+        : ["", "", ""],
+      penaltyTime: asStr(o.penaltyTime),
+      totalTime: asStr(o.totalTime),
+      ranked: asStr(o.ranked),
+      score: asStr(o.score),
+      penalty: asStr(o.penalty),
+    };
 
     return {
-      eventId: bucket.eventId,
-      initialId: bucket.initialId,
-      raceId: bucket.raceId,
-      divisionId: bucket.divisionId,
-      eventName: bucket.eventName,
-      initialName: bucket.initialName,
-      raceName: bucket.raceName,
-      divisionName: bucket.divisionName,
+      eventId: asStr(bucket.eventId),
+      initialId: asStr(bucket.initialId),
+      raceId: asStr(bucket.raceId),
+      divisionId: asStr(bucket.divisionId),
+      eventName: asStr(bucket.eventName || "DRR"),
+      initialName: asStr(bucket.initialName),
+      raceName: asStr(bucket.raceName),
+      divisionName: asStr(bucket.divisionName),
+
       ...team,
       result,
       otr,
-      createdAt: now,
-      updatedAt: now,
+
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
     };
   });
 }
 
 function normalizeTeamForDRR(t = {}) {
   const base = {
+    teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || ""),
     bibTeam: String(t.bibTeam || ""),
     startOrder: String(t.startOrder || ""),
@@ -525,6 +692,10 @@ function normalizeTeamForDRR(t = {}) {
     penaltySection: ["", "", ""],
     penaltyTime: "",
     totalTime: "",
+    startPenalty: 0,
+    finishPenalty: 0,
+    sectionPenalty: 0,
+    totalPenalty: 0,
     ranked: "",
     score: "",
   };
@@ -575,13 +746,12 @@ function readEventDetailsFromLS() {
   }
 }
 
-import { logger } from "@/utils/logger";
-
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
+      isLoading: false,
       defaultImg,
       selectPath: "",
       baudRate: 9600,
@@ -600,46 +770,8 @@ export default {
       drrSectionsCount: 3,
       editForm: "",
       editResult: false,
-      dataPenalties: [
-        { label: "0", value: 0, timePen: "00:00:00.000" },
-        { label: "+ 10", value: 10, timePen: "00:00:10.000" },
-        { label: "- 10", value: 999, timePen: "-00:00:10.000" },
-        { label: "+ 50", value: 50, timePen: "00:00:50.000" },
-      ],
-      dataScore: [
-        { ranking: 1, score: 350 },
-        { ranking: 2, score: 322 },
-        { ranking: 3, score: 301 },
-        { ranking: 4, score: 287 },
-        { ranking: 5, score: 277 },
-        { ranking: 6, score: 266 },
-        { ranking: 7, score: 256 },
-        { ranking: 8, score: 245 },
-        { ranking: 9, score: 235 },
-        { ranking: 10, score: 224 },
-        { ranking: 11, score: 214 },
-        { ranking: 12, score: 203 },
-        { ranking: 13, score: 193 },
-        { ranking: 14, score: 182 },
-        { ranking: 15, score: 172 },
-        { ranking: 16, score: 161 },
-        { ranking: 17, score: 151 },
-        { ranking: 18, score: 140 },
-        { ranking: 19, score: 133 },
-        { ranking: 20, score: 126 },
-        { ranking: 21, score: 119 },
-        { ranking: 22, score: 112 },
-        { ranking: 23, score: 105 },
-        { ranking: 24, score: 98 },
-        { ranking: 25, score: 91 },
-        { ranking: 26, score: 84 },
-        { ranking: 27, score: 77 },
-        { ranking: 28, score: 70 },
-        { ranking: 29, score: 63 },
-        { ranking: 30, score: 56 },
-        { ranking: 31, score: 49 },
-        { ranking: 32, score: 42 },
-      ],
+      dataPenalties: [],
+      dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
       currentPort: "",
@@ -647,6 +779,12 @@ export default {
       participant: [],
       dataEvent: {},
       titleCategories: "",
+
+      /* === NEW: State untuk Preview JSON (TAMBAHAN) === */
+
+      previewDocs: [],
+      previewJsonText: "",
+      prettyPrint: true,
     };
   },
   computed: {
@@ -749,9 +887,10 @@ export default {
     },
   },
   async mounted() {
-    this.dataEvent = readEventDetailsFromLS();
-    window.addEventListener("scroll", this.handleScroll);
+    await this.loadDataScore("DRR");
+    await this.loadDataPenalties("DRR");
 
+    this.dataEvent = readEventDetailsFromLS();
     this.buildStaticDrrOptions();
 
     if (this.drrBucketOptions.length) {
@@ -767,9 +906,6 @@ export default {
     }
 
     this.fetchDrrSectionCountFromSettings();
-  },
-  beforeDestroy() {
-    window.removeEventListener("scroll", this.handleScroll);
   },
   methods: {
     // === SERIAL CONNECTION ===
@@ -858,6 +994,37 @@ export default {
       this.notify("error", detail, message);
     },
     // ======
+
+    async loadDataScore(type) {
+      try {
+        ipcRenderer.send("option-ranked", type);
+        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+          if (payload) {
+            this.dataScore = payload[0].data;
+          } else {
+            this.dataScore = [];
+          }
+        });
+      } catch (error) {
+        this.dataScore = [];
+      }
+    },
+
+    async loadDataPenalties(type) {
+      try {
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          if (payload) {
+            this.dataPenalties = payload[0].data;
+          } else {
+            this.dataPenalties = [];
+          }
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
     resetRow(item) {
       if (!item || !item.result) return;
 
@@ -871,6 +1038,10 @@ export default {
       item.result.startTime = "";
       item.result.finishTime = "";
       item.result.raceTime = "";
+      item.result.startPenalty = 0;
+      item.result.finishPenalty = 0;
+      item.result.sectionPenalty = 0;
+      item.result.totalPenalty = 0;
 
       // kosongkan penalti DRR
       item.result.penaltyStartTime = "";
@@ -1101,6 +1272,7 @@ export default {
     },
     loadAllDrrBucketsFromEvent() {
       try {
+        this.isLoading = true;
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
         const participant = Array.isArray(ev.participant) ? ev.participant : [];
@@ -1195,6 +1367,7 @@ export default {
       } catch {
         // biarkan fallback yang sudah ada (loadFromRaceStartPayload / checkValueStorage)
       }
+      this.isLoading = false;
     },
 
     _useDrrBucket(key) {
@@ -1246,6 +1419,8 @@ export default {
 
     async fetchBucketTeamsByKey(key) {
       try {
+        this.isLoading = true;
+
         if (
           !key ||
           !this.drrBucketMap[key] ||
@@ -1307,6 +1482,7 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
+      this.isLoading = false;
     },
     _bucketKey(b) {
       // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil
@@ -1380,6 +1556,22 @@ export default {
         });
       }
     },
+
+    timeToPenaltyValue(timeStr) {
+      const p = String(timeStr || "");
+      // cari di dataPenalties by timePen
+      const found = this.dataPenalties.find((x) => x.timePen === p);
+      if (found) return Number(found.value) || 0;
+
+      // fallback: parse waktu jadi detik & pakai sebagai nilai (misal 00:00:50.000 → 50, tanda minus ikut)
+      const neg = p.startsWith("-");
+      const t = p.replace("-", "");
+      const [hh = "0", mm = "0", ssms = "0"] = t.split(":");
+      const ss = parseFloat(ssms) || 0; // boleh ada .ms, tetap aman
+      const val = +hh * 3600 + +mm * 60 + ss; // detik
+      return (neg ? -1 : 1) * Math.round(val); // bulatkan ke detik terdekat
+    },
+
     loadFromRaceStartPayload() {
       const { bucket } = loadRaceStartPayloadForDRR();
       if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
@@ -1459,17 +1651,39 @@ export default {
       penaltyType,
       sectionIndex = null
     ) {
+      // 1) set waktu penalti di field yang sesuai
       if (penaltyType === "penaltySection" && sectionIndex !== null) {
         item.result.penaltySection[sectionIndex] = selectedTimePen;
       } else {
-        item.result[penaltyType] = selectedTimePen;
+        item.result[penaltyType] = selectedTimePen; // "penaltyStartTime" / "penaltyFinishTime"
       }
 
+      // 2) hitung penalty numeric per bagian
+      const startPenalty = this.timeToPenaltyValue(
+        item.result.penaltyStartTime || "00:00:00.000"
+      );
+      const finishPenalty = this.timeToPenaltyValue(
+        item.result.penaltyFinishTime || "00:00:00.000"
+      );
+
+      let sectionPenalty = 0;
+      for (const s of item.result.penaltySection || []) {
+        sectionPenalty += this.timeToPenaltyValue(s || "00:00:00.000");
+      }
+      const totalPenalty = startPenalty + finishPenalty + sectionPenalty;
+
+      // 3) simpan angka ke result
+      item.result.startPenalty = startPenalty;
+      item.result.finishPenalty = finishPenalty;
+      item.result.sectionPenalty = sectionPenalty;
+      item.result.totalPenalty = totalPenalty;
+
+      // 4) hitung total penalty time (string HH:MM:SS.mmm) sesuai existing logic
       let totalPenaltyTime = "00:00:00.000";
       const fields = [
         item.result.penaltyStartTime || "00:00:00.000",
         item.result.penaltyFinishTime || "00:00:00.000",
-        ...item.result.penaltySection.map((x) => x || "00:00:00.000"),
+        ...(item.result.penaltySection || []).map((x) => x || "00:00:00.000"),
       ];
       for (const p of fields) {
         if (String(p).startsWith("-")) {
@@ -1481,14 +1695,17 @@ export default {
           totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, p);
         }
       }
-      item.result.penaltyTime = totalPenaltyTime;
+      item.result.penaltyTime = totalPenaltyTime; // tetap isi field lama
+      item.result.totalPenaltyTime = totalPenaltyTime; // kalau mau disimpan juga sesuai pattern baru
 
+      // 5) update totalTime bila raceTime ada
       if (item.result.raceTime) {
         item.result.totalTime = await this.tambahWaktu(
           item.result.raceTime,
           totalPenaltyTime
         );
       }
+
       this.editResult = true;
       await this.assignRanks(this.participant);
     },
@@ -1651,23 +1868,160 @@ export default {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
-    handleScroll() {
-      this.isScrolled = window.scrollY > 0;
+    /* === NEW: Helper membangun docs yang sama seperti saat Save (TAMBAHAN) === */
+    _buildDocsForSave() {
+      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+      return buildResultDocs(clean, this.currentBucket);
+    },
+
+    /* === NEW: Buka modal Preview JSON (TAMBAHAN) === */
+    async previewJson() {
+      try {
+        this.previewDocs = this._buildDocsForSave();
+        this.prettyPrint = true;
+        this.refreshPreviewText();
+        this.$bvModal &&
+          this.$bvModal.show &&
+          this.$bvModal.show("preview-json-modal");
+      } catch (e) {
+        logger.warn("❌ openPreviewJson failed", e);
+      }
+    },
+
+    /* === NEW: Toggle pretty/compact (TAMBAHAN) === */
+    refreshPreviewText() {
+      try {
+        if (!Array.isArray(this.previewDocs)) return;
+        this.previewJsonText = JSON.stringify(
+          this.previewDocs,
+          null,
+          this.prettyPrint ? 2 : 0
+        );
+      } catch (err) {
+        // ignore
+      }
+    },
+
+    /* === NEW: Copy JSON ke clipboard (TAMBAHAN) === */
+    async copyPreview() {
+      try {
+        await navigator.clipboard.writeText(this.previewJsonText || "");
+        this.notify("success", "JSON copied to clipboard.", "Copied");
+      } catch (err) {
+        this.notifyError(err, "Copy Failed");
+      }
+    },
+
+    /* === NEW: Download JSON file (TAMBAHAN) === */
+    downloadPreview() {
+      try {
+        const fileName = `drr-preview-${Date.now()}.json`;
+        const blob = new Blob([this.previewJsonText || "[]"], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        this.notifyError(err, "Download Failed");
+      }
+    },
+
+    /* === NEW: Lanjutkan simpan dari modal (TAMBAHAN) === */
+    saveResultConfirmed() {
+      try {
+        this.$bvModal &&
+          this.$bvModal.hide &&
+          this.$bvModal.hide("preview-json-modal");
+
+        if (!this.currentBucket) {
+          this.notify(
+            "warning",
+            "Bucket tidak valid untuk penyimpanan.",
+            "Save"
+          );
+          return;
+        }
+        const must = ["eventId", "initialId", "raceId", "divisionId"];
+        const missing = must.filter((k) => !this.currentBucket[k]);
+        if (missing.length) {
+          this.notify(
+            "error",
+            `Bucket fields missing: ${missing.join(", ")}`,
+            "Save"
+          );
+          return;
+        }
+
+        const docs =
+          Array.isArray(this.previewDocs) && this.previewDocs.length
+            ? this.previewDocs
+            : this._buildDocsForSave();
+
+        if (!docs.length) {
+          this.notify(
+            "warning",
+            "Tidak ada dokumen yang akan disimpan.",
+            "Save"
+          );
+          return;
+        }
+
+        ipcRenderer.send("insert-drr-result", docs);
+        ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
+          if (res && res.ok) {
+            ipcRenderer.send("get-alert-saved", {
+              type: "question",
+              detail: "Result data has been successfully saved",
+              message: "Successfully",
+            });
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Save failed",
+              message: "Failed",
+            });
+          }
+        });
+      } catch (err) {
+        this.notifyError(err, "Save Failed");
+      }
     },
   },
 };
 </script>
 
 <style scoped>
+.racetime-header {
+  display: flex;
+  flex-direction: column; /* susun vertikal */
+  align-items: flex-start; /* rata kiri */
+  gap: 2px; /* jarak kecil antara h4 dan small */
+}
+
+.racetime-header h4 {
+  margin: 0;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+
+.racetime-header small {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
 /* --- DRR Action Bar --- */
 .drr-actionbar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap; /* biar rapi saat layar kecil */
+  flex-wrap: wrap;
 }
 
+/* ---- Styling utk Switch DRR Category select ---- */
 .drr-actionbar__select {
   min-width: 260px;
   flex: 1 1 260px;
@@ -1678,19 +2032,42 @@ export default {
   cursor: pointer;
 }
 
-.drr-actionbar__buttons {
-  display: inline-flex;
-  gap: 8px;
-  flex: 0 0 auto;
+#drrBucketSelect {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
+#drrBucketSelect:hover {
+  border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+/* ---- End styling utk Switch DRR Category select ---- */
+
+.drr-actionbar {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.drr-actionbar__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Pastikan tombol tidak nempel terlalu rapat ke tepi kanan */
+.drr-actionbar__buttons .btn-action {
+  margin-right: 0;
+}
+
+/* Responsif: tetap kanan, tapi biar wrap rapi */
 @media (max-width: 767.98px) {
-  .drr-actionbar {
-    align-items: stretch;
-  }
   .drr-actionbar__buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
     width: 100%;
-    justify-content: flex-end; /* tombol rata kanan saat turun ke baris baru */
   }
 }
 
@@ -1864,18 +2241,6 @@ td {
   white-space: nowrap; /* prevent wrapping */
 }
 
-/* ---- Styling utk Switch DRR Category select ---- */
-#drrBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-#drrBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-
 /* ---- Styling utk penalty section select ---- */
 .small-select {
   margin-bottom: 5px;
@@ -1984,5 +2349,23 @@ td {
   .meta-panel {
     padding: 12px;
   }
+}
+
+/* === NEW: Styling area preview JSON (TAMBAHAN) === */
+.json-scroll {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #0b1020;
+  padding: 12px;
+}
+.json-pre {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e5e7eb;
+  white-space: pre-wrap; /* wrap kalau area sempit */
+  word-break: break-word;
 }
 </style>

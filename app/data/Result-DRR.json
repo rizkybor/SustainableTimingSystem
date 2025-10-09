@@ -1,0 +1,115 @@
+{
+  "_id": {
+    "$oid": "68e61020e2494d1d48b426dd"
+  },
+  "initialId": "6",
+  "divisionId": "1",
+  "raceId": "1",
+  "eventId": "68b5bf07a338efc467bf4850",
+  "createdAt": {
+    "$date": "2025-10-08T07:17:52.599Z"
+  },
+  "divisionName": "R4",
+  "eventName": "DRR",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "result": [
+    {
+      "nameTeam": "MAKOPALA CLUB",
+      "bibTeam": "11",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "08:00:00.000",
+        "finishTime": "08:40:00.000",
+        "raceTime": "00:40:00.000",
+        "startPenalty": 10,
+        "finishPenalty": 10,
+        "sectionPenalty": 0,
+        "totalPenalty": 20,
+        "startPenaltyTime": "00:00:10.000",
+        "finishPenaltyTime": "00:00:10.000",
+        "sectionPenaltyTime": [
+          "00:00:00.000",
+          "00:00:00.000",
+          "00:00:00.000"
+        ],
+        "totalPenaltyTime": "00:00:20.000",
+        "totalTime": "00:40:20.000",
+        "ranked": 1,
+        "score": 350,
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyStartTime": "",
+        "penaltyFinishTime": "",
+        "penaltySection": [
+          "",
+          "",
+          ""
+        ],
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "penalty": ""
+      }
+    },
+    {
+      "nameTeam": "JAKTIM",
+      "bibTeam": "12",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
+        "startTime": "08:00:00.000",
+        "finishTime": "08:42:00.000",
+        "raceTime": "00:42:00.000",
+        "startPenalty": 0,
+        "finishPenalty": 0,
+        "sectionPenalty": 50,
+        "totalPenalty": 50,
+        "startPenaltyTime": "00:00:00.000",
+        "finishPenaltyTime": "00:00:00.000",
+        "sectionPenaltyTime": [
+          "00:00:00.000",
+          "00:00:50.000",
+          "00:00:00.000"
+        ],
+        "totalPenaltyTime": "00:00:50.000",
+        "totalTime": "00:42:50.000",
+        "ranked": 2,
+        "score": 322,
+        "judgesBy": "",
+        "judgesTime": ""
+      },
+      "otr": {
+        "startTime": "",
+        "finishTime": "",
+        "raceTime": "",
+        "penaltyStartTime": "",
+        "penaltyFinishTime": "",
+        "penaltySection": [
+          "",
+          "",
+          ""
+        ],
+        "penaltyTime": "",
+        "totalTime": "",
+        "ranked": "",
+        "score": "",
+        "penalty": ""
+      }
+    }
+  ],
+  "updatedAt": {
+    "$date": "2025-10-08T07:17:52.599Z"
+  }
+}

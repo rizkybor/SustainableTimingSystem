@@ -66,11 +66,16 @@ async function getOptionCategoriesRace() {
 }
 
 // get Option Penalties
-async function getOptionPenalties() {
+async function getOptionPenalties(type) {
   try {
     const database = await getDb();
     const collection = database.collection("optionPenalties");
-    const data = await collection.find({}).toArray();
+
+    let query = {};
+    if (type) {
+      query = { type: type };
+    }
+    const data = await collection.find(query).toArray();
     return data;
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -78,12 +83,17 @@ async function getOptionPenalties() {
   }
 }
 
-// get Option Ranked
-async function getOptionRanked() {
+// get Option Ranked (dinamis)
+async function getOptionRanked(type) {
   try {
     const database = await getDb();
     const collection = database.collection("optionRanked");
-    const data = await collection.find({}).toArray();
+
+    let query = {};
+    if (type) {
+      query = { type: type };
+    }
+    const data = await collection.find(query).toArray();
     return data;
   } catch (error) {
     console.error("Error fetching data:", error);

@@ -1,0 +1,178 @@
+{
+  "_id": {
+    "$oid": "68e60f1be2494d1d48b426d8"
+  },
+  "divisionId": "1",
+  "initialId": "6",
+  "raceId": "1",
+  "eventId": "68b5bf07a338efc467bf4850",
+  "_lastRevision": 1759907611278,
+  "createdAt": {
+    "$date": "2025-10-08T07:13:31.278Z"
+  },
+  "divisionName": "R4",
+  "eventName": "SLALOM",
+  "initialName": "OPEN NATIONAL",
+  "raceName": "MEN",
+  "teams": [
+    {
+      "nameTeam": "JAKSEL",
+      "bibTeam": "20",
+      "statusId": 0,
+      "result": [
+        {
+          "session": "Run 1",
+          "startTime": "08:00:00.000",
+          "finishTime": "08:45:00.000",
+          "raceTime": "00:45:00.000",
+          "penaltyTime": "00:00:05.000",
+          "penaltyTotal": {
+            "start": 5,
+            "gates": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "finish": 0
+          },
+          "penalty": 5,
+          "totalTime": "00:45:05.000",
+          "ranked": 0,
+          "score": 0,
+          "judgesBy": "",
+          "judgesTime": ""
+        },
+        {
+          "session": "Run 2",
+          "startTime": "09:00:00.000",
+          "finishTime": "09:32:00.000",
+          "raceTime": "00:32:00.000",
+          "penaltyTime": "00:00:55.000",
+          "penaltyTotal": {
+            "start": 0,
+            "gates": [
+              0,
+              0,
+              50,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "finish": 5
+          },
+          "penalty": 55,
+          "totalTime": "00:32:55.000",
+          "ranked": 0,
+          "score": 0,
+          "judgesBy": "",
+          "judgesTime": ""
+        }
+      ],
+      "bestTime": "00:32:55.000",
+      "ranked": 1,
+      "score": 0,
+      "meta": {},
+      "otr": {}
+    },
+    {
+      "nameTeam": "JAKTIM",
+      "bibTeam": "10",
+      "statusId": 0,
+      "result": [
+        {
+          "session": "Run 1",
+          "startTime": "08:00:00.000",
+          "finishTime": "08:35:00.000",
+          "raceTime": "00:35:00.000",
+          "penaltyTime": "00:00:05.000",
+          "penaltyTotal": {
+            "start": 0,
+            "gates": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "finish": 5
+          },
+          "penalty": 5,
+          "totalTime": "00:35:05.000",
+          "ranked": 0,
+          "score": 0,
+          "judgesBy": "",
+          "judgesTime": ""
+        },
+        {
+          "session": "Run 2",
+          "startTime": "09:00:00.000",
+          "finishTime": "09:52:00.000",
+          "raceTime": "00:52:00.000",
+          "penaltyTime": "00:00:55.000",
+          "penaltyTotal": {
+            "start": 5,
+            "gates": [
+              0,
+              0,
+              0,
+              50,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "finish": 0
+          },
+          "penalty": 55,
+          "totalTime": "00:52:55.000",
+          "ranked": 0,
+          "score": 0,
+          "judgesBy": "",
+          "judgesTime": ""
+        }
+      ],
+      "bestTime": "00:35:05.000",
+      "ranked": 2,
+      "score": 0,
+      "meta": {},
+      "otr": {}
+    }
+  ],
+  "updatedAt": {
+    "$date": "2025-10-08T07:13:31.278Z"
+  }
+}

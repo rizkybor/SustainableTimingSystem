@@ -70,9 +70,9 @@
 
         <!-- Satu <tbody> per tim (boleh banyak tbody di dalam table) -->
         <tbody
-          v-for="(t, i) in pdfParticipantsSession1"
-          :key="t && t.bibTeam ? 'team-' + t.bibTeam : 'idx-' + i"
-        >
+  v-for="(t, i) in sortedParticipantsSession1"
+  :key="t && t.bibTeam ? 'team-' + t.bibTeam : 'idx-' + i"
+>
           <!-- RUN 1 -->
           <tr>
             <td class="center" :rowspan="2">{{ i + 1 }}</td>
@@ -128,8 +128,8 @@
 
         <!-- Tampil bila tidak ada data -->
         <tbody
-          v-if="!pdfParticipantsSession1 || !pdfParticipantsSession1.length"
-        >
+  v-if="!sortedParticipantsSession1 || !sortedParticipantsSession1.length"
+>
           <tr>
             <td class="empty" colspan="999">No data</td>
           </tr>
@@ -169,11 +169,12 @@ export default {
   },
   computed: {
     maxGates() {
-      let m = 1,
-        arr = this.pdfParticipantsSession1 || [];
-      for (const t of arr) {
-        const r0 = this.run(t, 0),
-          r1 = this.run(t, 1);
+      let m = 1;
+      const arr = this.pdfParticipantsSession1 || [];
+      for (let i = 0; i < arr.length; i++) {
+        const t = arr[i];
+        const r0 = this.run(t, 0);
+        const r1 = this.run(t, 1);
         const g0 =
           r0 && r0.penaltyTotal && Array.isArray(r0.penaltyTotal.gates)
             ? r0.penaltyTotal.gates.length
@@ -182,10 +183,12 @@ export default {
           r1 && r1.penaltyTotal && Array.isArray(r1.penaltyTotal.gates)
             ? r1.penaltyTotal.gates.length
             : 0;
-        m = Math.max(m, g0, g1);
+        if (g0 > m) m = g0;
+        if (g1 > m) m = g1;
       }
       return m;
     },
+
     today() {
       var d = new Date();
       var dd = String(d.getDate()).padStart(2, "0");
@@ -193,6 +196,7 @@ export default {
       var yyyy = d.getFullYear();
       return dd + "/" + mm + "/" + yyyy;
     },
+
     timestamp() {
       var d = new Date();
       var pad = function (x) {
@@ -212,7 +216,86 @@ export default {
         pad(d.getSeconds())
       );
     },
+
+    // === URUTKAN UNTUK CETAK: begitu ada tim yang punya ≥2 run, urutkan oleh t.ranked (naik)
+    // Tim dengan <2 run tetap di bawah; mereka diurutkan pakai ranked run-1 kalau ada.
+    sortedParticipantsSession1() {
+      const src = Array.isArray(this.pdfParticipantsSession1)
+        ? this.pdfParticipantsSession1.slice()
+        : [];
+
+      // helper: "HH:MM:SS.mmm" -> ms (Infinity jika kosong/invalid)
+      function hmsToMs(txt) {
+        const val = typeof txt === "string" ? txt.trim() : "";
+        if (!val) return Infinity;
+        const parts = val.split(":");
+        if (parts.length < 3) return Infinity;
+        const h = Number(parts[0]);
+        const m = Number(parts[1]);
+        const sMs = parts[2].split(".");
+        const s = Number(sMs[0]);
+        const ms = sMs.length > 1 ? Number(sMs[1]) : 0;
+        if (
+          !Number.isFinite(h) ||
+          !Number.isFinite(m) ||
+          !Number.isFinite(s) ||
+          !Number.isFinite(ms)
+        ) {
+          return Infinity;
+        }
+        return h * 3600000 + m * 60000 + s * 1000 + ms;
+      }
+
+      src.sort(function (a, b) {
+        const aRuns = Array.isArray(a && a.result) ? a.result.length : 0;
+        const bRuns = Array.isArray(b && b.result) ? b.result.length : 0;
+        const aHas2 = aRuns >= 2;
+        const bHas2 = bRuns >= 2;
+
+        // prioritas: tim yang sudah 2 run di atas
+        if (aHas2 && !bHas2) return -1;
+        if (!aHas2 && bHas2) return 1;
+
+        if (aHas2 && bHas2) {
+          const ar = Number(a && a.ranked) || 0;
+          const br = Number(b && b.ranked) || 0;
+          if (ar && br && ar !== br) return ar - br;
+
+          // tie-breaker: bestTime kecil dulu
+          const ab = hmsToMs(a && a.bestTime);
+          const bb = hmsToMs(b && b.bestTime);
+          if (ab !== bb) return ab - bb;
+        }
+
+        // keduanya <2 run: pakai ranked run-1 kalau ada
+        const ar1 =
+          (a &&
+            a.result &&
+            a.result[0] &&
+            Number(a.result[0].ranked)) ||
+          0;
+        const br1 =
+          (b &&
+            b.result &&
+            b.result[0] &&
+            Number(b.result[0].ranked)) ||
+          0;
+        if (ar1 && br1 && ar1 !== br1) return ar1 - br1;
+
+        // fallback stabil
+        const abib = (a && a.bibTeam ? String(a.bibTeam) : "");
+        const bbib = (b && b.bibTeam ? String(b.bibTeam) : "");
+        if (abib !== bbib) return abib.localeCompare(bbib);
+
+        const aname = (a && a.nameTeam ? String(a.nameTeam) : "");
+        const bname = (b && b.nameTeam ? String(b.nameTeam) : "");
+        return aname.localeCompare(bname);
+      });
+
+      return src;
+    },
   },
+
   methods: {
     num(v) {
       const n = Number(v);
@@ -226,18 +309,22 @@ export default {
     bib(t) {
       return (t && t.bibTeam) || "-";
     },
+
+    // tampilkan bestTime hanya jika tim sudah punya 2 run
     bestTime(t) {
-      if (this.pdfParticipantsSession1.length == 0) {
+      if (t && Array.isArray(t.result) && t.result.length === 2) {
         return (t && t.bestTime) || "00:00:00.000";
       } else {
         return "00:00:00.000";
       }
     },
+
+    // tampilkan rank tim hanya jika punya 2 run
     teamRank(t) {
-      if (this.pdfParticipantsSession1.length == 0) {
+      if (t && Array.isArray(t.result) && t.result.length === 2) {
         return (t && t.ranked) || "-";
       } else {
-        return "-"
+        return "-";
       }
     },
 

@@ -60,6 +60,15 @@
       </div>
 
       <div class="right-actions">
+        <b-button
+          v-if="sessionMode == 'all'"
+          :disabled="results.length === 0 || loading"
+          variant="primary"
+          class="action-btn"
+          @click="generatePdf"
+        >
+          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
+        </b-button>
         <b-button-group class="mr-3 custom-btn-group">
           <b-button
             size="sm"
@@ -85,15 +94,6 @@
             >Session 2</b-button
           >
         </b-button-group>
-
-        <b-button
-          :disabled="results.length === 0 || loading"
-          variant="primary"
-          class="action-btn"
-          @click="generatePdf"
-        >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
       </div>
     </div>
 
@@ -306,10 +306,9 @@
       <section slot="pdf-content">
         <SlalomPdf
           :data="pdfEventData"
-          :dataParticipant="pdfParticipants"
-          :categories="pdfCategories"
+          :pdfParticipantsSession1="pdfParticipants"
+          :titleCategories="pdfCategories"
           :isOfficial="isOfficial"
-          :slalomCats="slalomCats"
         />
       </section>
     </vue-html2pdf>
@@ -318,7 +317,9 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
+import SlalomPdf from "../DetailEvent/ResultComponent/slalom-session1-pdfResult.vue";
+
+// import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
@@ -448,25 +449,122 @@ export default {
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
     pdfParticipants() {
-      return (this.results || []).map((r) => ({
-        nameTeam: r.nameTeam,
-        bibTeam: r.bibTeam,
-        result: {
-          raceTime: r.raceTime || "",
-          startPenalty: Number(r.startPenalty) || 0,
-          finishPenalty: Number(r.finishPenalty) || 0,
-          sectionPenalty: Number(r.sectionPenalty) || 0,
-          totalPenalty: Number(r.totalPenalty) || 0,
-          penaltyTime: r.penaltyTime || "00:00:00.000",
-          totalTime: r.totalTime || "",
-          totalPenaltyTime: r.penaltyTime || "00:00:00.000",
-          ranked: r.ranked || "",
-          score:
-            r.score !== undefined && r.score !== null && r.score !== ""
-              ? r.score
-              : this.getScoreByRanked(r.ranked) || 0,
-        },
-      }));
+      // Ambil langsung dari payload DB yang diisi di loadSlalomResult()
+      const items = Array.isArray(this.rawResultItems)
+        ? this.rawResultItems
+        : [];
+      const teamsMap = Object.create(null);
+
+      // helper waktu
+      const timeToMs = (str) => {
+        if (!str) return Infinity;
+        const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
+        const [ss = "0", ms = "0"] = String(ssms).split(".");
+        return +hh * 3600000 + +mm * 60000 + +ss * 1000 + (+ms || 0);
+      };
+      const msToHMSms = (ms) => {
+        if (!Number.isFinite(ms)) return "";
+        const pad = (n, w = 2) => String(n).padStart(w, "0");
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        const mil = ms % 1000;
+        return `${pad(h)}:${pad(m)}:${pad(s)}.${String(mil).padStart(3, "0")}`;
+      };
+
+      // Flatten dari semua dokumen → per tim
+      for (const doc of items) {
+        const teams = Array.isArray(doc && doc.teams) ? doc.teams : [];
+        for (const t of teams) {
+          const nameTeam = String(t && t.nameTeam ? t.nameTeam : "-");
+          const bibTeam = String(
+            t && (t.bibTeam || t.bibNumber) ? t.bibTeam || t.bibNumber : "-"
+          );
+          const key = nameTeam + "|" + bibTeam;
+
+          if (!teamsMap[key]) {
+            teamsMap[key] = {
+              nameTeam,
+              bibTeam,
+              statusId: Number(t && t.statusId) || 0,
+              result: [],
+              ranked: 0,
+              score: 0,
+              bestTime: "",
+              meta: {},
+              otr: {},
+              __bestMs: Infinity, // internal
+            };
+          }
+
+          const runs = Array.isArray(t && t.result) ? t.result : [];
+          for (let i = 0; i < runs.length; i++) {
+            const r = runs[i] || {};
+            const p = r.penaltyTotal || {};
+            const gates = Array.isArray(p.gates) ? p.gates : [];
+
+            const runObj = {
+              session: r.session || `Run ${i + 1}`,
+              startTime: String(r.startTime || ""),
+              finishTime: String(r.finishTime || ""),
+              raceTime: String(r.raceTime || ""),
+              penaltyTime: String(r.penaltyTime || "00:00:00.000"),
+              penaltyTotal: {
+                start: Number(p.start) || 0,
+                gates,
+                finish: Number(p.finish) || 0,
+              },
+              penalty:
+                (Number(p.start) || 0) +
+                gates.reduce((a, v) => a + (Number(v) || 0), 0) +
+                (Number(p.finish) || 0),
+              totalTime: String(r.totalTime || r.raceTime || ""),
+              ranked: Number(r.ranked) || 0,
+              judgesBy: String(r.judgesBy || ""),
+              judgesTime: String(r.judgesTime || ""),
+            };
+
+            teamsMap[key].result.push(runObj);
+
+            // hitung kandidat best (pakai totalTime bila ada, else raceTime)
+            const ms = timeToMs(runObj.totalTime || runObj.raceTime);
+            if (Number.isFinite(ms) && ms < teamsMap[key].__bestMs) {
+              teamsMap[key].__bestMs = ms;
+            }
+
+            // isi ranked/score level tim bila run ini punya rank
+            if (runObj.ranked > 0) {
+              teamsMap[key].ranked = runObj.ranked;
+              teamsMap[key].score =
+                Number(r.score) || this.getScoreByRanked(runObj.ranked) || 0;
+            }
+          }
+        }
+      }
+
+      // fallback ranked/score jika belum terisi
+      const out = [];
+      for (const k of Object.keys(teamsMap)) {
+        const t = teamsMap[k];
+
+        if (
+          Array.isArray(t.result) &&
+          t.result.length >= 2 &&
+          Number.isFinite(t.__bestMs)
+        ) {
+          t.bestTime = msToHMSms(t.__bestMs);
+        } else {
+          t.bestTime = ""; // biar konsisten dengan PDF lama
+        }
+
+        if (!t.ranked) t.ranked = 0;
+        if (!t.score) t.score = this.getScoreByRanked(t.ranked) || 0;
+
+        delete t.__bestMs;
+        out.push(t);
+      }
+
+      return out;
     },
     pdfCategories() {
       const payload = safeParse(
@@ -690,36 +788,6 @@ export default {
       return h * 3600000 + m * 60000 + s * 1000 + mil;
     },
 
-    computeRanksAndScores(rows) {
-      const withTime = rows
-        .map((r, i) => ({
-          i,
-          ms: this.timeToMs(r.resultTime || r.totalTime || r.raceTime || ""),
-        }))
-        .filter((x) => Number.isFinite(x.ms));
-
-      withTime.sort((a, b) => a.ms - b.ms);
-      withTime.forEach((item, idx) => {
-        const rank = idx + 1;
-        rows[item.i].ranked = rank;
-        if (!rows[item.i].score)
-          rows[item.i].score = this.getScoreByRanked(rank);
-      });
-
-      rows.forEach((r) => {
-        if (!r.ranked || Number(r.ranked) <= 0) {
-          r.ranked = r.ranked ? r.ranked : "-";
-          r.score = r.score ? Number(r.score) || 0 : 0;
-        }
-      });
-
-      rows.sort(
-        (a, b) =>
-          (Number(a.ranked) || Infinity) - (Number(b.ranked) || Infinity)
-      );
-      return rows;
-    },
-
     normalizeResult(raw) {
       const base = {
         raceTime: "",
@@ -800,7 +868,6 @@ export default {
             this.results = this.buildResultRows("all");
             this.loading = false;
           } catch (err) {
-            console.error(err);
             this.results = [];
             this.error = "Terjadi kesalahan saat memproses data.";
             this.loading = false;
@@ -824,7 +891,6 @@ export default {
         this.error = "Gagal membuat PDF";
       }
     },
-    onBeforeDownload() {},
     onPdfGenerated() {
       this.showPdf = false;
     },
@@ -1090,7 +1156,6 @@ export default {
   border-radius: 30px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   display: flex;
   align-items: center;

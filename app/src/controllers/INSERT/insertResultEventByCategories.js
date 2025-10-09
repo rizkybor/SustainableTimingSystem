@@ -224,30 +224,613 @@ async function insertSprintResult(payload) {
   }
 }
 
+// async function insertSlalomResult(payload) {
+//   try {
+//     const db = await getDb();
+//     const col = db.collection("temporarySlalomResult");
+
+//     // === Ambil SCORE_TABLE dari optionRanked (SLALOM) ===
+//     var SCORE_TABLE = [];
+//     try {
+//       const optCol = db.collection("optionRanked");
+//       const slalomDoc = await optCol.findOne({ type: "SLALOM" });
+//       if (slalomDoc && typeof slalomDoc === "object") {
+//         const dataObj = slalomDoc.data;
+//         if (dataObj && Array.isArray(dataObj.score)) {
+//           var arr = [];
+//           var si = 0;
+//           for (si = 0; si < dataObj.score.length; si++) {
+//             var v = Number(dataObj.score[si]);
+//             if (Number.isFinite(v)) arr.push(v);
+//           }
+//           SCORE_TABLE = arr;
+//         }
+//       }
+//     } catch (eFetch) {
+//       var msg = eFetch && eFetch.message ? eFetch.message : String(eFetch);
+//       console.error("[DAO] optionRanked fetch failed (SLALOM):", msg);
+//     }
+
+//     // Fallback jika kosong
+//     if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) {
+//       console.warn("[DAO] SCORE_TABLE empty; using default fallback.");
+//       SCORE_TABLE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+//     }
+
+//     // === Unique index per bucket ===
+//     if (!insertSlalomResult.__indexCreated) {
+//       try {
+//         await col.createIndex(
+//           { eventId: 1, initialId: 1, raceId: 1, divisionId: 1 },
+//           { unique: true, name: "uniq_bucket" }
+//         );
+//       } catch (eIdx) {
+//         var codeName = eIdx && eIdx.codeName ? eIdx.codeName : "";
+//         var message = eIdx && eIdx.message ? eIdx.message : String(eIdx);
+//         if (!eIdx || codeName !== "IndexOptionsConflict") {
+//           console.warn("[DAO] createIndex warning:", message);
+//         }
+//       }
+//       insertSlalomResult.__indexCreated = true;
+//     }
+
+//     // === Validasi payload ===
+//     if (!Array.isArray(payload)) {
+//       return { ok: false, error: "insertSlalomResult: payload must be an array" };
+//     }
+//     if (payload.length === 0) {
+//       return { ok: true, upsertedCount: 0 };
+//     }
+
+//     // === Helpers ===
+//     function scoreForRank(rank) {
+//       if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) return 0;
+//       var idx = rank - 1;
+//       if (idx < 0) return 0;
+//       var v = SCORE_TABLE[idx];
+//       return Number(v) || 0;
+//     }
+//     function toStr(v, d) {
+//       if (v === null || v === undefined) return String(d || "");
+//       return String(v);
+//     }
+//     function toInt(v, d) {
+//       if (Number.isFinite(v)) return Number(v);
+//       var n = Number(v);
+//       if (Number.isFinite(n)) return n;
+//       return d || 0;
+//     }
+//     function hmsToMs(str) {
+//       var txt = String(str || "");
+//       var parts = txt.split(":");
+//       var h = parts.length > 0 ? Number(parts[0]) || 0 : 0;
+//       var m = parts.length > 1 ? Number(parts[1]) || 0 : 0;
+//       var sMs = parts.length > 2 ? parts[2] : "0.000";
+//       var sSplit = String(sMs).split(".");
+//       var s = sSplit.length > 0 ? Number(sSplit[0]) || 0 : 0;
+//       var ms = sSplit.length > 1 ? Number(sSplit[1]) || 0 : 0;
+//       return h * 3600000 + m * 60000 + s * 1000 + ms;
+//     }
+//     function msToHMSms(ms) {
+//       if (!Number.isFinite(ms)) return "";
+//       var hr = Math.floor(ms / 3600000);
+//       var rem1 = ms % 3600000;
+//       var min = Math.floor(rem1 / 60000);
+//       var rem2 = rem1 % 60000;
+//       var sec = Math.floor(rem2 / 1000);
+//       var mss = rem2 % 1000;
+//       function pad(n, w) { return String(n).padStart(w, "0"); }
+//       return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
+//     }
+//     function pruneEmpty(obj) {
+//       if (!obj || typeof obj !== "object") return obj;
+//       var keys = Object.keys(obj);
+//       var i = 0;
+//       for (i = 0; i < keys.length; i++) {
+//         var k = keys[i];
+//         var v = obj[k];
+//         if (v === "" || v === null) delete obj[k];
+//       }
+//       return obj;
+//     }
+
+//     // === Normalisasi Run (tanpa "score" di run) ===
+//     function normRun(r) {
+//       var run = r || {};
+
+//       var ptRaw = (run.penaltyTotal && typeof run.penaltyTotal === "object")
+//         ? run.penaltyTotal
+//         : {};
+//       var gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
+//       var gates = [];
+//       var gi = 0;
+//       for (gi = 0; gi < gatesRaw.length; gi++) {
+//         gates.push(Number(gatesRaw[gi]) || 0);
+//       }
+//       var pt = {
+//         start: Number(ptRaw.start) || 0,
+//         gates: gates,
+//         finish: Number(ptRaw.finish) || 0
+//       };
+
+//       var penaltySum = pt.start + pt.finish;
+//       var pi = 0;
+//       for (pi = 0; pi < pt.gates.length; pi++) {
+//         penaltySum += pt.gates[pi];
+//       }
+//       var penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
+
+//       return {
+//         session: String(run.session || ""),
+//         startTime: String(run.startTime || ""),
+//         finishTime: String(run.finishTime || ""),
+//         raceTime: String(run.raceTime || ""),
+//         penaltyTime: String(run.penaltyTime || "00:00:00.000"),
+//         penaltyTotal: pt,
+//         penalty: penaltyNum,
+//         totalTime: String(run.totalTime || run.raceTime || ""),
+//         ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
+//         judgesBy: String(run.judgesBy || ""),
+//         judgesTime: String(run.judgesTime || "")
+//       };
+//     }
+
+//     function normTeamFromFlat(clean) {
+//       var arr = Array.isArray(clean.result) ? clean.result : [];
+//       var resultArr = [];
+//       var i = 0;
+//       for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+
+//       var bestTime = "";
+//       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
+//         bestTime = clean.bestTime;
+//       }
+
+//       return pruneEmpty({
+//         nameTeam: toStr(clean.nameTeam, ""),
+//         bibTeam: toStr(clean.bibTeam, ""),
+//         startOrder: toStr(clean.startOrder, ""),
+//         praStart: toStr(clean.praStart, ""),
+//         intervalRace: toStr(clean.intervalRace, ""),
+//         statusId: toInt(clean.statusId, 0),
+//         result: resultArr,
+//         bestTime: bestTime,
+//         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
+//         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
+//         meta: pruneEmpty(clean.meta || {}),
+//         otr: pruneEmpty(clean.otr || {})
+//       });
+//     }
+
+//     function normTeamFromBucketTeam(t) {
+//       var clean = t || {};
+//       var arr = Array.isArray(clean.result) ? clean.result : [];
+//       var resultArr = [];
+//       var i = 0;
+//       for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+
+//       var bestTime = "";
+//       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
+//         bestTime = clean.bestTime;
+//       }
+
+//       return pruneEmpty({
+//         nameTeam: toStr(clean.nameTeam, ""),
+//         bibTeam: toStr(clean.bibTeam || clean.bibNumber, ""),
+//         startOrder: toStr(clean.startOrder, ""),
+//         praStart: toStr(clean.praStart, ""),
+//         intervalRace: toStr(clean.intervalRace, ""),
+//         statusId: toInt(clean.statusId, 0),
+//         result: resultArr,
+//         bestTime: bestTime,
+//         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
+//         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
+//         meta: pruneEmpty(clean.meta || {}),
+//         otr: pruneEmpty(clean.otr || {})
+//       });
+//     }
+
+//     // === Group payload per bucket ===
+//     var groups = new Map();
+//     var pIdx = 0;
+//     for (pIdx = 0; pIdx < payload.length; pIdx++) {
+//       var item = payload[pIdx];
+//       if (!item || typeof item !== "object") continue;
+
+//       if (Array.isArray(item.teams)) {
+//         var metaB = {
+//           eventId: toStr(item.eventId, ""),
+//           initialId: toStr(item.initialId, ""),
+//           raceId: toStr(item.raceId, ""),
+//           divisionId: toStr(item.divisionId, ""),
+//           eventName: toStr(item.eventName, ""),
+//           initialName: toStr(item.initialName, ""),
+//           raceName: toStr(item.raceName, ""),
+//           divisionName: toStr(item.divisionName, "")
+//         };
+//         if (!metaB.eventId || !metaB.initialId || !metaB.raceId || !metaB.divisionId) {
+//           console.warn("[DAO] Skip bucket, meta tidak lengkap:", metaB);
+//           continue;
+//         }
+//         var keyB = metaB.eventId + "|" + metaB.initialId + "|" + metaB.raceId + "|" + metaB.divisionId;
+
+//         var teamsArrB = [];
+//         var tb = 0;
+//         for (tb = 0; tb < item.teams.length; tb++) {
+//           teamsArrB.push(normTeamFromBucketTeam(item.teams[tb]));
+//         }
+
+//         if (!groups.has(keyB)) {
+//           groups.set(keyB, { meta: metaB, teams: teamsArrB });
+//         } else {
+//           var exB = groups.get(keyB);
+//           var ca = exB.teams;
+//           var kx = 0;
+//           for (kx = 0; kx < teamsArrB.length; kx++) ca.push(teamsArrB[kx]);
+//           exB.teams = ca;
+//         }
+//       } else {
+//         var metaF = {
+//           eventId: toStr(item.eventId, ""),
+//           initialId: toStr(item.initialId, ""),
+//           raceId: toStr(item.raceId, ""),
+//           divisionId: toStr(item.divisionId, ""),
+//           eventName: toStr(item.eventName, ""),
+//           initialName: toStr(item.initialName, ""),
+//           raceName: toStr(item.raceName, ""),
+//           divisionName: toStr(item.divisionName, "")
+//         };
+//         if (!metaF.eventId || !metaF.initialId || !metaF.raceId || !metaF.divisionId) {
+//           console.warn("[DAO] Skip flat item, meta tidak lengkap:", metaF);
+//           continue;
+//         }
+//         var keyF = metaF.eventId + "|" + metaF.initialId + "|" + metaF.raceId + "|" + metaF.divisionId;
+
+//         var cleanJson = JSON.stringify(item);
+//         var cleanAny = JSON.parse(cleanJson);
+//         if (cleanAny && cleanAny._id) delete cleanAny._id;
+
+//         var teamEntry = normTeamFromFlat(cleanAny);
+
+//         if (!groups.has(keyF)) {
+//           groups.set(keyF, { meta: metaF, teams: [teamEntry] });
+//         } else {
+//           groups.get(keyF).teams.push(teamEntry);
+//         }
+//       }
+//     }
+
+//     if (groups.size === 0) {
+//       return { ok: false, error: "Meta bucket kosong di payload" };
+//     }
+
+//     // === Ambil existing per semua bucket ===
+//     var filterOr = [];
+//     var vals = Array.from(groups.values());
+//     var vi = 0;
+//     for (vi = 0; vi < vals.length; vi++) {
+//       var m = vals[vi].meta;
+//       filterOr.push({
+//         eventId: m.eventId,
+//         initialId: m.initialId,
+//         raceId: m.raceId,
+//         divisionId: m.divisionId
+//       });
+//     }
+//     var existingDocs = await col.find({ $or: filterOr }).toArray();
+//     var existingMap = new Map();
+//     var ei = 0;
+//     for (ei = 0; ei < existingDocs.length; ei++) {
+//       var exDoc = existingDocs[ei];
+//       var ek = exDoc.eventId + "|" + exDoc.initialId + "|" + exDoc.raceId + "|" + exDoc.divisionId;
+//       existingMap.set(ek, exDoc);
+//     }
+
+//     // === Proses per bucket ===
+//     var now = new Date();
+//     var upsertedCount = 0;
+
+//     var ge = groups.entries();
+//     var step = ge.next();
+//     while (!step.done) {
+//       var bucketKey = step.value[0];
+//       var entryObj = step.value[1];
+
+//       var meta = entryObj.meta;
+//       var incomingTeams = entryObj.teams;
+
+//       var filter = {
+//         eventId: meta.eventId,
+//         initialId: meta.initialId,
+//         raceId: meta.raceId,
+//         divisionId: meta.divisionId
+//       };
+
+//       var existing = existingMap.get(bucketKey);
+//       if (existing) {
+//         var dup = await col.countDocuments(filter);
+//         if (dup > 1) {
+//           console.warn("[DAO] Found >1 doc, cleanup:", filter);
+//           await col.deleteMany(filter);
+//           existing = null;
+//         }
+//       }
+
+//       // Merge by (bibTeam|nameTeam) DENGAN MERGE PER-RUN
+//       var mergedByKey = new Map();
+
+//       // Seed dari existing
+//       if (existing && Array.isArray(existing.teams)) {
+//         var st = 0;
+//         for (st = 0; st < existing.teams.length; st++) {
+//           var tSeed = existing.teams[st];
+//           if (!tSeed) continue;
+//           var kSeed = (toStr(tSeed.bibTeam, "").trim() || "NO-BIB") + "|" + toStr(tSeed.nameTeam, "").trim();
+//           if (!mergedByKey.has(kSeed)) {
+//             // deep copy sederhana
+//             mergedByKey.set(kSeed, JSON.parse(JSON.stringify(tSeed)));
+//           }
+//         }
+//       }
+
+//       // Merge dengan incoming
+//       var it = 0;
+//       for (it = 0; it < incomingTeams.length; it++) {
+//         var nt = incomingTeams[it];
+//         var nbib = toStr(nt.bibTeam, "").trim();
+//         var nname = toStr(nt.nameTeam, "").trim();
+//         var kIn = (nbib || "NO-BIB") + "|" + nname;
+
+//         var exTeam = mergedByKey.get(kIn); // bisa undefined
+
+//         if (!exTeam) {
+//           mergedByKey.set(kIn, JSON.parse(JSON.stringify(nt)));
+//         } else {
+//           var exRes = Array.isArray(exTeam.result) ? exTeam.result.slice() : [];
+//           var ntRes = Array.isArray(nt.result) ? nt.result : [];
+
+//           // outRes: pertahankan run-1 lama; gunakan run-2 dari nt jika ada
+//           var outRes = [];
+//           if (exRes[0]) outRes[0] = exRes[0];
+//           else if (ntRes[0]) outRes[0] = ntRes[0];
+
+//           if (ntRes[1]) outRes[1] = ntRes[1];
+//           else if (exRes[1]) outRes[1] = exRes[1];
+
+//           // build mergedTeam (tanpa spread)
+//           var mergedTeam = {};
+//           // copy semua field exTeam
+//           var exKeys = Object.keys(exTeam);
+//           var exi = 0;
+//           for (exi = 0; exi < exKeys.length; exi++) {
+//             mergedTeam[exKeys[exi]] = exTeam[exKeys[exi]];
+//           }
+//           // override dengan nt
+//           var ntKeys = Object.keys(nt);
+//           var nti = 0;
+//           for (nti = 0; nti < ntKeys.length; nti++) {
+//             mergedTeam[ntKeys[nti]] = nt[ntKeys[nti]];
+//           }
+//           mergedTeam.nameTeam = toStr(nname, exTeam.nameTeam);
+//           mergedTeam.bibTeam = toStr(nbib, exTeam.bibTeam);
+
+//           // norm run hasil gabung
+//           var resOutFinal = [];
+//           var rfi = 0;
+//           for (rfi = 0; rfi < outRes.length; rfi++) {
+//             resOutFinal.push(normRun(outRes[rfi]));
+//           }
+//           mergedTeam.result = resOutFinal;
+
+//           // Jika data baru belum lengkap (<2 run), jangan timpa bestTime/ranked/score lama
+//           var newRuns = outRes.length;
+//           if (newRuns < 2) {
+//             if (!(typeof mergedTeam.bestTime === "string" && mergedTeam.bestTime.trim() !== "")) {
+//               mergedTeam.bestTime = exTeam.bestTime;
+//             }
+//             if (!Number.isFinite(mergedTeam.ranked)) mergedTeam.ranked = exTeam.ranked;
+//             if (!Number.isFinite(mergedTeam.score)) mergedTeam.score = exTeam.score;
+//           }
+
+//           mergedByKey.set(kIn, mergedTeam);
+//         }
+//       }
+
+//       var mergedArray = Array.from(mergedByKey.values());
+
+//       // ====== RUN-LEVEL RANKING ======
+//       var maxRuns = 0;
+//       var mri = 0;
+//       for (mri = 0; mri < mergedArray.length; mri++) {
+//         var rr = Array.isArray(mergedArray[mri].result) ? mergedArray[mri].result : [];
+//         if (rr.length > maxRuns) maxRuns = rr.length;
+//       }
+
+//       function rankPerSession(sessionIdx) {
+//         var candidates = [];
+//         var ci = 0;
+//         for (ci = 0; ci < mergedArray.length; ci++) {
+//           var t = mergedArray[ci];
+//           var r = Array.isArray(t.result) ? t.result[sessionIdx] : null;
+//           var ms = r && r.totalTime ? hmsToMs(r.totalTime) : Infinity;
+//           if (Number.isFinite(ms)) {
+//             candidates.push({ t: t, r: r, ms: ms });
+//           }
+//         }
+//         // sort by ms asc
+//         candidates.sort(function (a, b) { return a.ms - b.ms; });
+//         var rankCounter = 0;
+//         var last = null;
+//         var disp = 0;
+//         var cj = 0;
+//         for (cj = 0; cj < candidates.length; cj++) {
+//           var item = candidates[cj];
+//           rankCounter++;
+//           if (last === null || item.ms !== last) disp = rankCounter;
+//           last = item.ms;
+//           if (Array.isArray(item.t.result) && item.t.result[sessionIdx]) {
+//             item.t.result[sessionIdx].ranked = disp;
+//           }
+//         }
+//       }
+
+//       if (maxRuns === 1) {
+//         rankPerSession(0);
+//       } else if (maxRuns >= 2) {
+//         rankPerSession(0);
+//         rankPerSession(1);
+//       }
+
+//       // ====== TEAM-LEVEL (≥2 run valid) ======
+//       var eligibleTeams = [];
+//       var et = 0;
+//       for (et = 0; et < mergedArray.length; et++) {
+//         var tm = mergedArray[et];
+//         var resArr = Array.isArray(tm.result) ? tm.result : [];
+//         if (resArr.length >= 2) {
+//           var valsMs = [];
+//           var vj = 0;
+//           for (vj = 0; vj < resArr.length; vj++) {
+//             var x = resArr[vj];
+//             if (x && typeof x.totalTime === "string" && x.totalTime.trim() !== "") {
+//               var ms = hmsToMs(x.totalTime);
+//               if (Number.isFinite(ms)) valsMs.push(ms);
+//             }
+//           }
+//           if (valsMs.length > 0) {
+//             // cari min manual
+//             var minMs = valsMs[0];
+//             var mi = 1;
+//             for (mi = 1; mi < valsMs.length; mi++) {
+//               if (valsMs[mi] < minMs) minMs = valsMs[mi];
+//             }
+//             tm.bestTime = msToHMSms(minMs);
+//             eligibleTeams.push(tm);
+//           }
+//         }
+//       }
+
+//       if (eligibleTeams.length > 0) {
+//         // sort eligible by bestTime asc
+//         eligibleTeams.sort(function (a, b) {
+//           var am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
+//           var bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
+//           return am - bm;
+//         });
+//         var rc = 0;
+//         var lastBest = null;
+//         var dispBest = 0;
+//         var ei2 = 0;
+//         for (ei2 = 0; ei2 < eligibleTeams.length; ei2++) {
+//           var tt = eligibleTeams[ei2];
+//           var best = tt && tt.bestTime ? hmsToMs(tt.bestTime) : Infinity;
+//           rc++;
+//           if (!Number.isFinite(best)) {
+//             tt.ranked = 0;
+//             tt.score = 0;
+//           } else {
+//             if (lastBest === null || best !== lastBest) dispBest = rc;
+//             lastBest = best;
+//             tt.ranked = dispBest;
+//             tt.score = scoreForRank(dispBest); // ← skor dari table/fallback
+//           }
+//         }
+//       }
+
+//       var update = {
+//         $set: {
+//           eventId: meta.eventId,
+//           initialId: meta.initialId,
+//           raceId: meta.raceId,
+//           divisionId: meta.divisionId,
+//           eventName: meta.eventName,
+//           initialName: meta.initialName,
+//           raceName: meta.raceName,
+//           divisionName: meta.divisionName,
+//           teams: mergedArray,
+//           updatedAt: now,
+//           _lastRevision: now.getTime()
+//         },
+//         $setOnInsert: { createdAt: now }
+//       };
+
+//       var res = await col.updateOne(filter, update, { upsert: true });
+//       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+
+//       step = ge.next();
+//     }
+
+//     return { ok: true, upsertedCount: upsertedCount };
+//   } catch (err) {
+//     var message = err && err.message ? err.message : String(err);
+//     console.error("Error insertSlalomResult:", message);
+//     return { ok: false, error: message };
+//   }
+// }
+
 async function insertSlalomResult(payload) {
   try {
     const db = await getDb();
     const col = db.collection("temporarySlalomResult");
 
     // === Ambil SCORE_TABLE dari optionRanked (SLALOM) ===
-    var SCORE_TABLE = [];
+    let SCORE_TABLE = [];
     try {
       const optCol = db.collection("optionRanked");
-      const slalomDoc = await optCol.findOne({ name: "SLALOM" });
+
+      // dukung skema baru & lama
+      // - baru: { type: "SLALOM", data: [{ ranking, score }, ...] }
+      // - lama: { name: "SLALOM", data: { score: [num, ...] } } atau score di root
+      const slalomDoc =
+        (await optCol.findOne({ type: "SLALOM" })) ||
+        (await optCol.findOne({ name: "SLALOM" }));
+
       if (slalomDoc && typeof slalomDoc === "object") {
-        const dataObj = slalomDoc.data;
-        if (dataObj && Array.isArray(dataObj.score)) {
-          var arr = [];
-          var si = 0;
-          for (si = 0; si < dataObj.score.length; si++) {
-            var v = Number(dataObj.score[si]);
-            if (Number.isFinite(v)) arr.push(v);
+        const d = slalomDoc.data;
+
+        if (Array.isArray(d)) {
+          // skema BARU
+          const cleaned = d
+            .filter(
+              (x) =>
+                x &&
+                Number.isFinite(Number(x.ranking)) &&
+                Number.isFinite(Number(x.score))
+            )
+            .map((x) => ({
+              ranking: Number(x.ranking),
+              score: Number(x.score),
+            }))
+            .sort((a, b) => a.ranking - b.ranking);
+
+          if (cleaned.length > 0) {
+            const maxRank = cleaned[cleaned.length - 1].ranking;
+            const table = new Array(maxRank).fill(0);
+            for (const { ranking, score } of cleaned) {
+              table[ranking - 1] = score; // 1-based → 0-based
+            }
+            SCORE_TABLE = table;
+          }
+        } else if (d && Array.isArray(d.score)) {
+          // variasi skema LAMA
+          const arr = [];
+          for (const v of d.score) {
+            const n = Number(v);
+            if (Number.isFinite(n)) arr.push(n);
+          }
+          SCORE_TABLE = arr;
+        } else if (Array.isArray(slalomDoc.score)) {
+          // fallback lain
+          const arr = [];
+          for (const v of slalomDoc.score) {
+            const n = Number(v);
+            if (Number.isFinite(n)) arr.push(n);
           }
           SCORE_TABLE = arr;
         }
       }
     } catch (eFetch) {
-      var msg = eFetch && eFetch.message ? eFetch.message : String(eFetch);
+      const msg = eFetch?.message ? eFetch.message : String(eFetch);
       console.error("[DAO] optionRanked fetch failed (SLALOM):", msg);
     }
 
@@ -265,8 +848,8 @@ async function insertSlalomResult(payload) {
           { unique: true, name: "uniq_bucket" }
         );
       } catch (eIdx) {
-        var codeName = eIdx && eIdx.codeName ? eIdx.codeName : "";
-        var message = eIdx && eIdx.message ? eIdx.message : String(eIdx);
+        const codeName = eIdx && eIdx.codeName ? eIdx.codeName : "";
+        const message = eIdx && eIdx.message ? eIdx.message : String(eIdx);
         if (!eIdx || codeName !== "IndexOptionsConflict") {
           console.warn("[DAO] createIndex warning:", message);
         }
@@ -285,9 +868,9 @@ async function insertSlalomResult(payload) {
     // === Helpers ===
     function scoreForRank(rank) {
       if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) return 0;
-      var idx = rank - 1;
+      const idx = rank - 1;
       if (idx < 0) return 0;
-      var v = SCORE_TABLE[idx];
+      const v = SCORE_TABLE[idx];
       return Number(v) || 0;
     }
     function toStr(v, d) {
@@ -296,39 +879,38 @@ async function insertSlalomResult(payload) {
     }
     function toInt(v, d) {
       if (Number.isFinite(v)) return Number(v);
-      var n = Number(v);
+      const n = Number(v);
       if (Number.isFinite(n)) return n;
       return d || 0;
     }
     function hmsToMs(str) {
-      var txt = String(str || "");
-      var parts = txt.split(":");
-      var h = parts.length > 0 ? Number(parts[0]) || 0 : 0;
-      var m = parts.length > 1 ? Number(parts[1]) || 0 : 0;
-      var sMs = parts.length > 2 ? parts[2] : "0.000";
-      var sSplit = String(sMs).split(".");
-      var s = sSplit.length > 0 ? Number(sSplit[0]) || 0 : 0;
-      var ms = sSplit.length > 1 ? Number(sSplit[1]) || 0 : 0;
+      const txt = String(str || "");
+      const parts = txt.split(":");
+      const h = parts.length > 0 ? Number(parts[0]) || 0 : 0;
+      const m = parts.length > 1 ? Number(parts[1]) || 0 : 0;
+      const sMs = parts.length > 2 ? parts[2] : "0.000";
+      const sSplit = String(sMs).split(".");
+      const s = sSplit.length > 0 ? Number(sSplit[0]) || 0 : 0;
+      const ms = sSplit.length > 1 ? Number(sSplit[1]) || 0 : 0;
       return h * 3600000 + m * 60000 + s * 1000 + ms;
     }
     function msToHMSms(ms) {
       if (!Number.isFinite(ms)) return "";
-      var hr = Math.floor(ms / 3600000);
-      var rem1 = ms % 3600000;
-      var min = Math.floor(rem1 / 60000);
-      var rem2 = rem1 % 60000;
-      var sec = Math.floor(rem2 / 1000);
-      var mss = rem2 % 1000;
-      function pad(n, w) { return String(n).padStart(w, "0"); }
-      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
+      const hr = Math.floor(ms / 3600000);
+      const rem1 = ms % 3600000;
+      const min = Math.floor(rem1 / 60000);
+      const rem2 = rem1 % 60000;
+      const sec = Math.floor(rem2 / 1000);
+      const mss = rem2 % 1000;
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${String(mss).padStart(3, "0")}`;
     }
     function pruneEmpty(obj) {
       if (!obj || typeof obj !== "object") return obj;
-      var keys = Object.keys(obj);
-      var i = 0;
-      for (i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        var v = obj[k];
+      const keys = Object.keys(obj);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const v = obj[k];
         if (v === "" || v === null) delete obj[k];
       }
       return obj;
@@ -336,29 +918,22 @@ async function insertSlalomResult(payload) {
 
     // === Normalisasi Run (tanpa "score" di run) ===
     function normRun(r) {
-      var run = r || {};
+      const run = r || {};
 
-      var ptRaw = (run.penaltyTotal && typeof run.penaltyTotal === "object")
-        ? run.penaltyTotal
-        : {};
-      var gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
-      var gates = [];
-      var gi = 0;
-      for (gi = 0; gi < gatesRaw.length; gi++) {
-        gates.push(Number(gatesRaw[gi]) || 0);
-      }
-      var pt = {
+      const ptRaw = run.penaltyTotal && typeof run.penaltyTotal === "object" ? run.penaltyTotal : {};
+      const gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
+      const gates = [];
+      for (let gi = 0; gi < gatesRaw.length; gi++) gates.push(Number(gatesRaw[gi]) || 0);
+
+      const pt = {
         start: Number(ptRaw.start) || 0,
         gates: gates,
-        finish: Number(ptRaw.finish) || 0
+        finish: Number(ptRaw.finish) || 0,
       };
 
-      var penaltySum = pt.start + pt.finish;
-      var pi = 0;
-      for (pi = 0; pi < pt.gates.length; pi++) {
-        penaltySum += pt.gates[pi];
-      }
-      var penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
+      let penaltySum = pt.start + pt.finish;
+      for (let pi = 0; pi < pt.gates.length; pi++) penaltySum += pt.gates[pi];
+      const penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
 
       return {
         session: String(run.session || ""),
@@ -371,17 +946,16 @@ async function insertSlalomResult(payload) {
         totalTime: String(run.totalTime || run.raceTime || ""),
         ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
         judgesBy: String(run.judgesBy || ""),
-        judgesTime: String(run.judgesTime || "")
+        judgesTime: String(run.judgesTime || ""),
       };
     }
 
     function normTeamFromFlat(clean) {
-      var arr = Array.isArray(clean.result) ? clean.result : [];
-      var resultArr = [];
-      var i = 0;
-      for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+      const arr = Array.isArray(clean.result) ? clean.result : [];
+      const resultArr = [];
+      for (let i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
 
-      var bestTime = "";
+      let bestTime = "";
       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
         bestTime = clean.bestTime;
       }
@@ -398,18 +972,17 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {})
+        otr: pruneEmpty(clean.otr || {}),
       });
     }
 
     function normTeamFromBucketTeam(t) {
-      var clean = t || {};
-      var arr = Array.isArray(clean.result) ? clean.result : [];
-      var resultArr = [];
-      var i = 0;
-      for (i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
+      const clean = t || {};
+      const arr = Array.isArray(clean.result) ? clean.result : [];
+      const resultArr = [];
+      for (let i = 0; i < arr.length; i++) resultArr.push(normRun(arr[i]));
 
-      var bestTime = "";
+      let bestTime = "";
       if (typeof clean.bestTime === "string" && clean.bestTime.trim() !== "") {
         bestTime = clean.bestTime;
       }
@@ -426,19 +999,18 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {})
+        otr: pruneEmpty(clean.otr || {}),
       });
     }
 
     // === Group payload per bucket ===
-    var groups = new Map();
-    var pIdx = 0;
-    for (pIdx = 0; pIdx < payload.length; pIdx++) {
-      var item = payload[pIdx];
+    const groups = new Map();
+    for (let pIdx = 0; pIdx < payload.length; pIdx++) {
+      const item = payload[pIdx];
       if (!item || typeof item !== "object") continue;
 
       if (Array.isArray(item.teams)) {
-        var metaB = {
+        const metaB = {
           eventId: toStr(item.eventId, ""),
           initialId: toStr(item.initialId, ""),
           raceId: toStr(item.raceId, ""),
@@ -446,31 +1018,27 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, "")
+          divisionName: toStr(item.divisionName, ""),
         };
         if (!metaB.eventId || !metaB.initialId || !metaB.raceId || !metaB.divisionId) {
           console.warn("[DAO] Skip bucket, meta tidak lengkap:", metaB);
           continue;
         }
-        var keyB = metaB.eventId + "|" + metaB.initialId + "|" + metaB.raceId + "|" + metaB.divisionId;
+        const keyB = `${metaB.eventId}|${metaB.initialId}|${metaB.raceId}|${metaB.divisionId}`;
 
-        var teamsArrB = [];
-        var tb = 0;
-        for (tb = 0; tb < item.teams.length; tb++) {
+        const teamsArrB = [];
+        for (let tb = 0; tb < item.teams.length; tb++) {
           teamsArrB.push(normTeamFromBucketTeam(item.teams[tb]));
         }
 
         if (!groups.has(keyB)) {
           groups.set(keyB, { meta: metaB, teams: teamsArrB });
         } else {
-          var exB = groups.get(keyB);
-          var ca = exB.teams;
-          var kx = 0;
-          for (kx = 0; kx < teamsArrB.length; kx++) ca.push(teamsArrB[kx]);
-          exB.teams = ca;
+          const exB = groups.get(keyB);
+          exB.teams.push(...teamsArrB);
         }
       } else {
-        var metaF = {
+        const metaF = {
           eventId: toStr(item.eventId, ""),
           initialId: toStr(item.initialId, ""),
           raceId: toStr(item.raceId, ""),
@@ -478,19 +1046,19 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, "")
+          divisionName: toStr(item.divisionName, ""),
         };
         if (!metaF.eventId || !metaF.initialId || !metaF.raceId || !metaF.divisionId) {
           console.warn("[DAO] Skip flat item, meta tidak lengkap:", metaF);
           continue;
         }
-        var keyF = metaF.eventId + "|" + metaF.initialId + "|" + metaF.raceId + "|" + metaF.divisionId;
+        const keyF = `${metaF.eventId}|${metaF.initialId}|${metaF.raceId}|${metaF.divisionId}`;
 
-        var cleanJson = JSON.stringify(item);
-        var cleanAny = JSON.parse(cleanJson);
+        const cleanJson = JSON.stringify(item);
+        const cleanAny = JSON.parse(cleanJson);
         if (cleanAny && cleanAny._id) delete cleanAny._id;
 
-        var teamEntry = normTeamFromFlat(cleanAny);
+        const teamEntry = normTeamFromFlat(cleanAny);
 
         if (!groups.has(keyF)) {
           groups.set(keyF, { meta: metaF, teams: [teamEntry] });
@@ -505,50 +1073,43 @@ async function insertSlalomResult(payload) {
     }
 
     // === Ambil existing per semua bucket ===
-    var filterOr = [];
-    var vals = Array.from(groups.values());
-    var vi = 0;
-    for (vi = 0; vi < vals.length; vi++) {
-      var m = vals[vi].meta;
+    const filterOr = [];
+    const vals = Array.from(groups.values());
+    for (let vi = 0; vi < vals.length; vi++) {
+      const m = vals[vi].meta;
       filterOr.push({
         eventId: m.eventId,
         initialId: m.initialId,
         raceId: m.raceId,
-        divisionId: m.divisionId
+        divisionId: m.divisionId,
       });
     }
-    var existingDocs = await col.find({ $or: filterOr }).toArray();
-    var existingMap = new Map();
-    var ei = 0;
-    for (ei = 0; ei < existingDocs.length; ei++) {
-      var exDoc = existingDocs[ei];
-      var ek = exDoc.eventId + "|" + exDoc.initialId + "|" + exDoc.raceId + "|" + exDoc.divisionId;
+    const existingDocs = await col.find({ $or: filterOr }).toArray();
+    const existingMap = new Map();
+    for (let ei = 0; ei < existingDocs.length; ei++) {
+      const exDoc = existingDocs[ei];
+      const ek = `${exDoc.eventId}|${exDoc.initialId}|${exDoc.raceId}|${exDoc.divisionId}`;
       existingMap.set(ek, exDoc);
     }
 
     // === Proses per bucket ===
-    var now = new Date();
-    var upsertedCount = 0;
+    const now = new Date();
+    let upsertedCount = 0;
 
-    var ge = groups.entries();
-    var step = ge.next();
-    while (!step.done) {
-      var bucketKey = step.value[0];
-      var entryObj = step.value[1];
+    for (const [bucketKey, entryObj] of groups.entries()) {
+      const meta = entryObj.meta;
+      const incomingTeams = entryObj.teams;
 
-      var meta = entryObj.meta;
-      var incomingTeams = entryObj.teams;
-
-      var filter = {
+      const filter = {
         eventId: meta.eventId,
         initialId: meta.initialId,
         raceId: meta.raceId,
-        divisionId: meta.divisionId
+        divisionId: meta.divisionId,
       };
 
-      var existing = existingMap.get(bucketKey);
+      let existing = existingMap.get(bucketKey);
       if (existing) {
-        var dup = await col.countDocuments(filter);
+        const dup = await col.countDocuments(filter);
         if (dup > 1) {
           console.warn("[DAO] Found >1 doc, cleanup:", filter);
           await col.deleteMany(filter);
@@ -557,73 +1118,70 @@ async function insertSlalomResult(payload) {
       }
 
       // Merge by (bibTeam|nameTeam) DENGAN MERGE PER-RUN
-      var mergedByKey = new Map();
+      const mergedByKey = new Map();
 
       // Seed dari existing
       if (existing && Array.isArray(existing.teams)) {
-        var st = 0;
-        for (st = 0; st < existing.teams.length; st++) {
-          var tSeed = existing.teams[st];
+        for (let st = 0; st < existing.teams.length; st++) {
+          const tSeed = existing.teams[st];
           if (!tSeed) continue;
-          var kSeed = (toStr(tSeed.bibTeam, "").trim() || "NO-BIB") + "|" + toStr(tSeed.nameTeam, "").trim();
+          const kSeed =
+            (toStr(tSeed.bibTeam, "").trim() || "NO-BIB") +
+            "|" +
+            toStr(tSeed.nameTeam, "").trim();
           if (!mergedByKey.has(kSeed)) {
-            // deep copy sederhana
             mergedByKey.set(kSeed, JSON.parse(JSON.stringify(tSeed)));
           }
         }
       }
 
       // Merge dengan incoming
-      var it = 0;
-      for (it = 0; it < incomingTeams.length; it++) {
-        var nt = incomingTeams[it];
-        var nbib = toStr(nt.bibTeam, "").trim();
-        var nname = toStr(nt.nameTeam, "").trim();
-        var kIn = (nbib || "NO-BIB") + "|" + nname;
+      for (let it = 0; it < incomingTeams.length; it++) {
+        const nt = incomingTeams[it];
+        const nbib = toStr(nt.bibTeam, "").trim();
+        const nname = toStr(nt.nameTeam, "").trim();
+        const kIn = (nbib || "NO-BIB") + "|" + nname;
 
-        var exTeam = mergedByKey.get(kIn); // bisa undefined
+        const exTeam = mergedByKey.get(kIn);
 
         if (!exTeam) {
           mergedByKey.set(kIn, JSON.parse(JSON.stringify(nt)));
         } else {
-          var exRes = Array.isArray(exTeam.result) ? exTeam.result.slice() : [];
-          var ntRes = Array.isArray(nt.result) ? nt.result : [];
+          const exRes = Array.isArray(exTeam.result) ? exTeam.result.slice() : [];
+          const ntRes = Array.isArray(nt.result) ? nt.result : [];
 
           // outRes: pertahankan run-1 lama; gunakan run-2 dari nt jika ada
-          var outRes = [];
+          const outRes = [];
           if (exRes[0]) outRes[0] = exRes[0];
           else if (ntRes[0]) outRes[0] = ntRes[0];
 
           if (ntRes[1]) outRes[1] = ntRes[1];
           else if (exRes[1]) outRes[1] = exRes[1];
 
-          // build mergedTeam (tanpa spread)
-          var mergedTeam = {};
-          // copy semua field exTeam
-          var exKeys = Object.keys(exTeam);
-          var exi = 0;
-          for (exi = 0; exi < exKeys.length; exi++) {
+          // build mergedTeam
+          const mergedTeam = {};
+          // copy exTeam → mergedTeam
+          const exKeys = Object.keys(exTeam);
+          for (let exi = 0; exi < exKeys.length; exi++) {
             mergedTeam[exKeys[exi]] = exTeam[exKeys[exi]];
           }
-          // override dengan nt
-          var ntKeys = Object.keys(nt);
-          var nti = 0;
-          for (nti = 0; nti < ntKeys.length; nti++) {
+          // override by nt
+          const ntKeys = Object.keys(nt);
+          for (let nti = 0; nti < ntKeys.length; nti++) {
             mergedTeam[ntKeys[nti]] = nt[ntKeys[nti]];
           }
           mergedTeam.nameTeam = toStr(nname, exTeam.nameTeam);
           mergedTeam.bibTeam = toStr(nbib, exTeam.bibTeam);
 
           // norm run hasil gabung
-          var resOutFinal = [];
-          var rfi = 0;
-          for (rfi = 0; rfi < outRes.length; rfi++) {
+          const resOutFinal = [];
+          for (let rfi = 0; rfi < outRes.length; rfi++) {
             resOutFinal.push(normRun(outRes[rfi]));
           }
           mergedTeam.result = resOutFinal;
 
           // Jika data baru belum lengkap (<2 run), jangan timpa bestTime/ranked/score lama
-          var newRuns = outRes.length;
+          const newRuns = outRes.length;
           if (newRuns < 2) {
             if (!(typeof mergedTeam.bestTime === "string" && mergedTeam.bestTime.trim() !== "")) {
               mergedTeam.bestTime = exTeam.bestTime;
@@ -636,35 +1194,31 @@ async function insertSlalomResult(payload) {
         }
       }
 
-      var mergedArray = Array.from(mergedByKey.values());
+      const mergedArray = Array.from(mergedByKey.values());
 
       // ====== RUN-LEVEL RANKING ======
-      var maxRuns = 0;
-      var mri = 0;
-      for (mri = 0; mri < mergedArray.length; mri++) {
-        var rr = Array.isArray(mergedArray[mri].result) ? mergedArray[mri].result : [];
+      let maxRuns = 0;
+      for (let mri = 0; mri < mergedArray.length; mri++) {
+        const rr = Array.isArray(mergedArray[mri].result) ? mergedArray[mri].result : [];
         if (rr.length > maxRuns) maxRuns = rr.length;
       }
 
       function rankPerSession(sessionIdx) {
-        var candidates = [];
-        var ci = 0;
-        for (ci = 0; ci < mergedArray.length; ci++) {
-          var t = mergedArray[ci];
-          var r = Array.isArray(t.result) ? t.result[sessionIdx] : null;
-          var ms = r && r.totalTime ? hmsToMs(r.totalTime) : Infinity;
+        const candidates = [];
+        for (let ci = 0; ci < mergedArray.length; ci++) {
+          const t = mergedArray[ci];
+          const r = Array.isArray(t.result) ? t.result[sessionIdx] : null;
+          const ms = r && r.totalTime ? hmsToMs(r.totalTime) : Infinity;
           if (Number.isFinite(ms)) {
-            candidates.push({ t: t, r: r, ms: ms });
+            candidates.push({ t, r, ms });
           }
         }
-        // sort by ms asc
-        candidates.sort(function (a, b) { return a.ms - b.ms; });
-        var rankCounter = 0;
-        var last = null;
-        var disp = 0;
-        var cj = 0;
-        for (cj = 0; cj < candidates.length; cj++) {
-          var item = candidates[cj];
+        candidates.sort((a, b) => a.ms - b.ms);
+        let rankCounter = 0;
+        let last = null;
+        let disp = 0;
+        for (let cj = 0; cj < candidates.length; cj++) {
+          const item = candidates[cj];
           rankCounter++;
           if (last === null || item.ms !== last) disp = rankCounter;
           last = item.ms;
@@ -682,26 +1236,22 @@ async function insertSlalomResult(payload) {
       }
 
       // ====== TEAM-LEVEL (≥2 run valid) ======
-      var eligibleTeams = [];
-      var et = 0;
-      for (et = 0; et < mergedArray.length; et++) {
-        var tm = mergedArray[et];
-        var resArr = Array.isArray(tm.result) ? tm.result : [];
+      const eligibleTeams = [];
+      for (let et = 0; et < mergedArray.length; et++) {
+        const tm = mergedArray[et];
+        const resArr = Array.isArray(tm.result) ? tm.result : [];
         if (resArr.length >= 2) {
-          var valsMs = [];
-          var vj = 0;
-          for (vj = 0; vj < resArr.length; vj++) {
-            var x = resArr[vj];
+          const valsMs = [];
+          for (let vj = 0; vj < resArr.length; vj++) {
+            const x = resArr[vj];
             if (x && typeof x.totalTime === "string" && x.totalTime.trim() !== "") {
-              var ms = hmsToMs(x.totalTime);
+              const ms = hmsToMs(x.totalTime);
               if (Number.isFinite(ms)) valsMs.push(ms);
             }
           }
           if (valsMs.length > 0) {
-            // cari min manual
-            var minMs = valsMs[0];
-            var mi = 1;
-            for (mi = 1; mi < valsMs.length; mi++) {
+            let minMs = valsMs[0];
+            for (let mi = 1; mi < valsMs.length; mi++) {
               if (valsMs[mi] < minMs) minMs = valsMs[mi];
             }
             tm.bestTime = msToHMSms(minMs);
@@ -711,19 +1261,17 @@ async function insertSlalomResult(payload) {
       }
 
       if (eligibleTeams.length > 0) {
-        // sort eligible by bestTime asc
-        eligibleTeams.sort(function (a, b) {
-          var am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
-          var bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
+        eligibleTeams.sort((a, b) => {
+          const am = a && a.bestTime ? hmsToMs(a.bestTime) : Infinity;
+          const bm = b && b.bestTime ? hmsToMs(b.bestTime) : Infinity;
           return am - bm;
         });
-        var rc = 0;
-        var lastBest = null;
-        var dispBest = 0;
-        var ei2 = 0;
-        for (ei2 = 0; ei2 < eligibleTeams.length; ei2++) {
-          var tt = eligibleTeams[ei2];
-          var best = tt && tt.bestTime ? hmsToMs(tt.bestTime) : Infinity;
+        let rc = 0;
+        let lastBest = null;
+        let dispBest = 0;
+        for (let ei2 = 0; ei2 < eligibleTeams.length; ei2++) {
+          const tt = eligibleTeams[ei2];
+          const best = tt && tt.bestTime ? hmsToMs(tt.bestTime) : Infinity;
           rc++;
           if (!Number.isFinite(best)) {
             tt.ranked = 0;
@@ -732,12 +1280,12 @@ async function insertSlalomResult(payload) {
             if (lastBest === null || best !== lastBest) dispBest = rc;
             lastBest = best;
             tt.ranked = dispBest;
-            tt.score = scoreForRank(dispBest); // ← skor dari table/fallback
+            tt.score = scoreForRank(dispBest);
           }
         }
       }
 
-      var update = {
+      const update = {
         $set: {
           eventId: meta.eventId,
           initialId: meta.initialId,
@@ -749,20 +1297,18 @@ async function insertSlalomResult(payload) {
           divisionName: meta.divisionName,
           teams: mergedArray,
           updatedAt: now,
-          _lastRevision: now.getTime()
+          _lastRevision: now.getTime(),
         },
-        $setOnInsert: { createdAt: now }
+        $setOnInsert: { createdAt: now },
       };
 
-      var res = await col.updateOne(filter, update, { upsert: true });
+      const res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
-
-      step = ge.next();
     }
 
-    return { ok: true, upsertedCount: upsertedCount };
+    return { ok: true, upsertedCount };
   } catch (err) {
-    var message = err && err.message ? err.message : String(err);
+    const message = err?.message ? err.message : String(err);
     console.error("Error insertSlalomResult:", message);
     return { ok: false, error: message };
   }

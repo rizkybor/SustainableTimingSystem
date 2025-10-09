@@ -13,7 +13,7 @@
 
     <!-- CATEGORY & STATUS -->
     <div class="band">
-      <div>{{ categories || "SLALOM CATEGORY" }}</div>
+      <div>{{ categories || "SLALOM CATEGORY BOOOSSSS" }}</div>
       <div :class="[isOfficial ? 'official-stamp' : 'unofficial-stamp']">
         {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
       </div>

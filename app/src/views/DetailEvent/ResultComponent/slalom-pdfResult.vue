@@ -10,7 +10,7 @@
         <div class="band-left">
           <strong>SCORE BOARD</strong>
           <span class="dot">•</span>
-          <span class="cat">{{ categories || "SLALOM" }}</span>
+          <span class="cat">{{ "SLALOM" }}</span>
           <span class="dot">•</span>
           <span class="cat">
             {{ data && data.levelName ? data.levelName : "Classification" }}

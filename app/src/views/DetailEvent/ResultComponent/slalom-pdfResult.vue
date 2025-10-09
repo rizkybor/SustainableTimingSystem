@@ -18,8 +18,9 @@
         </div>
         <div class="band-right">
           <strong
-            >{{ slalomCats.initial }} - {{ slalomCats.division }}
-            {{ slalomCats.race }}</strong
+            >{{ slalomCats ? slalomCats.initial : "" }} -
+            {{ slalomCats ? slalomCats.division : "" }}
+            {{ slalomCats ? slalomCats.race : "" }}</strong
           >
           <span class="dot">•</span>
           <span>{{ today }}</span>
@@ -43,7 +44,8 @@
       <!-- EVENT INFO -->
       <div class="event">
         <div class="event-name">
-          {{ data && data.eventName ? data.eventName : "-" }} | {{ flaggingSession1 ? "Final" : "Run 1" }}
+          {{ data && data.eventName ? data.eventName : "-" }} |
+          {{ isFinal ? "Final" : "Run 1" }}
         </div>
         <div class="event-meta">
           Kp/Ds. {{ data && data.addressVillage ? data.addressVillage : "-" }},
@@ -216,6 +218,11 @@ export default {
     slalomCats: { type: Object, required: false },
   },
   computed: {
+    isFinal() {
+      const arr = this.pdfParticipantsSession1 || [];
+      if (!arr.length) return false;
+      return arr.every((t) => Array.isArray(t.result) && t.result.length === 2);
+    },
     maxGates() {
       let m = 1;
       const arr = this.pdfParticipantsSession1 || [];
@@ -348,14 +355,6 @@ export default {
     },
     bib(t) {
       return (t && t.bibTeam) || "-";
-    },
-
-    flaggingSession1() {
-      if (t && Array.isArray(t.result) && t.result.length === 2) {
-        return false;
-      } else {
-        return true;
-      }
     },
 
     // tampilkan bestTime hanya jika tim sudah punya 2 run

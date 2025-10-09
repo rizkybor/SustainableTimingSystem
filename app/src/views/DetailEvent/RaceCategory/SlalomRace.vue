@@ -670,6 +670,7 @@
                 :pdf-participants-session1="pdfParticipantsSession1"
                 :title-categories="titleCategories"
                 :is-official="false"
+                :slalomCats="slalomCats"
               />
             </section>
           </vue-html2pdf>
@@ -798,6 +799,7 @@ export default {
 
   data() {
     return {
+      slalomCats: { initial: "-", race: "-", division: "-" },
       pdfParticipantsSession1: [],
       localShow: true,
       showSession1Modal: false,
@@ -1063,9 +1065,20 @@ export default {
 
     // Ambil jumlah gate untuk slalom dari pengaturan
     this.fetchSlalomGateCountFromSettings();
+    this.refreshSlalomCats();
   },
 
   methods: {
+    refreshSlalomCats() {
+      const payload = safeJSON("raceStartPayload", {}) || {};
+      const b = (payload && payload.bucket) || {};
+      const q = (this.$route && this.$route.query) || {};
+      this.slalomCats = {
+        initial: b.initialName || q.initialName || "-",
+        race: b.raceName || q.raceName || "-",
+        division: b.divisionName || q.divisionName || "-",
+      };
+    },
     async loadDataScore(type) {
       try {
         ipcRenderer.send("option-ranked", type);

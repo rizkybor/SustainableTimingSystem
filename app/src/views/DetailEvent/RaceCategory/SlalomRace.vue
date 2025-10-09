@@ -588,8 +588,7 @@
 
             <div v-else>
               <div class="mb-2 text-muted small">
-                Ditampilkan dari <code>teams.result[0]</code> (Session 1) —
-                sumber: <strong>get-result-slalom</strong>
+                Ditampilkan dari <code>(Session 1)</code>
               </div>
 
               <div class="table-responsive">
@@ -692,7 +691,6 @@
 
 <script>
 import SlalomSession1PdfResult from "../ResultComponent/slalom-session1-pdfResult.vue";
-
 import { ipcRenderer } from "electron";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
@@ -788,12 +786,6 @@ function getBucket() {
   return obj.bucket || {};
 }
 
-function loadFromRaceStartPayloadForSlalom() {
-  // Define the function logic here, for example:
-  const obj = safeJSON("raceStartPayload", {});
-  return obj.bucket || {}; // return the bucket or an empty object if not found
-}
-
 export default {
   name: "SlalomRacePanel",
   components: {
@@ -867,7 +859,7 @@ export default {
         fromRoute = String(this.$route.params.id);
       }
       let fromBucket = "";
-      const bucket = getBucket(); // Use the external function
+      const bucket = getBucket();
       if (bucket && bucket.eventId) fromBucket = String(bucket.eventId);
 
       return fromEvent || fromRoute || fromBucket || "";
@@ -968,9 +960,9 @@ export default {
         const times = (Array.isArray(team.sessions) ? team.sessions : [])
           .map((s) => s && s.totalTime)
           .filter(Boolean)
-          .map(hmsToMs); // helper kamu sudah ada
+          .map(hmsToMs);
 
-        if (!times.length) return Number.POSITIVE_INFINITY; // tanpa waktu → di bawah
+        if (!times.length) return Number.POSITIVE_INFINITY;
         return Math.min(...times);
       };
 
@@ -1029,7 +1021,7 @@ export default {
         if (prev === null || it.bestMs !== prev) {
           rank = idx;
           prev = it.bestMs;
-        } // 1,1,3
+        }
         const scoreObj = this.dataScore.find((d) => Number(d.ranking) === rank);
         map[it.id] = { rank, score: scoreObj ? Number(scoreObj.score) : 0 };
       }
@@ -1040,7 +1032,6 @@ export default {
     this.activeRun = 0;
   },
   async mounted() {
-    // Ambil event info dari localStorage dengan aman
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -1062,14 +1053,10 @@ export default {
           ? savedKey
           : this.slalomBucketOptions[0].value;
 
-      // Ambil tim berdasarkan key yang dipilih
       await this.fetchSlalomTeamsByKey(this.selectedSlalomKey);
     } else {
-      // Fallback jika tidak ada opsi slalom, muat semua bucket dari eventDetails
       this.loadAllSlalomBucketsFromEvent();
     }
-
-    // Tentukan indeks sesi default untuk setiap tim
     this.teams.forEach((t) =>
       this.$set(this.selectedSession, String(t._id), this.activeRun)
     );
@@ -1267,25 +1254,6 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
-
-      // this.assignRanks(this.teams);
-    },
-    assignRanks(teams) {
-      // // Rank teams based on their best times (use calculateBestTime for each team)
-      // teams.forEach((team) => {
-      //   const bestTime = this.calculateBestTime(team);
-      //   team.bestTime = bestTime; // Store the best time in the team object
-      // });
-      // // Sort teams by best time in ascending order (lower time is better)
-      // teams.sort((a, b) => {
-      //   const timeA = hmsToMs(a.bestTime); // Convert best time to milliseconds for comparison
-      //   const timeB = hmsToMs(b.bestTime);
-      //   return timeA - timeB; // Sort from fastest to slowest
-      // });
-      // // Assign ranks based on sorted order
-      // teams.forEach((team, index) => {
-      //   team.rank = index + 1; // Rank starts from 1, hence add 1
-      // });
     },
     // === SERIAL CONNECTION ===
     async connectPort() {
@@ -1799,10 +1767,7 @@ export default {
     /** === Save (parity dengan Sprint) === */
     saveResult() {
       try {
-        const docs = this.buildDocs(); // hasilnya object tunggal
-        console.log(docs, "<< cek");
-
-        // Jika bukan object valid → hentikan
+        const docs = this.buildDocs();
         if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
           ipcRenderer.send("get-alert", {
             type: "warning",
@@ -2021,7 +1986,6 @@ export default {
 
     // ===== PDF SESSION 1 (ambil data dari DB seperti openSession1Modal) =====
     async printPdfSession1() {
-      console.log("🔍 [printPdfSession1] Fetching data from DB...");
       this.loadingSession1 = true;
       try {
         const key = this.selectedSlalomKey;
@@ -2061,7 +2025,6 @@ export default {
 
         const pdf = this.$refs.html2PdfS1;
         if (pdf && typeof pdf.generatePdf === "function") {
-          console.log("🧾 Generating PDF Session 1...");
           await pdf.generatePdf();
         } else {
           ipcRenderer &&
@@ -2072,7 +2035,6 @@ export default {
             });
         }
       } catch (err) {
-        console.error("❌ Error generating PDF:", err);
         ipcRenderer &&
           ipcRenderer.send("get-alert", {
             type: "error",
@@ -2084,8 +2046,6 @@ export default {
       this.loadingSession1 = false;
     },
     onPdfGeneratedS1() {
-      console.log("✅ PDF Slalom Session 1 berhasil di-generate!");
-      // optional: tampilkan notifikasi
       try {
         ipcRenderer &&
           ipcRenderer.send("get-alert", {
@@ -2093,7 +2053,9 @@ export default {
             detail: "PDF Slalom Session 1 telah berhasil diunduh.",
             message: "Download Selesai",
           });
-      } catch (_) {}
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
     },
   },
 };

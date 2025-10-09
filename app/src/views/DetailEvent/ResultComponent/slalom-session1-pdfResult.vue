@@ -38,17 +38,28 @@
       <table class="score-table">
         <thead>
           <tr>
-            <th>No</th>
-            <th>Team</th>
-            <th>BIB</th>
-            <th>Start</th>
-            <th>Gates (Detail)</th>
-            <th>Finish</th>
-            <th>Total Penalty</th>
-            <th>Race</th>
-            <th>Penalty</th>
-            <th>Total</th>
-            <th>Rank</th>
+            <th rowspan="2">No</th>
+            <th rowspan="2">Team</th>
+            <th rowspan="2">BIB</th>
+            <th rowspan="2">Start Time</th>
+
+            <th :colspan="maxGates + 2" class="pen-group text-center">
+              Penalties
+            </th>
+
+            <th rowspan="2">Penalty Time</th>
+            <th rowspan="2">Total Penalty</th>
+            <th rowspan="2">Finish Time</th>
+            <th rowspan="2">Race Time</th>
+            <th rowspan="2">Total</th>
+            <th rowspan="2">Rank</th>
+          </tr>
+          <tr>
+            <th class="pen-head start">S</th>
+            <th class="pen-head section" v-for="n in maxGates" :key="'gh' + n">
+              {{ n }}
+            </th>
+            <th class="pen-head finish">F</th>
           </tr>
         </thead>
 
@@ -57,112 +68,77 @@
             <td class="text-center">{{ i + 1 }}</td>
             <td class="text-strong">{{ p.nameTeam || "-" }}</td>
             <td class="text-center">{{ p.bibTeam || "-" }}</td>
+            <td class="text-center">{{ p.result[0].startTime || "-" }}</td>
 
-            <!-- Ambil session pertama -->
-            <template v-if="Array.isArray(p.result) && p.result.length">
-              <td class="right">
-                {{
-                  p.result[0] &&
-                  p.result[0].penaltyTotal &&
-                  p.result[0].penaltyTotal.start
-                    ? p.result[0].penaltyTotal.start
-                    : 0
-                }}
-              </td>
+            <!-- Start -->
+            <td class="right">
+              {{ hasGates(p) ? toNum(p.result[0].penaltyTotal.start) : 0 }}
+            </td>
 
-              <!-- Gates list -->
-              <td class="right">
-                <div
-                  v-if="
-                    p.result[0] &&
-                    p.result[0].penaltyTotal &&
-                    Array.isArray(p.result[0].penaltyTotal.gates) &&
-                    p.result[0].penaltyTotal.gates.length
-                  "
-                >
-                  <ul class="penalty-list">
-                    <li
-                      v-for="(pen, idx) in p.result[0].penaltyTotal.gates"
-                      :key="idx"
-                    >
-                      Gate {{ idx + 1 }}: <strong>{{ pen }}</strong>
-                    </li>
-                  </ul>
-                  <div class="penalty-sum">
-                    Σ Gates =
-                    <strong>
-                      {{
-                        p.result[0].penaltyTotal.gates.reduce(function (a, v) {
-                          return a + Number(v || 0);
-                        }, 0)
-                      }}
-                    </strong>
-                  </div>
-                </div>
-                <div v-else>0</div>
-              </td>
+            <!-- Gates 1..maxGates -->
+            <td
+              class="right"
+              v-for="(v, idx) in padToMaxGates(getGates(p), maxGates)"
+              :key="'gv' + i + '-' + idx"
+            >
+              {{ toNum(v) }}
+            </td>
 
-              <td class="right">
-                {{
-                  p.result[0] &&
-                  p.result[0].penaltyTotal &&
-                  p.result[0].penaltyTotal.finish
-                    ? p.result[0].penaltyTotal.finish
-                    : 0
-                }}
-              </td>
+            <!-- Finish -->
+            <td class="right">
+              {{ hasGates(p) ? toNum(p.result[0].penaltyTotal.finish) : 0 }}
+            </td>
 
-              <!-- Total Penalty -->
-              <td class="right">
-                {{
-                  p.result[0] && p.result[0].penaltyTotal
-                    ? Number(p.result[0].penaltyTotal.start || 0) +
-                      p.result[0].penaltyTotal.gates.reduce(function (a, v) {
-                        return a + Number(v || 0);
-                      }, 0) +
-                      Number(p.result[0].penaltyTotal.finish || 0)
-                    : 0
-                }}
-              </td>
+            <!-- Total Penalty -->
+            <td class="right">
+              {{
+                hasGates(p)
+                  ? toNum(p.result[0].penaltyTotal.start) +
+                    padToMaxGates(getGates(p), maxGates).reduce(function (
+                      a,
+                      v
+                    ) {
+                      return a + toNum(v);
+                    },
+                    0) +
+                    toNum(p.result[0].penaltyTotal.finish)
+                  : 0
+              }}
+            </td>
 
-              <!-- Race / Penalty / Total / Rank -->
-              <td class="center">
-                {{
-                  p.result[0] && p.result[0].raceTime
-                    ? p.result[0].raceTime
-                    : "00:00:00.000"
-                }}
-              </td>
-              <td class="center">
-                {{
-                  p.result[0] && p.result[0].penaltyTime
-                    ? p.result[0].penaltyTime
-                    : "00:00:00.000"
-                }}
-              </td>
-              <td class="center text-strong">
-                {{
-                  p.result[0] && p.result[0].totalTime
-                    ? p.result[0].totalTime
-                    : "00:00:00.000"
-                }}
-              </td>
-              <td class="center">
-                {{
-                  p.result[0] && p.result[0].ranked
-                    ? p.result[0].ranked
-                    : p.ranked || "-"
-                }}
-              </td>
-            </template>
+            <td class="center">
+              {{
+                p && p.result && p.result[0] && p.result[0].penaltyTime
+                  ? p.result[0].penaltyTime
+                  : "00:00:00.000"
+              }}
+            </td>
 
-            <template v-else>
-              <td colspan="8" class="empty">No Result</td>
-            </template>
-          </tr>
+            <td class="text-center">{{ p.result[0].finishTime || "-" }}</td>
 
-          <tr v-if="pdfParticipantsSession1.length === 0">
-            <td class="empty" colspan="11">No data</td>
+            <!-- Race / Penalty / Total / Rank -->
+            <td class="center">
+              {{
+                p && p.result && p.result[0] && p.result[0].raceTime
+                  ? p.result[0].raceTime
+                  : "00:00:00.000"
+              }}
+            </td>
+
+            <td class="center text-strong">
+              {{
+                p && p.result && p.result[0] && p.result[0].totalTime
+                  ? p.result[0].totalTime
+                  : "00:00:00.000"
+              }}
+            </td>
+            <td class="center">
+              {{
+                p && p.result && p.result[0] && p.result[0].ranked
+                  ? p.result[0].ranked
+                  : p.ranked || "-"
+              }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -193,12 +169,37 @@
 export default {
   name: "SlalomSession1PdfResult",
   props: {
-    data: { type: Object, default: function () { return {}; } },
+    data: {
+      type: Object,
+      default: function () {
+        return {};
+      },
+    },
     pdfParticipantsSession1: { type: Array, required: true },
     titleCategories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
   },
   computed: {
+    maxGates() {
+      var max = 1;
+      var arr = this.pdfParticipantsSession1 || [];
+      for (var i = 0; i < arr.length; i++) {
+        var p = arr[i];
+        if (
+          p &&
+          p.result &&
+          Array.isArray(p.result) &&
+          p.result.length &&
+          p.result[0] &&
+          p.result[0].penaltyTotal &&
+          Array.isArray(p.result[0].penaltyTotal.gates)
+        ) {
+          var len = p.result[0].penaltyTotal.gates.length;
+          if (len > max) max = len;
+        }
+      }
+      return max; // minimal 1 gate
+    },
     today() {
       var d = new Date();
       var dd = String(d.getDate()).padStart(2, "0");
@@ -208,7 +209,9 @@ export default {
     },
     timestamp() {
       var d = new Date();
-      var pad = function (x) { return String(x).padStart(2, "0"); };
+      var pad = function (x) {
+        return String(x).padStart(2, "0");
+      };
       return (
         pad(d.getDate()) +
         "/" +
@@ -222,6 +225,31 @@ export default {
         ":" +
         pad(d.getSeconds())
       );
+    },
+  },
+  methods: {
+    toNum(v) {
+      var n = Number(v);
+      return isNaN(n) ? 0 : n;
+    },
+    hasGates(p) {
+      return (
+        p &&
+        p.result &&
+        Array.isArray(p.result) &&
+        p.result.length &&
+        p.result[0] &&
+        p.result[0].penaltyTotal &&
+        Array.isArray(p.result[0].penaltyTotal.gates)
+      );
+    },
+    getGates(p) {
+      return this.hasGates(p) ? p.result[0].penaltyTotal.gates : [];
+    },
+    padToMaxGates(arr, max) {
+      var out = Array.isArray(arr) ? arr.slice(0, max) : [];
+      while (out.length < max) out.push(0);
+      return out;
     },
   },
 };
@@ -402,5 +430,37 @@ export default {
   color: #8b8b8b;
   opacity: 0.7;
   letter-spacing: 0.5px;
+}
+
+/* === Mini Table di kolom Gates (Detail) === */
+.mini-penalty {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  background: #fff;
+}
+.mini-penalty th,
+.mini-penalty td {
+  border: 1px solid #dde6ee;
+  text-align: center;
+  padding: 3px 4px;
+  line-height: 1.2;
+}
+.mini-penalty .mini-title {
+  background: rgb(240, 250, 255);
+  color: #173f5f;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.mini-penalty .mini-head {
+  background: #f7fafd;
+  color: #111;
+  font-weight: 700;
+  font-size: 9px;
+}
+.mini-penalty .mini-val {
+  font-weight: 700;
+  color: #111;
+  background: #fff;
 }
 </style>

@@ -1813,6 +1813,7 @@ export default {
     saveSession1() {
       try {
         const doc = this.buildDocsSession1Only(); // object
+        console.log(doc,'<<<< CEK DOC')
         if (!doc || typeof doc !== "object" || !Array.isArray(doc.teams)) {
           ipcRenderer.send("get-alert", {
             type: "warning",
@@ -1910,7 +1911,7 @@ export default {
           praStart: String(t.praStart || ""),
           intervalRace: String(t.intervalRace || ""),
           statusId: Number(t.statusId || 0),
-          result: [r1], // HANYA SESSION 1
+          result: [r1],
         });
       }
 

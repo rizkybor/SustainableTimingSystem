@@ -38,109 +38,100 @@
       <table class="score-table">
         <thead>
           <tr>
-            <th rowspan="2">No</th>
-            <th rowspan="2">Team</th>
-            <th rowspan="2">1st Run Rank</th>
+            <th rowspan="2" class="text-center">No</th>
+            <th rowspan="2">TEAM</th>
+            <th rowspan="2" class="wrap-title">1st Run Rank</th>
+            <th rowspan="2" class="text-center">BIB</th>
+            <th rowspan="2" class="text-center">RUN</th>
 
-            <th rowspan="2">BIB</th>
-
-            <th :colspan="maxGates + 2" class="pen-group text-center py-2">
-              Penalties
+            <th :colspan="maxGates + 2" class="pen-group text-center">
+              PENALTIES
             </th>
 
-            <th rowspan="2" class="col-total-penalty text-center">Total</th>
-            <th rowspan="2">Penalty Time</th>
-            <th rowspan="2">Start Time</th>
-            <th rowspan="2">Finish Time</th>
-            <th rowspan="2">Race Time</th>
-            <th rowspan="2">Total Time</th>
+            <th rowspan="2" class="col-total-penalty text-center wrap-title">
+              TOTAL PENALTY
+            </th>
+            <th rowspan="2" class="text-center">TIME PENALTY</th>
+            <th rowspan="2" class="text-center">START TIME</th>
+            <th rowspan="2" class="text-center">FINISH TIME</th>
+            <th rowspan="2" class="text-center">RACE TIME</th>
+            <th rowspan="2" class="text-center">TOTAL TIME</th>
+            <th rowspan="2" class="text-center">BEST TIME</th>
+            <th rowspan="2" class="text-center">RANK</th>
           </tr>
           <tr>
             <th class="pen-head start">S</th>
-            <th class="pen-head section" v-for="n in maxGates" :key="'gh' + n">
+            <th class="pen-head section" v-for="n in maxGates" :key="'h' + n">
               {{ n }}
             </th>
             <th class="pen-head finish">F</th>
           </tr>
         </thead>
 
-        <tbody>
-          <tr v-for="(p, i) in pdfParticipantsSession1" :key="i">
-            <td class="text-center">{{ i + 1 }}</td>
-            <td class="text-strong">{{ p.nameTeam || "-" }}</td>
-            <td class="center">
-              {{
-                p && p.result && p.result[0] && p.result[0].ranked
-                  ? p.result[0].ranked
-                  : p.ranked || "-"
-              }}
-            </td>
-            <td class="text-center">{{ p.bibTeam || "-" }}</td>
+        <!-- Satu <tbody> per tim (boleh banyak tbody di dalam table) -->
+        <tbody
+          v-for="(t, i) in pdfParticipantsSession1"
+          :key="t && t.bibTeam ? 'team-' + t.bibTeam : 'idx-' + i"
+        >
+          <!-- RUN 1 -->
+          <tr>
+            <td class="center" :rowspan="2">{{ i + 1 }}</td>
+            <td class="text-strong" :rowspan="2">{{ teamName(t) }}</td>
+            <td class="center" :rowspan="2">{{ firstRunRank(t) }}</td>
+            <td class="center" :rowspan="2">{{ bib(t) }}</td>
 
-            <!-- Start -->
-            <td class="right">
-              {{ hasGates(p) ? toNum(p.result[0].penaltyTotal.start) : 0 }}
-            </td>
+            <td class="center">1</td>
 
-            <!-- Gates 1..maxGates -->
+            <td class="right">{{ startAt(t, 0) }}</td>
             <td
               class="right"
-              v-for="(v, idx) in padToMaxGates(getGates(p), maxGates)"
-              :key="'gv' + i + '-' + idx"
+              v-for="(v, gi) in gatesAtPadded(t, 0)"
+              :key="'r1g' + gi"
             >
-              {{ toNum(v) }}
+              {{ v }}
             </td>
+            <td class="right">{{ finishAt(t, 0) }}</td>
 
-            <!-- Finish -->
-            <td class="right">
-              {{ hasGates(p) ? toNum(p.result[0].penaltyTotal.finish) : 0 }}
+            <td class="center col-total-penalty">{{ totalPenaltyAt(t, 0) }}</td>
+            <td class="center">{{ timeAt(t, 0, "penaltyTime") }}</td>
+            <td class="center">{{ timeAt(t, 0, "startTime") }}</td>
+            <td class="center">{{ timeAt(t, 0, "finishTime") }}</td>
+            <td class="center">{{ timeAt(t, 0, "raceTime") }}</td>
+            <td class="center text-strong">{{ timeAt(t, 0, "totalTime") }}</td>
+
+            <td class="center" :rowspan="2">{{ bestTime(t) }}</td>
+            <td class="center" :rowspan="2">{{ teamRank(t) }}</td>
+          </tr>
+
+          <!-- RUN 2 -->
+          <tr>
+            <td class="center">2</td>
+
+            <td class="right">{{ startAt(t, 1) }}</td>
+            <td
+              class="right"
+              v-for="(v, gi) in gatesAtPadded(t, 1)"
+              :key="'r2g' + gi"
+            >
+              {{ v }}
             </td>
+            <td class="right">{{ finishAt(t, 1) }}</td>
 
-            <!-- Total Penalty -->
-            <td class="col-total-penalty right text-center">
-              {{
-                hasGates(p)
-                  ? toNum(p.result[0].penaltyTotal.start) +
-                    padToMaxGates(getGates(p), maxGates).reduce(function (
-                      a,
-                      v
-                    ) {
-                      return a + toNum(v);
-                    },
-                    0) +
-                    toNum(p.result[0].penaltyTotal.finish)
-                  : 0
-              }}
-            </td>
+            <td class="center col-total-penalty">{{ totalPenaltyAt(t, 1) }}</td>
+            <td class="center">{{ timeAt(t, 1, "penaltyTime") }}</td>
+            <td class="center">{{ timeAt(t, 1, "startTime") }}</td>
+            <td class="center">{{ timeAt(t, 1, "finishTime") }}</td>
+            <td class="center">{{ timeAt(t, 1, "raceTime") }}</td>
+            <td class="center text-strong">{{ timeAt(t, 1, "totalTime") }}</td>
+          </tr>
+        </tbody>
 
-            <td class="center">
-              {{
-                p && p.result && p.result[0] && p.result[0].penaltyTime
-                  ? p.result[0].penaltyTime
-                  : "00:00:00.000"
-              }}
-            </td>
-
-            <td class="text-center">{{ p.result[0].startTime || "-" }}</td>
-
-            <td class="text-center">{{ p.result[0].finishTime || "-" }}</td>
-
-            <!-- Race / Penalty / Total / Rank -->
-            <td class="center">
-              {{
-                p && p.result && p.result[0] && p.result[0].raceTime
-                  ? p.result[0].raceTime
-                  : "00:00:00.000"
-              }}
-            </td>
-
-            <td class="center text-strong">
-              {{
-                p && p.result && p.result[0] && p.result[0].totalTime
-                  ? p.result[0].totalTime
-                  : "00:00:00.000"
-              }}
-            </td>
+        <!-- Tampil bila tidak ada data -->
+        <tbody
+          v-if="!pdfParticipantsSession1 || !pdfParticipantsSession1.length"
+        >
+          <tr>
+            <td class="empty" colspan="999">No data</td>
           </tr>
         </tbody>
       </table>
@@ -178,24 +169,22 @@ export default {
   },
   computed: {
     maxGates() {
-      var max = 1;
-      var arr = this.pdfParticipantsSession1 || [];
-      for (var i = 0; i < arr.length; i++) {
-        var p = arr[i];
-        if (
-          p &&
-          p.result &&
-          Array.isArray(p.result) &&
-          p.result.length &&
-          p.result[0] &&
-          p.result[0].penaltyTotal &&
-          Array.isArray(p.result[0].penaltyTotal.gates)
-        ) {
-          var len = p.result[0].penaltyTotal.gates.length;
-          if (len > max) max = len;
-        }
+      let m = 1,
+        arr = this.pdfParticipantsSession1 || [];
+      for (const t of arr) {
+        const r0 = this.run(t, 0),
+          r1 = this.run(t, 1);
+        const g0 =
+          r0 && r0.penaltyTotal && Array.isArray(r0.penaltyTotal.gates)
+            ? r0.penaltyTotal.gates.length
+            : 0;
+        const g1 =
+          r1 && r1.penaltyTotal && Array.isArray(r1.penaltyTotal.gates)
+            ? r1.penaltyTotal.gates.length
+            : 0;
+        m = Math.max(m, g0, g1);
       }
-      return max; // minimal 1 gate
+      return m;
     },
     today() {
       var d = new Date();
@@ -225,34 +214,99 @@ export default {
     },
   },
   methods: {
-    toNum(v) {
-      var n = Number(v);
-      return isNaN(n) ? 0 : n;
+    num(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
     },
-    hasGates(p) {
-      return (
-        p &&
-        p.result &&
-        Array.isArray(p.result) &&
-        p.result.length &&
-        p.result[0] &&
-        p.result[0].penaltyTotal &&
-        Array.isArray(p.result[0].penaltyTotal.gates)
+
+    // --- akses aman level team/run ---
+    teamName(t) {
+      return (t && t.nameTeam) || "-";
+    },
+    bib(t) {
+      return (t && t.bibTeam) || "-";
+    },
+    bestTime(t) {
+      if (this.pdfParticipantsSession1.length == 0) {
+        return (t && t.bestTime) || "00:00:00.000";
+      } else {
+        return "00:00:00.000";
+      }
+    },
+    teamRank(t) {
+      if (this.pdfParticipantsSession1.length == 0) {
+        return (t && t.ranked) || "-";
+      } else {
+        return "-"
+      }
+    },
+
+    run(t, idx) {
+      if (!t || !Array.isArray(t.result)) return null;
+      return t.result[idx] || null;
+    },
+
+    firstRunRank(t) {
+      const r = this.run(t, 0);
+      return r && r.ranked ? r.ranked : "-";
+    },
+
+    // --- penalties ---
+    penaltyTotal(t, idx) {
+      const r = this.run(t, idx);
+      return r && r.penaltyTotal
+        ? r.penaltyTotal
+        : { start: 0, gates: [], finish: 0 };
+    },
+    startAt(t, idx) {
+      return this.num(this.penaltyTotal(t, idx).start);
+    },
+    finishAt(t, idx) {
+      return this.num(this.penaltyTotal(t, idx).finish);
+    },
+    gatesAt(t, idx) {
+      const g = this.penaltyTotal(t, idx).gates;
+      return Array.isArray(g) ? g : [];
+    },
+    gatesAtPadded(t, idx) {
+      const g = this.gatesAt(t, idx).slice(0, this.maxGates);
+      while (g.length < this.maxGates) g.push(0);
+      return g.map(this.num);
+    },
+    totalPenaltyAt(t, idx) {
+      const pt = this.penaltyTotal(t, idx);
+      const sumG = this.gatesAtPadded(t, idx).reduce(
+        (a, b) => a + this.num(b),
+        0
       );
+      return this.num(pt.start) + sumG + this.num(pt.finish);
     },
-    getGates(p) {
-      return this.hasGates(p) ? p.result[0].penaltyTotal.gates : [];
-    },
-    padToMaxGates(arr, max) {
-      var out = Array.isArray(arr) ? arr.slice(0, max) : [];
-      while (out.length < max) out.push(0);
-      return out;
+
+    // --- times ---
+    timeAt(t, idx, key) {
+      const r = this.run(t, idx);
+      const v = r && r[key];
+      return v || (key === "penaltyTime" ? "00:00:00.000" : "-");
     },
   },
 };
 </script>
 
 <style scoped>
+/* --- Header yang bisa wrap text --- */
+.wrap-title {
+  white-space: normal !important; /* izinkan teks turun ke baris berikutnya */
+  word-wrap: break-word; /* potong kata panjang kalau perlu */
+  overflow-wrap: anywhere; /* modern support */
+  text-align: center; /* teks tetap di tengah */
+  vertical-align: middle; /* sejajarkan vertikal */
+  line-height: 1.2; /* jarak antar baris pas */
+  padding: 2px 4px; /* ruang di sekitar teks */
+  max-width: 70px; /* batasi lebar kolom agar wrap terjadi */
+  background: rgb(240, 250, 255); /* biar konsisten dengan header */
+  font-weight: 800;
+  font-size: 8.8px;
+}
 @page {
   size: A4 landscape;
   margin: 8mm;
@@ -458,7 +512,7 @@ export default {
   text-transform: uppercase;
   font-size: 8.8px; /* kecilkan header */
   font-weight: 800;
-  text-align: center;
+  /* text-align: end; */
   padding: 2px 3px; /* header padding kecil */
 }
 
@@ -475,13 +529,18 @@ export default {
 
 .score-table th:nth-child(3),
 .score-table td:nth-child(3) {
-  width: 80px;
+  width: 44px;
 } /* 1st Run Rank */
 
 .score-table th:nth-child(4),
 .score-table td:nth-child(4) {
-  width: 44px;
+  width: 30px;
 } /* BIB */
+
+.score-table th:nth-child(5),
+.score-table td:nth-child(5) {
+  width: 30px;
+} /* RUN */
 
 /* kolom-kolom di ujung */
 .score-table th:nth-last-child(6),
@@ -492,24 +551,37 @@ export default {
 .score-table th:nth-child(7),
 .score-table td:nth-child(7) {
   width: 80px;
+} /* Time Penalty */
+
+.score-table th:nth-child(8),
+.score-table td:nth-child(8) {
+  width: 80px;
 } /* Start Time */
 
-.score-table th:nth-last-child(4),
-.score-table td:nth-last-child(4) {
-  width: 80px;
-} /* Penalty Time */
-.score-table th:nth-last-child(3),
-.score-table td:nth-last-child(3) {
+.score-table th:nth-child(10),
+.score-table td:nth-child(10) {
   width: 80px;
 } /* Finish Time */
-.score-table th:nth-last-child(2),
-.score-table td:nth-last-child(2) {
+
+.score-table th:nth-child(11),
+.score-table td:nth-child(11) {
   width: 80px;
 } /* Race Time */
-.score-table th:nth-last-child(1),
-.score-table td:nth-last-child(1) {
+
+.score-table th:nth-child(12),
+.score-table td:nth-child(12) {
   width: 80px;
-} /* Total (waktu) */
+} /* Total Time */
+
+.score-table th:nth-child(13),
+.score-table td:nth-child(13) {
+  width: 80px;
+} /* Best Time */
+
+.score-table th:nth-child(14),
+.score-table td:nth-child(14) {
+  width: 35px;
+} /* Rank */
 
 /* --- heading untuk grup penalties & cell gates lebih rapat --- */
 .pen-group {
@@ -543,7 +615,7 @@ export default {
 /* ==== Total Penalty column width ==== */
 .score-table th.col-total-penalty,
 .score-table td.col-total-penalty {
-  width: 50px; /* atur sesuai selera: 110–140px */
+  width: 55px; /* atur sesuai selera: 110–140px */
   min-width: 120px;
   max-width: 140px; /* cegah melebar berlebihan */
   white-space: nowrap;
@@ -558,5 +630,16 @@ export default {
     width: 130px;
     min-width: 130px;
   }
+}
+
+.wrap-title {
+  white-space: normal; 
+  word-wrap: break-word; 
+  overflow-wrap: anywhere; 
+  max-width: 80px;
+  text-align: center; 
+  vertical-align: middle; 
+  line-height: 1.2; 
+  padding: 2px 4px; 
 }
 </style>

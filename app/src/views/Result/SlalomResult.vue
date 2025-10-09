@@ -159,12 +159,19 @@
               <th class="text-center">Finish Pen.</th>
               <th class="text-center">Gate Pen.</th>
               <th class="text-center">Total Pen.</th>
-              <th class="text-center">Race Time</th>
               <th class="text-center">Penalty Time</th>
+              <th class="text-center">Start Time</th>
+              <th class="text-center">Finish Time</th>
+              <th class="text-center">Race Time</th>
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
-              <th v-if="sessionMode === 'all'">Score</th>
-              <th v-if="!isOfficial && sessionMode === 'all'">Action</th>
+              <th class="text-center" v-if="sessionMode === 'all'">Score</th>
+              <th
+                class="text-center"
+                v-if="!isOfficial && sessionMode === 'all'"
+              >
+                Action
+              </th>
             </tr>
           </thead>
 
@@ -205,17 +212,33 @@
 
               <!-- Session-specific columns (tetap per baris) -->
               <td class="text-center">{{ r.session || "-" }}</td>
-              <td class="text-center">{{ r.startPenalty || 0 }}</td>
-              <td class="text-center">{{ r.finishPenalty || 0 }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.startPenalty || 0 }}
+              </td>
+              <td class="text-center" style="color: red">
+                {{ r.finishPenalty || 0 }}
+              </td>
               <td class="text-center">
-                <span class="gate-modal-trigger" @click="openGateModal(r)">
+                <span
+                  class="gate-modal-trigger"
+                  style="color: red"
+                  @click="openGateModal(r)"
+                >
                   {{ r.sectionPenalty || 0 }}
                 </span>
               </td>
-              <td class="text-center">{{ r.totalPenalty || 0 }}</td>
-              <td class="text-center">{{ r.raceTime || "00:00:00.000" }}</td>
-              <td class="text-center">{{ r.penaltyTime || "00:00:00.000" }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.totalPenalty || 0 }}
+              </td>
+              <td class="text-center" style="color: red">
+                {{ r.penaltyTime || "00:00:00.000" }}
+              </td>
+              <td class="text-center">{{ r.startTime || "00:00:00.000" }}</td>
+              <td class="text-center">{{ r.finishTime || "00:00:00.000" }}</td>
               <td class="bold text-center">
+                {{ r.raceTime || "00:00:00.000" }}
+              </td>
+              <td class="bold text-center" style="color: green">
                 {{ r.resultTime || "00:00:00.000" }}
               </td>
 

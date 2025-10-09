@@ -53,7 +53,7 @@
             <th rowspan="2">Start Time</th>
             <th rowspan="2">Finish Time</th>
             <th rowspan="2">Race Time</th>
-            <th rowspan="2">Total</th>
+            <th rowspan="2">Total Time</th>
           </tr>
           <tr>
             <th class="pen-head start">S</th>

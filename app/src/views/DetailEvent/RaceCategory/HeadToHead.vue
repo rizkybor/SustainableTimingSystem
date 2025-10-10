@@ -258,7 +258,10 @@
               </button>
 
               <button
-                v-if="visibleParticipants && visibleParticipants.length && currentRound == 'Semifinals'"
+                v-if="
+                  (visibleParticipants && visibleParticipants.length) ||
+                  currentRound == 'Semifinals'
+                "
                 class="btn-action btn-secondary"
                 @click="populateBronzeFromSemis"
                 v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
@@ -547,6 +550,35 @@
             >
               <Icon icon="mdi:download" /> Export JSON
             </button>
+
+            <!-- NEW: By Round -->
+            <!-- contoh -->
+            <button
+              class="btn-action btn-outline-dark"
+              @click="printCurrentRoundVuePdf"
+            >
+              <Icon icon="mdi:printer" /> Print Round
+            </button>
+            <button
+              class="btn-action btn-outline-secondary"
+              @click="saveCurrentRoundToDB"
+            >
+              <Icon icon="mdi:database-arrow-up-outline" /> Save Round (DB)
+            </button>
+
+            <!-- NEW: Overall -->
+            <button
+              class="btn-action btn-outline-dark"
+              @click="printOverallVuePdf"
+            >
+              <Icon icon="mdi:printer" /> Print Overall
+            </button>
+            <button
+              class="btn-action btn-outline-secondary"
+              @click="saveOverallToDB"
+            >
+              <Icon icon="mdi:database-arrow-up-outline" /> Save Overall (DB)
+            </button>
           </div>
         </div>
         <b-row>
@@ -575,12 +607,12 @@
                     <th rowspan="2">Heat</th>
                     <th rowspan="2">Team Name</th>
                     <th rowspan="2">BIB</th>
+                    <th rowspan="2">Start Time</th>
 
                     <!-- Grup Penalties -->
                     <th colspan="9" class="text-center">Penalties Group</th>
                     <th rowspan="2">Penalty Total</th>
                     <th class="text-center" rowspan="2">Penalty Time</th>
-                    <th rowspan="2">Start Time</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
                     <th class="text-center" rowspan="2">Result</th>
@@ -658,6 +690,11 @@
                     </td>
                     <!-- BIB TEAM -->
                     <td class="text-center">{{ item.bibTeam }}</td>
+
+                    <!-- START TIME -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.startTime }}
+                    </td>
 
                     <!-- PENALTY START -->
                     <td>
@@ -838,11 +875,6 @@
                       {{ item.result.penaltyTime }}
                     </td>
 
-                    <!-- START TIME -->
-                    <td class="text-center text-monospace">
-                      {{ item.result.startTime }}
-                    </td>
-
                     <!-- FINISH TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.finishTime }}
@@ -957,6 +989,61 @@
     </div>
 
     <br /><br />
+
+    <vue-html2pdf
+      v-if="pdfMode !== 'round' || (pdfRoundRows && pdfRoundRows.length)"
+      v-show="true"
+      ref="html2Pdf"
+      :show-layout="false"
+      :float-layout="false"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :pdf-quality="2"
+      :filename="pdfFilename"
+      pdf-format="a4"
+      pdf-orientation="landscape"
+      pdf-content-width="100%"
+      style="
+        opacity: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: auto;
+        z-index: -1;
+        pointer-events: none;
+      "
+      @pdfGenerated="onPdfGeneratedS1"
+    >
+      <!-- WAJIB: slot pdf-content -->
+      <template slot="pdf-content">
+        <!-- ROUNDED -->
+        <section v-if="pdfMode === 'round'">
+          <HeadToHeadPdfResult
+            :pdfMode="'round'"
+            :pdfRound="pdfRound"
+            :pdfRoundRows="pdfRoundRows"
+            :dataEventSafe="dataEventSafe"
+            :categories="titleCategories"
+            :isOfficial="false"
+            :headToHeadCats="headToHeadCats"
+          />
+        </section>
+
+        <!-- FINAL -->
+        <section v-else>
+          <HeadToHeadPdfResult
+            :pdfMode="'overall'"
+            :pdfOverallPkg="getOverallPackage()"
+            :dataEventSafe="dataEventSafe"
+            :categories="titleCategories"
+            :isOfficial="false"
+            :headToHeadCats="headToHeadCats"
+          />
+        </section>
+      </template>
+    </vue-html2pdf>
   </div>
 </template>
 
@@ -966,7 +1053,9 @@ import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
+import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
+import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
@@ -975,6 +1064,14 @@ const MAX_HEAT_NUMBER = 24;
 const HEAT_GLOBAL_KEY = "h2hHeatUsage:page"; // session-scoped
 const HEAT_GLOBAL_LIMIT = 2; // tiap nomor dipakai max 2 tim
 const SHOW_BRACKET_KEY = "h2h:ui:showBracket";
+
+function safeParse(str, fallback) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
+}
 
 function readGlobalHeatUsage() {
   try {
@@ -1188,9 +1285,20 @@ function seedGlobalHeatFromList(list, { reset = false } = {}) {
 
 export default {
   name: "SustainableTimingSystemH2HRace",
-  components: { OperationTimePanel, EmptyCard, Icon },
+  components: {
+    OperationTimePanel,
+    EmptyCard,
+    VueHtml2pdf,
+    HeadToHeadPdfResult,
+    Icon,
+  },
   data() {
     return {
+      pdfMode: "round",
+      pdfFilename: "Report.pdf",
+      pdfRound: null,
+      pdfRoundRows: [],
+      pdfOverallPkg: null,
       defaultImg,
       isLoadingBracket: false,
       isLoadingTableList: false,
@@ -1208,6 +1316,10 @@ export default {
       currentBucket: null,
       roundResultsRootKey: null,
       booyanActive: { r1: false, r2: false, l1: false, l2: false },
+      sChoices: [],
+      fChoices: [],
+      clChoices: [],
+      ynChoices: [],
       podium: {
         gold: null, // Juara 1
         silver: null, // Juara 2
@@ -1238,6 +1350,20 @@ export default {
   },
 
   computed: {
+    headToHeadCats() {
+      const payload = safeParse(
+        localStorage.getItem("raceStartPayload") || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      const q = this.$route.query || {};
+      return {
+        // urutan sesuai permintaan: Initial, Race, Division
+        initial: b.initialName || q.initialName || "-",
+        race: b.raceName || q.raceName || "-",
+        division: b.divisionName || q.divisionName || "-",
+      };
+    },
     hasEventLogo() {
       var ev = this.dataEventSafe || {};
       var logos = ev.event_logo;
@@ -1355,33 +1481,6 @@ export default {
       }
       return [];
     },
-    // sChoices() {
-    //   return [
-    //     { value: 0, text: "0 (0s)" },
-    //     { value: 50, text: "50 (50s)" },
-    //   ];
-    // },
-    // fChoices() {
-    //   return [
-    //     { value: 0, text: "0 (0s)" },
-    //     { value: 10, text: "10 (10s)" },
-    //     { value: 50, text: "50 (50s)" },
-    //   ];
-    // },
-    // clChoices() {
-    //   return [
-    //     { value: 0, text: "0 (0s)" },
-    //     { value: 10, text: "10 (10s)" },
-    //     { value: 20, text: "20 (20s)" },
-    //   ];
-    // },
-    // ynChoices() {
-    //   return [
-    //     { value: null, text: "-" },
-    //     { value: "N", text: "N" },
-    //     { value: "Y", text: "Y" },
-    //   ];
-    // },
     storedResultsByRound() {
       // baca semua yang sudah dipersist ke localStorage untuk bucket saat ini
       if (!this.roundResultsRootKey) return {};
@@ -1653,6 +1752,324 @@ export default {
   },
 
   methods: {
+    getOverallPackage() {
+      return this.buildOverallPackage();
+    },
+    onPdfGeneratedS1() {
+      try {
+        ipcRenderer &&
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: "PDF Slalom Session 1 telah berhasil diunduh.",
+            message: "Download Selesai",
+          });
+      } catch (err) {
+        logger.warn("❌ Failed to update race settings:", err);
+      }
+    },
+    // === GETTER DATA ===
+    buildRoundRows(roundObj) {
+      const list = this.participantsForRound(roundObj);
+      return list.map((p, i) => ({
+        no: i + 1,
+        team: String(p.nameTeam || p.teamName || ""),
+        bib: String(p.bibTeam || ""),
+        heat: p.result ? p.result.heat : null,
+        start: p.result ? p.result.startTime || "" : "",
+        finish: p.result ? p.result.finishTime || "" : "",
+        race: p.result ? p.result.raceTime || "" : "",
+        penaltyTime: p.result
+          ? p.result.penaltyTime || "00:00:00.000"
+          : "00:00:00.000",
+        total: p.result ? p.result.totalTime || p.result.raceTime || "" : "",
+        penaltySum: this.getTotalPenalty(p),
+        penalties:
+          p.result && p.result.penalties
+            ? Object.assign({}, p.result.penalties)
+            : {},
+        flag: p.result ? p.result.flag || null : null,
+        winLose: p.result ? p.result.winLose || null : null,
+        ranked: p.result ? p.result.ranked || null : null,
+      }));
+    },
+
+    buildAllRoundsPackage() {
+      var roundsList = this.rounds || [];
+      var arr = [];
+      for (var i = 0; i < roundsList.length; i++) {
+        var r = roundsList[i];
+        var obj = {
+          roundId: String(r.id),
+          roundName: r.bronze ? "Final B" : r.name,
+          rows: this.buildRoundRows(r),
+        };
+        arr.push(obj);
+      }
+      return arr;
+    },
+
+    buildOverallPackage() {
+      var placements = [];
+      if (this.podium && this.podium.gold)
+        placements.push({ place: 1, team: this.podium.gold });
+      if (this.podium && this.podium.silver)
+        placements.push({ place: 2, team: this.podium.silver });
+      if (this.podium && this.podium.bronze)
+        placements.push({ place: 3, team: this.podium.bronze });
+      if (this.podium && this.podium.fourth)
+        placements.push({ place: 4, team: this.podium.fourth });
+
+      var final = this.getFinalRound ? this.getFinalRound() : null;
+      var finalRows = final ? this.buildRoundRows(final) : [];
+
+      return {
+        event: (this.dataEventSafe && this.dataEventSafe.eventName) || "",
+        category: this.titleCategories || "",
+        placements: placements,
+        finalRows: finalRows,
+        rounds: this.buildAllRoundsPackage(),
+      };
+    },
+
+    // util: sortir rows mengikuti urutan bracket + BYE di bawah
+    sortRowsByBracketAndBye: function (rows, roundObj) {
+      if (!Array.isArray(rows) || !roundObj || !roundObj.matches) return rows;
+
+      // map: TEAM_NAME_UPPER → {heat, pos}
+      var orderMap = {};
+      for (var i = 0; i < roundObj.matches.length; i++) {
+        var m = roundObj.matches[i];
+        var heat = i + 1;
+
+        var n1 =
+          m.team1 && m.team1.name ? String(m.team1.name).toUpperCase() : "";
+        var n2 =
+          m.team2 && m.team2.name ? String(m.team2.name).toUpperCase() : "";
+        if (n1)
+          orderMap[n1] = { heat: heat, pos: 0, bye: !!(m.bye && n1 && !n2) };
+        if (n2)
+          orderMap[n2] = { heat: heat, pos: 1, bye: !!(m.bye && n2 && !n1) };
+      }
+
+      var copy = rows.slice();
+      copy.sort(function (a, b) {
+        var A = orderMap[String(a.team || "").toUpperCase()] || {};
+        var B = orderMap[String(b.team || "").toUpperCase()] || {};
+
+        // BYE terakhir
+        var byeA = !!A.bye;
+        var byeB = !!B.bye;
+        if (byeA !== byeB) return byeA ? 1 : -1;
+
+        // heat kecil dulu
+        var hA = Number.isFinite(A.heat) ? A.heat : Number.POSITIVE_INFINITY;
+        var hB = Number.isFinite(B.heat) ? B.heat : Number.POSITIVE_INFINITY;
+        if (hA !== hB) return hA - hB;
+
+        // pos team1 (0) lalu team2 (1)
+        var pA = Number.isFinite(A.pos) ? A.pos : 9;
+        var pB = Number.isFinite(B.pos) ? B.pos : 9;
+        if (pA !== pB) return pA - pB;
+
+        return String(a.team || "").localeCompare(String(b.team || ""));
+      });
+      // re-assign nomor urut
+      for (var k = 0; k < copy.length; k++) copy[k].no = k + 1;
+      return copy;
+    },
+
+    // Cetak round aktif
+    printCurrentRoundVuePdf: async function () {
+      var r = this.currentRound;
+      if (!r) return;
+
+      var rows = this.buildRoundRows(r);
+      rows = this.sortRowsByBracketAndBye(rows, r);
+
+      // set state untuk template
+      this.pdfMode = "round";
+      if (r.bronze) {
+        this.pdfFilename = "Result - Final B.pdf";
+      } else {
+        this.pdfFilename = "Result - " + r.name + ".pdf";
+      }
+      this.pdfRound = r;
+      this.pdfRoundRows = rows;
+
+      console.log(this.pdfRound, "<< Round");
+      console.log(this.pdfRoundRows, "<< Round Rows");
+      console.log(this.dataEventSafe, "<<< data event");
+      console.log(this.titleCategories, "<<<<< title");
+      console.log(this.headToHeadCats, "<<< head CATS");
+
+      // pastikan komponen render selesai
+      await this.$nextTick();
+      await new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve();
+        }, 300);
+      });
+
+      await this.$nextTick();
+
+      // validasi referensi
+      if (!this.$refs) return;
+      if (!this.$refs.html2Pdf) return;
+      if (!this.$refs.html2Pdf.$el) return;
+
+      try {
+        await this.$refs.html2Pdf.generatePdf();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    printOverallVuePdf: async function () {
+      var pkg = this.buildOverallPackage();
+      if (pkg && Array.isArray(pkg.rounds)) {
+        for (var i = 0; i < pkg.rounds.length; i++) {
+          var R = pkg.rounds[i];
+          var found = null;
+          for (var j = 0; j < this.rounds.length; j++) {
+            if (String(this.rounds[j].id) === R.roundId) {
+              found = this.rounds[j];
+              break;
+            }
+          }
+          R.rows = this.sortRowsByBracketAndBye(R.rows, found);
+        }
+      }
+
+      this.pdfMode = "overall";
+      this.pdfFilename = "Overall Result.pdf";
+      this.pdfOverallPkg = pkg;
+
+      await this.$nextTick();
+      await new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve();
+        }, 300);
+      });
+
+      await this.$nextTick();
+
+      if (!this.$refs) return;
+      if (!this.$refs.html2Pdf) return;
+      if (!this.$refs.html2Pdf.$el) return;
+
+      try {
+        await this.$refs.html2Pdf.generatePdf();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    saveCurrentRoundToDB: function () {
+      var r = this.currentRound;
+      if (!r) return;
+
+      var bucket = getBucket();
+      var required = ["eventId", "initialId", "raceId", "divisionId"];
+      var missing = [];
+      for (var i = 0; i < required.length; i++) {
+        var key = required[i];
+        if (!bucket[key]) missing.push(key);
+      }
+      if (missing.length > 0) {
+        this.notify("error", "Missing fields: " + missing.join(", "), "Failed");
+        return;
+      }
+
+      var rows = this.buildRoundRows(r);
+      if (rows.length === 0) {
+        this.notify("warning", "Tidak ada data round ini.", "Save Round");
+        return;
+      }
+
+      var docs = [];
+      for (var j = 0; j < rows.length; j++) {
+        var row = rows[j];
+        var data = buildResultDocs(
+          [
+            {
+              nameTeam: row.team,
+              bibTeam: row.bib,
+              result: {
+                startTime: row.start,
+                finishTime: row.finish,
+                raceTime: row.race,
+                penaltyTime: row.penaltyTime,
+                penalty: row.penaltySum,
+                totalTime: row.total,
+                ranked: row.ranked,
+                winLose: row.winLose,
+                heat: row.heat,
+                _roundId: String(r.id),
+                _roundName: r.bronze ? "Final B" : r.name,
+              },
+            },
+          ],
+          bucket
+        )[0];
+        docs.push(data);
+      }
+      console.log(docs, "<< cek docs");
+      // ipcRenderer.send("insert-h2h-result", docs);
+      // ipcRenderer.once(
+      //   "insert-h2h-result-reply",
+      //   function (_e, res) {
+      //     if (res && res.ok)
+      //       this.notify("success", "Hasil round tersimpan.", "Saved");
+      //     else
+      //       this.notify(
+      //         "error",
+      //         res && res.error ? res.error : "Save failed",
+      //         "Failed"
+      //       );
+      //   }.bind(this)
+      // );
+    },
+
+    saveOverallToDB: function () {
+      var pkg = this.buildOverallPackage();
+      var bucket = getBucket();
+      var required = ["eventId", "initialId", "raceId", "divisionId"];
+      var missing = [];
+      for (var i = 0; i < required.length; i++) {
+        var key = required[i];
+        if (!bucket[key]) missing.push(key);
+      }
+      if (missing.length > 0) {
+        this.notify("error", "Missing fields: " + missing.join(", "), "Failed");
+        return;
+      }
+
+      var placements = pkg.placements ? pkg.placements : [];
+      var overallDoc = buildResultDocs([{}], bucket)[0];
+      overallDoc.result = {
+        _type: "OVERALL_H2H",
+        placements: placements,
+        eventName: bucket.eventName ? bucket.eventName : "",
+        category: this.titleCategories ? this.titleCategories : "",
+        savedAt: new Date().toISOString(),
+      };
+
+      console.log([overallDoc], "<< cek docs");
+      // ipcRenderer.send("insert-h2h-result", [overallDoc]);
+      // ipcRenderer.once(
+      //   "insert-h2h-result-reply",
+      //   function (_e, res) {
+      //     if (res && res.ok)
+      //       this.notify("success", "Overall tersimpan.", "Saved");
+      //     else
+      //       this.notify(
+      //         "error",
+      //         res && res.error ? res.error : "Save failed",
+      //         "Failed"
+      //       );
+      //   }.bind(this)
+      // );
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -2994,7 +3411,6 @@ export default {
       }
     },
     /** Method podium config */
-    /** Cari round final (size==2) dan bronze (round.bronze) */
     getFinalRound() {
       return (this.rounds || []).find((r) => !r.bronze && r.size === 2) || null;
     },

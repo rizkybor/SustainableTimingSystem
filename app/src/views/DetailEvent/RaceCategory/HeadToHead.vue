@@ -206,31 +206,31 @@
     <div class="px-5 mt-2 mb-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="racetime-header">
-              <h4>
-                Bracket Head To Head —
-                {{
-                  currentRound
-                    ? currentRound.bronze
-                      ? "Final B"
-                      : currentRound.name
-                    : "—"
-                }}
-              </h4>
-              <small class="text-muted">
-                Category active: {{ titleCategories || "-" }}
-              </small>
-            </div>
+          <h4>
+            Bracket Head To Head —
+            {{
+              currentRound
+                ? currentRound.bronze
+                  ? "Final B"
+                  : currentRound.name
+                : "—"
+            }}
+          </h4>
+          <small class="text-muted">
+            Category active: {{ titleCategories || "-" }}
+          </small>
+        </div>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
           <div class="toolbar-actions">
             <!-- Kelompok tombol -->
             <div
-              v-if="visibleParticipants && visibleParticipants.length"
               class="btn-group-actions"
               role="group"
               aria-label="Build actions"
             >
               <button
+                v-if="visibleParticipants && visibleParticipants.length"
                 class="btn-action btn-outline-info ml-2"
                 @click="toggleBracket"
                 v-b-tooltip.hover="
@@ -249,22 +249,7 @@
               </button>
 
               <button
-                class="btn-action"
-                :class="
-                  editBracketTeams ? 'btn-success' : 'btn-outline-success'
-                "
-                @click="editBracketTeams = !editBracketTeams"
-                v-b-tooltip.hover="
-                  editBracketTeams
-                    ? 'Selesai edit tim'
-                    : 'Edit tim di ronde pertama'
-                "
-              >
-                <Icon icon="mdi:pencil-outline" class="mr-1" />
-                {{ editBracketTeams ? "Done" : "Edit Teams" }}
-              </button>
-
-              <button
+                v-if="visibleParticipants && visibleParticipants.length"
                 class="btn-action btn-outline-danger"
                 @click="clearFirstRoundAssignments"
                 v-b-tooltip.hover="'Kosongkan ronde pertama'"
@@ -273,11 +258,28 @@
               </button>
 
               <button
+                v-if="visibleParticipants && visibleParticipants.length && currentRound == 'Semifinals'"
                 class="btn-action btn-secondary"
                 @click="populateBronzeFromSemis"
                 v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
               >
                 <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
+              </button>
+
+              <button
+                class="btn-action"
+                :class="
+                  editBracketTeams ? 'btn-success' : 'btn-outline-success'
+                "
+                @click="editBracketTeams = !editBracketTeams"
+                v-b-tooltip.hover="
+                  editBracketTeams
+                    ? 'Bracket edit finished'
+                    : 'The first round bracket edit'
+                "
+              >
+                <Icon icon="mdi:pencil-outline" class="mr-1" />
+                {{ editBracketTeams ? "Done" : "Edit Bracket" }}
               </button>
             </div>
           </div>
@@ -337,10 +339,6 @@
           >
             <div class="bracket__round-header">
               <span class="bracket__round-title">{{ round.name }}</span>
-              <span class="bracket__round-meta" v-if="!round.bronze"
-                >Matches: {{ round.matches.length }}</span
-              >
-              <span class="bracket__round-meta" v-else>Final B</span>
             </div>
 
             <div class="bracket__list">
@@ -511,22 +509,26 @@
     <div class="px-4 mt-4">
       <div class="card-body">
         <div class="py-3" style="display: flex; justify-content: space-between">
-            <div class="racetime-header">
-              <h4>
-                Output Racetime —
-                {{
-                  currentRound
-                    ? currentRound.bronze
-                      ? "Final B"
-                      : currentRound.name
-                    : "—"
-                }}
-              </h4>
-              <small class="text-muted">
-                Category active: {{ titleCategories || "-" }}
-              </small>
-            </div>
-          <div class="d-flex" style="gap: 8px" v-if="visibleParticipants && visibleParticipants.length">
+          <div class="racetime-header">
+            <h4>
+              Output Racetime —
+              {{
+                currentRound
+                  ? currentRound.bronze
+                    ? "Final B"
+                    : currentRound.name
+                  : "—"
+              }}
+            </h4>
+            <small class="text-muted">
+              Category active: {{ titleCategories || "-" }}
+            </small>
+          </div>
+          <div
+            class="d-flex"
+            style="gap: 8px"
+            v-if="visibleParticipants && visibleParticipants.length"
+          >
             <button
               class="btn-action btn-outline-success"
               @click="saveAllRoundsLocal"
@@ -573,14 +575,14 @@
                     <th rowspan="2">Heat</th>
                     <th rowspan="2">Team Name</th>
                     <th rowspan="2">BIB</th>
-                    <th rowspan="2">Start Time</th>
 
                     <!-- Grup Penalties -->
                     <th colspan="9" class="text-center">Penalties Group</th>
                     <th rowspan="2">Penalty Total</th>
+                    <th class="text-center" rowspan="2">Penalty Time</th>
+                    <th rowspan="2">Start Time</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
                     <th class="text-center" rowspan="2">Race Time</th>
-                    <th class="text-center" rowspan="2">Penalty Time</th>
                     <th class="text-center" rowspan="2">Result</th>
                     <th class="text-center" rowspan="2">Win/Lose</th>
                     <th v-if="editResult" class="text-center" rowspan="2">
@@ -654,10 +656,8 @@
                         >
                       </div>
                     </td>
+                    <!-- BIB TEAM -->
                     <td class="text-center">{{ item.bibTeam }}</td>
-                    <td class="text-center text-monospace">
-                      {{ item.result.startTime }}
-                    </td>
 
                     <!-- PENALTY START -->
                     <td>
@@ -833,6 +833,16 @@
                       >
                     </td>
 
+                    <!-- PENALTY TIME -->
+                    <td class="text-center text-monospace penalty-char">
+                      {{ item.result.penaltyTime }}
+                    </td>
+
+                    <!-- START TIME -->
+                    <td class="text-center text-monospace">
+                      {{ item.result.startTime }}
+                    </td>
+
                     <!-- FINISH TIME  -->
                     <td class="text-center text-monospace">
                       {{ item.result.finishTime }}
@@ -841,11 +851,6 @@
                     <!-- RACE TIME  -->
                     <td class="text-center large-bold text-monospace">
                       {{ item.result.raceTime }}
-                    </td>
-
-                    <!-- PENALTY TIME -->
-                    <td class="text-center text-monospace penalty-char">
-                      {{ item.result.penaltyTime }}
                     </td>
 
                     <!-- RESULT  -->

@@ -33,4 +33,29 @@ async function upsertEventResultsDoc(payload) {
   return result;
 }
 
-module.exports = { upsertEventResultsDoc };
+
+async function getEventResultsAggregate(f) {
+  const db = await getDb();
+  const col = db.collection("temporaryOverallEventResults"); // nama koleksi rekap kamu
+
+  const q = {
+    eventId: String(f.eventId || ""),
+    initialId: String(f.initialId || ""),
+    divisionId: String(f.divisionId || ""),
+  };
+
+  // sesuai struktur kamu: satu dokumen per kombinasi 3 field di atas
+  // kalau ternyata ada lebih dari satu, ambil yang terbaru by updatedAt
+  const doc = await col
+    .find(q)
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .limit(1)
+    .next();
+
+  if (!doc) throw new Error("Aggregate not found");
+  return doc;
+}
+
+
+
+module.exports = { upsertEventResultsDoc, getEventResultsAggregate };

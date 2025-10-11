@@ -42,6 +42,7 @@ const {
 
 const {
   upsertEventResultsDoc,
+  getEventResultsAggregate
 } = require("../controllers/INSERT/insertResultOverall.js");
 
 const {
@@ -699,6 +700,22 @@ ipcMain.on("event-results:upsert", async (event, payload) => {
       error: error && error.message ? error.message : String(error),
     });
     event.reply("event-results:upsert-reply", serialized);
+  }
+});
+
+
+// GET: Event Results (overall/aggregate)
+ipcMain.on("event-results:get", async function (event, filters) {
+  try {
+    var f = filters || {};
+    var doc = await getEventResultsAggregate(f);
+    event.reply("event-results:get-reply", { ok: true, doc: doc });
+  } catch (error) {
+    event.reply("event-results:get-reply", {
+      ok: false,
+      doc: null,
+      error: error && error.message ? error.message : String(error),
+    });
   }
 });
 

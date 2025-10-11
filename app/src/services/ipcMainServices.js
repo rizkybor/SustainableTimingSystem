@@ -41,6 +41,10 @@ const {
 } = require("../controllers/INSERT/insertResultEventByCategories.js");
 
 const {
+  upsertEventResultsDoc,
+} = require("../controllers/INSERT/insertResultOverall.js");
+
+const {
   getTeamsRegistered,
   deleteTeamInBucket,
   upsertTeamsRegistered,
@@ -680,6 +684,20 @@ ipcMain.on("users-judges-assignment:getByEmail", async (event, payload) => {
       ok: false,
       error: msg,
     });
+  }
+});
+
+ipcMain.on("event-results:upsert", async (event, payload) => {
+  try {
+    const result = await upsertEventResultsDoc(payload);
+    const serialized = EJSON.serialize({ ok: true, result });
+    event.reply("event-results:upsert-reply", serialized);
+  } catch (error) {
+    const serialized = EJSON.serialize({
+      ok: false,
+      error: error && error.message ? error.message : String(error),
+    });
+    event.reply("event-results:upsert-reply", serialized);
   }
 });
 

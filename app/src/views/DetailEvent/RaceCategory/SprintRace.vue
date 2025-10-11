@@ -1426,8 +1426,57 @@ export default {
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
 
-    saveResult() {
-      const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+    // saveResult() {
+    //   const clean = JSON.parse(JSON.stringify(this.participantArr || []));
+    //   if (!Array.isArray(clean) || clean.length === 0) {
+    //     ipcRenderer.send("get-alert", {
+    //       type: "warning",
+    //       detail: "Belum ada data yang bisa disimpan.",
+    //       message: "Ups Sorry",
+    //     });
+    //     return;
+    //   }
+
+    //   const bucket = getBucket();
+    //   const must = ["eventId", "initialId", "raceId", "divisionId"];
+    //   const missing = must.filter((k) => !bucket[k]);
+    //   if (missing.length) {
+    //     ipcRenderer.send("get-alert", {
+    //       type: "error",
+    //       detail: `Bucket fields missing: ${missing.join(", ")}`,
+    //       message: "Failed",
+    //     });
+    //     return;
+    //   }
+
+    //   const docs = buildResultDocs(clean, bucket);
+    //   ipcRenderer.send("insert-sprint-result", docs);
+    //   ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+    //     if (res && res.ok) {
+    //       ipcRenderer.send("get-alert-saved", {
+    //         type: "question",
+    //         detail: "Result data has been successfully saved",
+    //         message: "Successfully",
+    //       });
+    //     } else {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "error",
+    //         detail: (res && res.error) || "Save failed",
+    //         message: "Failed",
+    //       });
+    //     }
+    //   });
+    // },
+
+    async saveResult() {
+      // clone aman
+      var clean;
+      try {
+        clean = JSON.parse(JSON.stringify(this.participantArr || []));
+      } catch (e) {
+        clean = [];
+      }
+
       if (!Array.isArray(clean) || clean.length === 0) {
         ipcRenderer.send("get-alert", {
           type: "warning",
@@ -1437,32 +1486,113 @@ export default {
         return;
       }
 
-      const bucket = getBucket();
-      const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
-      if (missing.length) {
+      // validasi bucket
+      var bucket = getBucket();
+      var must = ["eventId", "initialId", "raceId", "divisionId"];
+      var missing = [];
+      for (var i = 0; i < must.length; i++) {
+        var k = must[i];
+        if (!bucket[k]) missing.push(k);
+      }
+      if (missing.length > 0) {
         ipcRenderer.send("get-alert", {
           type: "error",
-          detail: `Bucket fields missing: ${missing.join(", ")}`,
+          detail: "Bucket fields missing: " + missing.join(", "),
           message: "Failed",
         });
         return;
       }
 
-      const docs = buildResultDocs(clean, bucket);
+      // build & simpan hasil sprint
+      var docs = buildResultDocs(clean, bucket);
       ipcRenderer.send("insert-sprint-result", docs);
-      ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
-        if (res && res.ok) {
+
+      var self = this; // simpan konteks
+      ipcRenderer.once("insert-sprint-result-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+
+        if (ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
             detail: "Result data has been successfully saved",
             message: "Successfully",
           });
+
+          // lanjut upsert dokumen rekap eventResult
+          if (self && typeof self.upsertEventResults === "function") {
+            self.upsertEventResults(bucket, clean);
+          }
         } else {
           ipcRenderer.send("get-alert", {
             type: "error",
-            detail: (res && res.error) || "Save failed",
+            detail: res && res.error ? res.error : "Save failed",
             message: "Failed",
+          });
+        }
+      });
+    },
+
+    // ===== upsert tanpa optional-chaining / chaining
+    upsertEventResults(bucket, participantArr) {
+      var payload = {
+        eventId: bucket.eventId,
+        initialId: bucket.initialId,
+        raceId: bucket.raceId,
+        divisionId: bucket.divisionId,
+        eventName: bucket.eventName,
+        initialName: bucket.initialName,
+        raceName: bucket.raceName,
+        divisionName: bucket.divisionName,
+        eventResult: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // isi eventResult per tim
+      for (var i = 0; i < participantArr.length; i++) {
+        var t = participantArr[i];
+
+        var teamData = {
+          teamId: t && t.teamId ? t.teamId : "",
+          teamName: t && t.nameTeam ? t.nameTeam : "",
+          bib: t && t.bibTeam ? t.bibTeam : "",
+          categories: [],
+          totalScore: t && t.result && t.result.score ? t.result.score : "",
+          totalRanked: t && t.result && t.result.ranked ? t.result.ranked : "",
+        };
+
+        var cat1 = { name: "SPRINT", scored: "", rankedByCats: "" };
+        if (t && t.result) {
+          cat1.scored = t.result.score ? t.result.score : "";
+          cat1.rankedByCats = t.result.ranked ? t.result.ranked : "";
+        }
+        var cat2 = { name: "HEADTOHEAD", scored: "", rankedByCats: "" };
+        var cat3 = { name: "SLALOM", scored: "", rankedByCats: "" };
+        var cat4 = { name: "DRR", scored: "", rankedByCats: "" };
+
+        teamData.categories.push(cat1);
+        teamData.categories.push(cat2);
+        teamData.categories.push(cat3);
+        teamData.categories.push(cat4);
+
+        payload.eventResult.push(teamData);
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "Successfully upserted event result document",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
           });
         }
       });

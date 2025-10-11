@@ -143,9 +143,9 @@
         </table>
       </div>
 
-      <!-- MODE OVERALL -->
-      <div v-else>
-        <h3 class="sheet-title">Overall Result</h3>
+      <!-- MODE ALL ROUND -->
+      <div v-else-if="pdfMode === 'allround'">
+        <h3 class="sheet-title">All Round Result</h3>
 
         <!-- Podium -->
         <table
@@ -211,6 +211,68 @@
             </tbody>
           </table>
         </div>
+      </div>
+
+      <!-- MODE OVERALL -->
+      <div v-else>
+        <h3 class="sheet-title">Overall Result</h3>
+
+        <!-- Podium (tetap) -->
+        <!-- <table
+          v-if="
+            pdfOverallPkg &&
+            pdfOverallPkg.placements &&
+            pdfOverallPkg.placements.length
+          "
+          class="score-table"
+          style="margin-bottom: 10px"
+        >
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th>Team</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in pdfOverallPkg.placements" :key="'pl-' + p.place">
+              <td class="text-center">{{ p.place }}</td>
+              <td class="text-strong">{{ p.team }}</td>
+            </tr>
+          </tbody>
+        </table> -->
+
+        <!-- Overall Accumulation -->
+        <table
+          v-if="
+            pdfOverallPkg &&
+            pdfOverallPkg.overallRows &&
+            pdfOverallPkg.overallRows.length
+          "
+          class="score-table"
+          style="margin-bottom: 10px"
+        >
+          <thead>
+            <tr>
+              <th class="text-center">No</th>
+              <th class="text-center">Team</th>
+              <th class="text-center">BIB</th>
+              <th class="text-center">Score</th>
+              <th class="text-center">Rank</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(r, i) in pdfOverallPkg.overallRows"
+              :key="'ovr-' + (r.ranked || i)"
+            >
+              <td class="text-center">{{ i + 1 }}</td>
+              <td class="text-strong">{{ r.name }}</td>
+              <td class="text-center">{{ r.bib }}</td>
+              <td class="text-center">{{ r.score }}</td>
+              <td class="text-center">{{ r.ranked }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

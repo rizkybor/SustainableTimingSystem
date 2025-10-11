@@ -1,313 +1,405 @@
 <template>
-  <div class="page">
-    <!-- HEADER -->
-    <header class="head">
-      <!-- TRADEMARK -->
-      <div class="trademark">
-        @STiming.System.424.Timestamp {{ timestamp }} #-
-      </div>
+  <div>
+    <!-- ================== SINGLE PAGE (ROUND / OVERALL) ================== -->
+    <div v-if="pdfMode !== 'allround'" class="page">
+      <!-- HEADER -->
+      <header class="head">
+        <div class="trademark">
+          @STiming.System.424.Timestamp {{ timestamp }} #-
+        </div>
 
-      <div class="band">
-        <div class="band-left">
-          <strong>RACETIME RESULT</strong>
-          <span class="dot">•</span>
-          <span class="cat">HEAD TO HEAD</span>
-          <span class="dot">•</span>
-          <span class="cat">
+        <div class="band">
+          <div class="band-left">
+            <strong>SCORE BOARD</strong>
+            <span class="dot">•</span>
+            <span class="cat">HEAD TO HEAD</span>
+            <span class="dot">•</span>
+            <span class="cat">
+              {{
+                eventData && eventData.levelName
+                  ? eventData.levelName
+                  : "Classification"
+              }}
+            </span>
+          </div>
+          <div class="band-right">
+            <strong>
+              {{ headToHeadCats.initial || "H2H" }} -
+              {{ headToHeadCats.division || "DIV" }}
+              {{ headToHeadCats.race || "RACE" }}
+            </strong>
+            <span class="dot">•</span>
+            <span>{{ today }}</span>
+          </div>
+        </div>
+
+        <!-- LOGO ATAS -->
+        <div
+          class="mid-image-row"
+          v-if="
+            eventData && eventData.event_logo && eventData.event_logo.length > 0
+          "
+        >
+          <div
+            v-for="(url, index) in eventData.event_logo"
+            :key="index"
+            class="mid-image py-4"
+          >
+            <img :src="url" alt="Event Poster" />
+          </div>
+        </div>
+
+        <!-- EVENT INFO -->
+        <div class="event">
+          <div class="event-name">
+            {{ eventData && eventData.eventName ? eventData.eventName : "-" }}
+          </div>
+          <div class="event-meta">
+            Kp/Ds.
             {{
-              eventData && eventData.levelName
-                ? eventData.levelName
-                : "Classification"
+              eventData && eventData.addressVillage
+                ? eventData.addressVillage
+                : "-"
+            }}, Kel.
+            {{
+              eventData && eventData.addressDistrict
+                ? eventData.addressDistrict
+                : "-"
+            }}, Kec.
+            {{
+              eventData && eventData.addressSubDistrict
+                ? eventData.addressSubDistrict
+                : "-"
+            }}, Kota
+            {{
+              eventData && eventData.addressCity ? eventData.addressCity : "-"
+            }},
+            {{
+              eventData && eventData.addressProvince
+                ? eventData.addressProvince
+                : "-"
             }}
+            –
+            {{
+              eventData && eventData.addressState ? eventData.addressState : "-"
+            }}
+            ({{
+              eventData && eventData.addressZipCode
+                ? eventData.addressZipCode
+                : "-"
+            }}) •
+            {{ eventData && eventData.riverName ? eventData.riverName : "-" }}
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT -->
+      <section class="table-wrap">
+        <!-- MODE ROUND -->
+        <div v-if="pdfMode === 'round'">
+          <h3 class="sheet-title">
+            {{ pdfRound && (pdfRound.bronze ? "Final B" : pdfRound.name) }} —
+            Result
+          </h3>
+
+          <table class="score-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Heat</th>
+                <th>Team Name</th>
+                <th>BIB</th>
+                <th>Penalty Time</th>
+                <th>Penalty Sum</th>
+                <th>Start Time</th>
+                <th>Finish Time</th>
+                <th>Race Time</th>
+                <th>Total Time</th>
+                <th>Win or Lose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in pdfRoundRows || []" :key="r.no">
+                <td class="text-center">{{ r.no }}</td>
+                <td class="text-center">{{ r.heat || "" }}</td>
+                <td class="text-strong">
+                  {{ r.team }}
+                  <span v-if="r.flag" class="flag-badge">{{ r.flag }}</span>
+                </td>
+                <td class="text-center">{{ r.bib }}</td>
+                <td class="mono">{{ r.penaltyTime }}</td>
+                <td class="text-center">{{ r.penaltySum }}</td>
+                <td class="mono">{{ r.start }}</td>
+                <td class="mono">{{ r.finish }}</td>
+                <td class="mono">{{ r.race }}</td>
+                <td class="mono text-strong">{{ r.total }}</td>
+                <td class="text-center">{{ r.winLose || "" }}</td>
+              </tr>
+              <tr v-if="!pdfRoundRows || pdfRoundRows.length === 0">
+                <td class="empty" colspan="12">No data</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- MODE OVERALL -->
+        <div v-else>
+          <h3 class="sheet-title">Overall Result</h3>
+
+          <!-- Overall Accumulation (rata tengah) -->
+          <table
+            v-if="
+              pdfOverallPkg &&
+              pdfOverallPkg.overallRows &&
+              pdfOverallPkg.overallRows.length
+            "
+            class="score-table score-table--center"
+            style="margin-bottom: 10px"
+          >
+            <thead>
+              <tr>
+                <th class="text-center">No</th>
+                <th class="text-center">Team</th>
+                <th class="text-center">BIB</th>
+                <th class="text-center">Score</th>
+                <th class="text-center">Rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(r, i) in pdfOverallPkg.overallRows"
+                :key="'ovr-' + (r.ranked || i)"
+              >
+                <td class="text-center">{{ i + 1 }}</td>
+                <td class="text-center text-strong">{{ r.name }}</td>
+                <td class="text-center">{{ r.bib }}</td>
+                <td class="text-center">{{ r.score }}</td>
+                <td class="text-center">{{ r.ranked }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="sign">
+        <div class="sign-col">
+          <div class="sign-title">Chief Judge</div>
+          <div class="sign-line"></div>
+          <div class="sign-name">
+            {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
+          </div>
+        </div>
+        <div class="sign-col stamp-col">
+          <span
+            class="unofficial-stamp"
+            :class="{ 'official-stamp': isOfficial }"
+          >
+            {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
           </span>
         </div>
-        <div class="band-right">
-          <strong
-            >{{ headToHeadCats.initial || "H2H" }} -
-            {{ headToHeadCats.division || "DIV" }}
-            {{ headToHeadCats.race || "RACE" }}</strong
-          >
-          <span class="dot">•</span>
-          <span>{{ today }}</span>
-        </div>
-      </div>
+      </footer>
 
-      <!-- IMAGE DI ATAS EVENT NAME -->
+      <!-- SPONSOR -->
       <div
-        class="mid-image-row"
+        class="mid-image-sponsor-row"
         v-if="
           eventData && eventData.event_logo && eventData.event_logo.length > 0
         "
       >
         <div
           v-for="(url, index) in eventData.event_logo"
-          :key="index"
-          class="mid-image py-4"
+          :key="'sponsor-' + index"
+          class="mid-image-sponsor py-4"
         >
-          <img :src="url" alt="Event Poster" />
+          <img :src="url" alt="Event Sponsor" />
         </div>
       </div>
+    </div>
 
-      <!-- EVENT INFO -->
-      <div class="event">
-        <div class="event-name">
-          {{ eventData && eventData.eventName ? eventData.eventName : "-" }}
-        </div>
-        <div class="event-meta">
-          Kp/Ds.
-          {{
-            eventData && eventData.addressVillage
-              ? eventData.addressVillage
-              : "-"
-          }}, Kel.
-          {{
-            eventData && eventData.addressDistrict
-              ? eventData.addressDistrict
-              : "-"
-          }}, Kec.
-          {{
-            eventData && eventData.addressSubDistrict
-              ? eventData.addressSubDistrict
-              : "-"
-          }}, Kota
-          {{
-            eventData && eventData.addressCity ? eventData.addressCity : "-"
-          }},
-          {{
-            eventData && eventData.addressProvince
-              ? eventData.addressProvince
-              : "-"
-          }}
-          –
-          {{
-            eventData && eventData.addressState ? eventData.addressState : "-"
-          }}
-          ({{
-            eventData && eventData.addressZipCode
-              ? eventData.addressZipCode
-              : "-"
-          }}) •
-          {{ eventData && eventData.riverName ? eventData.riverName : "-" }}
-        </div>
-      </div>
-    </header>
+    <!-- ================== MULTI PAGE (ALLROUND) ================== -->
+    <div v-else>
+      <div
+        v-for="(R, idx) in pdfOverallPkg && pdfOverallPkg.rounds
+          ? pdfOverallPkg.rounds
+          : []"
+        :key="'page-round-' + idx"
+        class="page page--per-round"
+      >
+        <!-- HEADER -->
+        <header class="head">
+          <div class="trademark">
+            @STiming.System.424.Timestamp {{ timestamp }} #-
+          </div>
 
-    <!-- CONTENT (ROUND / OVERALL) -->
-    <section class="table-wrap">
-      <!-- MODE ROUND -->
-      <div v-if="pdfMode === 'round'">
-        <h3 class="sheet-title">
-          {{ pdfRound && (pdfRound.bronze ? "Final B" : pdfRound.name) }} —
-          Result
-        </h3>
+          <div class="band">
+            <div class="band-left">
+              <strong>RACETIME RESULT</strong>
+              <span class="dot">•</span>
+              <span class="cat">HEAD TO HEAD</span>
+              <span class="dot">•</span>
+              <span class="cat">
+                {{
+                  eventData && eventData.levelName
+                    ? eventData.levelName
+                    : "Classification"
+                }}
+              </span>
+            </div>
+            <div class="band-right">
+              <strong>
+                {{ headToHeadCats.initial || "H2H" }} -
+                {{ headToHeadCats.division || "DIV" }}
+                {{ headToHeadCats.race || "RACE" }}
+              </strong>
+              <span class="dot">•</span>
+              <span>{{ today }}</span>
+            </div>
+          </div>
 
-        <table class="score-table">
-          <thead>
-            <tr>
-              <th>No</th>
-              <th>Team</th>
-              <th>BIB</th>
-              <th>Heat</th>
-              <th>Start</th>
-              <th>Finish</th>
-              <th>Race</th>
-              <th>Penalty Sum</th>
-              <th>Penalty Time</th>
-              <th>Total</th>
-              <th>W/L</th>
-              <th>Rank</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in pdfRoundRows || []" :key="r.no">
-              <td class="text-center">{{ r.no }}</td>
-              <td class="text-strong">
-                {{ r.team }}
-                <span v-if="r.flag" class="flag-badge">{{ r.flag }}</span>
-              </td>
-              <td class="text-center">{{ r.bib }}</td>
-              <td class="text-center">{{ r.heat || "" }}</td>
-              <td class="mono">{{ r.start }}</td>
-              <td class="mono">{{ r.finish }}</td>
-              <td class="mono">{{ r.race }}</td>
-              <td class="text-center">{{ r.penaltySum }}</td>
-              <td class="mono">{{ r.penaltyTime }}</td>
-              <td class="mono text-strong">{{ r.total }}</td>
-              <td class="text-center">{{ r.winLose || "" }}</td>
-              <td class="text-center">{{ r.ranked || "" }}</td>
-            </tr>
-            <tr v-if="!pdfRoundRows || pdfRoundRows.length === 0">
-              <td class="empty" colspan="12">No data</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          <!-- LOGO ATAS -->
+          <div
+            class="mid-image-row"
+            v-if="
+              eventData &&
+              eventData.event_logo &&
+              eventData.event_logo.length > 0
+            "
+          >
+            <div
+              v-for="(url, i2) in eventData.event_logo"
+              :key="'logo-top-' + i2"
+              class="mid-image py-4"
+            >
+              <img :src="url" alt="Event Poster" />
+            </div>
+          </div>
 
-      <!-- MODE ALL ROUND -->
-      <div v-else-if="pdfMode === 'allround'">
-        <h3 class="sheet-title">All Round Result</h3>
+          <!-- EVENT INFO -->
+          <div class="event">
+            <div class="event-name">
+              {{ eventData && eventData.eventName ? eventData.eventName : "-" }}
+            </div>
+            <div class="event-meta">
+              Kp/Ds.
+              {{
+                eventData && eventData.addressVillage
+                  ? eventData.addressVillage
+                  : "-"
+              }}, Kel.
+              {{
+                eventData && eventData.addressDistrict
+                  ? eventData.addressDistrict
+                  : "-"
+              }}, Kec.
+              {{
+                eventData && eventData.addressSubDistrict
+                  ? eventData.addressSubDistrict
+                  : "-"
+              }}, Kota
+              {{
+                eventData && eventData.addressCity
+                  ? eventData.addressCity
+                  : "-"
+              }},
+              {{
+                eventData && eventData.addressProvince
+                  ? eventData.addressProvince
+                  : "-"
+              }}
+              –
+              {{
+                eventData && eventData.addressState
+                  ? eventData.addressState
+                  : "-"
+              }}
+              ({{
+                eventData && eventData.addressZipCode
+                  ? eventData.addressZipCode
+                  : "-"
+              }}) •
+              {{ eventData && eventData.riverName ? eventData.riverName : "-" }}
+            </div>
+          </div>
+        </header>
 
-        <!-- Podium -->
-        <table
-          v-if="
-            pdfOverallPkg &&
-            pdfOverallPkg.placements &&
-            pdfOverallPkg.placements.length
-          "
-          class="score-table"
-          style="margin-bottom: 10px"
-        >
-          <thead>
-            <tr>
-              <th>Place</th>
-              <th>Team</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in pdfOverallPkg.placements" :key="'pl-' + p.place">
-              <td class="text-center">{{ p.place }}</td>
-              <td class="text-strong">{{ p.team }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Sheet per round -->
-        <div
-          v-for="(R, idx) in pdfOverallPkg ? pdfOverallPkg.rounds : []"
-          :key="'sheet-' + idx"
-        >
-          <div v-if="idx > 0" style="page-break-before: always"></div>
+        <!-- CONTENT PER ROUND -->
+        <section class="table-wrap">
           <h3 class="sheet-title">{{ R.roundName }} — Result</h3>
 
           <table class="score-table">
             <thead>
               <tr>
                 <th>No</th>
-                <th>Team</th>
-                <th>BIB</th>
                 <th>Heat</th>
-                <th>Race</th>
+                <th>Team Name</th>
+                <th>BIB</th>
                 <th>Penalty Time</th>
-                <th>Total</th>
-                <th>W/L</th>
-                <th>Rank</th>
+                <th>Penalty Sum</th>
+                <th>Start Time</th>
+                <th>Finish Time</th>
+                <th>Race Time</th>
+                <th>Total Time</th>
+                <th>Win or Lose</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in R.rows" :key="row.no">
+              <tr v-for="row in R.rows || []" :key="row.no">
                 <td class="text-center">{{ row.no }}</td>
+                <td class="text-center">{{ row.heat || "" }}</td>
                 <td class="text-strong">{{ row.team }}</td>
                 <td class="text-center">{{ row.bib }}</td>
-                <td class="text-center">{{ row.heat || "" }}</td>
-                <td class="mono">{{ row.race }}</td>
                 <td class="mono">{{ row.penaltyTime }}</td>
-                <td class="mono text-strong">{{ row.total }}</td>
+                <td class="mono">{{ row.penaltySum }}</td>
+                <td class="mono">{{ row.start }}</td>
+                <td class="mono">{{ row.finish }}</td>
+                <td class="mono">{{ row.race }}</td>
                 <td class="text-center">{{ row.winLose || "" }}</td>
-                <td class="text-center">{{ row.ranked || "" }}</td>
+                <td class="mono text-strong">{{ row.total }}</td>
               </tr>
               <tr v-if="!R.rows || R.rows.length === 0">
                 <td class="empty" colspan="9">No data</td>
               </tr>
             </tbody>
           </table>
-        </div>
-      </div>
+        </section>
 
-      <!-- MODE OVERALL -->
-      <div v-else>
-        <h3 class="sheet-title">Overall Result</h3>
-
-        <!-- Podium (tetap) -->
-        <!-- <table
-          v-if="
-            pdfOverallPkg &&
-            pdfOverallPkg.placements &&
-            pdfOverallPkg.placements.length
-          "
-          class="score-table"
-          style="margin-bottom: 10px"
-        >
-          <thead>
-            <tr>
-              <th>Place</th>
-              <th>Team</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in pdfOverallPkg.placements" :key="'pl-' + p.place">
-              <td class="text-center">{{ p.place }}</td>
-              <td class="text-strong">{{ p.team }}</td>
-            </tr>
-          </tbody>
-        </table> -->
-
-        <!-- Overall Accumulation -->
-        <table
-          v-if="
-            pdfOverallPkg &&
-            pdfOverallPkg.overallRows &&
-            pdfOverallPkg.overallRows.length
-          "
-          class="score-table"
-          style="margin-bottom: 10px"
-        >
-          <thead>
-            <tr>
-              <th class="text-center">No</th>
-              <th class="text-center">Team</th>
-              <th class="text-center">BIB</th>
-              <th class="text-center">Score</th>
-              <th class="text-center">Rank</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(r, i) in pdfOverallPkg.overallRows"
-              :key="'ovr-' + (r.ranked || i)"
+        <!-- FOOTER -->
+        <footer class="sign">
+          <div class="sign-col">
+            <div class="sign-title">Chief Judge</div>
+            <div class="sign-line"></div>
+            <div class="sign-name">
+              {{
+                eventData && eventData.chiefJudge ? eventData.chiefJudge : "—"
+              }}
+            </div>
+          </div>
+          <div class="sign-col stamp-col">
+            <span
+              class="unofficial-stamp"
+              :class="{ 'official-stamp': isOfficial }"
             >
-              <td class="text-center">{{ i + 1 }}</td>
-              <td class="text-strong">{{ r.name }}</td>
-              <td class="text-center">{{ r.bib }}</td>
-              <td class="text-center">{{ r.score }}</td>
-              <td class="text-center">{{ r.ranked }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+              {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+            </span>
+          </div>
+        </footer>
 
-    <!-- SIGNATURE -->
-    <footer class="sign">
-      <div class="sign-col">
-        <div class="sign-title">Chief Judge</div>
-        <div class="sign-line"></div>
-        <div class="sign-name">
-          {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
-        </div>
-      </div>
-      <div class="sign-col stamp-col">
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
+        <!-- SPONSOR -->
+        <div
+          class="mid-image-sponsor-row"
+          v-if="
+            eventData && eventData.event_logo && eventData.event_logo.length > 0
+          "
         >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
-      </div>
-    </footer>
-
-    <!-- SPONSOR LOGOS (bottom) -->
-    <div
-      class="mid-image-sponsor-row"
-      v-if="
-        eventData && eventData.event_logo && eventData.event_logo.length > 0
-      "
-    >
-      <div
-        v-for="(url, index) in eventData.event_logo"
-        :key="'sponsor-' + index"
-        class="mid-image-sponsor py-4"
-      >
-        <img :src="url" alt="Event Sponsor" />
+          <div
+            v-for="(url, i3) in eventData.event_logo"
+            :key="'logo-btm-' + i3"
+            class="mid-image-sponsor py-4"
+          >
+            <img :src="url" alt="Event Sponsor" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -319,7 +411,7 @@ export default {
   props: {
     data: { type: Object, default: null },
     dataEventSafe: { type: Object, default: null },
-    pdfMode: { type: String, default: "round" }, // 'round' | 'overall'
+    pdfMode: { type: String, default: "round" }, // 'round' | 'allround' | 'overall'
     pdfRound: { type: Object, default: null },
     pdfRoundRows: { type: Array, default: () => [] },
     pdfOverallPkg: { type: Object, default: null },
@@ -330,7 +422,9 @@ export default {
   },
   computed: {
     eventData() {
-      return this.data || this.dataEventSafe || {};
+      if (this.data) return this.data;
+      if (this.dataEventSafe) return this.dataEventSafe;
+      return {};
     },
     today() {
       const d = new Date();
@@ -347,7 +441,7 @@ export default {
       const hh = String(d.getHours()).padStart(2, "0");
       const mi = String(d.getMinutes()).padStart(2, "0");
       const ss = String(d.getSeconds()).padStart(2, "0");
-      return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+      return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + mi + ":" + ss;
     },
   },
 };
@@ -364,7 +458,7 @@ export default {
   print-color-adjust: exact !important;
 }
 
-/* ===== PAGE AS FLEX COLUMN ===== */
+/* ===== PAGE WRAPPER ===== */
 .page {
   position: relative;
   display: flex;
@@ -378,18 +472,13 @@ export default {
   line-height: 1.35;
   color: #17202a;
 }
+.page--per-round {
+  page-break-after: always;
+}
+
 .table-wrap {
   flex: 1 1 auto;
   min-height: 0;
-}
-.mid-image-row {
-  margin-bottom: 2mm !important;
-}
-.band {
-  margin-bottom: 1mm !important;
-}
-header {
-  margin-bottom: 0 !important;
 }
 
 /* ===== HEADER ===== */
@@ -398,7 +487,7 @@ header {
   justify-content: space-between;
   align-items: center;
   background: rgb(24, 116, 165);
-  color: white;
+  color: #fff;
   padding: 6px 12px;
   border-radius: 8px;
   margin-bottom: 6mm;
@@ -408,7 +497,6 @@ header {
   margin: 0 4px;
   opacity: 0.9;
 }
-
 .event {
   text-align: center;
   margin-bottom: 4mm;
@@ -439,6 +527,12 @@ header {
   border: 1px solid #dde6ee;
   border-radius: 8px;
   overflow: hidden;
+  margin-left: auto;
+  margin-right: auto;
+}
+.score-table--center th,
+.score-table--center td {
+  text-align: center;
 }
 .score-table th,
 .score-table td {
@@ -472,7 +566,6 @@ header {
   color: #999;
   padding: 10px 0;
 }
-
 .flag-badge {
   display: inline-block;
   padding: 2px 6px;
@@ -482,7 +575,7 @@ header {
   font-size: 11px;
 }
 
-/* ===== SIGNATURE ===== */
+/* ===== FOOTER ===== */
 .sign {
   display: flex;
   justify-content: space-between;
@@ -534,7 +627,7 @@ header {
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
 
-/* ===== TOP LOGOS ===== */
+/* ===== LOGOS ===== */
 .mid-image-row,
 .mid-image-sponsor-row {
   display: flex;
@@ -543,28 +636,10 @@ header {
   flex-wrap: nowrap;
   gap: 2mm;
 }
-.mid-image {
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 .mid-image img {
   width: 80px;
   height: 80px;
   object-fit: contain;
-}
-
-/* ===== SPONSOR (bottom) ===== */
-.mid-image-sponsor-row {
-  margin-top: auto;
-  margin-bottom: 0;
-}
-.mid-image-sponsor {
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 .mid-image-sponsor img {
   width: 40px;
@@ -572,16 +647,17 @@ header {
   object-fit: contain;
 }
 
-/* Hindari pecah di tengah blok */
+/* ===== AVOID BREAKS ===== */
 header,
 .band,
 .mid-image-row,
-.mid-image-sponsor-row {
+.mid-image-sponsor-row,
+.sign {
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
-/* Trademark */
+/* ===== Trademark ===== */
 .trademark {
   position: absolute;
   top: 0;

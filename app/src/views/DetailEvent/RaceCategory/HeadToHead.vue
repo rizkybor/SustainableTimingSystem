@@ -1776,6 +1776,48 @@ export default {
   },
 
   methods: {
+      _parseTimeMs: function (t) {
+    if (!t) return Number.POSITIVE_INFINITY;
+    var parts = String(t).split(":");
+    var h = parseInt(parts[0] || "0", 10);
+    var m = parseInt(parts[1] || "0", 10);
+    var sPart = String(parts[2] || "0");
+    var s = parseInt(sPart.split(".")[0] || "0", 10);
+    var ms = parseInt(sPart.split(".")[1] || "0", 10);
+    return (((h * 60 + m) * 60) + s) * 1000 + ms;
+  },
+
+  sortRowsByRankThenTime: function (rows) {
+    if (!Array.isArray(rows)) return rows;
+    var copy = rows.slice(0);
+    copy.sort(function(a, b) {
+      var ra = a && a.ranked ? Number(a.ranked) : null;
+      var rb = b && b.ranked ? Number(b.ranked) : null;
+
+      var aHas = ra !== null && isFinite(ra) && ra > 0;
+      var bHas = rb !== null && isFinite(rb) && rb > 0;
+
+      if (aHas && bHas && ra !== rb) return ra - rb;
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+
+      // tie-break pakai total time lalu race time
+      var ta = this._parseTimeMs(a && a.total ? a.total : a && a.race ? a.race : "");
+      var tb = this._parseTimeMs(b && b.total ? b.total : b && b.race ? b.race : "");
+      if (ta !== tb) return ta - tb;
+
+      // terakhir: No (jika ada)
+      var na = a && a.no ? Number(a.no) : Number.POSITIVE_INFINITY;
+      var nb = b && b.no ? Number(b.no) : Number.POSITIVE_INFINITY;
+      return na - nb;
+    }.bind(this));
+
+    // re-number kolom No setelah di-sort
+    for (var i = 0; i < copy.length; i++) {
+      copy[i].no = i + 1;
+    }
+    return copy;
+  },
     getOverallPackage() {
       return this.buildOverallPackage();
     },
@@ -2027,6 +2069,7 @@ export default {
       if (!r) return;
 
       var rows = this.buildRoundRows(r);
+        // rows = this.sortRowsByRankThenTime(rows);
       rows = this.sortRowsByBracketAndBye(rows, r);
 
       this.pdfMode = "round";

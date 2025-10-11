@@ -20,75 +20,73 @@ async function insertSprintResult(payload) {
     const toInt = (v, d = 0) => (Number.isFinite(v) ? Number(v) : d);
     const toStr = (v, d = "") => String(v == null ? d : v);
 
-    function normalizeResultObj(r = {}) {
-      // dukung format lama (array) -> ambil elemen pertama
-      if (Array.isArray(r)) r = r[0] || {};
+    function normalizeResultObj(r) {
+      if (!r || typeof r !== "object") r = {};
 
-      // field default sesuai schema baru
-      const out = {
+      function toStr(v, d) {
+        return v != null && v !== undefined && v !== "" ? String(v) : d;
+      }
+      function toInt(v, d) {
+        return Number.isFinite(v) ? Number(v) : d;
+      }
+
+      return {
         startTime: toStr(r.startTime, ""),
         finishTime: toStr(r.finishTime, ""),
         raceTime: toStr(r.raceTime, ""),
-
-        // penalti aktif (start & finish)
         startPenalty: toInt(r.startPenalty, 0),
         finishPenalty: toInt(r.finishPenalty, 0),
-
-        // legacy middle penalty selalu 0
-        penalty: 0,
-
-        // turunan & waktu penalti
-        totalPenalty: Number.isFinite(r.totalPenalty)
-          ? Number(r.totalPenalty)
-          : toInt(r.startPenalty, 0) + toInt(r.finishPenalty, 0),
-
+        penalty: toInt(r.penalty, 0),
+        totalPenalty:
+          r.totalPenalty != null
+            ? toInt(r.totalPenalty, 0)
+            : toInt(r.startPenalty, 0) + toInt(r.finishPenalty, 0),
         startPenaltyTime: toStr(r.startPenaltyTime, "00:00:00.000"),
         finishPenaltyTime: toStr(r.finishPenaltyTime, "00:00:00.000"),
         totalPenaltyTime: toStr(
           r.totalPenaltyTime != null ? r.totalPenaltyTime : r.penaltyTime,
           "00:00:00.000"
         ),
-
-        // sinkron legacy
         penaltyTime: toStr(
           r.penaltyTime != null ? r.penaltyTime : r.totalPenaltyTime,
           "00:00:00.000"
         ),
-
         totalTime: toStr(r.totalTime != null ? r.totalTime : r.raceTime, ""),
-        ranked: Number.isFinite(r.ranked) ? Number(r.ranked) : 0,
-        score: Number.isFinite(r.score) ? Number(r.score) : 0,
+        ranked: toInt(r.ranked, 0),
+        score: toInt(r.score, 0),
         judgesBy: toStr(r.judgesBy, ""),
         judgesTime: toStr(r.judgesTime, ""),
       };
-
-      // jika totalPenaltyTime kosong tapi ada start/finishPenaltyTime → jumlahkan string tak mudah;
-      // biarkan FE yang sudah menghitung (sesuai kode Anda). Backend cukup menerima.
-
-      return out;
     }
 
-    function normalizeOtrObj(otr = {}) {
-      // untuk konsistensi, samakan struktur dengan result (meski jarang dipakai di Sprint)
-      const base = {
-        startTime: "",
-        finishTime: "",
-        raceTime: "",
-        startPenalty: 0,
-        finishPenalty: 0,
-        penalty: 0,
-        totalPenalty: 0,
-        startPenaltyTime: "00:00:00.000",
-        finishPenaltyTime: "00:00:00.000",
-        totalPenaltyTime: "00:00:00.000",
-        penaltyTime: "00:00:00.000",
-        totalTime: "",
-        ranked: 0,
-        score: 0,
-        judgesBy: toStr(r.judgesBy, ""),
-        judgesTime: toStr(r.judgesTime, ""),
+    function normalizeOtrObj(otr) {
+      if (!otr || typeof otr !== "object") otr = {};
+
+      function toStr(v, d) {
+        return v != null && v !== undefined && v !== "" ? String(v) : d;
+      }
+      function toInt(v, d) {
+        return Number.isFinite(v) ? Number(v) : d;
+      }
+
+      return {
+        startTime: toStr(otr.startTime, ""),
+        finishTime: toStr(otr.finishTime, ""),
+        raceTime: toStr(otr.raceTime, ""),
+        startPenalty: toInt(otr.startPenalty, 0),
+        finishPenalty: toInt(otr.finishPenalty, 0),
+        penalty: toInt(otr.penalty, 0),
+        totalPenalty: toInt(otr.totalPenalty, 0),
+        startPenaltyTime: toStr(otr.startPenaltyTime, "00:00:00.000"),
+        finishPenaltyTime: toStr(otr.finishPenaltyTime, "00:00:00.000"),
+        totalPenaltyTime: toStr(otr.totalPenaltyTime, "00:00:00.000"),
+        penaltyTime: toStr(otr.penaltyTime, "00:00:00.000"),
+        totalTime: toStr(otr.totalTime, ""),
+        ranked: toInt(otr.ranked, 0),
+        score: toInt(otr.score, 0),
+        judgesBy: toStr(otr.judgesBy, ""),
+        judgesTime: toStr(otr.judgesTime, ""),
       };
-      return { ...base, ...normalizeResultObj(otr) };
     }
 
     function normalizeTeamDoc(it = {}) {
@@ -317,7 +315,10 @@ async function insertSlalomResult(payload) {
 
     // === Validasi payload ===
     if (!Array.isArray(payload)) {
-      return { ok: false, error: "insertSlalomResult: payload must be an array" };
+      return {
+        ok: false,
+        error: "insertSlalomResult: payload must be an array",
+      };
     }
     if (payload.length === 0) {
       return { ok: true, upsertedCount: 0 };
@@ -360,8 +361,12 @@ async function insertSlalomResult(payload) {
       const rem2 = rem1 % 60000;
       const sec = Math.floor(rem2 / 1000);
       const mss = rem2 % 1000;
-      function pad(n, w) { return String(n).padStart(w, "0"); }
-      return pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3);
+      function pad(n, w) {
+        return String(n).padStart(w, "0");
+      }
+      return (
+        pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(mss, 3)
+      );
     }
     function pruneEmpty(obj) {
       if (!obj || typeof obj !== "object") return obj;
@@ -378,20 +383,26 @@ async function insertSlalomResult(payload) {
     function normRun(r) {
       const run = r || {};
 
-      const ptRaw = run.penaltyTotal && typeof run.penaltyTotal === "object" ? run.penaltyTotal : {};
+      const ptRaw =
+        run.penaltyTotal && typeof run.penaltyTotal === "object"
+          ? run.penaltyTotal
+          : {};
       const gatesRaw = Array.isArray(ptRaw.gates) ? ptRaw.gates : [];
       const gates = [];
-      for (let gi = 0; gi < gatesRaw.length; gi++) gates.push(Number(gatesRaw[gi]) || 0);
+      for (let gi = 0; gi < gatesRaw.length; gi++)
+        gates.push(Number(gatesRaw[gi]) || 0);
 
       const pt = {
         start: Number(ptRaw.start) || 0,
         gates: gates,
-        finish: Number(ptRaw.finish) || 0
+        finish: Number(ptRaw.finish) || 0,
       };
 
       let penaltySum = pt.start + pt.finish;
       for (let pi = 0; pi < pt.gates.length; pi++) penaltySum += pt.gates[pi];
-      const penaltyNum = Number.isFinite(run.penalty) ? Number(run.penalty) : penaltySum;
+      const penaltyNum = Number.isFinite(run.penalty)
+        ? Number(run.penalty)
+        : penaltySum;
 
       return {
         session: String(run.session || ""),
@@ -402,9 +413,11 @@ async function insertSlalomResult(payload) {
         penaltyTotal: pt,
         penalty: penaltyNum,
         totalTime: String(run.totalTime || run.raceTime || ""),
-        ranked: Number.isFinite(run.ranked) ? Number(run.ranked) : Number(run.ranked) || 0,
+        ranked: Number.isFinite(run.ranked)
+          ? Number(run.ranked)
+          : Number(run.ranked) || 0,
         judgesBy: String(run.judgesBy || ""),
-        judgesTime: String(run.judgesTime || "")
+        judgesTime: String(run.judgesTime || ""),
       };
     }
 
@@ -430,7 +443,7 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {})
+        otr: pruneEmpty(clean.otr || {}),
       });
     }
 
@@ -457,7 +470,7 @@ async function insertSlalomResult(payload) {
         ranked: Number.isFinite(clean.ranked) ? Number(clean.ranked) : 0,
         score: Number.isFinite(clean.score) ? Number(clean.score) : 0,
         meta: pruneEmpty(clean.meta || {}),
-        otr: pruneEmpty(clean.otr || {})
+        otr: pruneEmpty(clean.otr || {}),
       });
     }
 
@@ -476,13 +489,25 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, "")
+          divisionName: toStr(item.divisionName, ""),
         };
-        if (!metaB.eventId || !metaB.initialId || !metaB.raceId || !metaB.divisionId) {
+        if (
+          !metaB.eventId ||
+          !metaB.initialId ||
+          !metaB.raceId ||
+          !metaB.divisionId
+        ) {
           console.warn("[DAO] Skip bucket, meta tidak lengkap:", metaB);
           continue;
         }
-        const keyB = metaB.eventId + "|" + metaB.initialId + "|" + metaB.raceId + "|" + metaB.divisionId;
+        const keyB =
+          metaB.eventId +
+          "|" +
+          metaB.initialId +
+          "|" +
+          metaB.raceId +
+          "|" +
+          metaB.divisionId;
 
         const teamsArrB = [];
         for (let tb = 0; tb < item.teams.length; tb++) {
@@ -494,7 +519,8 @@ async function insertSlalomResult(payload) {
         } else {
           const exB = groups.get(keyB);
           // hindari spread (kompat ES5)
-          for (let i = 0; i < teamsArrB.length; i++) exB.teams.push(teamsArrB[i]);
+          for (let i = 0; i < teamsArrB.length; i++)
+            exB.teams.push(teamsArrB[i]);
         }
       } else {
         const metaF = {
@@ -505,13 +531,25 @@ async function insertSlalomResult(payload) {
           eventName: toStr(item.eventName, ""),
           initialName: toStr(item.initialName, ""),
           raceName: toStr(item.raceName, ""),
-          divisionName: toStr(item.divisionName, "")
+          divisionName: toStr(item.divisionName, ""),
         };
-        if (!metaF.eventId || !metaF.initialId || !metaF.raceId || !metaF.divisionId) {
+        if (
+          !metaF.eventId ||
+          !metaF.initialId ||
+          !metaF.raceId ||
+          !metaF.divisionId
+        ) {
           console.warn("[DAO] Skip flat item, meta tidak lengkap:", metaF);
           continue;
         }
-        const keyF = metaF.eventId + "|" + metaF.initialId + "|" + metaF.raceId + "|" + metaF.divisionId;
+        const keyF =
+          metaF.eventId +
+          "|" +
+          metaF.initialId +
+          "|" +
+          metaF.raceId +
+          "|" +
+          metaF.divisionId;
 
         const cleanJson = JSON.stringify(item);
         const cleanAny = JSON.parse(cleanJson);
@@ -540,14 +578,21 @@ async function insertSlalomResult(payload) {
         eventId: m.eventId,
         initialId: m.initialId,
         raceId: m.raceId,
-        divisionId: m.divisionId
+        divisionId: m.divisionId,
       });
     }
     const existingDocs = await col.find({ $or: filterOr }).toArray();
     const existingMap = new Map();
     for (let ei = 0; ei < existingDocs.length; ei++) {
       const exDoc = existingDocs[ei];
-      const ek = exDoc.eventId + "|" + exDoc.initialId + "|" + exDoc.raceId + "|" + exDoc.divisionId;
+      const ek =
+        exDoc.eventId +
+        "|" +
+        exDoc.initialId +
+        "|" +
+        exDoc.raceId +
+        "|" +
+        exDoc.divisionId;
       existingMap.set(ek, exDoc);
     }
 
@@ -568,7 +613,7 @@ async function insertSlalomResult(payload) {
         eventId: meta.eventId,
         initialId: meta.initialId,
         raceId: meta.raceId,
-        divisionId: meta.divisionId
+        divisionId: meta.divisionId,
       };
 
       let existing = existingMap.get(bucketKey);
@@ -611,7 +656,9 @@ async function insertSlalomResult(payload) {
         if (!exTeam) {
           mergedByKey.set(kIn, JSON.parse(JSON.stringify(nt)));
         } else {
-          const exRes = Array.isArray(exTeam.result) ? exTeam.result.slice() : [];
+          const exRes = Array.isArray(exTeam.result)
+            ? exTeam.result.slice()
+            : [];
           const ntRes = Array.isArray(nt.result) ? nt.result : [];
 
           // outRes: pertahankan run-1 lama; gunakan run-2 dari nt jika ada
@@ -650,11 +697,18 @@ async function insertSlalomResult(payload) {
           // Jika data baru belum lengkap (<2 run), jangan timpa bestTime/ranked/score lama
           const newRuns = outRes.length;
           if (newRuns < 2) {
-            if (!(typeof mergedTeam.bestTime === "string" && mergedTeam.bestTime.trim() !== "")) {
+            if (
+              !(
+                typeof mergedTeam.bestTime === "string" &&
+                mergedTeam.bestTime.trim() !== ""
+              )
+            ) {
               mergedTeam.bestTime = exTeam.bestTime;
             }
-            if (!Number.isFinite(mergedTeam.ranked)) mergedTeam.ranked = exTeam.ranked;
-            if (!Number.isFinite(mergedTeam.score)) mergedTeam.score = exTeam.score;
+            if (!Number.isFinite(mergedTeam.ranked))
+              mergedTeam.ranked = exTeam.ranked;
+            if (!Number.isFinite(mergedTeam.score))
+              mergedTeam.score = exTeam.score;
           }
 
           mergedByKey.set(kIn, mergedTeam);
@@ -666,7 +720,9 @@ async function insertSlalomResult(payload) {
       // ====== RUN-LEVEL RANKING ======
       let maxRuns = 0;
       for (let mri = 0; mri < mergedArray.length; mri++) {
-        const rr = Array.isArray(mergedArray[mri].result) ? mergedArray[mri].result : [];
+        const rr = Array.isArray(mergedArray[mri].result)
+          ? mergedArray[mri].result
+          : [];
         if (rr.length > maxRuns) maxRuns = rr.length;
       }
 
@@ -680,7 +736,9 @@ async function insertSlalomResult(payload) {
             candidates.push({ t: t, r: r, ms: ms });
           }
         }
-        candidates.sort(function (a, b) { return a.ms - b.ms; });
+        candidates.sort(function (a, b) {
+          return a.ms - b.ms;
+        });
         let rankCounter = 0;
         let last = null;
         let disp = 0;
@@ -711,7 +769,11 @@ async function insertSlalomResult(payload) {
           const valsMs = [];
           for (let vj = 0; vj < resArr.length; vj++) {
             const x = resArr[vj];
-            if (x && typeof x.totalTime === "string" && x.totalTime.trim() !== "") {
+            if (
+              x &&
+              typeof x.totalTime === "string" &&
+              x.totalTime.trim() !== ""
+            ) {
               const ms = hmsToMs(x.totalTime);
               if (Number.isFinite(ms)) valsMs.push(ms);
             }
@@ -764,9 +826,9 @@ async function insertSlalomResult(payload) {
           divisionName: meta.divisionName,
           teams: mergedArray,
           updatedAt: now,
-          _lastRevision: now.getTime()
+          _lastRevision: now.getTime(),
         },
-        $setOnInsert: { createdAt: now }
+        $setOnInsert: { createdAt: now },
       };
 
       const res = await col.updateOne(filter, update, { upsert: true });

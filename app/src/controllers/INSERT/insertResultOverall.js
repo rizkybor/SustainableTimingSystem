@@ -3,7 +3,7 @@ const { ObjectId } = require("mongodb");
 
 async function upsertEventResultsDoc(payload) {
   const db = await getDb();
-  const col = db.collection("eventResults");
+  const col = db.collection("temporaryOverallEventResults");
 
   const filter = {
     eventId: payload.eventId,

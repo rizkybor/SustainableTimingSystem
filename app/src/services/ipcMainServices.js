@@ -690,6 +690,7 @@ ipcMain.on("users-judges-assignment:getByEmail", async (event, payload) => {
 ipcMain.on("event-results:upsert", async (event, payload) => {
   try {
     const result = await upsertEventResultsDoc(payload);
+    console.log(result,'<<<<')
     const serialized = EJSON.serialize({ ok: true, result });
     event.reply("event-results:upsert-reply", serialized);
   } catch (error) {

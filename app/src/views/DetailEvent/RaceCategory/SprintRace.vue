@@ -1468,15 +1468,15 @@ export default {
     //   });
     // },
 
+    // === tambahkan di methods: ===
     async saveResult() {
-      // clone aman
+      // 1) clone aman
       var clean;
       try {
         clean = JSON.parse(JSON.stringify(this.participantArr || []));
       } catch (e) {
         clean = [];
       }
-
       if (!Array.isArray(clean) || clean.length === 0) {
         ipcRenderer.send("get-alert", {
           type: "warning",
@@ -1486,7 +1486,7 @@ export default {
         return;
       }
 
-      // validasi bucket
+      // 2) validasi bucket
       var bucket = getBucket();
       var must = ["eventId", "initialId", "raceId", "divisionId"];
       var missing = [];
@@ -1503,14 +1503,13 @@ export default {
         return;
       }
 
-      // build & simpan hasil sprint
+      // 3) simpan hasil SPRINT
       var docs = buildResultDocs(clean, bucket);
       ipcRenderer.send("insert-sprint-result", docs);
 
-      var self = this; // simpan konteks
+      var self = this;
       ipcRenderer.once("insert-sprint-result-reply", function (_e, res) {
         var ok = res && res.ok ? true : false;
-
         if (ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
@@ -1518,7 +1517,7 @@ export default {
             message: "Successfully",
           });
 
-          // lanjut upsert dokumen rekap eventResult
+          // 4) lanjut upsert dokumen rekap eventResult
           if (self && typeof self.upsertEventResults === "function") {
             self.upsertEventResults(bucket, clean);
           }
@@ -1532,7 +1531,7 @@ export default {
       });
     },
 
-    // ===== upsert tanpa optional-chaining / chaining
+    // // === dipanggil setelah insert-sprint-result sukses ===
     upsertEventResults(bucket, participantArr) {
       var payload = {
         eventId: bucket.eventId,
@@ -1548,7 +1547,7 @@ export default {
         updatedAt: new Date(),
       };
 
-      // isi eventResult per tim
+      // isi eventResult per tim (tanpa optional-chaining)
       for (var i = 0; i < participantArr.length; i++) {
         var t = participantArr[i];
 
@@ -1578,6 +1577,7 @@ export default {
         payload.eventResult.push(teamData);
       }
 
+      // kirim upsert
       ipcRenderer.send("event-results:upsert", payload);
 
       ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
@@ -1607,39 +1607,6 @@ export default {
       this.titleCategories = "";
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-
-    //   previewResult() {
-    //     const clean = JSON.parse(JSON.stringify(this.participantArr || []));
-    //     if (!Array.isArray(clean) || clean.length === 0) {
-    //       ipcRenderer.send("get-alert", {
-    //         type: "warning",
-    //         detail: "Belum ada data.",
-    //         message: "Ups Sorry",
-    //       });
-    //       return;
-    //     }
-    //     const bucket = getBucket();
-    //     const must = ["eventId", "initialId", "raceId", "divisionId"];
-    //     const missing = must.filter((k) => !bucket[k]);
-    //     if (missing.length) {
-    //       ipcRenderer.send("get-alert", {
-    //         type: "error",
-    //         detail: `Bucket fields missing: ${missing.join(", ")}`,
-    //         message: "Failed",
-    //       });
-    //       return;
-    //     }
-
-    //     const docs = buildResultDocs(clean, bucket);
-    //     const jsonStr = JSON.stringify(docs, null, 2);
-
-    //     const html = `<!doctype html><meta charset="utf-8"><title>Preview Result JSON</title>
-    // <style>html,body{height:100%;margin:0}body{font:12px ui-monospace, Menlo, Consolas, monospace; background:#0b1220; color:#cde2ff; display:flex}
-    // pre{margin:0;padding:16px;white-space:pre;overflow:auto;flex:1}</style>
-    // <pre>${jsonStr.replace(/</g, "&lt;")}</pre>`;
-    //     const url = "data:text/html;charset=utf-8," + encodeURIComponent(html);
-    //     window.open(url, "_blank", "width=980,height=700");
-    //   },
   },
 };
 </script>

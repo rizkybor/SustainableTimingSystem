@@ -354,8 +354,8 @@
                 <td class="mono">{{ row.start }}</td>
                 <td class="mono">{{ row.finish }}</td>
                 <td class="mono">{{ row.race }}</td>
-                <td class="text-center">{{ row.winLose || "" }}</td>
                 <td class="mono text-strong">{{ row.total }}</td>
+                <td class="text-center">{{ row.winLose || "" }}</td>
               </tr>
               <tr v-if="!R.rows || R.rows.length === 0">
                 <td class="empty" colspan="9">No data</td>

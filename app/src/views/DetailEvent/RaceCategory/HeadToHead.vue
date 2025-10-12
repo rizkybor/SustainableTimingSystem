@@ -1777,6 +1777,206 @@ export default {
   },
 
   methods: {
+    scoreForRank(rank) {
+      if (!rank || !Number.isFinite(+rank)) return 0;
+      const s = this.getScoreByRanked ? this.getScoreByRanked(+rank) : null;
+      return Number.isFinite(+s) ? +s : 0;
+    },
+    _teamKey(name, bib) {
+      return String(name || "").toUpperCase() + "|" + String(bib || "");
+    },
+    _timeMsFromRow(row) {
+      // prioritas total, fallback race
+      const t = row && (row.total || row.race) ? row.total || row.race : "";
+      // kamu sudah punya _parseTimeMs; kalau mau pakai itu, ganti di sini
+      return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
+    },
+    buildOverallPlacingsFromLastRound() {
+      const rounds = this.rounds || [];
+      if (!rounds.length) return [];
+
+      const final = this.getFinalRound && this.getFinalRound();
+      const bronze = this.getBronzeRound && this.getBronzeRound();
+
+      const top4 = [];
+      const top4Keys = new Set();
+
+      const teamKey = (name, bib) =>
+        String(name || "").toUpperCase() + "|" + String(bib || "");
+
+      const timeMsFromRow = (row) => {
+        const t = row && (row.total || row.race) ? row.total || row.race : "";
+        return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
+      };
+
+      // ---- Final A → #1 & #2
+      if (final && final.matches && final.matches[0]) {
+        const fm = final.matches[0];
+        const t1 = fm.team1 && fm.team1.name ? fm.team1.name : "";
+        const t2 = fm.team2 && fm.team2.name ? fm.team2.name : "";
+
+        const finalRows = this.buildRoundRows(final);
+        const findRow = (nm) =>
+          finalRows.find(
+            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
+          ) || null;
+
+        if (fm.winner && fm.winner.name) {
+          const winner = fm.winner.name;
+          const loser = (winner === t1 ? t2 : t1) || "";
+
+          const rwW = findRow(winner);
+          const rwL = findRow(loser);
+
+          const kW = teamKey(winner, rwW ? rwW.bib : "");
+          const kL = teamKey(loser, rwL ? rwL.bib : "");
+
+          if (winner) {
+            top4.push({
+              place: 1,
+              name: winner,
+              bib: rwW ? rwW.bib : "",
+              source: "FinalA",
+              timeMs: timeMsFromRow(rwW),
+            });
+            top4Keys.add(kW);
+          }
+          if (loser) {
+            top4.push({
+              place: 2,
+              name: loser,
+              bib: rwL ? rwL.bib : "",
+              source: "FinalA",
+              timeMs: timeMsFromRow(rwL),
+            });
+            top4Keys.add(kL);
+          }
+        }
+      }
+
+      // ---- Final B (Bronze) → #3 & #4
+      if (bronze && bronze.matches && bronze.matches[0]) {
+        const bm = bronze.matches[0];
+        const t1 = bm.team1 && bm.team1.name ? bm.team1.name : "";
+        const t2 = bm.team2 && bm.team2.name ? bm.team2.name : "";
+
+        const bronzeRows = this.buildRoundRows(bronze);
+        const findRow = (nm) =>
+          bronzeRows.find(
+            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
+          ) || null;
+
+        if (bm.winner && bm.winner.name) {
+          const winner = bm.winner.name; // #3
+          const loser = (winner === t1 ? t2 : t1) || ""; // #4
+
+          const rwW = findRow(winner);
+          const rwL = findRow(loser);
+
+          const kW = teamKey(winner, rwW ? rwW.bib : "");
+          const kL = teamKey(loser, rwL ? rwL.bib : "");
+
+          if (winner && !top4Keys.has(kW)) {
+            top4.push({
+              place: 3,
+              name: winner,
+              bib: rwW ? rwW.bib : "",
+              source: "FinalB",
+              timeMs: timeMsFromRow(rwW),
+            });
+            top4Keys.add(kW);
+          }
+          if (loser && !top4Keys.has(kL)) {
+            top4.push({
+              place: 4,
+              name: loser,
+              bib: rwL ? rwL.bib : "",
+              source: "FinalB",
+              timeMs: timeMsFromRow(rwL),
+            });
+            top4Keys.add(kL);
+          }
+        }
+      }
+
+      // ---- Tim lainnya: pakai LAST ROUND REACHED
+      const lastRowByTeam = new Map(); // key → { row, roundIdx, roundId, roundName }
+
+      for (let ri = 0; ri < rounds.length; ri++) {
+        const r = rounds[ri];
+        if (r && r.bronze) continue; // bronze sudah diambil untuk top4
+
+        const rows = this.buildRoundRows(r);
+        rows.forEach((row) => {
+          const key = teamKey(row.team, row.bib);
+          if (top4Keys.has(key)) return;
+
+          const prev = lastRowByTeam.get(key);
+          if (!prev || ri > prev.roundIdx) {
+            lastRowByTeam.set(key, {
+              row,
+              roundIdx: ri,
+              roundId: r.id,
+              roundName: r.name,
+            });
+          }
+        });
+      }
+
+      const others = Array.from(lastRowByTeam.values()).map((v) => ({
+        name: v.row.team,
+        bib: v.row.bib,
+        sourceRoundId: String(v.roundId),
+        sourceRoundName: v.roundName,
+        timeMs: timeMsFromRow(v.row),
+        roundIdx: v.roundIdx,
+      }));
+
+      // Urut “others”: waktu tercepat → duluan
+      others.sort((a, b) => {
+        const ta = Number.isFinite(a.timeMs)
+          ? a.timeMs
+          : Number.POSITIVE_INFINITY;
+        const tb = Number.isFinite(b.timeMs)
+          ? b.timeMs
+          : Number.POSITIVE_INFINITY;
+        if (ta !== tb) return ta - tb;
+        // (opsional) kalau mau: yang tersingkir di babak lebih akhir → lebih atas
+        // if (a.roundIdx !== b.roundIdx) return b.roundIdx - a.roundIdx;
+        return String(a.name).localeCompare(String(b.name));
+      });
+
+      // Gabungkan jadi overallRows + hitung score dari ranking final
+      const overall = [];
+
+      // 1..4 (top4)
+      top4
+        .sort((a, b) => a.place - b.place)
+        .forEach((x) => {
+          overall.push({
+            ranked: x.place,
+            name: x.name,
+            bib: x.bib,
+            score: this.scoreForRank(x.place), // ← skor dari this.dataScore
+            _source: x.source,
+          });
+        });
+
+      // 5..N (others)
+      let rank = 5;
+      others.forEach((o) => {
+        overall.push({
+          ranked: rank,
+          name: o.name,
+          bib: o.bib,
+          score: this.scoreForRank(rank), // ← skor dari this.dataScore
+          _source: o.sourceRoundName,
+        });
+        rank++;
+      });
+
+      return overall;
+    },
     // ---- BRACKET SAVE/LOAD ----
     _currentBucketOrThrow() {
       const b = getBucket();
@@ -1955,58 +2155,179 @@ export default {
       return result;
     },
 
-    // === Build Overall Accumulation ===
+    // // === Build Overall Accumulation ===
+    // buildOverallAccumulation: function () {
+    //   var roundsPkg = this.buildAllRoundsPackage();
+    //   var acc = {};
+
+    //   var i = 0;
+    //   while (i < roundsPkg.length) {
+    //     var R = roundsPkg[i];
+    //     if (R.rows && Array.isArray(R.rows)) {
+    //       var j = 0;
+    //       while (j < R.rows.length) {
+    //         var row = R.rows[j];
+    //         var name = row.team;
+    //         var bib = row.bib;
+    //         var ranked = row.ranked;
+    //         var totalOrRace = row.total ? row.total : row.race;
+    //         var key = String(name).toUpperCase() + "|" + String(bib);
+
+    //         if (!acc[key]) {
+    //           acc[key] = {
+    //             name: name,
+    //             bib: bib,
+    //             score: 0,
+    //             bestRank: 999,
+    //             bestTimeMs: null,
+    //           };
+    //         }
+
+    //         var ref = acc[key];
+    //         var rankNum = parseInt(ranked);
+    //         if (!isNaN(rankNum)) {
+    //           var s = this.getScoreByRanked(rankNum);
+    //           if (isNaN(s)) s = 0;
+    //           ref.score = ref.score + s;
+    //           if (rankNum < ref.bestRank) {
+    //             ref.bestRank = rankNum;
+    //           }
+    //         }
+
+    //         var T = this.parsesTime(totalOrRace ? totalOrRace : "");
+    //         if (isFinite(T)) {
+    //           if (ref.bestTimeMs === null || T < ref.bestTimeMs) {
+    //             ref.bestTimeMs = T;
+    //           }
+    //         }
+
+    //         j = j + 1;
+    //       }
+    //     }
+    //     i = i + 1;
+    //   }
+
+    //   var arr = [];
+    //   for (var key in acc) {
+    //     if (Object.prototype.hasOwnProperty.call(acc, key)) {
+    //       var v = acc[key];
+    //       arr.push({
+    //         name: v.name,
+    //         bib: v.bib,
+    //         score: v.score,
+    //         bestRank: v.bestRank,
+    //         bestTimeMs: v.bestTimeMs,
+    //       });
+    //     }
+    //   }
+
+    //   arr.sort(function (a, b) {
+    //     if (a.score !== b.score) return b.score - a.score;
+    //     if (a.bestRank !== b.bestRank) return a.bestRank - b.bestRank;
+    //     if ((a.bestTimeMs || 0) !== (b.bestTimeMs || 0))
+    //       return (a.bestTimeMs || 0) - (b.bestTimeMs || 0);
+    //     return String(a.name).localeCompare(String(b.name));
+    //   });
+
+    //   var k = 0;
+    //   while (k < arr.length) {
+    //     arr[k].ranked = k + 1;
+    //     k = k + 1;
+    //   }
+
+    //   var result = [];
+    //   var n = 0;
+    //   while (n < arr.length) {
+    //     var r = arr[n];
+    //     result.push({
+    //       ranked: r.ranked,
+    //       name: r.name,
+    //       bib: r.bib,
+    //       score: r.score,
+    //     });
+    //     n = n + 1;
+    //   }
+
+    //   return result;
+    // },
+    // =======================================================
+    // === Fungsi: buildOverallAccumulation()
+    // === Tujuan: Menghitung hasil akumulasi (overall result)
+    // ===          dari seluruh babak Head-to-Head / Slalom.
+    // === Menghasilkan daftar akhir tim (ranking, skor, dst)
+    // =======================================================
     buildOverallAccumulation: function () {
+      // Ambil semua paket babak yang sudah dibangun sebelumnya
+      // (biasanya berisi data tiap round: R1, R2, Final A, Final B, dst.)
       var roundsPkg = this.buildAllRoundsPackage();
+
+      // Objek untuk menyimpan akumulasi per tim
       var acc = {};
 
+      // Loop setiap babak
       var i = 0;
       while (i < roundsPkg.length) {
         var R = roundsPkg[i];
+
+        // Cek apakah babak punya data rows (tim yang ikut)
         if (R.rows && Array.isArray(R.rows)) {
           var j = 0;
+
+          // Loop setiap tim di babak tersebut
           while (j < R.rows.length) {
             var row = R.rows[j];
-            var name = row.team;
-            var bib = row.bib;
-            var ranked = row.ranked;
-            var totalOrRace = row.total ? row.total : row.race;
-            var key = String(name).toUpperCase() + "|" + String(bib);
+            var name = row.team; // Nama tim
+            var bib = row.bib; // Nomor BIB tim
+            var ranked = row.ranked; // Peringkat di babak itu
+            var totalOrRace = row.total ? row.total : row.race; // Waktu hasil
+            var key = String(name).toUpperCase() + "|" + String(bib); // Key unik tim
 
+            // --- Jika tim belum ada di daftar akumulasi, buat entri baru ---
             if (!acc[key]) {
               acc[key] = {
                 name: name,
                 bib: bib,
-                score: 0,
-                bestRank: 999,
-                bestTimeMs: null,
+                score: 0, // total skor kumulatif
+                bestRank: 999, // peringkat terbaik (angka kecil = lebih bagus)
+                bestTimeMs: null, // waktu tercepat (dalam ms)
               };
             }
 
-            var ref = acc[key];
+            var ref = acc[key]; // pointer ke entri tim ini
+
+            // --- Hitung skor berdasarkan ranking di babak ini ---
             var rankNum = parseInt(ranked);
             if (!isNaN(rankNum)) {
+              // Ambil skor dari fungsi internal getScoreByRanked()
+              // contoh: Rank 1 → 100pts, Rank 2 → 80pts, dst.
               var s = this.getScoreByRanked(rankNum);
               if (isNaN(s)) s = 0;
+
+              // Tambahkan skor ke total
               ref.score = ref.score + s;
+
+              // Jika peringkat sekarang lebih bagus (lebih kecil), simpan sebagai bestRank
               if (rankNum < ref.bestRank) {
                 ref.bestRank = rankNum;
               }
             }
 
+            // --- Cek waktu terbaik ---
             var T = this.parsesTime(totalOrRace ? totalOrRace : "");
             if (isFinite(T)) {
+              // Simpan waktu tercepat (paling kecil)
               if (ref.bestTimeMs === null || T < ref.bestTimeMs) {
                 ref.bestTimeMs = T;
               }
             }
 
-            j = j + 1;
+            j = j + 1; // lanjut tim berikutnya
           }
         }
-        i = i + 1;
+        i = i + 1; // lanjut ke babak berikutnya
       }
 
+      // --- Konversi hasil akumulasi (object) menjadi array ---
       var arr = [];
       for (var key in acc) {
         if (Object.prototype.hasOwnProperty.call(acc, key)) {
@@ -2021,20 +2342,30 @@ export default {
         }
       }
 
+      // --- Urutkan hasil akhir ---
       arr.sort(function (a, b) {
+        // 1️⃣ Skor tertinggi di atas
         if (a.score !== b.score) return b.score - a.score;
+
+        // 2️⃣ Jika skor sama → lihat peringkat terbaik (semakin kecil semakin baik)
         if (a.bestRank !== b.bestRank) return a.bestRank - b.bestRank;
+
+        // 3️⃣ Jika masih sama → waktu terbaik (lebih kecil lebih baik)
         if ((a.bestTimeMs || 0) !== (b.bestTimeMs || 0))
           return (a.bestTimeMs || 0) - (b.bestTimeMs || 0);
+
+        // 4️⃣ Jika masih sama → urut alfabet nama tim
         return String(a.name).localeCompare(String(b.name));
       });
 
+      // --- Tambahkan properti ranked (posisi urutan akhir) ---
       var k = 0;
       while (k < arr.length) {
-        arr[k].ranked = k + 1;
+        arr[k].ranked = k + 1; // urutan ke-1, ke-2, dst.
         k = k + 1;
       }
 
+      // --- Buat hasil akhir (output ringan) ---
       var result = [];
       var n = 0;
       while (n < arr.length) {
@@ -2048,50 +2379,81 @@ export default {
         n = n + 1;
       }
 
+      // --- Kembalikan array hasil akhir ---
       return result;
     },
 
     // === Build Overall Package (gabungan podium + akumulasi) ===
+    // buildOverallPackage: function () {
+    //   var placements = [];
+
+    //   if (this.podium && this.podium.gold) {
+    //     placements.push({ place: 1, team: this.podium.gold });
+    //   }
+    //   if (this.podium && this.podium.silver) {
+    //     placements.push({ place: 2, team: this.podium.silver });
+    //   }
+    //   if (this.podium && this.podium.bronze) {
+    //     placements.push({ place: 3, team: this.podium.bronze });
+    //   }
+    //   if (this.podium && this.podium.fourth) {
+    //     placements.push({ place: 4, team: this.podium.fourth });
+    //   }
+
+    //   var final = null;
+    //   if (this.getFinalRound) {
+    //     final = this.getFinalRound();
+    //   }
+    //   var finalRows = [];
+    //   if (final) {
+    //     finalRows = this.buildRoundRows(final);
+    //   }
+
+    //   var overallRows = this.buildOverallAccumulation();
+    //   var rounds = this.buildAllRoundsPackage();
+
+    //   var result = {
+    //     event:
+    //       this.dataEventSafe && this.dataEventSafe.eventName
+    //         ? this.dataEventSafe.eventName
+    //         : "",
+    //     category: this.titleCategories ? this.titleCategories : "",
+    //     placements: placements,
+    //     finalRows: finalRows,
+    //     rounds: rounds,
+    //     overallRows: overallRows,
+    //   };
+    //   return result;
+    // },
     buildOverallPackage: function () {
-      var placements = [];
-
-      if (this.podium && this.podium.gold) {
+      const placements = [];
+      if (this.podium && this.podium.gold)
         placements.push({ place: 1, team: this.podium.gold });
-      }
-      if (this.podium && this.podium.silver) {
+      if (this.podium && this.podium.silver)
         placements.push({ place: 2, team: this.podium.silver });
-      }
-      if (this.podium && this.podium.bronze) {
+      if (this.podium && this.podium.bronze)
         placements.push({ place: 3, team: this.podium.bronze });
-      }
-      if (this.podium && this.podium.fourth) {
+      if (this.podium && this.podium.fourth)
         placements.push({ place: 4, team: this.podium.fourth });
-      }
 
-      var final = null;
-      if (this.getFinalRound) {
-        final = this.getFinalRound();
-      }
-      var finalRows = [];
-      if (final) {
-        finalRows = this.buildRoundRows(final);
-      }
+      const final = this.getFinalRound ? this.getFinalRound() : null;
+      const finalRows = final ? this.buildRoundRows(final) : [];
 
-      var overallRows = this.buildOverallAccumulation();
-      var rounds = this.buildAllRoundsPackage();
+      const overallRows = this.buildOverallPlacingsFromLastRound(); // ← sudah ada score
 
-      var result = {
+      const rounds = this.buildAllRoundsPackage();
+
+      return {
         event:
           this.dataEventSafe && this.dataEventSafe.eventName
             ? this.dataEventSafe.eventName
             : "",
-        category: this.titleCategories ? this.titleCategories : "",
-        placements: placements,
-        finalRows: finalRows,
-        rounds: rounds,
-        overallRows: overallRows,
+        category: this.titleCategories || "",
+        placements,
+        finalRows,
+        rounds,
+        overallRows,
       };
-      return result;
     },
 
     // util: sortir rows mengikuti urutan bracket + BYE di bawah

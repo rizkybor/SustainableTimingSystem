@@ -432,7 +432,6 @@ import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
-
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
@@ -442,6 +441,7 @@ import {
   mergeTeamsWithCache,
   debounce,
 } from "@/utils/localStoreSprint";
+import tone from "../../../assets/tone/tone_message.mp3";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -612,8 +612,7 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, EmptyCard, PrintOverallModal, Icon },
-
+  components: { OperationTimePanel, EmptyCard, PrintOverallModal, tone, Icon },
   data() {
     return {
       showOverallModal: false,
@@ -780,6 +779,7 @@ export default {
   },
 
   async mounted() {
+    var audio = new Audio(tone);
     const socket = getSocket();
 
     const onConnect = () => {
@@ -799,6 +799,7 @@ export default {
 
       // tampilkan toast (opsional)
       if (this.$bvToast) {
+        audio.play();
         this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
           title: "Pesan Realtime",
           variant: "success",

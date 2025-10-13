@@ -701,6 +701,7 @@ import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -947,6 +948,7 @@ export default {
     EmptyCard,
     VueHtml2pdf,
     SlalomSession1PdfResult,
+    tone,
     Icon,
   },
 
@@ -1203,6 +1205,7 @@ export default {
     },
   },
   async mounted() {
+    var audio = new Audio(tone);
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -1271,6 +1274,7 @@ export default {
         if (!isSameEvent(msg)) return;
 
         if (this.$bvToast && msg.text) {
+          audio.play();
           var txt = (msg.from ? msg.from : "Realtime") + ": " + msg.text;
           this.$bvToast.toast(txt, {
             title: "Pesan Realtime",

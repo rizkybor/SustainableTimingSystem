@@ -1756,6 +1756,7 @@ export default {
           : this.h2hBucketOptions[0].value;
 
       await this.fetchH2HBucketTeamsByKey(this.selectedH2HKey);
+      await this.tryLoadBracketFromDB();
     } else {
       // fallback: baca seluruh bucket H2H dari eventDetails (mode offline)
       this.loadAllH2HBucketsFromEvent();
@@ -1776,48 +1777,325 @@ export default {
   },
 
   methods: {
-      _parseTimeMs: function (t) {
-    if (!t) return Number.POSITIVE_INFINITY;
-    var parts = String(t).split(":");
-    var h = parseInt(parts[0] || "0", 10);
-    var m = parseInt(parts[1] || "0", 10);
-    var sPart = String(parts[2] || "0");
-    var s = parseInt(sPart.split(".")[0] || "0", 10);
-    var ms = parseInt(sPart.split(".")[1] || "0", 10);
-    return (((h * 60 + m) * 60) + s) * 1000 + ms;
-  },
+    scoreForRank(rank) {
+      if (!rank || !Number.isFinite(+rank)) return 0;
+      const s = this.getScoreByRanked ? this.getScoreByRanked(+rank) : null;
+      return Number.isFinite(+s) ? +s : 0;
+    },
+    _teamKey(name, bib) {
+      return String(name || "").toUpperCase() + "|" + String(bib || "");
+    },
+    _timeMsFromRow(row) {
+      // prioritas total, fallback race
+      const t = row && (row.total || row.race) ? row.total || row.race : "";
+      // kamu sudah punya _parseTimeMs; kalau mau pakai itu, ganti di sini
+      return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
+    },
+    buildOverallPlacingsFromLastRound() {
+      const rounds = this.rounds || [];
+      if (!rounds.length) return [];
 
-  sortRowsByRankThenTime: function (rows) {
-    if (!Array.isArray(rows)) return rows;
-    var copy = rows.slice(0);
-    copy.sort(function(a, b) {
-      var ra = a && a.ranked ? Number(a.ranked) : null;
-      var rb = b && b.ranked ? Number(b.ranked) : null;
+      const final = this.getFinalRound && this.getFinalRound();
+      const bronze = this.getBronzeRound && this.getBronzeRound();
 
-      var aHas = ra !== null && isFinite(ra) && ra > 0;
-      var bHas = rb !== null && isFinite(rb) && rb > 0;
+      const top4 = [];
+      const top4Keys = new Set();
 
-      if (aHas && bHas && ra !== rb) return ra - rb;
-      if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
+      const teamKey = (name, bib) =>
+        String(name || "").toUpperCase() + "|" + String(bib || "");
 
-      // tie-break pakai total time lalu race time
-      var ta = this._parseTimeMs(a && a.total ? a.total : a && a.race ? a.race : "");
-      var tb = this._parseTimeMs(b && b.total ? b.total : b && b.race ? b.race : "");
-      if (ta !== tb) return ta - tb;
+      const timeMsFromRow = (row) => {
+        const t = row && (row.total || row.race) ? row.total || row.race : "";
+        return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
+      };
 
-      // terakhir: No (jika ada)
-      var na = a && a.no ? Number(a.no) : Number.POSITIVE_INFINITY;
-      var nb = b && b.no ? Number(b.no) : Number.POSITIVE_INFINITY;
-      return na - nb;
-    }.bind(this));
+      // ---- Final A → #1 & #2
+      if (final && final.matches && final.matches[0]) {
+        const fm = final.matches[0];
+        const t1 = fm.team1 && fm.team1.name ? fm.team1.name : "";
+        const t2 = fm.team2 && fm.team2.name ? fm.team2.name : "";
 
-    // re-number kolom No setelah di-sort
-    for (var i = 0; i < copy.length; i++) {
-      copy[i].no = i + 1;
-    }
-    return copy;
-  },
+        const finalRows = this.buildRoundRows(final);
+        const findRow = (nm) =>
+          finalRows.find(
+            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
+          ) || null;
+
+        if (fm.winner && fm.winner.name) {
+          const winner = fm.winner.name;
+          const loser = (winner === t1 ? t2 : t1) || "";
+
+          const rwW = findRow(winner);
+          const rwL = findRow(loser);
+
+          const kW = teamKey(winner, rwW ? rwW.bib : "");
+          const kL = teamKey(loser, rwL ? rwL.bib : "");
+
+          if (winner) {
+            top4.push({
+              place: 1,
+              name: winner,
+              bib: rwW ? rwW.bib : "",
+              source: "FinalA",
+              timeMs: timeMsFromRow(rwW),
+            });
+            top4Keys.add(kW);
+          }
+          if (loser) {
+            top4.push({
+              place: 2,
+              name: loser,
+              bib: rwL ? rwL.bib : "",
+              source: "FinalA",
+              timeMs: timeMsFromRow(rwL),
+            });
+            top4Keys.add(kL);
+          }
+        }
+      }
+
+      // ---- Final B (Bronze) → #3 & #4
+      if (bronze && bronze.matches && bronze.matches[0]) {
+        const bm = bronze.matches[0];
+        const t1 = bm.team1 && bm.team1.name ? bm.team1.name : "";
+        const t2 = bm.team2 && bm.team2.name ? bm.team2.name : "";
+
+        const bronzeRows = this.buildRoundRows(bronze);
+        const findRow = (nm) =>
+          bronzeRows.find(
+            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
+          ) || null;
+
+        if (bm.winner && bm.winner.name) {
+          const winner = bm.winner.name; // #3
+          const loser = (winner === t1 ? t2 : t1) || ""; // #4
+
+          const rwW = findRow(winner);
+          const rwL = findRow(loser);
+
+          const kW = teamKey(winner, rwW ? rwW.bib : "");
+          const kL = teamKey(loser, rwL ? rwL.bib : "");
+
+          if (winner && !top4Keys.has(kW)) {
+            top4.push({
+              place: 3,
+              name: winner,
+              bib: rwW ? rwW.bib : "",
+              source: "FinalB",
+              timeMs: timeMsFromRow(rwW),
+            });
+            top4Keys.add(kW);
+          }
+          if (loser && !top4Keys.has(kL)) {
+            top4.push({
+              place: 4,
+              name: loser,
+              bib: rwL ? rwL.bib : "",
+              source: "FinalB",
+              timeMs: timeMsFromRow(rwL),
+            });
+            top4Keys.add(kL);
+          }
+        }
+      }
+
+      // ---- Tim lainnya: pakai LAST ROUND REACHED
+      const lastRowByTeam = new Map(); // key → { row, roundIdx, roundId, roundName }
+
+      for (let ri = 0; ri < rounds.length; ri++) {
+        const r = rounds[ri];
+        if (r && r.bronze) continue; // bronze sudah diambil untuk top4
+
+        const rows = this.buildRoundRows(r);
+        rows.forEach((row) => {
+          const key = teamKey(row.team, row.bib);
+          if (top4Keys.has(key)) return;
+
+          const prev = lastRowByTeam.get(key);
+          if (!prev || ri > prev.roundIdx) {
+            lastRowByTeam.set(key, {
+              row,
+              roundIdx: ri,
+              roundId: r.id,
+              roundName: r.name,
+            });
+          }
+        });
+      }
+
+      const others = Array.from(lastRowByTeam.values()).map((v) => ({
+        name: v.row.team,
+        bib: v.row.bib,
+        sourceRoundId: String(v.roundId),
+        sourceRoundName: v.roundName,
+        timeMs: timeMsFromRow(v.row),
+        roundIdx: v.roundIdx,
+      }));
+
+      // Urut “others”: waktu tercepat → duluan
+      others.sort((a, b) => {
+        const ta = Number.isFinite(a.timeMs)
+          ? a.timeMs
+          : Number.POSITIVE_INFINITY;
+        const tb = Number.isFinite(b.timeMs)
+          ? b.timeMs
+          : Number.POSITIVE_INFINITY;
+        if (ta !== tb) return ta - tb;
+        // (opsional) kalau mau: yang tersingkir di babak lebih akhir → lebih atas
+        // if (a.roundIdx !== b.roundIdx) return b.roundIdx - a.roundIdx;
+        return String(a.name).localeCompare(String(b.name));
+      });
+
+      // Gabungkan jadi overallRows + hitung score dari ranking final
+      const overall = [];
+
+      // 1..4 (top4)
+      top4
+        .sort((a, b) => a.place - b.place)
+        .forEach((x) => {
+          overall.push({
+            ranked: x.place,
+            name: x.name,
+            bib: x.bib,
+            score: this.scoreForRank(x.place), // ← skor dari this.dataScore
+            _source: x.source,
+          });
+        });
+
+      // 5..N (others)
+      let rank = 5;
+      others.forEach((o) => {
+        overall.push({
+          ranked: rank,
+          name: o.name,
+          bib: o.bib,
+          score: this.scoreForRank(rank), // ← skor dari this.dataScore
+          _source: o.sourceRoundName,
+        });
+        rank++;
+      });
+
+      return overall;
+    },
+    // ---- BRACKET SAVE/LOAD ----
+    _currentBucketOrThrow() {
+      const b = getBucket();
+      const must = ["eventId", "initialId", "raceId", "divisionId"];
+      const miss = must.filter((k) => !b[k]);
+      if (miss.length) throw new Error("Missing bucket: " + miss.join(", "));
+      return b;
+    },
+
+    buildBracketDoc() {
+      const bucket = this._currentBucketOrThrow();
+      return {
+        bucket: {
+          eventId: bucket.eventId,
+          initialId: bucket.initialId,
+          raceId: bucket.raceId,
+          divisionId: bucket.divisionId,
+          eventName: "HEAD2HEAD",
+          initialName: bucket.initialName,
+          raceName: bucket.raceName,
+          divisionName: bucket.divisionName,
+        },
+        rounds: (this.rounds || []).map((r) => JSON.parse(JSON.stringify(r))),
+        showBronze: !!this.showBronze,
+        settings: { booyanActive: { ...this.booyanActive } },
+      };
+    },
+
+    async saveBracketToDB() {
+      try {
+        const payload = this.buildBracketDoc();
+        ipcRenderer.send("h2h:bracket:save", payload);
+        ipcRenderer.once("h2h:bracket:save-reply", (_e, res) => {
+          if (res && res.ok) {
+            this.notify("success", "Bracket tersimpan.", "Saved");
+          } else {
+            this.notify("error", (res && res.error) || "Save failed", "Failed");
+          }
+        });
+      } catch (err) {
+        this.notify("error", String(err), "Failed");
+      }
+    },
+
+    async tryLoadBracketFromDB() {
+      const bucket = this._currentBucketOrThrow();
+      return new Promise((resolve) => {
+        ipcRenderer.send("h2h:bracket:get", bucket);
+        ipcRenderer.once("h2h:bracket:get-reply", (_e, res) => {
+          if (res && res.ok && res.item && Array.isArray(res.item.rounds)) {
+            // pakai bracket dari DB
+            this.rounds = res.item.rounds;
+            this.showBronze = !!res.item.showBronze;
+            // optional restore settings
+            if (res.item.settings && res.item.settings.booyanActive) {
+              this.booyanActive = { ...res.item.settings.booyanActive };
+            }
+            // set currentRoundIndex ke ronde kompetitif paling awal
+            this.currentRoundIndex = this.firstRoundIndex;
+            this.computePodium();
+            this.syncWinLoseFromBracketToParticipants();
+            this.persistRoundResults();
+            seedGlobalHeatFromList(this.visibleParticipants, { reset: true });
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        });
+      });
+    },
+
+    _parseTimeMs: function (t) {
+      if (!t) return Number.POSITIVE_INFINITY;
+      var parts = String(t).split(":");
+      var h = parseInt(parts[0] || "0", 10);
+      var m = parseInt(parts[1] || "0", 10);
+      var sPart = String(parts[2] || "0");
+      var s = parseInt(sPart.split(".")[0] || "0", 10);
+      var ms = parseInt(sPart.split(".")[1] || "0", 10);
+      return ((h * 60 + m) * 60 + s) * 1000 + ms;
+    },
+
+    sortRowsByRankThenTime: function (rows) {
+      if (!Array.isArray(rows)) return rows;
+      var copy = rows.slice(0);
+      copy.sort(
+        function (a, b) {
+          var ra = a && a.ranked ? Number(a.ranked) : null;
+          var rb = b && b.ranked ? Number(b.ranked) : null;
+
+          var aHas = ra !== null && isFinite(ra) && ra > 0;
+          var bHas = rb !== null && isFinite(rb) && rb > 0;
+
+          if (aHas && bHas && ra !== rb) return ra - rb;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+
+          // tie-break pakai total time lalu race time
+          var ta = this._parseTimeMs(
+            a && a.total ? a.total : a && a.race ? a.race : ""
+          );
+          var tb = this._parseTimeMs(
+            b && b.total ? b.total : b && b.race ? b.race : ""
+          );
+          if (ta !== tb) return ta - tb;
+
+          // terakhir: No (jika ada)
+          var na = a && a.no ? Number(a.no) : Number.POSITIVE_INFINITY;
+          var nb = b && b.no ? Number(b.no) : Number.POSITIVE_INFINITY;
+          return na - nb;
+        }.bind(this)
+      );
+
+      // re-number kolom No setelah di-sort
+      for (var i = 0; i < copy.length; i++) {
+        copy[i].no = i + 1;
+      }
+      return copy;
+    },
     getOverallPackage() {
       return this.buildOverallPackage();
     },
@@ -1877,58 +2155,179 @@ export default {
       return result;
     },
 
-    // === Build Overall Accumulation ===
+    // // === Build Overall Accumulation ===
+    // buildOverallAccumulation: function () {
+    //   var roundsPkg = this.buildAllRoundsPackage();
+    //   var acc = {};
+
+    //   var i = 0;
+    //   while (i < roundsPkg.length) {
+    //     var R = roundsPkg[i];
+    //     if (R.rows && Array.isArray(R.rows)) {
+    //       var j = 0;
+    //       while (j < R.rows.length) {
+    //         var row = R.rows[j];
+    //         var name = row.team;
+    //         var bib = row.bib;
+    //         var ranked = row.ranked;
+    //         var totalOrRace = row.total ? row.total : row.race;
+    //         var key = String(name).toUpperCase() + "|" + String(bib);
+
+    //         if (!acc[key]) {
+    //           acc[key] = {
+    //             name: name,
+    //             bib: bib,
+    //             score: 0,
+    //             bestRank: 999,
+    //             bestTimeMs: null,
+    //           };
+    //         }
+
+    //         var ref = acc[key];
+    //         var rankNum = parseInt(ranked);
+    //         if (!isNaN(rankNum)) {
+    //           var s = this.getScoreByRanked(rankNum);
+    //           if (isNaN(s)) s = 0;
+    //           ref.score = ref.score + s;
+    //           if (rankNum < ref.bestRank) {
+    //             ref.bestRank = rankNum;
+    //           }
+    //         }
+
+    //         var T = this.parsesTime(totalOrRace ? totalOrRace : "");
+    //         if (isFinite(T)) {
+    //           if (ref.bestTimeMs === null || T < ref.bestTimeMs) {
+    //             ref.bestTimeMs = T;
+    //           }
+    //         }
+
+    //         j = j + 1;
+    //       }
+    //     }
+    //     i = i + 1;
+    //   }
+
+    //   var arr = [];
+    //   for (var key in acc) {
+    //     if (Object.prototype.hasOwnProperty.call(acc, key)) {
+    //       var v = acc[key];
+    //       arr.push({
+    //         name: v.name,
+    //         bib: v.bib,
+    //         score: v.score,
+    //         bestRank: v.bestRank,
+    //         bestTimeMs: v.bestTimeMs,
+    //       });
+    //     }
+    //   }
+
+    //   arr.sort(function (a, b) {
+    //     if (a.score !== b.score) return b.score - a.score;
+    //     if (a.bestRank !== b.bestRank) return a.bestRank - b.bestRank;
+    //     if ((a.bestTimeMs || 0) !== (b.bestTimeMs || 0))
+    //       return (a.bestTimeMs || 0) - (b.bestTimeMs || 0);
+    //     return String(a.name).localeCompare(String(b.name));
+    //   });
+
+    //   var k = 0;
+    //   while (k < arr.length) {
+    //     arr[k].ranked = k + 1;
+    //     k = k + 1;
+    //   }
+
+    //   var result = [];
+    //   var n = 0;
+    //   while (n < arr.length) {
+    //     var r = arr[n];
+    //     result.push({
+    //       ranked: r.ranked,
+    //       name: r.name,
+    //       bib: r.bib,
+    //       score: r.score,
+    //     });
+    //     n = n + 1;
+    //   }
+
+    //   return result;
+    // },
+    // =======================================================
+    // === Fungsi: buildOverallAccumulation()
+    // === Tujuan: Menghitung hasil akumulasi (overall result)
+    // ===          dari seluruh babak Head-to-Head / Slalom.
+    // === Menghasilkan daftar akhir tim (ranking, skor, dst)
+    // =======================================================
     buildOverallAccumulation: function () {
+      // Ambil semua paket babak yang sudah dibangun sebelumnya
+      // (biasanya berisi data tiap round: R1, R2, Final A, Final B, dst.)
       var roundsPkg = this.buildAllRoundsPackage();
+
+      // Objek untuk menyimpan akumulasi per tim
       var acc = {};
 
+      // Loop setiap babak
       var i = 0;
       while (i < roundsPkg.length) {
         var R = roundsPkg[i];
+
+        // Cek apakah babak punya data rows (tim yang ikut)
         if (R.rows && Array.isArray(R.rows)) {
           var j = 0;
+
+          // Loop setiap tim di babak tersebut
           while (j < R.rows.length) {
             var row = R.rows[j];
-            var name = row.team;
-            var bib = row.bib;
-            var ranked = row.ranked;
-            var totalOrRace = row.total ? row.total : row.race;
-            var key = String(name).toUpperCase() + "|" + String(bib);
+            var name = row.team; // Nama tim
+            var bib = row.bib; // Nomor BIB tim
+            var ranked = row.ranked; // Peringkat di babak itu
+            var totalOrRace = row.total ? row.total : row.race; // Waktu hasil
+            var key = String(name).toUpperCase() + "|" + String(bib); // Key unik tim
 
+            // --- Jika tim belum ada di daftar akumulasi, buat entri baru ---
             if (!acc[key]) {
               acc[key] = {
                 name: name,
                 bib: bib,
-                score: 0,
-                bestRank: 999,
-                bestTimeMs: null,
+                score: 0, // total skor kumulatif
+                bestRank: 999, // peringkat terbaik (angka kecil = lebih bagus)
+                bestTimeMs: null, // waktu tercepat (dalam ms)
               };
             }
 
-            var ref = acc[key];
+            var ref = acc[key]; // pointer ke entri tim ini
+
+            // --- Hitung skor berdasarkan ranking di babak ini ---
             var rankNum = parseInt(ranked);
             if (!isNaN(rankNum)) {
+              // Ambil skor dari fungsi internal getScoreByRanked()
+              // contoh: Rank 1 → 100pts, Rank 2 → 80pts, dst.
               var s = this.getScoreByRanked(rankNum);
               if (isNaN(s)) s = 0;
+
+              // Tambahkan skor ke total
               ref.score = ref.score + s;
+
+              // Jika peringkat sekarang lebih bagus (lebih kecil), simpan sebagai bestRank
               if (rankNum < ref.bestRank) {
                 ref.bestRank = rankNum;
               }
             }
 
+            // --- Cek waktu terbaik ---
             var T = this.parsesTime(totalOrRace ? totalOrRace : "");
             if (isFinite(T)) {
+              // Simpan waktu tercepat (paling kecil)
               if (ref.bestTimeMs === null || T < ref.bestTimeMs) {
                 ref.bestTimeMs = T;
               }
             }
 
-            j = j + 1;
+            j = j + 1; // lanjut tim berikutnya
           }
         }
-        i = i + 1;
+        i = i + 1; // lanjut ke babak berikutnya
       }
 
+      // --- Konversi hasil akumulasi (object) menjadi array ---
       var arr = [];
       for (var key in acc) {
         if (Object.prototype.hasOwnProperty.call(acc, key)) {
@@ -1943,20 +2342,30 @@ export default {
         }
       }
 
+      // --- Urutkan hasil akhir ---
       arr.sort(function (a, b) {
+        // 1️⃣ Skor tertinggi di atas
         if (a.score !== b.score) return b.score - a.score;
+
+        // 2️⃣ Jika skor sama → lihat peringkat terbaik (semakin kecil semakin baik)
         if (a.bestRank !== b.bestRank) return a.bestRank - b.bestRank;
+
+        // 3️⃣ Jika masih sama → waktu terbaik (lebih kecil lebih baik)
         if ((a.bestTimeMs || 0) !== (b.bestTimeMs || 0))
           return (a.bestTimeMs || 0) - (b.bestTimeMs || 0);
+
+        // 4️⃣ Jika masih sama → urut alfabet nama tim
         return String(a.name).localeCompare(String(b.name));
       });
 
+      // --- Tambahkan properti ranked (posisi urutan akhir) ---
       var k = 0;
       while (k < arr.length) {
-        arr[k].ranked = k + 1;
+        arr[k].ranked = k + 1; // urutan ke-1, ke-2, dst.
         k = k + 1;
       }
 
+      // --- Buat hasil akhir (output ringan) ---
       var result = [];
       var n = 0;
       while (n < arr.length) {
@@ -1970,50 +2379,81 @@ export default {
         n = n + 1;
       }
 
+      // --- Kembalikan array hasil akhir ---
       return result;
     },
 
     // === Build Overall Package (gabungan podium + akumulasi) ===
+    // buildOverallPackage: function () {
+    //   var placements = [];
+
+    //   if (this.podium && this.podium.gold) {
+    //     placements.push({ place: 1, team: this.podium.gold });
+    //   }
+    //   if (this.podium && this.podium.silver) {
+    //     placements.push({ place: 2, team: this.podium.silver });
+    //   }
+    //   if (this.podium && this.podium.bronze) {
+    //     placements.push({ place: 3, team: this.podium.bronze });
+    //   }
+    //   if (this.podium && this.podium.fourth) {
+    //     placements.push({ place: 4, team: this.podium.fourth });
+    //   }
+
+    //   var final = null;
+    //   if (this.getFinalRound) {
+    //     final = this.getFinalRound();
+    //   }
+    //   var finalRows = [];
+    //   if (final) {
+    //     finalRows = this.buildRoundRows(final);
+    //   }
+
+    //   var overallRows = this.buildOverallAccumulation();
+    //   var rounds = this.buildAllRoundsPackage();
+
+    //   var result = {
+    //     event:
+    //       this.dataEventSafe && this.dataEventSafe.eventName
+    //         ? this.dataEventSafe.eventName
+    //         : "",
+    //     category: this.titleCategories ? this.titleCategories : "",
+    //     placements: placements,
+    //     finalRows: finalRows,
+    //     rounds: rounds,
+    //     overallRows: overallRows,
+    //   };
+    //   return result;
+    // },
     buildOverallPackage: function () {
-      var placements = [];
-
-      if (this.podium && this.podium.gold) {
+      const placements = [];
+      if (this.podium && this.podium.gold)
         placements.push({ place: 1, team: this.podium.gold });
-      }
-      if (this.podium && this.podium.silver) {
+      if (this.podium && this.podium.silver)
         placements.push({ place: 2, team: this.podium.silver });
-      }
-      if (this.podium && this.podium.bronze) {
+      if (this.podium && this.podium.bronze)
         placements.push({ place: 3, team: this.podium.bronze });
-      }
-      if (this.podium && this.podium.fourth) {
+      if (this.podium && this.podium.fourth)
         placements.push({ place: 4, team: this.podium.fourth });
-      }
 
-      var final = null;
-      if (this.getFinalRound) {
-        final = this.getFinalRound();
-      }
-      var finalRows = [];
-      if (final) {
-        finalRows = this.buildRoundRows(final);
-      }
+      const final = this.getFinalRound ? this.getFinalRound() : null;
+      const finalRows = final ? this.buildRoundRows(final) : [];
 
-      var overallRows = this.buildOverallAccumulation();
-      var rounds = this.buildAllRoundsPackage();
+      const overallRows = this.buildOverallPlacingsFromLastRound(); // ← sudah ada score
 
-      var result = {
+      const rounds = this.buildAllRoundsPackage();
+
+      return {
         event:
           this.dataEventSafe && this.dataEventSafe.eventName
             ? this.dataEventSafe.eventName
             : "",
-        category: this.titleCategories ? this.titleCategories : "",
-        placements: placements,
-        finalRows: finalRows,
-        rounds: rounds,
-        overallRows: overallRows,
+        category: this.titleCategories || "",
+        placements,
+        finalRows,
+        rounds,
+        overallRows,
       };
-      return result;
     },
 
     // util: sortir rows mengikuti urutan bracket + BYE di bawah
@@ -2069,7 +2509,7 @@ export default {
       if (!r) return;
 
       var rows = this.buildRoundRows(r);
-        // rows = this.sortRowsByRankThenTime(rows);
+      // rows = this.sortRowsByRankThenTime(rows);
       rows = this.sortRowsByBracketAndBye(rows, r);
 
       this.pdfMode = "round";
@@ -2184,231 +2624,60 @@ export default {
       }
     },
 
-    saveCurrentRoundToDB: function () {
-      var r = this.currentRound;
-      if (!r) {
-        return;
-      }
+    async saveCurrentRoundToDB() {
+      const r = this.currentRound;
+      if (!r)
+        return this.notify("warning", "Tidak ada babak aktif.", "Save Round");
 
-      var bucket = getBucket();
-      var required = ["eventId", "initialId", "raceId", "divisionId"];
-      var missing = [];
-      var i = 0;
-      while (i < required.length) {
-        var k = required[i];
-        if (!bucket[k]) {
-          missing.push(k);
-        }
-        i = i + 1;
-      }
-      if (missing.length > 0) {
-        this.notify("error", "Missing fields: " + missing.join(", "), "Failed");
-        return;
-      }
+      const bucket = this._currentBucketOrThrow();
 
-      var rows = this.buildRoundRows(r);
-      if (!rows || rows.length === 0) {
-        this.notify("warning", "Tidak ada data round ini.", "Save Round");
-        return;
-      }
+      const rows = this.buildRoundRows(r); // sudah kamu punya
+      if (!rows || !rows.length)
+        return this.notify(
+          "warning",
+          "Tidak ada data round ini.",
+          "Save Round"
+        );
 
-      var docs = [];
-      var j = 0;
-      while (j < rows.length) {
-        var row = rows[j];
-
-        var payloadArr = [];
-        var roundName = r && r.bronze ? "Final B" : r ? r.name : "";
-
-        var one = {
-          nameTeam: row.team,
-          bibTeam: row.bib,
-          result: {
-            startTime: row.start,
-            finishTime: row.finish,
-            raceTime: row.race,
-            penaltyTime: row.penaltyTime,
-            penalty: row.penaltySum,
-            totalTime: row.total,
-            ranked: row.ranked,
-            winLose: row.winLose,
-            heat: row.heat,
-            _roundId: String(r.id),
-            _roundName: roundName,
-          },
-        };
-        payloadArr.push(one);
-
-        var built = buildResultDocs(payloadArr, bucket);
-        var firstDoc = null;
-        if (built && built.length > 0) {
-          firstDoc = built[0];
-        }
-        if (firstDoc) {
-          docs.push(firstDoc);
-        }
-
-        j = j + 1;
-      }
-
-      console.log(docs, "<< cek docs");
-
-      // -- kirim ke DB (aktifkan bila siap) --
-      // if (typeof ipcRenderer !== "undefined") {
-      //   ipcRenderer.send("insert-h2h-result", docs);
-      //   var self = this;
-      //   ipcRenderer.once("insert-h2h-result-reply", function (_e, res) {
-      //     if (res && res.ok) {
-      //       self.notify("success", "Hasil round tersimpan.", "Saved");
-      //     } else {
-      //       var errMsg = (res && res.error) ? res.error : "Save failed";
-      //       self.notify("error", errMsg, "Failed");
-      //     }
-      //   });
-      // }
+      ipcRenderer.send("h2h:round:save", {
+        bucket,
+        roundId: String(r.id),
+        roundName: r.bronze ? "Final B" : r.name,
+        rows,
+      });
+      ipcRenderer.once("h2h:round:save-reply", (_e, res) => {
+        if (res && res.ok)
+          this.notify("success", "Hasil round tersimpan.", "Saved");
+        else
+          this.notify("error", (res && res.error) || "Save failed", "Failed");
+      });
+      this.saveBracketToDB();
     },
 
-    saveAllRoundToDB: function () {
-      var pkgRounds = this.buildAllRoundsPackage();
-      var bucket = getBucket();
-      var required = ["eventId", "initialId", "raceId", "divisionId"];
-      var missing = [];
-      var i = 0;
-      while (i < required.length) {
-        var k = required[i];
-        if (!bucket[k]) missing.push(k);
-        i = i + 1;
-      }
-      if (missing.length > 0) {
-        this.notify("error", "Missing fields: " + missing.join(", "), "Failed");
-        return;
-      }
+    async saveAllRoundToDB() {
+      const bucket = this._currentBucketOrThrow();
+      const roundsSheets = this.buildAllRoundsPackage(); // kamu sudah buat
 
-      var docs = [];
-      var r = 0;
-      while (r < pkgRounds.length) {
-        var R = pkgRounds[r];
-        var j = 0;
-        while (j < R.rows.length) {
-          var row = R.rows[j];
-          var payloadArr = [
-            {
-              nameTeam: row.team,
-              bibTeam: row.bib,
-              result: {
-                raceTime: row.race,
-                penaltyTime: row.penaltyTime,
-                totalTime: row.total,
-                ranked: row.ranked,
-                winLose: row.winLose,
-                heat: row.heat,
-                _roundId: R.roundId,
-                _roundName: R.roundName,
-              },
-            },
-          ];
-          var built = buildResultDocs(payloadArr, bucket);
-          if (built && built.length > 0) {
-            docs.push(built[0]);
-          }
-          j = j + 1;
-        }
-        r = r + 1;
-      }
-
-      console.log(docs, "<< cek docs all round");
-      // ipcRenderer.send("insert-h2h-result", docs);
-      // var self = this;
-      // ipcRenderer.once("insert-h2h-result-reply", function (_e, res) {
-      //   if (res && res.ok) {
-      //     self.notify("success", "Semua round tersimpan.", "Saved");
-      //   } else {
-      //     var errMsg = (res && res.error) ? res.error : "Save failed";
-      //     self.notify("error", errMsg, "Failed");
-      //   }
-      // });
+      ipcRenderer.send("h2h:rounds:saveMany", { bucket, roundsSheets });
+      ipcRenderer.once("h2h:rounds:saveMany-reply", (_e, res) => {
+        if (res && res.ok)
+          this.notify("success", "Semua round tersimpan.", "Saved");
+        else
+          this.notify("error", (res && res.error) || "Save failed", "Failed");
+      });
     },
 
-    saveOverallToDB: function () {
-      var pkg = this.buildOverallPackage();
-      var bucket = getBucket();
+    async saveOverallToDB() {
+      const bucket = this._currentBucketOrThrow();
+      const overallPkg = this.buildOverallPackage(); // kamu sudah buat
 
-      var required = ["eventId", "initialId", "raceId", "divisionId"];
-      var missing = [];
-      var i = 0;
-      while (i < required.length) {
-        var k = required[i];
-        if (!bucket[k]) {
-          missing.push(k);
-        }
-        i = i + 1;
-      }
-      if (missing.length > 0) {
-        this.notify("error", "Missing fields: " + missing.join(", "), "Failed");
-        return;
-      }
-
-      var placements = [];
-      if (pkg && pkg.placements && Array.isArray(pkg.placements)) {
-        var p = 0;
-        while (p < pkg.placements.length) {
-          placements.push(pkg.placements[p]);
-          p = p + 1;
-        }
-      }
-
-      var emptyArr = [];
-      var built = buildResultDocs(emptyArr, bucket);
-      var overallDoc = null;
-
-      // kalau buildResultDocs butuh minimal satu item, buat satu objek kosong
-      if (!built || built.length === 0) {
-        var tempArr = [{}];
-        built = buildResultDocs(tempArr, bucket);
-      }
-      if (built && built.length > 0) {
-        overallDoc = built[0];
-      } else {
-        // gagal membuat dokumen dasar
-        this.notify("error", "Gagal membentuk dokumen overall.", "Failed");
-        return;
-      }
-
-      var eventNameVal = "";
-      if (bucket && bucket.eventName) {
-        eventNameVal = bucket.eventName;
-      }
-
-      var categoryVal = "";
-      if (this.titleCategories) {
-        categoryVal = this.titleCategories;
-      }
-
-      var nowIso = new Date().toISOString();
-
-      overallDoc.result = {};
-      overallDoc.result._type = "OVERALL_H2H";
-      overallDoc.result.placements = placements;
-      overallDoc.result.eventName = eventNameVal;
-      overallDoc.result.category = categoryVal;
-      overallDoc.result.savedAt = nowIso;
-
-      var outArr = [overallDoc];
-      console.log(outArr, "<< cek docs");
-
-      // -- kirim ke DB (aktifkan bila siap) --
-      // if (typeof ipcRenderer !== "undefined") {
-      //   ipcRenderer.send("insert-h2h-result", outArr);
-      //   var self = this;
-      //   ipcRenderer.once("insert-h2h-result-reply", function (_e, res) {
-      //     if (res && res.ok) {
-      //       self.notify("success", "Overall tersimpan.", "Saved");
-      //     } else {
-      //       var errMsg = (res && res.error) ? res.error : "Save failed";
-      //       self.notify("error", errMsg, "Failed");
-      //     }
-      //   });
-      // }
+      ipcRenderer.send("h2h:overall:save", { bucket, overallPkg });
+      ipcRenderer.once("h2h:overall:save-reply", (_e, res) => {
+        if (res && res.ok)
+          this.notify("success", "Overall tersimpan.", "Saved");
+        else
+          this.notify("error", (res && res.error) || "Save failed", "Failed");
+      });
     },
     // === SERIAL CONNECTION ===
     async connectPort() {

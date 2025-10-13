@@ -224,7 +224,7 @@
               <Icon icon="icon-park-outline:save" /> Preview JSON
             </button> -->
 
-              <button
+            <button
               type="button"
               class="btn-action btn-secondary"
               @click="fetchEventResultsAggregate"
@@ -380,7 +380,11 @@
 
                   <!-- SCORED  -->
                   <td class="text-center large-bold">
-                    {{ getScoreByRanked(item.result.ranked) }}
+                    {{
+                      item.result.ranked
+                        ? getScoreByRanked(item.result.ranked)
+                        : ""
+                    }}
                   </td>
                   <td v-if="endGame">
                     <button
@@ -410,7 +414,7 @@
       </div>
     </div>
 
-     <!-- MODAL KOMPONEN -->
+    <!-- MODAL KOMPONEN -->
     <PrintOverallModal
       centered
       :dataEvent="dataEventSafe"
@@ -428,7 +432,6 @@ import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
-
 import { getSocket } from "@/services/socket";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
@@ -438,6 +441,7 @@ import {
   mergeTeamsWithCache,
   debounce,
 } from "@/utils/localStoreSprint";
+import tone from "../../../assets/tone/tone_message.mp3";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -608,15 +612,20 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, EmptyCard, PrintOverallModal, Icon },
-
+  components: { OperationTimePanel, EmptyCard, PrintOverallModal, tone, Icon },
   data() {
     return {
-       showOverallModal: false,
-    dataAggregate: {
-      header: { title: "", subTitle: "", dateStr: "", official: false, chiefJudge: "" },
-      rows: []
-    },
+      showOverallModal: false,
+      dataAggregate: {
+        header: {
+          title: "",
+          subTitle: "",
+          dateStr: "",
+          official: false,
+          chiefJudge: "",
+        },
+        rows: [],
+      },
       isLoading: false,
       defaultImg,
       sprintBucketOptions: [],
@@ -770,6 +779,7 @@ export default {
   },
 
   async mounted() {
+    var audio = new Audio(tone);
     const socket = getSocket();
 
     const onConnect = () => {
@@ -789,6 +799,7 @@ export default {
 
       // tampilkan toast (opsional)
       if (this.$bvToast) {
+        audio.play();
         this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
           title: "Pesan Realtime",
           variant: "success",
@@ -854,136 +865,161 @@ export default {
 
   methods: {
     // ===== AGG BUILDER (safe, no optional chaining)
-  buildAggregateFromDoc: function (doc, dataEventSafe) {
-    var headerTitle = "";
-    if (doc && typeof doc.eventName === "string") headerTitle = doc.eventName;
-    if (!headerTitle && dataEventSafe && typeof dataEventSafe.eventName === "string") {
-      headerTitle = dataEventSafe.eventName;
-    }
-
-    var sub = "";
-    if (doc && typeof doc.divisionName === "string" && doc.divisionName) {
-      sub = String(doc.divisionName);
-    }
-    if (doc && typeof doc.initialName === "string" && doc.initialName) {
-      sub = sub ? sub + " • " + String(doc.initialName) : String(doc.initialName);
-    }
-
-    var d = new Date();
-    var dateStr = d.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
-    var chief = "";
-    if (dataEventSafe && typeof dataEventSafe.chiefJudge === "string") {
-      chief = dataEventSafe.chiefJudge;
-    }
-
-    var header = {
-      title: headerTitle || "—",
-      subTitle: sub || "—",
-      dateStr: dateStr,
-      official: false,
-      chiefJudge: chief || ""
-    };
-
-    // rows
-    var rows = [];
-    var arr = (doc && Array.isArray(doc.eventResult)) ? doc.eventResult : [];
-    for (var i = 0; i < arr.length; i++) {
-      var t = arr[i] || {};
-
-      var teamName = (t && typeof t.teamName === "string") ? t.teamName : "";
-      var bib = (t && typeof t.bib === "string") ? t.bib : "";
-      var cats = (t && Array.isArray(t.categories)) ? t.categories : [];
-
-      // default nilai
-      var sprintScore = 0, sprintRank = 0;
-      var h2hScore = 0, h2hRank = 0;
-      var slalomScore = 0, slalomRank = 0;
-      var drrScore = 0, drrRank = 0;
-
-      for (var j = 0; j < cats.length; j++) {
-        var c = cats[j] || {};
-        var nm = (c && typeof c.name === "string") ? c.name.toUpperCase() : "";
-        var sc = 0;
-        var rk = 0;
-
-        if (c && c.scored != null) {
-          sc = Number(c.scored);
-          if (!Number.isFinite(sc)) sc = Number(c.scored) || 0;
-        }
-        if (c && c.rankedByCats != null) {
-          rk = Number(c.rankedByCats);
-          if (!Number.isFinite(rk)) rk = Number(c.rankedByCats) || 0;
-        }
-
-        if (nm === "SPRINT") { sprintScore = sc; sprintRank = rk; }
-        else if (nm === "HEADTOHEAD" || nm === "HEAD TO HEAD" || nm === "H2H") { h2hScore = sc; h2hRank = rk; }
-        else if (nm === "SLALOM") { slalomScore = sc; slalomRank = rk; }
-        else if (nm === "DRR" || nm === "DOWN RIVER RACE") { drrScore = sc; drrRank = rk; }
+    buildAggregateFromDoc: function (doc, dataEventSafe) {
+      var headerTitle = "";
+      if (doc && typeof doc.eventName === "string") headerTitle = doc.eventName;
+      if (
+        !headerTitle &&
+        dataEventSafe &&
+        typeof dataEventSafe.eventName === "string"
+      ) {
+        headerTitle = dataEventSafe.eventName;
       }
 
-      var totalScore = 0;
-      if (t && t.totalScore != null) {
-        totalScore = Number(t.totalScore);
-        if (!Number.isFinite(totalScore)) totalScore = Number(t.totalScore) || 0;
-      } else {
-        totalScore = sprintScore + h2hScore + slalomScore + drrScore;
+      var sub = "";
+      if (doc && typeof doc.divisionName === "string" && doc.divisionName) {
+        sub = String(doc.divisionName);
+      }
+      if (doc && typeof doc.initialName === "string" && doc.initialName) {
+        sub = sub
+          ? sub + " • " + String(doc.initialName)
+          : String(doc.initialName);
       }
 
-      rows.push({
-        no: i + 1,
-        teamName: teamName,
-        bib: bib,
-        sprintScore: sprintScore,
-        sprintRank: sprintRank,
-        h2hScore: h2hScore,
-        h2hRank: h2hRank,
-        slalomScore: slalomScore,
-        slalomRank: slalomRank,
-        drrScore: drrScore,
-        drrRank: drrRank,
-        totalScore: totalScore
+      var d = new Date();
+      var dateStr = d.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
       });
-    }
 
-    // urutkan totalScore desc, lalu refresh nomor
-    rows.sort(function (a, b) { return b.totalScore - a.totalScore; });
-    for (var k = 0; k < rows.length; k++) rows[k].no = k + 1;
+      var chief = "";
+      if (dataEventSafe && typeof dataEventSafe.chiefJudge === "string") {
+        chief = dataEventSafe.chiefJudge;
+      }
 
-    return { header: header, rows: rows };
-  },
+      var header = {
+        title: headerTitle || "—",
+        subTitle: sub || "—",
+        dateStr: dateStr,
+        official: false,
+        chiefJudge: chief || "",
+      };
 
-  // ===== FETCH (pakai eventId + initialId + divisionId)
-  fetchEventResultsAggregate: function () {
-    var bucket = getBucket();
-    var f = {
-      eventId: bucket.eventId,
-      initialId: bucket.initialId,
-      divisionId: bucket.divisionId
-    };
-    console.log(f,'<< tes')
-    var self = this;
-    ipcRenderer.send("event-results:get", f);
-    ipcRenderer.once("event-results:get-reply", function (_e, res) {
-      console.log(res,'<<< cek')
-      if (res && res.ok && res.doc) {
-        var agg = self.buildAggregateFromDoc(res.doc, self.dataEventSafe);
-        self.dataAggregate = agg;
-        self.showOverallModal = true;
-      } else {
-        var det = (res && res.error) ? res.error : "Tidak ada data aggregate.";
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          message: "Load Overall",
-          detail: det
+      // rows
+      var rows = [];
+      var arr = doc && Array.isArray(doc.eventResult) ? doc.eventResult : [];
+      for (var i = 0; i < arr.length; i++) {
+        var t = arr[i] || {};
+
+        var teamName = t && typeof t.teamName === "string" ? t.teamName : "";
+        var bib = t && typeof t.bib === "string" ? t.bib : "";
+        var cats = t && Array.isArray(t.categories) ? t.categories : [];
+
+        // default nilai
+        var sprintScore = 0,
+          sprintRank = 0;
+        var h2hScore = 0,
+          h2hRank = 0;
+        var slalomScore = 0,
+          slalomRank = 0;
+        var drrScore = 0,
+          drrRank = 0;
+
+        for (var j = 0; j < cats.length; j++) {
+          var c = cats[j] || {};
+          var nm = c && typeof c.name === "string" ? c.name.toUpperCase() : "";
+          var sc = 0;
+          var rk = 0;
+
+          if (c && c.scored != null) {
+            sc = Number(c.scored);
+            if (!Number.isFinite(sc)) sc = Number(c.scored) || 0;
+          }
+          if (c && c.rankedByCats != null) {
+            rk = Number(c.rankedByCats);
+            if (!Number.isFinite(rk)) rk = Number(c.rankedByCats) || 0;
+          }
+
+          if (nm === "SPRINT") {
+            sprintScore = sc;
+            sprintRank = rk;
+          } else if (
+            nm === "HEADTOHEAD" ||
+            nm === "HEAD TO HEAD" ||
+            nm === "H2H"
+          ) {
+            h2hScore = sc;
+            h2hRank = rk;
+          } else if (nm === "SLALOM") {
+            slalomScore = sc;
+            slalomRank = rk;
+          } else if (nm === "DRR" || nm === "DOWN RIVER RACE") {
+            drrScore = sc;
+            drrRank = rk;
+          }
+        }
+
+        var totalScore = 0;
+        if (t && t.totalScore != null) {
+          totalScore = Number(t.totalScore);
+          if (!Number.isFinite(totalScore))
+            totalScore = Number(t.totalScore) || 0;
+        } else {
+          totalScore = sprintScore + h2hScore + slalomScore + drrScore;
+        }
+
+        rows.push({
+          no: i + 1,
+          teamName: teamName,
+          bib: bib,
+          sprintScore: sprintScore,
+          sprintRank: sprintRank,
+          h2hScore: h2hScore,
+          h2hRank: h2hRank,
+          slalomScore: slalomScore,
+          slalomRank: slalomRank,
+          drrScore: drrScore,
+          drrRank: drrRank,
+          totalScore: totalScore,
         });
       }
-    });
-  },
+
+      // urutkan totalScore desc, lalu refresh nomor
+      rows.sort(function (a, b) {
+        return b.totalScore - a.totalScore;
+      });
+      for (var k = 0; k < rows.length; k++) rows[k].no = k + 1;
+
+      return { header: header, rows: rows };
+    },
+
+    // ===== FETCH (pakai eventId + initialId + divisionId)
+    fetchEventResultsAggregate: function () {
+      var bucket = getBucket();
+      var f = {
+        eventId: bucket.eventId,
+        initialId: bucket.initialId,
+        divisionId: bucket.divisionId,
+        raceId: bucket.raceId,
+      };
+      var self = this;
+      ipcRenderer.send("event-results:get", f);
+      ipcRenderer.once("event-results:get-reply", function (_e, res) {
+        if (res && res.ok && res.doc) {
+          var agg = self.buildAggregateFromDoc(res.doc, self.dataEventSafe);
+          self.dataAggregate = agg;
+          self.showOverallModal = true;
+        } else {
+          var det = res && res.error ? res.error : "Tidak ada data aggregate.";
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Load Overall",
+            detail: det,
+          });
+        }
+      });
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1191,7 +1227,7 @@ export default {
         ipcRenderer.send("option-ranked", type);
         ipcRenderer.once("option-ranked-reply", (_e, payload) => {
           if (payload) {
-            this.dataScore = payload[0].data;
+            this.dataScore.push(payload[0].data);
           } else {
             this.dataScore = [];
           }
@@ -1495,7 +1531,7 @@ export default {
     },
 
     getScoreByRanked(ranked) {
-      const m = this.dataScore.find((d) => d.ranking === ranked);
+      const m = this.dataScore[0].find((d) => d.ranking === ranked);
       return m ? m.score : null;
     },
 
@@ -1702,37 +1738,52 @@ export default {
         updatedAt: new Date(),
       };
 
-      // isi eventResult per tim (tanpa optional-chaining)
       for (var i = 0; i < participantArr.length; i++) {
         var t = participantArr[i];
+
+        // Ambil ranked dari sumber data tim (kalau ada)
+        var rankedTotal =
+          t && t.result && (t.result.ranked || t.result.ranked === 0)
+            ? t.result.ranked
+            : "";
+
+        // Hitung score berdasarkan ranked via getScoreByRanked
+        var computedTotalScore =
+          rankedTotal !== "" ? this.getScoreByRanked(rankedTotal) : "";
 
         var teamData = {
           teamId: t && t.teamId ? t.teamId : "",
           teamName: t && t.nameTeam ? t.nameTeam : "",
           bib: t && t.bibTeam ? t.bibTeam : "",
           categories: [],
-          totalScore: t && t.result && t.result.score ? t.result.score : "",
-          totalRanked: t && t.result && t.result.ranked ? t.result.ranked : "",
+          totalScore: computedTotalScore,
+          totalRanked: rankedTotal,
         };
 
-        var cat1 = { name: "SPRINT", scored: "", rankedByCats: "" };
-        if (t && t.result) {
-          cat1.scored = t.result.score ? t.result.score : "";
-          cat1.rankedByCats = t.result.ranked ? t.result.ranked : "";
-        }
+        // --- Per kategori ---
+        // SPRINT (pakai ranked dari t.result jika memang kategori ini yang diisi)
+        var cat1Ranked =
+          t && t.result && (t.result.ranked || t.result.ranked === 0)
+            ? t.result.ranked
+            : "";
+        var cat1Scored =
+          cat1Ranked !== "" ? this.getScoreByRanked(cat1Ranked) : "";
+
+        var cat1 = {
+          name: "SPRINT",
+          scored: cat1Scored,
+          rankedByCats: cat1Ranked,
+        };
+
+        // HEADTOHEAD, SLALOM, DRR (placeholder, tinggal isi ranked masing-masing jika ada)
         var cat2 = { name: "HEADTOHEAD", scored: "", rankedByCats: "" };
         var cat3 = { name: "SLALOM", scored: "", rankedByCats: "" };
         var cat4 = { name: "DRR", scored: "", rankedByCats: "" };
 
-        teamData.categories.push(cat1);
-        teamData.categories.push(cat2);
-        teamData.categories.push(cat3);
-        teamData.categories.push(cat4);
-
+        teamData.categories.push(cat1, cat2, cat3, cat4);
         payload.eventResult.push(teamData);
       }
 
-      // kirim upsert
       ipcRenderer.send("event-results:upsert", payload);
 
       ipcRenderer.once("event-results:upsert-reply", function (_e, res) {

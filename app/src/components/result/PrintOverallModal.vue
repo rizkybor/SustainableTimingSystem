@@ -144,7 +144,7 @@ export default {
   props: {
     show: { type: Boolean, default: false },
     centered: { type: Boolean, default: false },
-    dataEvent: { type: Object, default: true },
+    dataEvent: { type: Object },
     aggregate: {
       type: Object,
       default: () => ({

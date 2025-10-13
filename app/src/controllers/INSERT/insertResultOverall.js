@@ -33,7 +33,6 @@ async function upsertEventResultsDoc(payload) {
   return result;
 }
 
-
 async function getEventResultsAggregate(f) {
   const db = await getDb();
   const col = db.collection("temporaryOverallEventResults"); // nama koleksi rekap kamu
@@ -42,6 +41,7 @@ async function getEventResultsAggregate(f) {
     eventId: String(f.eventId || ""),
     initialId: String(f.initialId || ""),
     divisionId: String(f.divisionId || ""),
+    raceId: String(f.raceId || ""),
   };
 
   // sesuai struktur kamu: satu dokumen per kombinasi 3 field di atas
@@ -55,7 +55,5 @@ async function getEventResultsAggregate(f) {
   if (!doc) throw new Error("Aggregate not found");
   return doc;
 }
-
-
 
 module.exports = { upsertEventResultsDoc, getEventResultsAggregate };

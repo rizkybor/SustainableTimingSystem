@@ -112,7 +112,7 @@
 
             <td class="right">{{ startAt(t, 0) }}</td>
             <td
-            style="font-size: 7px; text-align: start;"
+              style="font-size: 8px; text-align: start"
               v-for="(v, gi) in gatesAtPadded(t, 0)"
               :key="'r1g' + gi"
             >
@@ -137,7 +137,7 @@
 
             <td class="right">{{ startAt(t, 1) }}</td>
             <td
-            style="font-size: 7px; text-align: start;"
+              style="font-size: 8px; text-align: start"
               v-for="(v, gi) in gatesAtPadded(t, 1)"
               :key="'r2g' + gi"
             >
@@ -693,12 +693,12 @@ header,
 /* --- kolom penting diberi lebar agar stabil --- */
 .score-table th:nth-child(1),
 .score-table td:nth-child(1) {
-  width: 28px;
+  width: 25px;
 } /* No */
 
 .score-table th:nth-child(2),
 .score-table td:nth-child(2) {
-  width: 100px;
+  width: 80px;
 } /* Team */
 
 .score-table th:nth-child(3),

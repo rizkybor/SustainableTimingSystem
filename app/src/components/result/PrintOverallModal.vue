@@ -93,8 +93,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in aggregate.rows" :key="r.no">
-                <td class="text-center">{{ r.no }}</td>
+              <tr v-for="r in processedRows" :key="r.rank">
+                <td class="text-center">{{ r.rank }}</td>
                 <td>{{ r.teamName }}</td>
                 <td class="text-center">{{ r.bib }}</td>
 
@@ -112,7 +112,7 @@
                 <td class="text-center">{{ r.drrRank }}</td>
 
                 <td class="text-center font-weight-bold">{{ r.totalScore }}</td>
-                <td class="text-center font-weight-bold">{{ r.no }}</td>
+                <td class="text-center font-weight-bold">{{ r.rank }}</td>
               </tr>
             </tbody>
           </table>
@@ -120,8 +120,7 @@
       </div>
 
       <!-- FOOTER -->
-      <div class="overall-footer">
-      </div>
+      <div class="overall-footer"></div>
 
       <div class="btn-row">
         <b-button variant="outline-danger" @click="$emit('close')"
@@ -151,6 +150,71 @@ export default {
         header: { title: "", subTitle: "", dateStr: "", chiefJudge: "" },
         rows: [],
       }),
+    },
+  },
+  computed: {
+    processedRows() {
+      var toNum = function (v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      // aman tanpa optional chaining
+      var ag =
+        this.aggregate && typeof this.aggregate === "object"
+          ? this.aggregate
+          : { rows: [] };
+
+      // clone tanpa mutasi prop
+      var src = Array.isArray(ag.rows) ? ag.rows.slice() : [];
+
+      // hitung totalScore per baris
+      var withTotals = src.map(function (r) {
+        var sprint = toNum(r.sprintScore);
+        var h2h = toNum(r.h2hScore);
+        var slalom = toNum(r.slalomScore);
+        var drr = toNum(r.drrScore);
+        var total = sprint + h2h + slalom + drr;
+
+        return Object.assign({}, r, {
+          sprintScore: sprint,
+          h2hScore: h2h,
+          slalomScore: slalom,
+          drrScore: drr,
+          totalScore: total,
+        });
+      });
+
+      // urutkan: totalScore tertinggi → terendah,
+      // tie-break: best rank terkecil, lalu nama tim
+      withTotals.sort(function (a, b) {
+        if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+
+        var aBestRank = Math.min(
+          Number(a.sprintRank) || Infinity,
+          Number(a.h2hRank) || Infinity,
+          Number(a.slalomRank) || Infinity,
+          Number(a.drrRank) || Infinity
+        );
+        var bBestRank = Math.min(
+          Number(b.sprintRank) || Infinity,
+          Number(b.h2hRank) || Infinity,
+          Number(b.slalomRank) || Infinity,
+          Number(b.drrRank) || Infinity
+        );
+        if (aBestRank !== bBestRank) return aBestRank - bBestRank;
+
+        var an = String(a.teamName || "");
+        var bn = String(b.teamName || "");
+        return an.localeCompare(bn);
+      });
+
+      // assign rank 1..N sesuai urutan
+      for (var i = 0; i < withTotals.length; i++) {
+        withTotals[i].rank = i + 1;
+      }
+
+      return withTotals;
     },
   },
 };

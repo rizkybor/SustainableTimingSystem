@@ -700,6 +700,8 @@ import EmptyCard from "@/components/cards/card-empty.vue";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
+import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -720,14 +722,19 @@ function msToHMSms(ms) {
   const hr = Math.floor(ms / 3600000);
   const rem1 = ms % 3600000;
   const min = Math.floor(rem1 / 60000);
-  const rem2 = rem1 % 60000;
+  const rem2 = ms % 60000;
   const sec = Math.floor(rem2 / 1000);
   const mss = rem2 % 1000;
   return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(mss, 3)}`;
 }
 function hmsToMs(str) {
-  const [h = "0", m = "0", sMs = "0.000"] = String(str || "").split(":");
-  const [s = "0", ms = "0"] = String(sMs).split(".");
+  const parts = String(str || "").split(":");
+  const h = parts[0] != null ? parts[0] : "0";
+  const m = parts[1] != null ? parts[1] : "0";
+  const sMs = parts[2] != null ? parts[2] : "0.000";
+  const sMsParts = String(sMs).split(".");
+  const s = sMsParts[0] != null ? sMsParts[0] : "0";
+  const ms = sMsParts[1] != null ? sMsParts[1] : "0";
   return +h * 3600000 + +m * 60000 + +s * 1000 + +ms;
 }
 
@@ -735,21 +742,26 @@ function hmsToMs(str) {
 const DEFAULT_S16 = 14;
 function buildGates(n) {
   const total = Number.isFinite(+n) && +n > 0 ? +n : DEFAULT_S16;
-  return Array.from({ length: total }, (_, i) => i + 1);
+  return Array.from({ length: total }, function (_, i) {
+    return i + 1;
+  });
 }
 const PENALTY_VALUE_TO_MS = { 0: 0, 5: 5000, 50: 50000 };
 
 /** ===== Payload baru: ambil bucket & teams (seperti Sprint Result) ===== */
-function normalizeTeamFromBucketForSlalom(t = {}) {
-  // id internal untuk v-for
-  const _id =
-    t._id ||
-    t.id ||
-    `${String(t.bibTeam || t.bibNumber || "")}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-  const base = {
-    _id,
+function normalizeTeamFromBucketForSlalom(t) {
+  if (!t) t = {};
+
+  var _id = t._id
+    ? t._id
+    : t.id
+    ? t.id
+    : String(t.bibTeam || t.bibNumber || "") +
+      "-" +
+      Math.random().toString(36).slice(2, 8);
+
+  var base = {
+    _id: _id,
     teamId: String(t.teamId || ""),
     nameTeam: String(t.nameTeam || t.name || ""),
     bibNumber: String(t.bibTeam || t.bibNumber || ""),
@@ -759,32 +771,141 @@ function normalizeTeamFromBucketForSlalom(t = {}) {
     statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
   };
 
-  // siapkan 2 sesi default, dan merge jika ada data existing
-  const emptySession = (gateLen = DEFAULT_S16) => ({
-    startPenalty: 0,
-    penalties: Array.from({ length: gateLen }, () => 0),
-    finishPenalty: 0,
-    totalPenalty: 0,
-    penaltyTime: "00:00:00.000",
-    startTime: "",
-    finishTime: "",
-    raceTime: "",
-    totalTime: "",
-    ranked: 0,
-    score: 0,
-  });
+  var gateLen = DEFAULT_S16; // boleh di-update nanti oleh settings
+  var emptySession = function () {
+    return {
+      startPenalty: 0,
+      penalties: Array.from({ length: gateLen }, function () {
+        return 0;
+      }),
+      finishPenalty: 0,
+      totalPenalty: 0,
+      penaltyTime: "00:00:00.000",
+      startTime: "",
+      finishTime: "",
+      raceTime: "",
+      totalTime: "",
+      ranked: 0,
+      score: 0,
+    };
+  };
 
-  const sessions =
-    Array.isArray(t.sessions) && t.sessions.length
-      ? t.sessions.map((s) => ({ ...emptySession(DEFAULT_S16), ...(s || {}) }))
-      : [emptySession(DEFAULT_S16), emptySession(DEFAULT_S16)];
+  var s0 = emptySession();
+  var s1 = emptySession();
 
-  return { ...base, sessions };
+  // ---- AMBIL DARI t.result (JIKA ADA) ----
+  var resArr = Array.isArray(t.result) ? t.result : [];
+
+  // Run 1
+  if (resArr[0]) {
+    var r0 = resArr[0];
+    var pt0 = r0.penaltyTotal ? r0.penaltyTotal : {};
+    s0.startPenalty = clampPenalty(pt0.start);
+    s0.finishPenalty = clampPenalty(pt0.finish);
+    s0.penalties = fitGates(pt0.gates, gateLen);
+
+    s0.startTime = String(r0.startTime || "");
+    s0.finishTime = String(r0.finishTime || "");
+    s0.raceTime = String(r0.raceTime || "");
+    s0.penaltyTime = String(r0.penaltyTime || "00:00:00.000");
+    s0.totalTime = String(r0.totalTime || r0.raceTime || "");
+    s0.ranked = Number(r0.ranked || 0);
+    s0.score = Number(r0.score || 0);
+    recomputeSessionFields(s0);
+  }
+
+  // Run 2
+  if (resArr[1]) {
+    var r1 = resArr[1];
+    var pt1 = r1.penaltyTotal ? r1.penaltyTotal : {};
+    s1.startPenalty = clampPenalty(pt1.start);
+    s1.finishPenalty = clampPenalty(pt1.finish);
+    s1.penalties = fitGates(pt1.gates, gateLen);
+
+    s1.startTime = String(r1.startTime || "");
+    s1.finishTime = String(r1.finishTime || "");
+    s1.raceTime = String(r1.raceTime || "");
+    s1.penaltyTime = String(r1.penaltyTime || "00:00:00.000");
+    s1.totalTime = String(r1.totalTime || r1.raceTime || "");
+    s1.ranked = Number(r1.ranked || 0);
+    s1.score = Number(r1.score || 0);
+    recomputeSessionFields(s1);
+  }
+
+  return Object.assign({}, base, { sessions: [s0, s1] });
 }
 
 function getBucket() {
   const obj = safeJSON(RACE_PAYLOAD_KEY, {});
   return obj.bucket || {};
+}
+
+function clampPenalty(v) {
+  var n = Number(v);
+  if (n === 0 || n === 5 || n === 50) return n;
+  return 0; // selain 0/5/50 dibersihkan ke 0 (contoh 10 -> 0)
+}
+function fitGates(arr, need) {
+  var out = [];
+  var i = 0;
+  if (Array.isArray(arr)) {
+    while (i < arr.length && i < need) {
+      out.push(clampPenalty(arr[i]));
+      i = i + 1;
+    }
+  }
+  while (out.length < need) out.push(0);
+  return out;
+}
+
+function penaltyMsFromValues(start, gates, finish) {
+  const toMs = function (v) {
+    return PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
+  };
+  const core = Array.isArray(gates)
+    ? gates.reduce(function (a, v) {
+        return a + toMs(v);
+      }, 0)
+    : 0;
+  return toMs(start) + core + toMs(finish);
+}
+
+// 1/2 atau 0/1 → 0-based 0|1; fallback ke active run
+function toRunIdx(msg, fallbackIdx) {
+  var v = null;
+  if (msg && msg.runNumber != null) v = msg.runNumber;
+  else if (msg && msg.run != null) v = msg.run;
+
+  var n = parseInt(v, 10);
+  if (!isNaN(n)) {
+    if (n >= 1 && n <= 2) return n - 1; // human 1/2
+    if (n === 0 || n === 1) return n; // already 0/1
+  }
+  return typeof fallbackIdx === "number" && isFinite(fallbackIdx)
+    ? fallbackIdx
+    : 0;
+}
+
+function recomputeSessionFields(session) {
+  const sVal = Number(session.startPenalty) || 0;
+  const fVal = Number(session.finishPenalty) || 0;
+  const gates = Array.isArray(session.penalties) ? session.penalties : [];
+
+  // totalPenalty angka (S + Σgates + F)
+  const coreSum = gates.reduce(function (a, v) {
+    return a + (Number(v) || 0);
+  }, 0);
+  session.totalPenalty = sVal + coreSum + fVal;
+
+  // penaltyTime
+  const penMs = penaltyMsFromValues(sVal, gates, fVal);
+  session.penaltyTime = msToHMSms(penMs);
+
+  // totalTime (jika ada raceTime)
+  if (session.raceTime) {
+    const raceMs = hmsToMs(session.raceTime);
+    session.totalTime = msToHMSms(raceMs + penMs);
+  }
 }
 
 export default {
@@ -801,11 +922,9 @@ export default {
     return {
       slalomCats: { initial: "-", race: "-", division: "-" },
       pdfParticipantsSession1: [],
-      localShow: true,
       showSession1Modal: false,
       loadingSession1: false,
       session1Rows: [],
-      showPdfS1: false,
       isLoading: false,
       defaultImg,
       slalomBucketOptions: [],
@@ -832,6 +951,10 @@ export default {
       dataPenalties: [],
       dataScore: [],
       penaltiesWrapped: false,
+
+      // ====== SOCKET ======
+      initSocket: null,
+      selfSocketId: null,
     };
   },
 
@@ -843,10 +966,6 @@ export default {
           : "";
       var cats = this.titleCategories ? this.titleCategories : "SLALOM";
       return eventSafe + cats + " - Session 1";
-    },
-    getBucket() {
-      const obj = safeJSON(RACE_PAYLOAD_KEY, {});
-      return obj.bucket || {};
     },
     currentSlalomEventId() {
       let fromEvent = "";
@@ -872,10 +991,9 @@ export default {
         this.dataEventSafe &&
         Array.isArray(this.dataEventSafe.categoriesDivision)
       ) {
-        return this.dataEventSafe.categoriesDivision.map((d) => ({
-          id: String(d.value),
-          name: String(d.name),
-        }));
+        return this.dataEventSafe.categoriesDivision.map(function (d) {
+          return { id: String(d.value), name: String(d.name) };
+        });
       }
       return [];
     },
@@ -885,10 +1003,9 @@ export default {
         this.dataEventSafe &&
         Array.isArray(this.dataEventSafe.categoriesRace)
       ) {
-        return this.dataEventSafe.categoriesRace.map((r) => ({
-          id: String(r.value),
-          name: String(r.name),
-        }));
+        return this.dataEventSafe.categoriesRace.map(function (r) {
+          return { id: String(r.value), name: String(r.name) };
+        });
       }
       return [];
     },
@@ -898,10 +1015,9 @@ export default {
         this.dataEventSafe &&
         Array.isArray(this.dataEventSafe.categoriesInitial)
       ) {
-        return this.dataEventSafe.categoriesInitial.map((i) => ({
-          id: String(i.value),
-          name: String(i.name),
-        }));
+        return this.dataEventSafe.categoriesInitial.map(function (i) {
+          return { id: String(i.value), name: String(i.name) };
+        });
       }
       return [];
     },
@@ -928,7 +1044,6 @@ export default {
       var ev = this.dataEventSafe || {};
       var logos = ev.event_logo;
       if (Array.isArray(logos) && logos.length > 0) {
-        // string URL langsung atau objek { url: '...' }
         var first = logos[0];
         if (typeof first === "string" && first) return true;
         if (
@@ -958,14 +1073,19 @@ export default {
 
       if (!this.sortBest.enabled) return arr;
 
-      const toBestMs = (team) => {
-        const times = (Array.isArray(team.sessions) ? team.sessions : [])
-          .map((s) => s && s.totalTime)
-          .filter(Boolean)
+      const toBestMs = function (team) {
+        const tArr = Array.isArray(team.sessions) ? team.sessions : [];
+        const times = tArr
+          .map(function (s) {
+            return s && s.totalTime;
+          })
+          .filter(function (v) {
+            return !!v;
+          })
           .map(hmsToMs);
 
         if (!times.length) return Number.POSITIVE_INFINITY;
-        return Math.min(...times);
+        return Math.min.apply(Math, times);
       };
 
       return arr.sort((a, b) => {
@@ -1001,20 +1121,27 @@ export default {
 
     // NEW: ranking & score per team berdasarkan best time
     ranksMap() {
-      const arr = this.teams.map((t) => {
+      const arr = this.teams.map(function (t) {
         const times = (t.sessions || [])
-          .map((s) => s && s.totalTime)
-          .filter(Boolean)
+          .map(function (s) {
+            return s && s.totalTime;
+          })
+          .filter(function (v) {
+            return !!v;
+          })
           .map(hmsToMs);
-        const bestMs = times.length ? Math.min(...times) : Infinity;
-        return { id: String(t._id), bestMs };
+        const bestMs = times.length ? Math.min.apply(Math, times) : Infinity;
+        return { id: String(t._id), bestMs: bestMs };
       });
-      arr.sort((a, b) => a.bestMs - b.bestMs);
+      arr.sort(function (a, b) {
+        return a.bestMs - b.bestMs;
+      });
       const map = {};
       let prev = null,
         rank = 0,
         idx = 0;
-      for (const it of arr) {
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
         idx++;
         if (!Number.isFinite(it.bestMs)) {
           map[it.id] = { rank: "-", score: 0 };
@@ -1024,8 +1151,13 @@ export default {
           rank = idx;
           prev = it.bestMs;
         }
-        const scoreObj = this.dataScore.find((d) => Number(d.ranking) === rank);
-        map[it.id] = { rank, score: scoreObj ? Number(scoreObj.score) : 0 };
+        const scoreObj = this.dataScore.find(function (d) {
+          return Number(d.ranking) === rank;
+        });
+        map[it.id] = {
+          rank: rank,
+          score: scoreObj ? Number(scoreObj.score) : 0,
+        };
       }
       return map;
     },
@@ -1039,6 +1171,7 @@ export default {
     },
   },
   async mounted() {
+    var audio = new Audio(tone);
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -1050,7 +1183,9 @@ export default {
 
     const ok = this.loadFromRaceStartPayloadForSlalom();
     if (!ok) {
-      await this.checkValueStorage();
+      if (typeof this.checkValueStorage === "function") {
+        await this.checkValueStorage();
+      }
     }
     this.buildSlalomOptions();
     if (this.slalomBucketOptions.length) {
@@ -1062,7 +1197,9 @@ export default {
 
       await this.fetchSlalomTeamsByKey(this.selectedSlalomKey);
     } else {
-      this.loadAllSlalomBucketsFromEvent();
+      if (typeof this.loadAllSlalomBucketsFromEvent === "function") {
+        this.loadAllSlalomBucketsFromEvent();
+      }
     }
     this.teams.forEach((t) =>
       this.$set(this.selectedSession, String(t._id), this.activeRun)
@@ -1071,9 +1208,632 @@ export default {
     // Ambil jumlah gate untuk slalom dari pengaturan
     this.fetchSlalomGateCountFromSettings();
     this.refreshSlalomCats();
+
+    // ====== SOCKET INIT & LISTENERS ======
+    try {
+      var socket = getSocket();
+      this.initSocket = socket;
+
+      var onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
+
+      var isSameEvent = (m) => {
+        var cur = this.currentSlalomEventId
+          ? String(this.currentSlalomEventId)
+          : "";
+        var ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
+
+      var onMessage = async (msgRaw) => {
+        var msg = msgRaw || {};
+
+        // cegah echo & filter event
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
+
+        if (this.$bvToast && msg.text) {
+          audio.play();
+          var txt = (msg.from ? msg.from : "Realtime") + ": " + msg.text;
+          this.$bvToast.toast(txt, {
+            title: "Pesan Realtime",
+            variant: "success",
+            solid: true,
+          });
+        }
+
+        // ==== Normalisasi tipe lama → baru ====
+        if (msg.type === "PenaltiesUpdated") {
+          const gt = String(msg.gate || "")
+            .trim()
+            .toLowerCase();
+          if (gt === "start" || gt === "s" || gt === "st")
+            msg.type = "PenaltyStart";
+          else if (gt === "finish" || gt === "f" || gt === "fin")
+            msg.type = "PenaltyFinish";
+          else msg.type = "PenaltyGates";
+        }
+
+        // HANYA penalties
+        if (
+          msg.type !== "PenaltyStart" &&
+          msg.type !== "PenaltyFinish" &&
+          msg.type !== "PenaltyGates"
+        )
+          return;
+
+        // pastikan ada identitas tim
+        var hasTeamKey =
+          (msg.teamId != null && String(msg.teamId) !== "") ||
+          (msg.bib != null && String(msg.bib) !== "") ||
+          (msg.bibTeam != null && String(msg.bibTeam) !== "") ||
+          (msg.teamName && String(msg.teamName).trim() !== "");
+        if (!hasTeamKey) return;
+
+        // normalisasi run → 0-based (fallback: activeRun)
+        msg.run = toRunIdx(msg, this.activeRun);
+
+        // khusus PenaltyGates: gate number 1-based → index 0-based
+        if (msg.type === "PenaltyGates") {
+          if (typeof msg.gate === "number" && Number.isFinite(msg.gate)) {
+            var gi = msg.gate > 0 ? msg.gate - 1 : msg.gate;
+            if (Number.isInteger(gi)) msg.gateIndex = gi;
+          }
+        }
+
+        await this.applyPenaltyFromSocketDirect(msg);
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
   },
 
   methods: {
+    // helper kecil untuk memastikan panjang array penalties = jumlah gate
+
+    async applyPenaltyFromSocketDirect(msg) {
+      try {
+        // --- 1) identifikasi tim (teamId/bib/name) ---
+        var key = "";
+        if (msg && msg.teamId != null) key = String(msg.teamId);
+        else if (msg && (msg.bib != null || msg.bibTeam != null))
+          key = String(msg.bib != null ? msg.bib : msg.bibTeam);
+        else if (msg && msg.teamName) key = String(msg.teamName);
+        if (!key) return false;
+
+        var teamIdOrBib = "";
+        if (msg && msg.teamId != null) teamIdOrBib = String(msg.teamId);
+        else if (msg && (msg.bib != null || msg.bibTeam != null))
+          teamIdOrBib = String(msg.bib != null ? msg.bib : msg.bibTeam);
+
+        var f = this._findTeamAndSessionIndex(teamIdOrBib, undefined);
+
+        // fallback cari by name (case-insensitive)
+        if (!f || !f.team) {
+          if (msg && msg.teamName) {
+            var nameLC = String(msg.teamName).toLowerCase();
+            var foundTeam = null,
+              foundIdx = -1;
+            for (var i = 0; i < this.teams.length; i++) {
+              var t = this.teams[i] || {};
+              if (String(t.nameTeam || "").toLowerCase() === nameLC) {
+                foundTeam = t;
+                foundIdx = i;
+                break;
+              }
+            }
+            if (foundTeam) {
+              var chosen = this.selectedSession[String(foundTeam._id)];
+              var sessIdx = 0;
+              if (typeof chosen === "number" && isFinite(chosen))
+                sessIdx = chosen;
+              else if (
+                typeof this.activeRun === "number" &&
+                isFinite(this.activeRun)
+              )
+                sessIdx = this.activeRun;
+              f = { team: foundTeam, teamIdx: foundIdx, sessionIdx: sessIdx };
+            }
+          }
+        }
+        if (!f || !f.team) return false;
+
+        // --- 2) run index (1/2 → 0/1, atau pakai active) ---
+        var runIdx = toRunIdx(msg, f.sessionIdx);
+
+        // --- 3) pastikan sesi ada ---
+        if (!Array.isArray(f.team.sessions)) this.$set(f.team, "sessions", []);
+        if (!f.team.sessions[runIdx]) {
+          this.$set(f.team.sessions, runIdx, {
+            startPenalty: 0,
+            penalties: [],
+            finishPenalty: 0,
+            totalPenalty: 0,
+            penaltyTime: "00:00:00.000",
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            totalTime: "",
+            ranked: 0,
+            score: 0,
+          });
+        }
+        var s = f.team.sessions[runIdx];
+
+        // --- 4) tipe penalty ---
+        var kind = "gate";
+        if (msg && msg.type === "PenaltyStart") kind = "start";
+        else if (msg && msg.type === "PenaltyFinish") kind = "finish";
+        else if (msg && msg.type === "PenaltyGates") kind = "gate";
+
+        // --- 5) nilai penalty (0/5/50) ---
+        var rawPenalty =
+          msg && msg.penalty != null
+            ? msg.penalty
+            : msg && msg.value != null
+            ? msg.value
+            : 0;
+        var np = Number(rawPenalty);
+        var value = np === 0 || np === 5 || np === 50 ? np : 0;
+
+        // --- 6) apply ke target (in-place & reactive) ---
+        var changed = false;
+
+        if (kind === "start") {
+          if (s.startPenalty !== value) {
+            this.$set(s, "startPenalty", value);
+            changed = true;
+          }
+        } else if (kind === "finish") {
+          if (s.finishPenalty !== value) {
+            this.$set(s, "finishPenalty", value);
+            changed = true;
+          }
+        } else {
+          // GATE
+          var gateIdx = null;
+
+          if (
+            msg &&
+            typeof msg.gateIndex === "number" &&
+            isFinite(msg.gateIndex)
+          ) {
+            gateIdx = msg.gateIndex; // 0-based
+          } else if (msg && msg.gate != null) {
+            var token = msg.gate;
+            if (typeof token === "number" && isFinite(token)) {
+              gateIdx = token > 0 ? token - 1 : token; // 6 → 5
+            } else {
+              var sToken = String(token || "")
+                .trim()
+                .toLowerCase();
+              var extracted = null;
+              if (/^(?:gate|g)[\s-]*([0-9]+)$/.test(sToken)) {
+                extracted = parseInt(
+                  sToken.replace(/^(?:gate|g)[\s-]*/, ""),
+                  10
+                );
+              } else if (/^[0-9]+$/.test(sToken)) {
+                extracted = parseInt(sToken, 10);
+              }
+              if (extracted != null && !isNaN(extracted) && extracted > 0)
+                gateIdx = extracted - 1;
+            }
+          }
+
+          var need = this.SLALOM_GATES.length;
+
+          // === IN-PLACE ensure length (jangan ganti array) ===
+          if (!Array.isArray(s.penalties)) this.$set(s, "penalties", []);
+          while (s.penalties.length < need) s.penalties.push(0);
+          if (s.penalties.length > need) s.penalties.length = need;
+
+          if (typeof gateIdx === "number" && gateIdx >= 0 && gateIdx < need) {
+            if (s.penalties[gateIdx] !== value) {
+              this.$set(s.penalties, gateIdx, value); // penting untuk reaktivitas index array di Vue 2
+              changed = true;
+            }
+          } else {
+            return false; // index gate tidak valid
+          }
+        }
+
+        if (!changed) return false;
+
+        // --- 7) hitung ulang & status ---
+        this.recalcSession(s);
+        this.checkEndGameStatus();
+
+        // --- 8) feedback UI (opsional) ---
+        if (ipcRenderer) {
+          var label;
+          if (kind === "start") label = "START";
+          else if (kind === "finish") label = "FINISH";
+          else {
+            var gateNo = typeof gateIdx === "number" ? gateIdx + 1 : "?";
+            label = "GATE " + String(gateNo);
+          }
+          var teamNameStr =
+            f.team && f.team.nameTeam ? String(f.team.nameTeam) : "";
+          var detail =
+            "Penalty updated • " +
+            teamNameStr +
+            " • Run " +
+            String(runIdx + 1) +
+            " • " +
+            label +
+            " = " +
+            String(value);
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail: detail,
+            message: "Realtime Penalty",
+          });
+        }
+
+        return true;
+      } catch (err) {
+        if (logger && logger.warn)
+          logger.warn("applyPenaltyFromSocketDirect error:", err);
+        return false;
+      }
+    },
+    async refreshPenaltiesFromRegistered(params) {
+      try {
+        params = params || {};
+        var teamId = params.teamId;
+        var bib = params.bib;
+        var runIdx = params.runIdx;
+
+        var key = this.selectedSlalomKey;
+        var b = this.slalomBucketMap[key] || {};
+        var filters = {
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+        };
+
+        var res = await new Promise(function (resolve) {
+          ipcRenderer.once(
+            "teams-slalom-registered:find-reply",
+            function (_e, payload) {
+              resolve(payload);
+            }
+          );
+          ipcRenderer.send("teams-slalom-registered:find", filters);
+        });
+        if (!res || !res.ok) return;
+
+        var doc = Array.isArray(res.items) ? res.items[0] : res.items;
+        var serverTeams = doc && Array.isArray(doc.teams) ? doc.teams : [];
+        if (!serverTeams.length) return;
+
+        var keyId = String(teamId || "");
+        var keyBib = String(bib || "");
+        var serverTeam = null,
+          i,
+          t;
+        for (i = 0; i < serverTeams.length; i++) {
+          t = serverTeams[i] || {};
+          var tid = String(t.teamId || "");
+          var tbib = String(t.bibTeam || t.bibNumber || "");
+          if ((keyId && tid === keyId) || (keyBib && tbib === keyBib)) {
+            serverTeam = t;
+            break;
+          }
+        }
+        if (!serverTeam || !Array.isArray(serverTeam.result)) return;
+
+        var f = this._findTeamAndSessionIndex(teamId || bib, runIdx);
+        if (!f.team) return;
+        var run = Number.isFinite(runIdx) ? runIdx : f.sessionIdx;
+
+        var serverRun = serverTeam.result[run] || {};
+        var pt = serverRun.penaltyTotal || {};
+        var startVal = this.sanitizePenaltyValue(pt.start);
+        var finishVal = this.sanitizePenaltyValue(pt.finish);
+        var gatesArr = Array.isArray(pt.gates) ? pt.gates : [];
+        var fixedGates = this.sanitizeGates(gatesArr, this.SLALOM_GATES.length);
+
+        if (!Array.isArray(f.team.sessions)) this.$set(f.team, "sessions", []);
+        if (!f.team.sessions[run]) {
+          this.$set(f.team.sessions, run, {
+            startPenalty: 0,
+            penalties: [],
+            finishPenalty: 0,
+            totalPenalty: 0,
+            penaltyTime: "00:00:00.000",
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            totalTime: "",
+            ranked: 0,
+            score: 0,
+          });
+        }
+        var s = f.team.sessions[run];
+
+        this.$set(s, "startPenalty", startVal);
+        this.$set(s, "finishPenalty", finishVal);
+        this.$set(s, "penalties", fixedGates);
+
+        this.recalcSession(s);
+
+        if (ipcRenderer) {
+          ipcRenderer.send("get-alert", {
+            type: "success",
+            detail:
+              "Penalties pulled from DB (Run " +
+              (run + 1) +
+              ") untuk " +
+              (f.team.nameTeam || ""),
+            message: "Realtime Update",
+          });
+        }
+      } catch (err) {
+        if (logger && logger.warn)
+          logger.warn("refreshPenaltiesFromRegistered error:", err);
+      }
+    },
+    // ================= SOCKET HELPERS =================
+    _findTeamAndSessionIndex(teamIdOrBib, runIdx) {
+      var key = String(teamIdOrBib || "");
+      var team = null,
+        teamIdx = -1;
+      var i;
+      for (i = 0; i < this.teams.length; i++) {
+        var t = this.teams[i] || {};
+        var tId = String(t.teamId || "");
+        var bib = String(t.bibNumber || t.bibTeam || "");
+        if ((tId && tId === key) || (bib && bib === key)) {
+          team = t;
+          teamIdx = i;
+          break;
+        }
+      }
+      if (!team) return { team: null, teamIdx: -1, sessionIdx: -1 };
+
+      var sessionIdx;
+      if (Number.isFinite(runIdx)) {
+        sessionIdx = runIdx;
+      } else {
+        var chosen = this.selectedSession[String(team._id)];
+        sessionIdx = Number.isFinite(chosen) ? chosen : this.activeRun || 0;
+      }
+      return { team: team, teamIdx: teamIdx, sessionIdx: sessionIdx };
+    },
+
+    async applyPenaltyFromSocket(msg) {
+      var runIdx = Number.isFinite(msg && msg.run)
+        ? Number(msg.run)
+        : undefined;
+      await this.refreshPenaltiesFromRegistered({
+        teamId: msg && msg.teamId,
+        bib: msg && msg.bib,
+        runIdx: runIdx,
+      });
+    },
+
+    async applyRaceFromSocket(msg) {
+      try {
+        const f = this._findTeamAndSessionIndex(msg.teamId || msg.bib);
+        if (!f.team) return;
+
+        const s =
+          f.team.sessions && f.team.sessions[f.sessionIdx]
+            ? f.team.sessions[f.sessionIdx]
+            : null;
+        if (!s) return;
+
+        // msg.time harus string "HH:MM:SS.mmm"
+        const val = String(msg.time || "");
+        if (!val) return;
+
+        if (msg.type === "RaceStart") {
+          s.startTime = val;
+        } else if (msg.type === "RaceFinish") {
+          s.finishTime = val;
+          if (s.startTime && s.finishTime) {
+            const diff = Math.max(
+              0,
+              hmsToMs(s.finishTime) - hmsToMs(s.startTime)
+            );
+            s.raceTime = msToHMSms(diff);
+          }
+        }
+        this.recalcSession(s);
+        this.checkEndGameStatus();
+      } catch (err) {
+        logger && logger.warn && logger.warn("applyRaceFromSocket error:", err);
+      }
+    },
+
+    // ================= EXISTING LOGIC =================
+    sanitizePenaltyValue(v) {
+      var n = Number(v);
+      if (n === 0 || n === 5 || n === 50) return n;
+      return 0; // nilai lain (mis. 10) dipaksa 0
+    },
+    sanitizeGates(arr, need) {
+      var out = [];
+      var i = 0;
+      if (Array.isArray(arr)) {
+        while (i < arr.length && i < need) {
+          out.push(this.sanitizePenaltyValue(arr[i]));
+          i = i + 1;
+        }
+      }
+      while (out.length < need) out.push(0);
+      return out;
+    },
+    async hydrateTeamsFromResult() {
+      try {
+        var key = this.selectedSlalomKey;
+        var b = this.slalomBucketMap[key] || {};
+
+        var filters = {
+          eventId: String(b.eventId ? b.eventId : ""),
+          initialId: String(b.initialId ? b.initialId : ""),
+          raceId: String(b.raceId ? b.raceId : ""),
+          divisionId: String(b.divisionId ? b.divisionId : ""),
+        };
+
+        var res = await new Promise(function (resolve) {
+          ipcRenderer.once("get-slalom-result-reply", function (_e, payload) {
+            resolve(payload);
+          });
+          ipcRenderer.send("get-slalom-result", filters);
+        });
+
+        if (!res || !res.ok) return;
+        if (!Array.isArray(res.items) || res.items.length === 0) return;
+
+        var doc = res.items[0];
+        if (!doc || !Array.isArray(doc.teams)) return;
+
+        // index by teamId dan bib
+        var byId = {};
+        var byBib = {};
+        var k = 0;
+        while (k < doc.teams.length) {
+          var dt = doc.teams[k] || {};
+          var tid = String(dt.teamId ? dt.teamId : "");
+          var bib = String(
+            dt.bibTeam ? dt.bibTeam : dt.bibNumber ? dt.bibNumber : ""
+          );
+          if (tid) byId[tid] = dt;
+          if (bib) byBib[bib] = dt;
+          k = k + 1;
+        }
+
+        var gatesCount = Array.isArray(this.SLALOM_GATES)
+          ? this.SLALOM_GATES.length
+          : 14;
+
+        // map ke UI
+        var i = 0;
+        while (i < this.teams.length) {
+          var uiTeam = this.teams[i] || {};
+          var tidKey = String(uiTeam.teamId ? uiTeam.teamId : "");
+          var bibKey = String(
+            uiTeam.bibNumber
+              ? uiTeam.bibNumber
+              : uiTeam.bibTeam
+              ? uiTeam.bibTeam
+              : ""
+          );
+          var serverTeam = byId[tidKey]
+            ? byId[tidKey]
+            : byBib[bibKey]
+            ? byBib[bibKey]
+            : null;
+
+          if (serverTeam && Array.isArray(serverTeam.result)) {
+            if (!Array.isArray(uiTeam.sessions) || uiTeam.sessions.length < 2) {
+              this.$set(uiTeam, "sessions", [
+                {
+                  startPenalty: 0,
+                  penalties: [],
+                  finishPenalty: 0,
+                  totalPenalty: 0,
+                  penaltyTime: "00:00:00.000",
+                  startTime: "",
+                  finishTime: "",
+                  raceTime: "",
+                  totalTime: "",
+                  ranked: 0,
+                  score: 0,
+                },
+                {
+                  startPenalty: 0,
+                  penalties: [],
+                  finishPenalty: 0,
+                  totalPenalty: 0,
+                  penaltyTime: "00:00:00.000",
+                  startTime: "",
+                  finishTime: "",
+                  raceTime: "",
+                  totalTime: "",
+                  ranked: 0,
+                  score: 0,
+                },
+              ]);
+            }
+
+            var rIndex = 0;
+            while (rIndex < 2) {
+              var r = serverTeam.result[rIndex];
+              if (r) {
+                var s = uiTeam.sessions[rIndex];
+
+                this.$set(
+                  s,
+                  "startTime",
+                  String(r.startTime ? r.startTime : "")
+                );
+                this.$set(
+                  s,
+                  "finishTime",
+                  String(r.finishTime ? r.finishTime : "")
+                );
+                this.$set(s, "raceTime", String(r.raceTime ? r.raceTime : ""));
+                this.$set(
+                  s,
+                  "penaltyTime",
+                  String(r.penaltyTime ? r.penaltyTime : "00:00:00.000")
+                );
+                this.$set(
+                  s,
+                  "totalTime",
+                  String(
+                    r.totalTime ? r.totalTime : r.raceTime ? r.raceTime : ""
+                  )
+                );
+                this.$set(s, "ranked", Number(r.ranked ? r.ranked : 0));
+                this.$set(s, "score", Number(r.score ? r.score : 0));
+
+                var pt = r.penaltyTotal ? r.penaltyTotal : {};
+                var startVal =
+                  pt.start != null ? this.sanitizePenaltyValue(pt.start) : 0;
+                var finishVal =
+                  pt.finish != null ? this.sanitizePenaltyValue(pt.finish) : 0;
+                var gatesArr = Array.isArray(pt.gates) ? pt.gates : [];
+                var fixedGates = this.sanitizeGates(gatesArr, gatesCount);
+
+                this.$set(s, "startPenalty", startVal);
+                this.$set(s, "finishPenalty", finishVal);
+                this.$set(s, "penalties", fixedGates);
+
+                this.recalcSession(s);
+              }
+              rIndex = rIndex + 1;
+            }
+          }
+          i = i + 1;
+        }
+
+        this.checkEndGameStatus();
+      } catch (err) {
+        logger.error("hydrateTeamsFromResult error:", err);
+      }
+    },
     refreshSlalomCats() {
       const payload = safeJSON("raceStartPayload", {}) || {};
       const b = (payload && payload.bucket) || {};
@@ -1102,15 +1862,40 @@ export default {
     async loadDataPenalties(type) {
       try {
         ipcRenderer.send("option-penalties", type);
-        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          if (payload) {
-            this.dataPenalties = payload[0].data;
-          } else {
-            this.dataPenalties = [];
-          }
-        });
+        ipcRenderer.once(
+          "option-penalties-reply",
+          function (_e, payload) {
+            var raw =
+              payload && payload[0] && payload[0].data ? payload[0].data : [];
+            var out = [];
+            var i = 0;
+            while (i < raw.length) {
+              var it = raw[i] || {};
+              var val = Number(it.value);
+              if (val === 0 || val === 5 || val === 50) {
+                out.push({
+                  label: String(it.label != null ? it.label : val),
+                  value: val,
+                });
+              }
+              i = i + 1;
+            }
+            if (out.length === 0) {
+              out = [
+                { label: "0", value: 0 },
+                { label: "5", value: 5 },
+                { label: "50", value: 50 },
+              ];
+            }
+            this.dataPenalties = out;
+          }.bind(this)
+        );
       } catch (error) {
-        this.dataPenalties = [];
+        this.dataPenalties = [
+          { label: "0", value: 0 },
+          { label: "5", value: 5 },
+          { label: "50", value: 50 },
+        ];
       }
     },
     loadFromRaceStartPayloadForSlalom() {
@@ -1163,16 +1948,16 @@ export default {
       const opts = [];
       const map = Object.create(null);
 
-      divs.forEach((div) => {
-        races.forEach((race) => {
-          inits.forEach((init) => {
+      divs.forEach(function (div) {
+        races.forEach(function (race) {
+          inits.forEach(function (init) {
             const key = [eventId, init.id, race.id, div.id]
               .map(String)
               .join("|");
-            const label = `${div.name} ${race.name} – ${init.name}`;
+            const label = div.name + " " + race.name + " – " + init.name;
             opts.push({ value: key, text: label });
             map[key] = {
-              eventId,
+              eventId: eventId,
               initialId: String(init.id),
               raceId: String(race.id),
               divisionId: String(div.id),
@@ -1213,7 +1998,6 @@ export default {
         this.selectedSlalomKey = key;
         localStorage.setItem("currentSlalomBucketKey", key);
 
-        // Fetch data teams from IPC (channel baru untuk slalom)
         const res = await new Promise((resolve) => {
           ipcRenderer.once(
             "teams-slalom-registered:find-reply",
@@ -1224,7 +2008,7 @@ export default {
 
         if (!res || !res.ok) {
           this.teams = [];
-          this._useSlalomBucket(key);
+          await this._useSlalomBucket(key);
           return;
         }
 
@@ -1235,9 +2019,9 @@ export default {
             : [];
 
         this.slalomBucketMap[key] = { ...b, teams };
-        this._useSlalomBucket(key);
+        await this._useSlalomBucket(key);
       } catch {
-        this._useSlalomBucket(key);
+        await this._useSlalomBucket(key);
       }
       this.isLoading = false;
     },
@@ -1245,20 +2029,23 @@ export default {
       const div = b && b.divisionName ? String(b.divisionName) : "";
       const rac = b && b.raceName ? String(b.raceName) : "";
       const ini = b && b.initialName ? String(b.initialName) : "";
-      return `${div} ${rac} – ${ini}`;
+      return div + " " + rac + " – " + ini;
     },
-    _useSlalomBucket(key) {
-      const b = this.slalomBucketMap[key];
+    async _useSlalomBucket(key) {
+      var b = this.slalomBucketMap[key];
       if (!b) return;
 
-      this.teams = (b.teams || []).map((t) => ({ ...t }));
+      this.teams = Array.isArray(b.teams)
+        ? b.teams.map(function (t) {
+            return Object.assign({}, t);
+          })
+        : [];
       this.titleCategories = this._slalomBucketLabel(b);
-
       localStorage.setItem("currentSlalomBucketKey", key);
 
       try {
-        const raw = localStorage.getItem("raceStartPayload") || "{}";
-        const obj = JSON.parse(raw || "{}") || {};
+        var raw = localStorage.getItem("raceStartPayload") || "{}";
+        var obj = JSON.parse(raw || "{}") || {};
         obj.bucket =
           obj.bucket && typeof obj.bucket === "object" ? obj.bucket : {};
         obj.bucket.eventId = String(b.eventId || "");
@@ -1271,12 +2058,24 @@ export default {
         obj.bucket.divisionName = String(b.divisionName || "");
         localStorage.setItem("raceStartPayload", JSON.stringify(obj));
       } catch (err) {
-        logger.warn("❌ Failed to update race settings:", err);
+        logger &&
+          logger.warn &&
+          logger.warn("Failed to update race settings:", err);
       }
 
-      this.fetchSlalomGateCountFromSettings();
+      await this.fetchSlalomGateCountFromSettings();
       this.refreshSlalomCats();
+
+      await this.hydrateTeamsFromResult();
+
+      var i = 0;
+      while (i < this.teams.length) {
+        var t = this.teams[i];
+        this.$set(this.selectedSession, String(t._id), this.activeRun);
+        i = i + 1;
+      }
     },
+
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
@@ -1290,7 +2089,7 @@ export default {
         if (portIndex === -1) {
           this.notify(
             "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
+            "Preferred port not found: " + PREFERRED_PATH,
             "Device"
           );
           alert("Preferred port not found");
@@ -1308,10 +2107,10 @@ export default {
             this.digitId.unshift(a);
             this.digitTime.unshift(b);
           },
-          onStart: (formatted /*, a, b*/) => {
+          onStart: (formatted) => {
             this.digitTimeStart = formatted;
           },
-          onFinish: (formatted /*, a, b*/) => {
+          onFinish: (formatted) => {
             this.digitTimeFinish = formatted;
           },
         });
@@ -1319,7 +2118,7 @@ export default {
         const res = await this.serialCtrl.connect();
         if (res.ok) {
           this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
+          this.port = this.serialCtrl.port;
           alert("Connected");
         } else {
           this.isPortConnected = false;
@@ -1353,7 +2152,7 @@ export default {
         Array.isArray(this.teams) &&
         this.teams.length > 0 &&
         this.teams.every((t) => {
-          const s = this.currentSession(t); // run aktif per tim
+          const s = this.currentSession(t);
           return (
             s && typeof s.finishTime === "string" && s.finishTime.trim() !== ""
           );
@@ -1363,26 +2162,23 @@ export default {
     },
     resetRow(team) {
       if (!team) return;
-
-      // Tentukan sesi yang sedang aktif untuk tim ini
       const s = this.currentSession(team);
       if (!s) return;
 
-      // Opsional: konfirmasi agar tidak kepencet
       const ok = window.confirm(
-        `Reset data run aktif untuk tim "${team.nameTeam}"?`
+        'Reset data run aktif untuk tim "' + team.nameTeam + '"?'
       );
       if (!ok) return;
 
-      // Reset penalties: S, gates, F
       this.$set(s, "startPenalty", 0);
       this.$set(s, "finishPenalty", 0);
 
       const need = this.SLALOM_GATES.length;
-      const zeros = Array.from({ length: need }, () => 0);
+      const zeros = Array.from({ length: need }, function () {
+        return 0;
+      });
       this.$set(s, "penalties", zeros);
 
-      // Reset perhitungan & waktu
       this.$set(s, "totalPenalty", 0);
       this.$set(s, "penaltyTime", "00:00:00.000");
       this.$set(s, "startTime", "");
@@ -1392,19 +2188,19 @@ export default {
       this.$set(s, "ranked", 0);
       this.$set(s, "score", 0);
 
-      // Jika mau, panggil kalkulasi lagi (tidak wajib karena sudah 0 semua)
-      // this.recalcSession(s);
-
-      // Opsional: feedback lewat IPC alert (kalau mau konsisten dengan notifikasi lain)
       try {
-        ipcRenderer &&
+        if (ipcRenderer) {
           ipcRenderer.send("get-alert", {
             type: "success",
-            detail: `Row untuk "${team.nameTeam}" (Run ${
-              this.selectedSession[team._id] + 1
-            }) telah direset.`,
+            detail:
+              'Row untuk "' +
+              team.nameTeam +
+              '" (Run ' +
+              (this.selectedSession[team._id] + 1) +
+              ") telah direset.",
             message: "Reset Berhasil",
           });
+        }
       } catch (e) {
         /* no-op */
       }
@@ -1413,24 +2209,30 @@ export default {
 
     bestTimeWithRun(team) {
       const msList = (team.sessions || [])
-        .map((s) => s && s.totalTime)
-        .map((t) => (t ? hmsToMs(t) : Infinity));
+        .map(function (s) {
+          return s && s.totalTime;
+        })
+        .map(function (t) {
+          return t ? hmsToMs(t) : Infinity;
+        });
 
-      let best = Infinity,
-        runIndex = null;
-      msList.forEach((ms, i) => {
+      let best = Infinity;
+      let runIndex = null;
+      for (let i = 0; i < msList.length; i++) {
+        const ms = msList[i];
         if (Number.isFinite(ms) && ms < best) {
           best = ms;
-          runIndex = i; // 0-based
+          runIndex = i;
         }
-      });
+      }
 
       if (!Number.isFinite(best)) return { time: "", run: null };
-      return { time: msToHMSms(best), run: runIndex + 1 }; // 1-based untuk UI
+      return { time: msToHMSms(best), run: runIndex + 1 };
     },
 
     bestRunOf(team) {
-      return this.bestTimeWithRun(team).run; // 1 atau 2, atau null jika belum ada
+      const r = this.bestTimeWithRun(team);
+      return r.run;
     },
     setRun(idx) {
       this.activeRun = idx;
@@ -1451,7 +2253,6 @@ export default {
           return this.SLALOM_GATES;
         }
 
-        // bungkus ke Promise supaya bisa di-await dan mengembalikan gates
         const gates = await new Promise((resolve) => {
           ipcRenderer.once("race-settings:get-reply", (_e, res) => {
             var n = DEFAULT_S16;
@@ -1472,7 +2273,7 @@ export default {
           ipcRenderer.send("race-settings:get", evId);
         });
 
-        return gates; // array angka [1..N]
+        return gates;
       } catch (err) {
         this.SLALOM_GATES = buildGates(DEFAULT_S16);
         this.syncAllTeamsPenaltiesLength();
@@ -1483,7 +2284,7 @@ export default {
     // Samakan panjang penalties setiap sesi tim dengan jumlah gate terbaru
     syncAllTeamsPenaltiesLength() {
       const need = this.SLALOM_GATES.length;
-      const fixLen = (arr) => {
+      const fixLen = function (arr) {
         const a = Array.isArray(arr) ? arr.slice() : [];
         while (a.length < need) a.push(0);
         if (a.length > need) a.length = need;
@@ -1495,15 +2296,7 @@ export default {
         });
       });
     },
-    // rankOf(id) {
-    //   const r = this.ranksMap && this.ranksMap[id];
-    //   // jika tidak ada best time → '-'
-    //   return r && (typeof r.rank === "number" || r.rank === "-") ? r.rank : "-";
-    // },
-    // scoreOf(id) {
-    //   const r = this.ranksMap && this.ranksMap[id];
-    //   return r && typeof r.score === "number" ? r.score : 0;
-    // },
+
     rankOfTeam(team) {
       const r = this.ranksMap && this.ranksMap[String(team._id)];
       return r && (typeof r.rank === "number" || r.rank === "-") ? r.rank : "-";
@@ -1512,33 +2305,25 @@ export default {
       const r = this.ranksMap && this.ranksMap[String(team._id)];
       return r && typeof r.score === "number" ? r.score : 0;
     },
-    /** === Table accessors === */
-    sessionOptions(team) {
-      return team.sessions.map((_, i) => ({ text: `Run ${i + 1}`, value: i }));
-    },
-    // Modify currentSession to handle undefined cases
+
     currentSession(team) {
       const idx =
         this.selectedSession[String(team._id)] != null
           ? this.selectedSession[String(team._id)]
           : 0;
-      // Safeguard: Ensure the session is defined
       const session =
-        team.sessions && team.sessions[idx] ? team.sessions[idx] : {}; // Default to empty object if session is undefined
+        team.sessions && team.sessions[idx] ? team.sessions[idx] : {};
 
-      // Ensure penalties is always an array
       const need = this.SLALOM_GATES.length;
       let penalties = Array.isArray(session.penalties) ? session.penalties : [];
-      while (penalties.length < need) penalties.push(0); // Ensure enough penalties
-      if (penalties.length > need) penalties.length = need; // Ensure no more penalties than needed
+      while (penalties.length < need) penalties.push(0);
+      if (penalties.length > need) penalties.length = need;
 
-      // Safeguard: Ensure startPenalty and finishPenalty are defined
       session.startPenalty =
         session.startPenalty != null ? session.startPenalty : 0;
       session.finishPenalty =
         session.finishPenalty != null ? session.finishPenalty : 0;
 
-      // Set the penalties in the session object
       session.penalties = penalties;
 
       return session;
@@ -1546,20 +2331,21 @@ export default {
 
     /** === Perhitungan penalty/time === */
     recalcSession(s) {
-      // total penalty (angka) = S + sum(1..N) + F
-      const core = (s.penalties || []).reduce(
-        (a, v) => a + (Number(v) || 0),
-        0
-      );
+      const core = (s.penalties || []).reduce(function (a, v) {
+        return a + (Number(v) || 0);
+      }, 0);
       const sVal = Number(s.startPenalty) || 0;
       const fVal = Number(s.finishPenalty) || 0;
       s.totalPenalty = sVal + core + fVal;
 
-      // konversi ke ms dengan peta nilai
-      const toMs = (v) => PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
+      const toMs = function (v) {
+        return PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
+      };
       const penMs =
         toMs(sVal) +
-        (s.penalties || []).reduce((sum, v) => sum + toMs(v), 0) +
+        (s.penalties || []).reduce(function (sum, v) {
+          return sum + toMs(v);
+        }, 0) +
         toMs(fVal);
 
       s.penaltyTime = msToHMSms(penMs);
@@ -1578,18 +2364,17 @@ export default {
     },
     calculateBestTime(team) {
       const times = (team.sessions || [])
-        .map((s) => s && s.totalTime)
-        .filter(Boolean);
+        .map(function (s) {
+          return s && s.totalTime;
+        })
+        .filter(function (v) {
+          return !!v;
+        });
       if (!times.length) return "";
-      const best = times
-        .map(hmsToMs)
-        .reduce((min, ms) => Math.min(min, ms), Infinity);
+      const best = times.map(hmsToMs).reduce(function (min, ms) {
+        return Math.min(min, ms);
+      }, Infinity);
       return msToHMSms(best);
-    },
-    onGatePenaltyChange(team, gateIndex, value) {
-      const s = this.currentSession(team);
-      this.$set(s.penalties, gateIndex, Number(value) || 0);
-      this.recalcSession(s);
     },
 
     /** === Hook dari OperationTimePanel === */
@@ -1614,42 +2399,25 @@ export default {
 
     /** === Navigasi sederhana === */
     goTo() {
-      this.$router.push(`/event-detail/${this.$route.params.id}`);
-    },
-
-    getScoreByRanked(ranked) {
-      const m = this.dataScore.find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      this.$router.push("/event-detail/" + this.$route.params.id);
     },
 
     toggleSortRanked() {
-      // cycle: off → asc → desc → off
       if (!this.sortBest.enabled) {
         this.sortBest.enabled = true;
-        this.sortBest.desc = false; // ASC
+        this.sortBest.desc = false;
       } else if (!this.sortBest.desc) {
-        this.sortBest.desc = true; // DESC
+        this.sortBest.desc = true;
       } else {
-        this.sortBest.enabled = false; // OFF
+        this.sortBest.enabled = false;
       }
-    },
-    _zeroGates(n) {
-      var out = [];
-      var i = 0;
-      while (i < n) {
-        out.push(0);
-        i = i + 1;
-      }
-      return out;
     },
 
     /** === Save: dokumen Slalom (multi-run + penalty dinamis) === */
     buildDocs() {
-      // Ambil bucket & (opsional) teams dari payload start
       var payload = this.loadFromRaceStartPayloadForSlalom();
       var bucket = payload && payload.bucket ? payload.bucket : {};
 
-      // Validasi minimal
       var must = ["eventId", "initialId", "raceId", "divisionId"];
       var missing = [];
       var i = 0;
@@ -1662,7 +2430,6 @@ export default {
         throw new Error("Bucket fields missing: " + missing.join(", "));
       }
 
-      // Siapkan dokumen dasar
       var doc = {
         eventId: String(
           bucket.eventId || this.eventId || this.$route.params.id || ""
@@ -1686,7 +2453,6 @@ export default {
         sourceTeams = [];
       }
 
-      // Jumlah gate dari setting, fallback 14
       var gatesCount = this.SLALOM_GATES.length || 14;
 
       if (
@@ -1698,7 +2464,6 @@ export default {
         if (nGate > 0) gatesCount = nGate;
       }
 
-      // Loop tim satu per satu
       var tIndex = 0;
       while (tIndex < sourceTeams.length) {
         var t = sourceTeams[tIndex] || {};
@@ -1713,17 +2478,13 @@ export default {
         var statusNum = 0;
         if (Number.isFinite(t.statusId)) statusNum = Number(t.statusId);
 
-        // Ambil 2 sesi (run) dari struktur panel slalom:
-        // t.sessions[0] dan t.sessions[1] → kalau tidak ada, isi kosong
         var sessions = Array.isArray(t.sessions) ? t.sessions : [];
         var s1 = sessions[0] || {};
         var s2 = sessions[1] || {};
 
-        // Pastikan penalties S/1..N/F terset (angka)
         var s1Start = Number(s1.startPenalty || 0);
         var s1Finish = Number(s1.finishPenalty || 0);
         var s1Gates = Array.isArray(s1.penalties) ? s1.penalties : [];
-        // normalkan panjang gates ke gatesCount
         var fixed1 = [];
         var gi1 = 0;
         while (gi1 < gatesCount) {
@@ -1743,7 +2504,6 @@ export default {
           gi2 = gi2 + 1;
         }
 
-        // Bangun array result: Run 1 & Run 2
         var results = [];
 
         var r1 = {
@@ -1784,7 +2544,6 @@ export default {
         };
         results.push(r2);
 
-        // Dorong tim (PASTIKAN teamId tidak diubah)
         var teamOut = {
           teamId: teamIdStr,
           nameTeam: nameTeamStr,
@@ -1801,52 +2560,47 @@ export default {
       }
       return doc;
     },
-    /** === Save (parity dengan Sprint) === */
-    saveResult() {
-      try {
-        const docs = this.buildDocs();
-        if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
-          ipcRenderer.send("get-alert", {
-            type: "warning",
-            detail: "Belum ada data yang bisa disimpan.",
-            message: "Ups Sorry",
-          });
-          return;
-        }
 
-        // Bungkus ke array agar konsisten dengan format insert-sprint-result
-        const payload = [docs];
+    // saveResult() {
+    //   try {
+    //     const docs = this.buildDocs();
+    //     if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "warning",
+    //         detail: "Belum ada data yang bisa disimpan.",
+    //         message: "Ups Sorry",
+    //       });
+    //       return;
+    //     }
 
-        // Kirim ARRAY langsung (paritas dengan Sprint)
-        ipcRenderer.send("insert-slalom-result", payload);
+    //     const payload = [docs];
+    //     ipcRenderer.send("insert-slalom-result", payload);
 
-        // Tunggu balasan — pola sama seperti Sprint
-        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
-          if (res && res.ok) {
-            ipcRenderer.send("get-alert-saved", {
-              type: "question",
-              detail: "Result data has been successfully saved",
-              message: "Successfully",
-            });
-          } else {
-            ipcRenderer.send("get-alert", {
-              type: "error",
-              detail: (res && res.error) || "Save failed",
-              message: "Failed",
-            });
-          }
-        });
-      } catch (e) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: e && e.message ? e.message : "Save failed",
-          message: "Failed",
-        });
-      }
-    },
+    //     ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+    //       if (res && res.ok) {
+    //         ipcRenderer.send("get-alert-saved", {
+    //           type: "question",
+    //           detail: "Result data has been successfully saved",
+    //           message: "Successfully",
+    //         });
+    //       } else {
+    //         ipcRenderer.send("get-alert", {
+    //           type: "error",
+    //           detail: (res && res.error) || "Save failed",
+    //           message: "Failed",
+    //         });
+    //       }
+    //     });
+    //   } catch (e) {
+    //     ipcRenderer.send("get-alert", {
+    //       type: "error",
+    //       detail: e && e.message ? e.message : "Save failed",
+    //       message: "Failed",
+    //     });
+    //   }
+    // },
 
     // 1 ONLY
-    // ===== SAVE ONLY SESSION 1 =====
     saveSession1() {
       try {
         const doc = this.buildDocsSession1Only();
@@ -1885,7 +2639,6 @@ export default {
     },
 
     buildDocsSession1Only() {
-      // Ambil bucket dari localStorage
       const payload = this.loadFromRaceStartPayloadForSlalom();
       const b = (payload && payload.bucket) || {};
 
@@ -1906,10 +2659,9 @@ export default {
         teams: [],
       };
 
-      // Ambil dari UI (this.teams) → ambil sessions[0] saja
       const gatesCount = this.SLALOM_GATES.length || 14;
 
-      const fixGates = (arr) => {
+      const fixGates = function (arr) {
         const a = Array.isArray(arr) ? arr.slice() : [];
         const out = [];
         for (let i = 0; i < gatesCount; i++) out.push(Number(a[i] || 0));
@@ -1968,7 +2720,6 @@ export default {
           divisionId: String(b.divisionId || ""),
         };
 
-        // Ambil dari DB result slalom
         const res = await new Promise((resolve) => {
           ipcRenderer.once("get-slalom-result-reply", (_e, payload) =>
             resolve(payload)
@@ -1978,19 +2729,20 @@ export default {
 
         const rows = [];
         if (res && res.ok && Array.isArray(res.items)) {
-          // Ambil doc pertama yang match bucket
           const doc = res.items[0] || {};
           const teams = Array.isArray(doc.teams) ? doc.teams : [];
           for (let i = 0; i < teams.length; i++) {
             const t = teams[i] || {};
-            const s1 = Array.isArray(t.result) ? t.result[0] : null; // === SESSION 1
+            const s1 = Array.isArray(t.result) ? t.result[0] : null;
             if (!s1) continue;
 
             const g =
               s1.penaltyTotal && Array.isArray(s1.penaltyTotal.gates)
                 ? s1.penaltyTotal.gates
                 : [];
-            const gsum = g.reduce((a, v) => a + (Number(v) || 0), 0);
+            const gsum = g.reduce(function (a, v) {
+              return a + (Number(v) || 0);
+            }, 0);
             const start = Number(
               (s1.penaltyTotal && s1.penaltyTotal.start) || 0
             );
@@ -2021,7 +2773,7 @@ export default {
       this.loadingSession1 = false;
     },
 
-    // ===== PDF SESSION 1 (ambil data dari DB seperti openSession1Modal) =====
+    // ===== PDF SESSION 1 =====
     async printPdfSession1() {
       this.loadingSession1 = true;
       try {
@@ -2045,9 +2797,7 @@ export default {
           const doc = res.items[0] || {};
           const teams = Array.isArray(doc.teams) ? doc.teams : [];
 
-          // ✅ ini yang penting → langsung kirim ke komponen PDF
           this.pdfParticipantsSession1 = teams;
-          // this.dataEventSafe = doc;
           this.titleCategories =
             (doc.divisionName || "") +
             " " +
@@ -2064,34 +2814,341 @@ export default {
         if (pdf && typeof pdf.generatePdf === "function") {
           await pdf.generatePdf();
         } else {
-          ipcRenderer &&
+          if (ipcRenderer) {
             ipcRenderer.send("get-alert", {
               type: "warning",
               detail: "Komponen PDF belum siap. Coba lagi.",
               message: "PDF belum siap",
             });
+          }
         }
       } catch (err) {
-        ipcRenderer &&
+        if (ipcRenderer) {
           ipcRenderer.send("get-alert", {
             type: "error",
             detail: err.message || "Gagal membuat PDF Session 1",
             message: "Failed",
           });
+        }
       }
 
       this.loadingSession1 = false;
     },
     onPdfGeneratedS1() {
       try {
-        ipcRenderer &&
+        if (ipcRenderer) {
           ipcRenderer.send("get-alert", {
             type: "success",
             detail: "PDF Slalom Session 1 telah berhasil diunduh.",
             message: "Download Selesai",
           });
+        }
       } catch (err) {
-        logger.warn("❌ Failed to update race settings:", err);
+        logger &&
+          logger.warn &&
+          logger.warn("Failed to update race settings:", err);
+      }
+    },
+
+    // === merge hasil SLALOM ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResults() {
+      var now = new Date();
+
+      // --- helpers ---
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+      };
+
+      function toNumOrNull(v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      var self = this;
+      function getScoreByRank(rank) {
+        if (!Number.isFinite(rank) || rank <= 0) return 0;
+        var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
+        var i = 0;
+        while (i < ds.length) {
+          var d = ds[i];
+          if (Number(d.ranking) === Number(rank)) {
+            var sc = Number(d.score);
+            return Number.isFinite(sc) ? sc : 0;
+          }
+          i++;
+        }
+        return 0;
+      }
+
+      // --- ambil bucket dari localStorage (raceStartPayload) ---
+      var raw = localStorage.getItem("raceStartPayload");
+      var bucket = {};
+      try {
+        var parsed = JSON.parse(raw || "{}");
+        bucket = parsed && parsed.bucket ? parsed.bucket : {};
+      } catch (e) {
+        bucket = {};
+      }
+
+      var baseFilter = {
+        eventId: String(
+          bucket.eventId ||
+            (this.$route && this.$route.params && this.$route.params.id) ||
+            ""
+        ),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // --- siapkan incoming (rank/score per tim, dari best time) ---
+      var incoming = new Map();
+      var teamsArr = Array.isArray(this.teams) ? this.teams : [];
+      var ti = 0;
+      while (ti < teamsArr.length) {
+        var t = teamsArr[ti] || {};
+        var key = String(t.teamId || t.bibNumber || t.bibTeam || "");
+        if (key) {
+          var rMap = this.ranksMap || {};
+          var rInfo = rMap[String(t._id)];
+          var ranked =
+            rInfo && Number.isFinite(rInfo.rank) ? Number(rInfo.rank) : null;
+          var score = Number.isFinite(ranked) ? getScoreByRank(ranked) : 0;
+
+          incoming.set(key, {
+            key: key,
+            teamId: String(t.teamId || ""),
+            teamName: String(t.nameTeam || ""),
+            bib: String(t.bibNumber || t.bibTeam || ""),
+            slalomCat: {
+              name: K.SLALOM,
+              rankedByCats: toNumOrNull(ranked),
+              scored: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+            },
+            totalRanked: toNumOrNull(ranked),
+            totalScore: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+          });
+        }
+        ti++;
+      }
+
+      // --- ambil dokumen event-results yang lama (kalau ada) ---
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
+
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e2) {
+        existingDoc = null;
+      }
+
+      // --- payload dasar ---
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: String(bucket.eventName || "SLALOM").toUpperCase(),
+        initialName: String(bucket.initialName || "").toUpperCase(),
+        raceName: String(bucket.raceName || "").toUpperCase(),
+        divisionName: String(bucket.divisionName || "").toUpperCase(),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        // pertahankan createdAt lama
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        // map existing rows: key = teamId || bib
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei = 0;
+        while (ei < safeArr.length) {
+          var row = safeArr[ei] || {};
+          var k = String(row.teamId || row.bib || "");
+          if (k) {
+            // deep clone sederhana
+            map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+          ei++;
+        }
+
+        // merge SLALOM per tim saja
+        var iter = incoming.entries();
+        var step = iter.next();
+        while (!step.done) {
+          var ent = step.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci = 0;
+          while (ci < prevCats.length) {
+            var c = prevCats[ci] || {};
+            var cname = String(c.name || "").toUpperCase();
+            if (cname === K.SLALOM) {
+              foundIdx = ci;
+              break;
+            }
+            ci++;
+          }
+          if (foundIdx >= 0) {
+            prevCats[foundIdx] = inc.slalomCat;
+          } else {
+            prevCats.push(inc.slalomCat);
+          }
+
+          var merged = {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          };
+
+          map.set(ent[0], merged);
+          step = iter.next();
+        }
+
+        // konversi Map ke array (tanpa chaining)
+        var values = [];
+        var it2 = map.values();
+        var s2 = it2.next();
+        while (!s2.done) {
+          values.push(s2.value);
+          s2 = it2.next();
+        }
+        payload.eventResult = values;
+      } else {
+        // dokumen baru
+        var vals = [];
+        var iter2 = incoming.values();
+        var st = iter2.next();
+        while (!st.done) {
+          var inc2 = st.value;
+          var obj = {
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              {
+                name: K.SLALOM,
+                rankedByCats: toNumOrNull(inc2.slalomCat.rankedByCats),
+                scored:
+                  toNumOrNull(inc2.slalomCat.scored) !== null
+                    ? toNumOrNull(inc2.slalomCat.scored)
+                    : 0,
+              },
+              { name: K.SPRINT, rankedByCats: null, scored: 0 },
+              { name: K.H2H, rankedByCats: null, scored: 0 },
+              { name: K.DRR, rankedByCats: null, scored: 0 },
+            ],
+            totalRanked: toNumOrNull(inc2.totalRanked),
+            totalScore:
+              toNumOrNull(inc2.totalScore) !== null
+                ? toNumOrNull(inc2.totalScore)
+                : 0,
+          };
+          vals.push(obj);
+          st = iter2.next();
+        }
+        payload.eventResult = vals;
+      }
+
+      // --- kirim upsert ---
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "SLALOM category merged successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
+          });
+        }
+      });
+    },
+
+    // --- panggil setelah insert-slalom-result sukses ---
+    saveResult() {
+      try {
+        var docs = this.buildDocs();
+        if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            detail: "Belum ada data yang bisa disimpan.",
+            message: "Ups Sorry",
+          });
+          return;
+        }
+        ipcRenderer.send("insert-slalom-result", [docs]);
+
+        var self = this;
+        ipcRenderer.once(
+          "insert-slalom-result-reply",
+          async function (_e, res) {
+            var ok = res && res.ok ? true : false;
+            if (ok) {
+              ipcRenderer.send("get-alert-saved", {
+                type: "question",
+                detail: "Result data has been successfully saved",
+                message: "Successfully",
+              });
+
+              // merge ke event-results (kategori SLALOM saja)
+              await self.upsertEventResults();
+            } else {
+              ipcRenderer.send("get-alert", {
+                type: "error",
+                detail: res && res.error ? res.error : "Save failed",
+                message: "Failed",
+              });
+            }
+          }
+        );
+      } catch (e) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: e && e.message ? e.message : "Save failed",
+          message: "Failed",
+        });
       }
     },
   },
@@ -2122,7 +3179,7 @@ export default {
   flex: 1 1 260px;
 }
 
-.slalom-actionbar__select #drrBucketSelect {
+.slalom-actionbar__select #slalomBucketSelect {
   border-radius: 12px;
   cursor: pointer;
 }
@@ -2391,7 +3448,7 @@ td {
   display: grid;
   grid-template-columns: repeat(
     6,
-    minmax(56px, 1fr)
+    minmax(70px, 1fr)
   ); /* 8 kolom x 2 baris -> 16 item + S/F = 16 + 2 = 18; akan auto-wrap */
   gap: 6px 8px;
   align-items: center;

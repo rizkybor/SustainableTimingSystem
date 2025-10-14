@@ -286,8 +286,8 @@
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
-                    
-                     <!-- TEAM NAME  -->
+
+                    <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
@@ -422,13 +422,6 @@
                     </td>
 
                     <td v-if="editResult">
-                      <!-- <b-button
-                        size="sm"
-                        variant="warning"
-                        @click="openModal(item)"
-                        >Edit</b-button
-                      > -->
-
                       <b-button
                         size="sm"
                         class="btn-action"
@@ -539,6 +532,7 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
+import { getSocket } from "@/services/socket";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 function getBucket() {
@@ -751,14 +745,14 @@ export default {
   components: { OperationTimePanel, EmptyCard, Icon },
   data() {
     return {
+      initSocket: null,
+      selfSocketId: null,
       isLoading: false,
       defaultImg,
       selectPath: "",
       baudRate: 9600,
       baudOptions: [1200, 2400, 9600],
       serialCtrl: null,
-      endGame: false,
-      isScrolled: false,
       port: null,
       isPortConnected: false,
       digitId: [],
@@ -768,13 +762,11 @@ export default {
       selectedDrrKey: "",
       currentBucket: null,
       drrSectionsCount: 3,
-      editForm: "",
       editResult: false,
       dataPenalties: [],
       dataScore: [],
       digitTimeStart: null,
       digitTimeFinish: null,
-      currentPort: "",
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -877,43 +869,312 @@ export default {
           }))
         : [];
     },
-
-    drrEventId() {
-      // cari eventId untuk kategori DRR
-      const cat = (this.dataEventSafe.categoriesEvent || []).find(
-        (c) => String(c.name || "").toUpperCase() === "DRR"
-      );
-      return cat ? String(cat.value) : "";
-    },
   },
-  async mounted() {
-    await this.loadDataScore("DRR");
-    await this.loadDataPenalties("DRR");
+async mounted() {
+  await this.loadDataScore("DRR");
+  await this.loadDataPenalties("DRR");
 
-    this.dataEvent = readEventDetailsFromLS();
-    this.buildStaticDrrOptions();
+  this.dataEvent = readEventDetailsFromLS();
+  this.buildStaticDrrOptions();
 
-    if (this.drrBucketOptions.length) {
-      const savedKey = localStorage.getItem("currentDRRBucketKey");
-      this.selectedDrrKey =
-        savedKey && this.drrBucketMap[savedKey]
-          ? savedKey
-          : this.drrBucketOptions[0].value;
+  if (this.drrBucketOptions.length) {
+    const savedKey = localStorage.getItem("currentDRRBucketKey");
+    this.selectedDrrKey =
+      savedKey && this.drrBucketMap[savedKey]
+        ? savedKey
+        : this.drrBucketOptions[0].value;
 
-      await this.fetchBucketTeamsByKey(this.selectedDrrKey);
-    } else {
-      await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
-    }
+    await this.fetchBucketTeamsByKey(this.selectedDrrKey);
+  } else {
+    await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
+  }
 
-    this.fetchDrrSectionCountFromSettings();
-  },
+  this.fetchDrrSectionCountFromSettings();
+
+  // ====== SOCKET INIT & LISTENERS (inline di mounted) ======
+  try {
+    const socket = getSocket();
+    this.initSocket = socket;
+
+    // simpan id utk cegah echo (jaga-jaga kalau pengirim pakai senderId)
+    const onConnect = () => {
+      this.selfSocketId = socket && socket.id ? socket.id : null;
+    };
+    socket.on("connect", onConnect);
+
+    // Validasi event harus match dgn halaman ini
+    const isSameEvent = (m) => {
+      const cur = this.currentEventId ? String(this.currentEventId) : "";
+      const ev = m && m.eventId ? String(m.eventId) : "";
+      return !cur || !ev ? true : cur === ev;
+    };
+
+    // Handler pesan masuk
+    const onMessage = async (msgRaw) => {
+      let msg = msgRaw || {};
+
+      // cegah echo dari diri sendiri (kalau pengirim ikut kirim senderId)
+      if (msg.senderId && this.selfSocketId && msg.senderId === this.selfSocketId) return;
+      if (!isSameEvent(msg)) return;
+
+      // Normalisasi tipe lama → baru (opsional)
+      if (msg.type === "PenaltiesUpdated") {
+        const gt = String(msg.gate || "").trim().toLowerCase();
+        if (gt === "start" || gt === "s" || gt === "st") msg.type = "PenaltyStart";
+        else if (gt === "finish" || gt === "f" || gt === "fin") msg.type = "PenaltyFinish";
+        else msg.type = "PenaltyGates";
+      }
+
+      // Kumpulkan updates (bisa array tunggal / batch)
+      let updates;
+      if (Array.isArray(msg)) updates = msg;
+      else if (Array.isArray(msg.updates)) updates = msg.updates;
+      else updates = [msg];
+
+      // Normalisasi PenaltyGates → gateIndex 0-based, serta filter tipe lain
+      for (let i = 0; i < updates.length; i++) {
+        const u = updates[i] || {};
+        const t = String(u.type || "").toLowerCase();
+        if (t !== "penaltystart" && t !== "penaltyfinish" && t !== "penaltygates") {
+          updates[i] = null; // hanya proses penalty
+          continue;
+        }
+        if (t === "penaltygates") {
+          if (typeof u.gate === "number" && Number.isFinite(u.gate)) {
+            const gi = u.gate > 0 ? u.gate - 1 : u.gate;
+            if (Number.isInteger(gi)) u.gateIndex = gi;
+          }
+        }
+      }
+      updates = updates.filter(Boolean);
+      if (!updates.length) return;
+
+      // Terapkan semua update dulu…
+      for (const u of updates) {
+        await this.applyPenaltyFromSocketDirect(u);
+      }
+
+      // …baru re-rank sekali (hemat render)
+      await this.assignRanks(this.participant);
+      this.$forceUpdate && this.$forceUpdate();
+    };
+
+    socket.on("custom:event", onMessage);
+
+    // cleanup saat komponen di-destroy
+    this.$once("hook:beforeDestroy", () => {
+      if (this.initSocket) {
+        this.initSocket.off("connect", onConnect);
+        this.initSocket.off("custom:event", onMessage);
+      }
+    });
+  } catch (err) {
+    if (logger && logger.warn) logger.warn("socket init failed:", err);
+  }
+},
   methods: {
+    // ===== SOCKET: handler utama (langsung konsumsi format "custom:event") =====
+    async applyPenaltyFromSocketDirect(msg) {
+      try {
+        // Normalisasi tipe (Start / Finish / Section)
+        var rawType = "";
+        if (msg && msg.type) rawType = String(msg.type).toLowerCase();
+
+        var normType = ""; // "start" | "finish" | "section"
+        if (rawType === "penaltystart") normType = "start";
+        else if (rawType === "penaltyfinish") normType = "finish";
+        else if (rawType === "penaltygates") normType = "section";
+        else if (rawType === "penaltiesupdated") {
+          // fallback lawas
+          var gt = "";
+          if (msg && msg.gate != null)
+            gt = String(msg.gate).trim().toLowerCase();
+          if (gt === "start" || gt === "s" || gt === "st") normType = "start";
+          else if (gt === "finish" || gt === "f" || gt === "fin")
+            normType = "finish";
+          else normType = "section";
+        } else {
+          return; // bukan tipe yang kita proses
+        }
+
+        // Identitas tim (teamId | bib | bibTeam | teamName | rowIndex)
+        var teamId = msg && msg.teamId != null ? msg.teamId : null;
+        var bib = null;
+        if (msg && msg.bib != null) bib = msg.bib;
+        else if (msg && msg.bibTeam != null) bib = msg.bibTeam;
+        var teamName = msg && msg.teamName ? msg.teamName : "";
+        var rowIndex = msg && msg.rowIndex != null ? msg.rowIndex : null;
+
+        var team = this.resolveTeamByKey(teamId, bib, teamName, rowIndex);
+        if (!team) return;
+
+        // Section index (0-based) untuk "section"
+        var sectionIndex = null;
+        if (normType === "section") {
+          if (
+            msg &&
+            msg.gateIndex != null &&
+            Number.isFinite(Number(msg.gateIndex))
+          ) {
+            sectionIndex = Number(msg.gateIndex);
+          } else if (
+            msg &&
+            msg.index != null &&
+            Number.isFinite(Number(msg.index))
+          ) {
+            sectionIndex = Number(msg.index);
+          } else if (
+            msg &&
+            msg.gate != null &&
+            Number.isFinite(Number(msg.gate))
+          ) {
+            // gate 1-based → 0-based
+            var gi = Number(msg.gate);
+            sectionIndex = gi > 0 ? gi - 1 : gi;
+          }
+          if (sectionIndex != null) {
+            var maxIdx =
+              this.drrSectionsCount > 0 ? this.drrSectionsCount - 1 : 0;
+            if (sectionIndex < 0) sectionIndex = 0;
+            if (sectionIndex > maxIdx) sectionIndex = maxIdx;
+          }
+        }
+
+        // Ambil nilai penalti dari salah satu: timePen (string) → value (angka) → label (teks)
+        var timePenMaybe = msg && msg.timePen ? msg.timePen : null;
+        var valueMaybe = null;
+        if (msg && msg.value != null) valueMaybe = msg.value;
+        else if (msg && msg.penalty && msg.penalty.value != null)
+          valueMaybe = msg.penalty.value;
+
+        var labelMaybe = null;
+        if (msg && msg.label) labelMaybe = msg.label;
+        else if (msg && msg.penalty && msg.penalty.label)
+          labelMaybe = msg.penalty.label;
+
+        var timeStr = this.coercePenaltyTimeStr(
+          timePenMaybe,
+          valueMaybe,
+          labelMaybe
+        );
+        if (!timeStr) return;
+
+        // Terapkan ke UI (pakai updateTimePen agar semua perhitungan ikut jalan)
+        if (normType === "start") {
+          await this.updateTimePen(timeStr, team, "penaltyStartTime", null);
+        } else if (normType === "finish") {
+          await this.updateTimePen(timeStr, team, "penaltyFinishTime", null);
+        } else if (normType === "section") {
+          if (sectionIndex != null) {
+            await this.updateTimePen(
+              timeStr,
+              team,
+              "penaltySection",
+              sectionIndex
+            );
+          } else if (this.drrSectionsCount > 0) {
+            await this.updateTimePen(timeStr, team, "penaltySection", 0);
+          }
+        }
+
+        // Info juri kalau ada
+        if (msg && msg.judge) {
+          if (!team.result) team.result = {};
+          team.result.judgesBy = String(msg.judge);
+        }
+        if (msg && msg.at) {
+          if (!team.result) team.result = {};
+          team.result.judgesTime = String(msg.at);
+        }
+      } catch (e) {
+        this.notifyError(e, "Apply penalty (direct) failed");
+      }
+    },
+
+    // ==== helper: cari tim by teamId / bib / teamName / rowIndex ====
+    resolveTeamByKey(teamId, bib, teamName, rowIndex) {
+      var arr = this.participantArr || [];
+
+      if (Number.isFinite(Number(rowIndex)) && arr[Number(rowIndex)]) {
+        return arr[Number(rowIndex)];
+      }
+
+      var tid = teamId != null ? String(teamId).trim() : "";
+      if (tid) {
+        var byId = arr.find(function (t) {
+          return String(t.teamId || "") === tid;
+        });
+        if (byId) return byId;
+      }
+
+      var bb = bib != null ? String(bib).trim() : "";
+      if (bb) {
+        var byBib = arr.find(function (t) {
+          return String(t.bibTeam || "") === bb;
+        });
+        if (byBib) return byBib;
+      }
+
+      var nm = teamName ? String(teamName).trim().toUpperCase() : "";
+      if (nm) {
+        var byName = arr.find(function (t) {
+          return String(t.nameTeam || "").toUpperCase() === nm;
+        });
+        if (byName) return byName;
+      }
+
+      return null;
+    },
+
+    // ==== helper: jadikan "HH:MM:SS.mmm" dari timePen/value/label ====
+    coercePenaltyTimeStr(timePenMaybe, valueMaybe, labelMaybe) {
+      // 1) langsung string "HH:MM:SS.mmm" (boleh minus)
+      var tp = timePenMaybe != null ? String(timePenMaybe).trim() : "";
+      if (tp && /^-?\d{2}:\d{2}:\d{2}\.\d{3}$/.test(tp)) return tp;
+
+      // 2) angka (detik; boleh minus/pecahan) → coba map ke dataPenalties.value, jika tak ada, konversi manual
+      var val = Number(valueMaybe);
+      if (Number.isFinite(val)) {
+        var fromMap = this.penaltyValueToTime(val);
+        if (fromMap) return fromMap;
+        return this.hhmmssFromSeconds(val);
+      }
+
+      // 3) label seperti "50s", "-5s", "10 sec"
+      var lb = labelMaybe != null ? String(labelMaybe).trim() : "";
+      if (lb) {
+        var m = lb.match(/(-?\d+(?:\.\d+)?)\s*(s|sec|secs|detik)?/i);
+        if (m) {
+          var sec = Number(m[1]);
+          if (Number.isFinite(sec)) return this.hhmmssFromSeconds(sec);
+        }
+      }
+
+      return "";
+    },
+
+    // ==== helper: ubah detik (±, pecahan) → "HH:MM:SS.mmm"
+    hhmmssFromSeconds(seconds) {
+      var neg = seconds < 0;
+      var msTotal = Math.round(Math.abs(seconds) * 1000);
+      var hr = Math.floor(msTotal / 3600000);
+      var rem1 = msTotal % 3600000;
+      var min = Math.floor(rem1 / 60000);
+      var rem2 = rem1 % 60000;
+      var sec = Math.floor(rem2 / 1000);
+      var ms = rem2 % 1000;
+      var pad = function (n, w) {
+        return String(n).padStart(w, "0");
+      };
+      var s =
+        pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(ms, 3);
+      return neg ? "-" + s : s;
+    },
     // === SERIAL CONNECTION ===
     async connectPort() {
       if (!this.isPortConnected) {
         const PREFERRED_PATH = "/dev/tty.usbserial-120";
         const ports = await listPorts();
-        this.currentPort = ports;
         const portIndex = ports.findIndex(
           (p) => String(p.path) === PREFERRED_PATH
         );
@@ -984,8 +1245,6 @@ export default {
         const ir = this.$ipc || window.ipcRenderer;
         ir.send && ir.send("get-alert", { type, detail, message });
       }
-      // bisa juga set state:
-      this.lastErrorMessage = `${message}: ${detail}`;
     },
 
     notifyError(err, message = "Error") {
@@ -1128,148 +1387,7 @@ export default {
       this.drrBucketOptions = opts;
       this.drrBucketMap = map;
     },
-    async loadAllDrrBucketsFromDB() {
-      try {
-        if (typeof ipcRenderer === "undefined") return;
 
-        // 1) sumber eventId
-        const bucketLS = getBucket();
-        const routeId =
-          this.$route && this.$route.params && this.$route.params.id
-            ? String(this.$route.params.id)
-            : "";
-        let eventDetailsId = "";
-        try {
-          const evRaw = localStorage.getItem("eventDetails");
-          const evObj = evRaw ? JSON.parse(evRaw) : null;
-          eventDetailsId =
-            evObj && (evObj._id || evObj.id)
-              ? String(evObj._id || evObj.id)
-              : "";
-        } catch (err) {
-          logger.warn("❌ Failed to update race settings:", err);
-        }
-
-        const finalEventId = bucketLS.eventId || routeId || eventDetailsId;
-
-        if (!finalEventId) {
-          this.drrBucketOptions = [];
-          this.drrBucketMap = {};
-          return;
-        }
-
-        // 2) panggil IPC
-        const filters = { eventId: finalEventId };
-
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once("teams-registered:find-reply", (_e, payload) => {
-            resolve(payload);
-          });
-          ipcRenderer.send("teams-registered:find", filters);
-        });
-
-        if (!res || !res.ok) {
-          this.drrBucketOptions = [];
-          this.drrBucketMap = {};
-          return;
-        }
-        if (!Array.isArray(res.items) || res.items.length === 0) {
-          this.drrBucketOptions = [];
-          this.drrBucketMap = {};
-          return;
-        }
-
-        // 3) mapping → options + map + agregat
-        const map = Object.create(null);
-        const opts = [];
-
-        const agg = {
-          eventId: "",
-          initialId: "",
-          raceId: "",
-          divisionId: "",
-          eventName: "DRR",
-          initialName: "ALL",
-          raceName: "ALL",
-          divisionName: "ALL",
-          teams: [],
-          _isAggregate: true,
-        };
-
-        const toUpper = (v) => String(v || "").toUpperCase();
-
-        res.items.forEach((b) => {
-          const normalizedTeams = Array.isArray(b.teams)
-            ? b.teams.map(normalizeTeamForDRR)
-            : [];
-
-          const bucketDoc = {
-            ...b,
-            eventName: toUpper(b.eventName),
-            initialName: toUpper(b.initialName),
-            raceName: toUpper(b.raceName),
-            divisionName: toUpper(b.divisionName),
-            teams: normalizedTeams,
-          };
-
-          const key = this._bucketKey(bucketDoc); // "eventId|initialId|raceId|divisionId"
-          const label = this._bucketLabel(bucketDoc); // "DIV RACE – INITIAL"
-
-          map[key] = bucketDoc;
-          opts.push({ value: key, text: label });
-
-          // agregat
-          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
-        });
-
-        // hapus duplikat tim di agregat (nameTeam+bibTeam)
-        if (agg.teams.length) {
-          const seen = new Set();
-          agg.teams = agg.teams.filter((t) => {
-            const sig = `${String(t.nameTeam).toUpperCase()}|${String(
-              t.bibTeam
-            )}`;
-            if (seen.has(sig)) return false;
-            seen.add(sig);
-            return true;
-          });
-          const aggKey = "__ALL_DRR__";
-          map[aggKey] = agg;
-          opts.unshift({ value: aggKey, text: "All DRR Teams (aggregate)" });
-        }
-
-        // 4) commit ke state
-        this.drrBucketMap = map;
-        this.drrBucketOptions = opts;
-
-        // 5) pilih bucket default
-        const savedKey = localStorage.getItem("currentDRRBucketKey");
-        if (savedKey && map[savedKey]) {
-          this._useDrrBucket(savedKey);
-          this.selectedDrrKey = savedKey;
-          return;
-        }
-
-        const startKey = this._bucketKey({
-          eventId: finalEventId,
-          initialId: bucketLS.initialId,
-          raceId: bucketLS.raceId,
-          divisionId: bucketLS.divisionId,
-        });
-        if (map[startKey]) {
-          this._useDrrBucket(startKey);
-          this.selectedDrrKey = startKey;
-          return;
-        }
-
-        if (opts.length) {
-          this._useDrrBucket(opts[0].value); // biasanya agregat
-          this.selectedDrrKey = opts[0].value;
-        }
-      } catch (err) {
-        logger.warn("❌ Failed to update race settings:", err);
-      }
-    },
     loadAllDrrBucketsFromEvent() {
       try {
         this.isLoading = true;
@@ -1300,21 +1418,16 @@ export default {
           _isAggregate: true,
         };
 
-        drrBuckets.forEach((b) => {
+        drrBuckets.forEach(async (b) => {
           const key = this._bucketKey(b);
           const label = this._bucketLabel(b);
-          const normalizedTeams = Array.isArray(b.teams)
-            ? b.teams.map(normalizeTeamForDRR)
-            : [];
-
-          map[key] = {
-            ...b,
-            teams: normalizedTeams,
-          };
+          const hydrated = await this.hydratePenaltiesFromRegistered(
+            b.teams || []
+          );
           opts.push({ value: key, text: label });
 
           // gabungkan ke agregat
-          agg.teams.push(...normalizedTeams.map((t) => ({ ...t })));
+          agg.teams.push(...hydrated.map((t) => ({ ...t })));
         });
 
         // hapus duplikat di agregat berdasarkan (nameTeam + bibTeam)
@@ -1458,10 +1571,8 @@ export default {
         // server bisa return 1 dokumen bucket atau array dokumen.
         // Karena kita kasih filter lengkap (4 id), mestinya 0/1 dokumen.
         const doc = Array.isArray(res.items) ? res.items[0] : res.items;
-        const teams =
-          doc && Array.isArray(doc.teams)
-            ? doc.teams.map(normalizeTeamForDRR)
-            : [];
+        const teamsRaw = doc && Array.isArray(doc.teams) ? doc.teams : [];
+        const teams = await this.hydratePenaltiesFromRegistered(teamsRaw);
 
         // set participant + judul + currentBucket (buat save)
         this.participant = teams;
@@ -1479,6 +1590,8 @@ export default {
 
         // sesuaikan jumlah section penalty ke setting
         this.applyDrrSectionCount(this.drrSectionsCount);
+        await this.assignRanks(this.participant);
+        if (this.$forceUpdate) this.$forceUpdate();
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
@@ -1572,46 +1685,107 @@ export default {
       return (neg ? -1 : 1) * Math.round(val); // bulatkan ke detik terdekat
     },
 
-    loadFromRaceStartPayload() {
-      const { bucket } = loadRaceStartPayloadForDRR();
-      if (!bucket || !Array.isArray(bucket.teams) || bucket.teams.length === 0)
-        return false;
-      this.participant = bucket.teams.slice();
-      this.titleCategories =
-        `${bucket.divisionName} ${bucket.raceName} – ${bucket.initialName}`.trim();
-      try {
-        const events = localStorage.getItem("eventDetails");
-        this.dataEvent = events ? JSON.parse(events) : {};
-      } catch {
-        this.dataEvent = {};
-      }
-      return true;
-    },
-
-    async checkValueStorage() {
-      let dataStorage = null,
-        events = null;
-
-      dataStorage = localStorage.getItem("participantByCategories");
-      events = localStorage.getItem("eventDetails");
-
-      this.dataEvent = events ? JSON.parse(events) : {};
-      const raw = dataStorage ? JSON.parse(dataStorage) : [];
-      const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
-      arr.sort((a, b) =>
-        String(a.praStart || "").localeCompare(String(b.praStart || ""))
+    // === MAP angka penalty ↔ time string (mengacu ke this.dataPenalties) ===
+    penaltyValueToTime(val) {
+      if (val == null) return "";
+      const num = Number(val);
+      if (!Number.isFinite(num)) return "";
+      const found = (this.dataPenalties || []).find(
+        (p) => Number(p.value) === num
       );
-      this.participant = arr.map(normalizeTeamForDRR);
-      this.titleCategories = String(
-        localStorage.getItem("currentCategories") || ""
-      ).trim();
+      return found ? String(found.timePen || "") : "";
     },
 
-    openModal(datas) {
-      this.editForm = datas;
-      this.$bvModal &&
-        this.$bvModal.show &&
-        this.$bvModal.show("bv-modal-edit-team");
+    // pastikan array section punya panjang sesuai setting (drrSectionsCount)
+    _coerceSectionArray(arr, targetLen) {
+      const n =
+        Number.isFinite(targetLen) && targetLen > 0
+          ? targetLen
+          : this.drrSectionsCount || 3;
+      if (Array.isArray(arr)) {
+        const out = arr.slice(0, n);
+        while (out.length < n) out.push(null);
+        return out;
+      }
+      // jika sumbernya angka tunggal/null, ubah jadi array length n
+      const out = [];
+      if (arr != null) out.push(arr);
+      while (out.length < n) out.push(null);
+      return out.slice(0, n);
+    },
+
+    // jumlahkan daftar time string (boleh ada tanda minus) → "HH:MM:SS.mmm"
+    async _sumPenaltyTimes(times = []) {
+      let total = "00:00:00.000";
+      for (const t of times) {
+        const v = String(t || "00:00:00.000");
+        total = v.startsWith("-")
+          ? await this.kurangiWaktu(total, v.slice(1))
+          : await this.tambahWaktu(total, v);
+      }
+      return total;
+    },
+
+    // ambil penalties dari dokumen teams-registered → set ke shape UI
+    async hydratePenaltiesFromRegistered(rawTeams = []) {
+      const secCount =
+        Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+          ? this.drrSectionsCount
+          : 3;
+
+      const normalized = (rawTeams || []).map(normalizeTeamForDRR);
+
+      for (const t of normalized) {
+        const fromDB = Array.isArray(t.result)
+          ? t.result[0] || {}
+          : t.result || {};
+        const r = t.result && !Array.isArray(t.result) ? t.result : {};
+
+        const startPenNum = Number(fromDB.startPenalty);
+        const finishPenNum = Number(fromDB.finishPenalty);
+        const sectionPenRaw = fromDB.sectionPenalty;
+
+        // angka → time string (untuk select)
+        r.penaltyStartTime = this.penaltyValueToTime(startPenNum);
+        r.penaltyFinishTime = this.penaltyValueToTime(finishPenNum);
+
+        const sectionNums = this._coerceSectionArray(sectionPenRaw, secCount);
+        const sectionTimes = sectionNums.map((n) => this.penaltyValueToTime(n));
+        if (this.$set) this.$set(r, "penaltySection", sectionTimes);
+        else r.penaltySection = sectionTimes;
+
+        // set angka numerik (fallback 0 bila NaN)
+        r.startPenalty = Number.isFinite(startPenNum) ? startPenNum : 0;
+        r.finishPenalty = Number.isFinite(finishPenNum) ? finishPenNum : 0;
+        r.sectionPenalty = sectionNums.reduce(
+          (acc, v) => acc + (Number.isFinite(Number(v)) ? Number(v) : 0),
+          0
+        );
+        r.totalPenalty =
+          (r.startPenalty || 0) +
+          (r.finishPenalty || 0) +
+          (r.sectionPenalty || 0);
+
+        // totalPenaltyTime (string)
+        r.penaltyTime = await this._sumPenaltyTimes([
+          r.penaltyStartTime || "00:00:00.000",
+          r.penaltyFinishTime || "00:00:00.000",
+          ...(r.penaltySection || []).map((x) => x || "00:00:00.000"),
+        ]);
+        r.totalPenaltyTime = r.penaltyTime;
+
+        // totalTime jika raceTime sudah ada
+        if (r.raceTime)
+          r.totalTime = await this.tambahWaktu(r.raceTime, r.penaltyTime);
+
+        // bawa info juri bila ada
+        if (fromDB.judgesBy) r.judgesBy = String(fromDB.judgesBy);
+        if (fromDB.judgesTime) r.judgesTime = String(fromDB.judgesTime);
+
+        t.result = r;
+      }
+
+      return normalized;
     },
 
     async assignRanks(items) {
@@ -1632,17 +1806,6 @@ export default {
       if (!timeStr) return Number.POSITIVE_INFINITY;
       const [h = 0, m = 0, s = 0] = String(timeStr).split(":").map(parseFloat);
       return h * 3600 * 1000 + m * 60 * 1000 + s * 1000;
-    },
-
-    async calculateScore(ranked) {
-      const f = this.dataScore.find((d) => d.ranking === ranked);
-      return f ? f.score : 0;
-    },
-
-    async parseTimeResult(t) {
-      const parts = String(t || "00:00:00:000").split(":");
-      const [h, m, s, ms] = parts.map((p) => parseInt(p, 10) || 0);
-      return h * 3600000 + m * 60000 + s * 1000 + ms;
     },
 
     async updateTimePen(
@@ -1809,6 +1972,7 @@ export default {
     },
 
     saveResult() {
+      var self = this;
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
       if (!Array.isArray(clean) || clean.length === 0) {
         ipcRenderer.send("get-alert", {
@@ -1842,17 +2006,20 @@ export default {
 
       const docs = buildResultDocs(clean, this.currentBucket);
       ipcRenderer.send("insert-drr-result", docs);
-      ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
-        if (res && res.ok) {
+      ipcRenderer.once("insert-drr-result-reply", async function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
             detail: "Result data has been successfully saved",
             message: "Successfully",
           });
+          // ⬇️ merge ke event-results (kategori DRR)
+          await self.upsertEventResultsDRR();
         } else {
           ipcRenderer.send("get-alert", {
             type: "error",
-            detail: (res && res.error) || "Save failed",
+            detail: res && res.error ? res.error : "Save failed",
             message: "Failed",
           });
         }
@@ -1930,6 +2097,246 @@ export default {
       }
     },
 
+    // === merge hasil DRR ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResultsDRR() {
+      var now = new Date();
+
+      // --- helpers ---
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+      };
+
+      var self = this;
+      function toNumOrNull(v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+      function getScoreByRank(rank) {
+        if (!Number.isFinite(rank) || rank <= 0) return 0;
+        var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
+        var i = 0;
+        while (i < ds.length) {
+          var d = ds[i] || {};
+          if (Number(d.ranking) === Number(rank)) {
+            var sc = Number(d.score);
+            return Number.isFinite(sc) ? sc : 0;
+          }
+          i++;
+        }
+        return 0;
+      }
+
+      // --- ambil bucket aktif (pakai currentBucket dari state UI) ---
+      var bucket = this.currentBucket || {};
+      var baseFilter = {
+        eventId: String(
+          bucket.eventId ||
+            (this.$route && this.$route.params && this.$route.params.id) ||
+            ""
+        ),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // --- siapkan incoming dari tabel (rank/score per tim) ---
+      var incoming = new Map();
+      var arr = Array.isArray(this.participantArr) ? this.participantArr : [];
+      var i = 0;
+      while (i < arr.length) {
+        var t = arr[i] || {};
+        var key = String(t.teamId || t.bibTeam || "");
+        if (!key) key = String(t.nameTeam || "");
+        if (key) {
+          var ranked = Number.isFinite(Number(t.result && t.result.ranked))
+            ? Number(t.result.ranked)
+            : null;
+          var score = Number.isFinite(ranked) ? getScoreByRank(ranked) : 0;
+
+          incoming.set(key, {
+            key: key,
+            teamId: String(t.teamId || ""),
+            teamName: String(t.nameTeam || ""),
+            bib: String(t.bibTeam || ""),
+            drrCat: {
+              name: K.DRR,
+              rankedByCats: toNumOrNull(ranked),
+              scored: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+            },
+            totalRanked: toNumOrNull(ranked),
+            totalScore: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+          });
+        }
+        i++;
+      }
+
+      // --- ambil dokumen event-results yang lama (kalau ada) ---
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
+
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      // --- payload dasar ---
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: String(bucket.eventName || "DRR").toUpperCase(),
+        initialName: String(bucket.initialName || "").toUpperCase(),
+        raceName: String(bucket.raceName || "").toUpperCase(),
+        divisionName: String(bucket.divisionName || "").toUpperCase(),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        // pertahankan createdAt lama
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        // map existing rows: key = teamId || bib || nameTeam
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei = 0;
+        while (ei < safeArr.length) {
+          var row = safeArr[ei] || {};
+          var k = String(row.teamId || row.bib || row.teamName || "");
+          if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          ei++;
+        }
+
+        // merge DRR per tim
+        var it = incoming.entries();
+        var st = it.next();
+        while (!st.done) {
+          var ent = st.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci = 0;
+          while (ci < prevCats.length) {
+            var c = prevCats[ci] || {};
+            var cname = String(c.name || "").toUpperCase();
+            if (cname === K.DRR) {
+              foundIdx = ci;
+              break;
+            }
+            ci++;
+          }
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.drrCat;
+          else prevCats.push(inc.drrCat);
+
+          var merged = {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          };
+
+          map.set(ent[0], merged);
+          st = it.next();
+        }
+
+        // konversi Map ke array
+        var values = [];
+        var itv = map.values();
+        var sv = itv.next();
+        while (!sv.done) {
+          values.push(sv.value);
+          sv = itv.next();
+        }
+        payload.eventResult = values;
+      } else {
+        // dokumen baru
+        var vals = [];
+        var iv = incoming.values();
+        var sv2 = iv.next();
+        while (!sv2.done) {
+          var inc2 = sv2.value;
+          var obj = {
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              { name: K.SPRINT, rankedByCats: null, scored: 0 },
+              { name: K.H2H, rankedByCats: null, scored: 0 },
+              { name: K.SLALOM, rankedByCats: null, scored: 0 },
+              {
+                name: K.DRR,
+                rankedByCats: toNumOrNull(inc2.drrCat.rankedByCats),
+                scored:
+                  toNumOrNull(inc2.drrCat.scored) !== null
+                    ? toNumOrNull(inc2.drrCat.scored)
+                    : 0,
+              },
+            ],
+            totalRanked: toNumOrNull(inc2.totalRanked),
+            totalScore:
+              toNumOrNull(inc2.totalScore) !== null
+                ? toNumOrNull(inc2.totalScore)
+                : 0,
+          };
+          vals.push(obj);
+          sv2 = iv.next();
+        }
+        payload.eventResult = vals;
+      }
+
+      // --- kirim upsert ---
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "DRR category merged successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
+          });
+        }
+      });
+    },
+
     /* === NEW: Lanjutkan simpan dari modal (TAMBAHAN) === */
     saveResultConfirmed() {
       try {
@@ -1971,17 +2378,21 @@ export default {
         }
 
         ipcRenderer.send("insert-drr-result", docs);
-        ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
-          if (res && res.ok) {
+        var self = this;
+        ipcRenderer.once("insert-drr-result-reply", async function (_e, res) {
+          var ok = res && res.ok ? true : false;
+          if (ok) {
             ipcRenderer.send("get-alert-saved", {
               type: "question",
               detail: "Result data has been successfully saved",
               message: "Successfully",
             });
+            // ⬇️ merge ke event-results (kategori DRR)
+            await self.upsertEventResultsDRR();
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
-              detail: (res && res.error) || "Save failed",
+              detail: res && res.error ? res.error : "Save failed",
               message: "Failed",
             });
           }

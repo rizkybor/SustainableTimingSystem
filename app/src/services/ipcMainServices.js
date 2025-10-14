@@ -8,6 +8,14 @@ require("dotenv").config();
 const cloudinary = require("cloudinary").v2;
 
 const {
+  upsertBracket,
+  getBracket,
+  upsertRoundRows,
+  upsertAllRounds,
+  upsertOverall,
+} = require("../controllers/INSERT/upsertHeadToHead.js");
+
+const {
   getAllEvents,
   getEventById,
 } = require("../controllers/GET/getEvent.js");
@@ -41,6 +49,11 @@ const {
 } = require("../controllers/INSERT/insertResultEventByCategories.js");
 
 const {
+  upsertEventResultsDoc,
+  getEventResultsAggregate,
+} = require("../controllers/INSERT/insertResultOverall.js");
+
+const {
   getTeamsRegistered,
   deleteTeamInBucket,
   upsertTeamsRegistered,
@@ -63,7 +76,7 @@ const {
 const {
   getSprintResult,
   getDrrResult,
-  getSlalomResult
+  getSlalomResult,
 } = require("../controllers/GET/getResult.js");
 
 const {
@@ -683,6 +696,89 @@ ipcMain.on("users-judges-assignment:getByEmail", async (event, payload) => {
   }
 });
 
+ipcMain.on("event-results:upsert", async (event, payload) => {
+  try {
+    const result = await upsertEventResultsDoc(payload);
+    console.log(result, "<<<<");
+    const serialized = EJSON.serialize({ ok: true, result });
+    event.reply("event-results:upsert-reply", serialized);
+  } catch (error) {
+    const serialized = EJSON.serialize({
+      ok: false,
+      error: error && error.message ? error.message : String(error),
+    });
+    event.reply("event-results:upsert-reply", serialized);
+  }
+});
+
+// GET: Event Results (overall/aggregate)
+ipcMain.on("event-results:get", async function (event, filters) {
+  try {
+    var f = filters || {};
+    var doc = await getEventResultsAggregate(f);
+    event.reply("event-results:get-reply", { ok: true, doc: doc });
+  } catch (error) {
+    event.reply("event-results:get-reply", {
+      ok: false,
+      doc: null,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+});
+
+// HEAD 2 HEAD
+ipcMain.on("h2h:bracket:get", async (e, bucket) => {
+  try {
+    e.reply("h2h:bracket:get-reply", await getBracket(bucket));
+  } catch (err) {
+    e.reply("h2h:bracket:get-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:bracket:save", async (e, payload) => {
+  try {
+    const { bucket, rounds, showBronze, settings } = payload;
+    e.reply(
+      "h2h:bracket:save-reply",
+      await upsertBracket(bucket, rounds, { showBronze, settings })
+    );
+  } catch (err) {
+    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:round:save", async (e, payload) => {
+  try {
+    const { bucket, roundId, roundName, rows } = payload;
+    e.reply(
+      "h2h:round:save-reply",
+      await upsertRoundRows(bucket, roundId, roundName, rows)
+    );
+  } catch (err) {
+    e.reply("h2h:round:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:rounds:saveMany", async (e, payload) => {
+  try {
+    const { bucket, roundsSheets } = payload;
+    e.reply(
+      "h2h:rounds:saveMany-reply",
+      await upsertAllRounds(bucket, roundsSheets)
+    );
+  } catch (err) {
+    e.reply("h2h:rounds:saveMany-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:overall:save", async (e, payload) => {
+  try {
+    const { bucket, overallPkg } = payload;
+    e.reply("h2h:overall:save-reply", await upsertOverall(bucket, overallPkg));
+  } catch (err) {
+    e.reply("h2h:overall:save-reply", { ok: false, error: String(err) });
+  }
+});
 module.exports = {
   setupIPCMainHandlers,
 };

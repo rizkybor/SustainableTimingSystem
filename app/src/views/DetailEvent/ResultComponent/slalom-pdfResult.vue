@@ -112,7 +112,7 @@
 
             <td class="right">{{ startAt(t, 0) }}</td>
             <td
-              class="right"
+            style="font-size: 7px; text-align: start;"
               v-for="(v, gi) in gatesAtPadded(t, 0)"
               :key="'r1g' + gi"
             >
@@ -137,7 +137,7 @@
 
             <td class="right">{{ startAt(t, 1) }}</td>
             <td
-              class="right"
+            style="font-size: 7px; text-align: start;"
               v-for="(v, gi) in gatesAtPadded(t, 1)"
               :key="'r2g' + gi"
             >

@@ -889,186 +889,117 @@ export default {
         }
         rankCounter++;
       }
-
-      // // ---- susun finalRows sesuai mode ----
-      // var orderedKeys = Object.keys(teamsObj).sort(function (ka, kb) {
-      //   var ra = teamsObj[ka].bestRank || Infinity;
-      //   var rb = teamsObj[kb].bestRank || Infinity;
-      //   return ra - rb;
-      // });
-
-      // var finalRows = [];
-      // var teamCounter = 1;
-
-      // for (var x = 0; x < orderedKeys.length; x++) {
-      //   var key = orderedKeys[x];
-      //   var pack3 = teamsObj[key];
-      //   var rows = [];
-
-      //   if (mode === "1") {
-      //     if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
-      //   } else if (mode === "2") {
-      //     if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
-      //   } else {
-      //     // "all": maksimal 2 baris (run1 lalu run2 bila ada)
-      //     if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
-      //     if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
-      //   }
-
-      //   for (var y = 0; y < rows.length; y++) {
-      //     var rrow = rows[y];
-      //     finalRows.push({
-      //       nameTeam: rrow.nameTeam,
-      //       bibTeam: rrow.bibTeam,
-      //       session: rrow.session,
-      //       raceTime: rrow.raceTime,
-      //       startPenalty: rrow.startPenalty,
-      //       finishPenalty: rrow.finishPenalty,
-      //       sectionPenalty: rrow.sectionPenalty,
-      //       totalPenalty: rrow.totalPenalty,
-      //       penaltyTime: rrow.penaltyTime,
-      //       totalTime: rrow.totalTime,
-      //       resultTime: rrow.resultTime,
-      //       isBest: rrow.isBest,
-      //       gatesDetail: rrow.gatesDetail,
-      //       ranked: rrow.isBest ? rrow.ranked || "-" : "-",
-      //       score: rrow.isBest ? rrow.score || 0 : 0,
-      //       teamIndex: teamCounter,
-      //     });
-      //   }
-      //   teamCounter++;
-      // }
-
-      // // Rowspan merge utk mode "all" (sekarang pasti ≤2 per tim)
-      // if (mode === "all") {
-      //   var groupCount = new Map();
-      //   for (var z = 0; z < finalRows.length; z++) {
-      //     var rr = finalRows[z];
-      //     groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
-      //   }
-      //   var seenFirst = new Set();
-      //   for (var z2 = 0; z2 < finalRows.length; z2++) {
-      //     var r2 = finalRows[z2];
-      //     if (!seenFirst.has(r2.teamIndex)) {
-      //       r2.__groupStart = true;
-      //       r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
-      //       seenFirst.add(r2.teamIndex);
-      //     } else {
-      //       r2.__groupStart = false;
-      //       r2.__groupSize = 0;
-      //     }
-      //   }
-      // }
-
-      // return finalRows;
       // ---- susun finalRows sesuai mode ----
-var finalRows = [];
+      var finalRows = [];
 
-if (mode === "all") {
-  var orderedKeys = Object.keys(teamsObj).sort(function (ka, kb) {
-    var ra = teamsObj[ka].bestRank || Infinity;
-    var rb = teamsObj[kb].bestRank || Infinity;
-    return ra - rb;
-  });
+      if (mode === "all") {
+        var orderedKeys = Object.keys(teamsObj).sort(function (ka, kb) {
+          var ra = teamsObj[ka].bestRank || Infinity;
+          var rb = teamsObj[kb].bestRank || Infinity;
+          return ra - rb;
+        });
 
-  var teamCounter = 1;
-  for (var x = 0; x < orderedKeys.length; x++) {
-    var key = orderedKeys[x];
-    var pack3 = teamsObj[key];
+        var teamCounter = 1;
+        for (var x = 0; x < orderedKeys.length; x++) {
+          let key = orderedKeys[x];
+          var pack3 = teamsObj[key];
 
-    // urut: Run 1 lalu Run 2 (bila ada)
-    var rows = [];
-    if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
-    if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
+          // urut: Run 1 lalu Run 2 (bila ada)
+          var rows = [];
+          if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
+          if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
 
-    for (var y = 0; y < rows.length; y++) {
-      var rrow = rows[y];
-      finalRows.push({
-        nameTeam: rrow.nameTeam,
-        bibTeam: rrow.bibTeam,
-        session: rrow.session,
-        raceTime: rrow.raceTime,
-        startPenalty: rrow.startPenalty,
-        finishPenalty: rrow.finishPenalty,
-        sectionPenalty: rrow.sectionPenalty,
-        totalPenalty: rrow.totalPenalty,
-        penaltyTime: rrow.penaltyTime,
-        totalTime: rrow.totalTime,
-        resultTime: rrow.resultTime,
-        isBest: rrow.isBest,
-        gatesDetail: rrow.gatesDetail,
-        ranked: rrow.isBest ? (rrow.ranked || "-") : "-",
-        score: rrow.isBest ? (rrow.score || 0) : 0,
-        teamIndex: teamCounter
-      });
-    }
-    teamCounter++;
-  }
+          for (let y = 0; y < rows.length; y++) {
+            let rrow = rows[y];
+            finalRows.push({
+              nameTeam: rrow.nameTeam,
+              bibTeam: rrow.bibTeam,
+              session: rrow.session,
+              raceTime: rrow.raceTime,
+              startPenalty: rrow.startPenalty,
+              finishPenalty: rrow.finishPenalty,
+              sectionPenalty: rrow.sectionPenalty,
+              totalPenalty: rrow.totalPenalty,
+              penaltyTime: rrow.penaltyTime,
+              totalTime: rrow.totalTime,
+              resultTime: rrow.resultTime,
+              isBest: rrow.isBest,
+              gatesDetail: rrow.gatesDetail,
+              ranked: rrow.isBest ? rrow.ranked || "-" : "-",
+              score: rrow.isBest ? rrow.score || 0 : 0,
+              teamIndex: teamCounter,
+            });
+          }
+          teamCounter++;
+        }
 
-  // Rowspan merge utk mode "all"
-  var groupCount = new Map();
-  for (var z = 0; z < finalRows.length; z++) {
-    var rr = finalRows[z];
-    groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
-  }
-  var seenFirst = new Set();
-  for (var z2 = 0; z2 < finalRows.length; z2++) {
-    var r2 = finalRows[z2];
-    if (!seenFirst.has(r2.teamIndex)) {
-      r2.__groupStart = true;
-      r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
-      seenFirst.add(r2.teamIndex);
-    } else {
-      r2.__groupStart = false;
-      r2.__groupSize = 0;
-    }
-  }
+        // Rowspan merge utk mode "all"
+        var groupCount = new Map();
+        for (var z = 0; z < finalRows.length; z++) {
+          var rr = finalRows[z];
+          groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
+        }
+        var seenFirst = new Set();
+        for (var z2 = 0; z2 < finalRows.length; z2++) {
+          var r2 = finalRows[z2];
+          if (!seenFirst.has(r2.teamIndex)) {
+            r2.__groupStart = true;
+            r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
+            seenFirst.add(r2.teamIndex);
+          } else {
+            r2.__groupStart = false;
+            r2.__groupSize = 0;
+          }
+        }
+      } else {
+        // ---- mode "1" atau "2": urutkan by waktu run spesifik ----
+        var wantedIdx = mode === "1" ? 1 : 2;
+        let pool = [];
 
-} else {
-  // ---- mode "1" atau "2": urutkan by waktu run spesifik ----
-  var wantedIdx = mode === "1" ? 1 : 2;
-  var pool = [];
+        for (let k in teamsObj) {
+          if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
+          let run = teamsObj[k].runsByIdx[wantedIdx];
+          if (!run) continue;
 
-  for (var k in teamsObj) {
-    if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
-    var run = teamsObj[k].runsByIdx[wantedIdx];
-    if (!run) continue;
+          let ms = this.timeToMs(
+            run.resultTime || run.totalTime || run.raceTime
+          );
+          pool.push({
+            ms: Number.isFinite(ms) ? ms : Infinity,
+            row: run,
+          });
+        }
 
-    var ms = this.timeToMs(run.resultTime || run.totalTime || run.raceTime);
-    pool.push({
-      ms: Number.isFinite(ms) ? ms : Infinity,
-      row: run
-    });
-  }
+        // sort by waktu tercepat
+        pool.sort(function (a, b) {
+          return a.ms - b.ms;
+        });
 
-  // sort by waktu tercepat
-  pool.sort(function (a, b) { return a.ms - b.ms; });
+        // assign teamIndex sesuai urutan ini
+        for (let i = 0; i < pool.length; i++) {
+          let rrow = pool[i].row;
+          finalRows.push({
+            nameTeam: rrow.nameTeam,
+            bibTeam: rrow.bibTeam,
+            session: rrow.session,
+            raceTime: rrow.raceTime,
+            startPenalty: rrow.startPenalty,
+            finishPenalty: rrow.finishPenalty,
+            sectionPenalty: rrow.sectionPenalty,
+            totalPenalty: rrow.totalPenalty,
+            penaltyTime: rrow.penaltyTime,
+            totalTime: rrow.totalTime,
+            resultTime: rrow.resultTime,
+            isBest: rrow.isBest, // tidak dipakai di UI run-only
+            gatesDetail: rrow.gatesDetail,
+            ranked: "-", // kolom ini di UI run-only menampilkan teamIndex
+            score: 0, // tidak dipakai di UI run-only
+            teamIndex: i + 1, // <- ini yang jadi “urutan tercepat” untuk run tsb
+          });
+        }
+      }
 
-  // assign teamIndex sesuai urutan ini
-  for (var i = 0; i < pool.length; i++) {
-    var rrow = pool[i].row;
-    finalRows.push({
-      nameTeam: rrow.nameTeam,
-      bibTeam: rrow.bibTeam,
-      session: rrow.session,
-      raceTime: rrow.raceTime,
-      startPenalty: rrow.startPenalty,
-      finishPenalty: rrow.finishPenalty,
-      sectionPenalty: rrow.sectionPenalty,
-      totalPenalty: rrow.totalPenalty,
-      penaltyTime: rrow.penaltyTime,
-      totalTime: rrow.totalTime,
-      resultTime: rrow.resultTime,
-      isBest: rrow.isBest,            // tidak dipakai di UI run-only
-      gatesDetail: rrow.gatesDetail,
-      ranked: "-",                    // kolom ini di UI run-only menampilkan teamIndex
-      score: 0,                       // tidak dipakai di UI run-only
-      teamIndex: i + 1                // <- ini yang jadi “urutan tercepat” untuk run tsb
-    });
-  }
-}
-
-return finalRows;
+      return finalRows;
     },
     changeSessionMode(mode) {
       if (!["all", "1", "2"].includes(mode)) return;
@@ -1189,17 +1120,7 @@ return finalRows;
       this.error = "";
 
       ipcRenderer.send("get-slalom-result", q);
-
-      const TIMEOUT_MS = 8000;
-      let timeoutId;
-
       await new Promise((resolve) => {
-        // timeoutId = setTimeout(() => {
-        //   this.loading = false;
-        //   this.error = "Gagal memuat hasil (timeout). Coba ulangi.";
-        //   resolve();
-        // }, TIMEOUT_MS);
-
         ipcRenderer.once("get-slalom-result-reply", (_e, res) => {
           try {
             if (!(res && res.ok && Array.isArray(res.items))) {

@@ -286,8 +286,8 @@
                 <tbody v-if="participantArr.length">
                   <tr v-for="(item, index) in participantArr" :key="index">
                     <td class="text-center">{{ index + 1 }}</td>
-                    
-                     <!-- TEAM NAME  -->
+
+                    <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
                     </td>
@@ -1809,6 +1809,7 @@ export default {
     },
 
     saveResult() {
+      var self = this;
       const clean = JSON.parse(JSON.stringify(this.participantArr || []));
       if (!Array.isArray(clean) || clean.length === 0) {
         ipcRenderer.send("get-alert", {
@@ -1842,17 +1843,20 @@ export default {
 
       const docs = buildResultDocs(clean, this.currentBucket);
       ipcRenderer.send("insert-drr-result", docs);
-      ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
-        if (res && res.ok) {
+      ipcRenderer.once("insert-drr-result-reply", async function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
           ipcRenderer.send("get-alert-saved", {
             type: "question",
             detail: "Result data has been successfully saved",
             message: "Successfully",
           });
+          // ⬇️ merge ke event-results (kategori DRR)
+          await self.upsertEventResultsDRR();
         } else {
           ipcRenderer.send("get-alert", {
             type: "error",
-            detail: (res && res.error) || "Save failed",
+            detail: res && res.error ? res.error : "Save failed",
             message: "Failed",
           });
         }
@@ -1930,6 +1934,246 @@ export default {
       }
     },
 
+    // === merge hasil DRR ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResultsDRR() {
+      var now = new Date();
+
+      // --- helpers ---
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+      };
+
+      var self = this;
+      function toNumOrNull(v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+      function getScoreByRank(rank) {
+        if (!Number.isFinite(rank) || rank <= 0) return 0;
+        var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
+        var i = 0;
+        while (i < ds.length) {
+          var d = ds[i] || {};
+          if (Number(d.ranking) === Number(rank)) {
+            var sc = Number(d.score);
+            return Number.isFinite(sc) ? sc : 0;
+          }
+          i++;
+        }
+        return 0;
+      }
+
+      // --- ambil bucket aktif (pakai currentBucket dari state UI) ---
+      var bucket = this.currentBucket || {};
+      var baseFilter = {
+        eventId: String(
+          bucket.eventId ||
+            (this.$route && this.$route.params && this.$route.params.id) ||
+            ""
+        ),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // --- siapkan incoming dari tabel (rank/score per tim) ---
+      var incoming = new Map();
+      var arr = Array.isArray(this.participantArr) ? this.participantArr : [];
+      var i = 0;
+      while (i < arr.length) {
+        var t = arr[i] || {};
+        var key = String(t.teamId || t.bibTeam || "");
+        if (!key) key = String(t.nameTeam || "");
+        if (key) {
+          var ranked = Number.isFinite(Number(t.result && t.result.ranked))
+            ? Number(t.result.ranked)
+            : null;
+          var score = Number.isFinite(ranked) ? getScoreByRank(ranked) : 0;
+
+          incoming.set(key, {
+            key: key,
+            teamId: String(t.teamId || ""),
+            teamName: String(t.nameTeam || ""),
+            bib: String(t.bibTeam || ""),
+            drrCat: {
+              name: K.DRR,
+              rankedByCats: toNumOrNull(ranked),
+              scored: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+            },
+            totalRanked: toNumOrNull(ranked),
+            totalScore: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+          });
+        }
+        i++;
+      }
+
+      // --- ambil dokumen event-results yang lama (kalau ada) ---
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
+
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      // --- payload dasar ---
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: String(bucket.eventName || "DRR").toUpperCase(),
+        initialName: String(bucket.initialName || "").toUpperCase(),
+        raceName: String(bucket.raceName || "").toUpperCase(),
+        divisionName: String(bucket.divisionName || "").toUpperCase(),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        // pertahankan createdAt lama
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        // map existing rows: key = teamId || bib || nameTeam
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei = 0;
+        while (ei < safeArr.length) {
+          var row = safeArr[ei] || {};
+          var k = String(row.teamId || row.bib || row.teamName || "");
+          if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          ei++;
+        }
+
+        // merge DRR per tim
+        var it = incoming.entries();
+        var st = it.next();
+        while (!st.done) {
+          var ent = st.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci = 0;
+          while (ci < prevCats.length) {
+            var c = prevCats[ci] || {};
+            var cname = String(c.name || "").toUpperCase();
+            if (cname === K.DRR) {
+              foundIdx = ci;
+              break;
+            }
+            ci++;
+          }
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.drrCat;
+          else prevCats.push(inc.drrCat);
+
+          var merged = {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          };
+
+          map.set(ent[0], merged);
+          st = it.next();
+        }
+
+        // konversi Map ke array
+        var values = [];
+        var itv = map.values();
+        var sv = itv.next();
+        while (!sv.done) {
+          values.push(sv.value);
+          sv = itv.next();
+        }
+        payload.eventResult = values;
+      } else {
+        // dokumen baru
+        var vals = [];
+        var iv = incoming.values();
+        var sv2 = iv.next();
+        while (!sv2.done) {
+          var inc2 = sv2.value;
+          var obj = {
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              { name: K.SPRINT, rankedByCats: null, scored: 0 },
+              { name: K.H2H, rankedByCats: null, scored: 0 },
+              { name: K.SLALOM, rankedByCats: null, scored: 0 },
+              {
+                name: K.DRR,
+                rankedByCats: toNumOrNull(inc2.drrCat.rankedByCats),
+                scored:
+                  toNumOrNull(inc2.drrCat.scored) !== null
+                    ? toNumOrNull(inc2.drrCat.scored)
+                    : 0,
+              },
+            ],
+            totalRanked: toNumOrNull(inc2.totalRanked),
+            totalScore:
+              toNumOrNull(inc2.totalScore) !== null
+                ? toNumOrNull(inc2.totalScore)
+                : 0,
+          };
+          vals.push(obj);
+          sv2 = iv.next();
+        }
+        payload.eventResult = vals;
+      }
+
+      // --- kirim upsert ---
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "DRR category merged successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
+          });
+        }
+      });
+    },
+
     /* === NEW: Lanjutkan simpan dari modal (TAMBAHAN) === */
     saveResultConfirmed() {
       try {
@@ -1971,17 +2215,21 @@ export default {
         }
 
         ipcRenderer.send("insert-drr-result", docs);
-        ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
-          if (res && res.ok) {
+        var self = this;
+        ipcRenderer.once("insert-drr-result-reply", async function (_e, res) {
+          var ok = res && res.ok ? true : false;
+          if (ok) {
             ipcRenderer.send("get-alert-saved", {
               type: "question",
               detail: "Result data has been successfully saved",
               message: "Successfully",
             });
+            // ⬇️ merge ke event-results (kategori DRR)
+            await self.upsertEventResultsDRR();
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
-              detail: (res && res.error) || "Save failed",
+              detail: res && res.error ? res.error : "Save failed",
               message: "Failed",
             });
           }

@@ -2595,44 +2595,44 @@ export default {
       return doc;
     },
 
-    saveResult() {
-      try {
-        const docs = this.buildDocs();
-        if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
-          ipcRenderer.send("get-alert", {
-            type: "warning",
-            detail: "Belum ada data yang bisa disimpan.",
-            message: "Ups Sorry",
-          });
-          return;
-        }
+    // saveResult() {
+    //   try {
+    //     const docs = this.buildDocs();
+    //     if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
+    //       ipcRenderer.send("get-alert", {
+    //         type: "warning",
+    //         detail: "Belum ada data yang bisa disimpan.",
+    //         message: "Ups Sorry",
+    //       });
+    //       return;
+    //     }
 
-        const payload = [docs];
-        ipcRenderer.send("insert-slalom-result", payload);
+    //     const payload = [docs];
+    //     ipcRenderer.send("insert-slalom-result", payload);
 
-        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
-          if (res && res.ok) {
-            ipcRenderer.send("get-alert-saved", {
-              type: "question",
-              detail: "Result data has been successfully saved",
-              message: "Successfully",
-            });
-          } else {
-            ipcRenderer.send("get-alert", {
-              type: "error",
-              detail: (res && res.error) || "Save failed",
-              message: "Failed",
-            });
-          }
-        });
-      } catch (e) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: e && e.message ? e.message : "Save failed",
-          message: "Failed",
-        });
-      }
-    },
+    //     ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+    //       if (res && res.ok) {
+    //         ipcRenderer.send("get-alert-saved", {
+    //           type: "question",
+    //           detail: "Result data has been successfully saved",
+    //           message: "Successfully",
+    //         });
+    //       } else {
+    //         ipcRenderer.send("get-alert", {
+    //           type: "error",
+    //           detail: (res && res.error) || "Save failed",
+    //           message: "Failed",
+    //         });
+    //       }
+    //     });
+    //   } catch (e) {
+    //     ipcRenderer.send("get-alert", {
+    //       type: "error",
+    //       detail: e && e.message ? e.message : "Save failed",
+    //       message: "Failed",
+    //     });
+    //   }
+    // },
 
     // 1 ONLY
     saveSession1() {
@@ -2881,6 +2881,308 @@ export default {
         logger &&
           logger.warn &&
           logger.warn("Failed to update race settings:", err);
+      }
+    },
+
+    // === merge hasil SLALOM ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResults() {
+      var now = new Date();
+
+      // --- helpers ---
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+      };
+
+      function toNumOrNull(v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      var self = this;
+      function getScoreByRank(rank) {
+        if (!Number.isFinite(rank) || rank <= 0) return 0;
+        var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
+        var i = 0;
+        while (i < ds.length) {
+          var d = ds[i];
+          if (Number(d.ranking) === Number(rank)) {
+            var sc = Number(d.score);
+            return Number.isFinite(sc) ? sc : 0;
+          }
+          i++;
+        }
+        return 0;
+      }
+
+      // --- ambil bucket dari localStorage (raceStartPayload) ---
+      var raw = localStorage.getItem("raceStartPayload");
+      var bucket = {};
+      try {
+        var parsed = JSON.parse(raw || "{}");
+        bucket = parsed && parsed.bucket ? parsed.bucket : {};
+      } catch (e) {
+        bucket = {};
+      }
+
+      var baseFilter = {
+        eventId: String(
+          bucket.eventId ||
+            (this.$route && this.$route.params && this.$route.params.id) ||
+            ""
+        ),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // --- siapkan incoming (rank/score per tim, dari best time) ---
+      var incoming = new Map();
+      var teamsArr = Array.isArray(this.teams) ? this.teams : [];
+      var ti = 0;
+      while (ti < teamsArr.length) {
+        var t = teamsArr[ti] || {};
+        var key = String(t.teamId || t.bibNumber || t.bibTeam || "");
+        if (key) {
+          var rMap = this.ranksMap || {};
+          var rInfo = rMap[String(t._id)];
+          var ranked =
+            rInfo && Number.isFinite(rInfo.rank) ? Number(rInfo.rank) : null;
+          var score = Number.isFinite(ranked) ? getScoreByRank(ranked) : 0;
+
+          incoming.set(key, {
+            key: key,
+            teamId: String(t.teamId || ""),
+            teamName: String(t.nameTeam || ""),
+            bib: String(t.bibNumber || t.bibTeam || ""),
+            slalomCat: {
+              name: K.SLALOM,
+              rankedByCats: toNumOrNull(ranked),
+              scored: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+            },
+            totalRanked: toNumOrNull(ranked),
+            totalScore: toNumOrNull(score) !== null ? toNumOrNull(score) : 0,
+          });
+        }
+        ti++;
+      }
+
+      // --- ambil dokumen event-results yang lama (kalau ada) ---
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
+
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e2) {
+        existingDoc = null;
+      }
+
+      // --- payload dasar ---
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: String(bucket.eventName || "SLALOM").toUpperCase(),
+        initialName: String(bucket.initialName || "").toUpperCase(),
+        raceName: String(bucket.raceName || "").toUpperCase(),
+        divisionName: String(bucket.divisionName || "").toUpperCase(),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        // pertahankan createdAt lama
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        // map existing rows: key = teamId || bib
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei = 0;
+        while (ei < safeArr.length) {
+          var row = safeArr[ei] || {};
+          var k = String(row.teamId || row.bib || "");
+          if (k) {
+            // deep clone sederhana
+            map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+          ei++;
+        }
+
+        // merge SLALOM per tim saja
+        var iter = incoming.entries();
+        var step = iter.next();
+        while (!step.done) {
+          var ent = step.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci = 0;
+          while (ci < prevCats.length) {
+            var c = prevCats[ci] || {};
+            var cname = String(c.name || "").toUpperCase();
+            if (cname === K.SLALOM) {
+              foundIdx = ci;
+              break;
+            }
+            ci++;
+          }
+          if (foundIdx >= 0) {
+            prevCats[foundIdx] = inc.slalomCat;
+          } else {
+            prevCats.push(inc.slalomCat);
+          }
+
+          var merged = {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          };
+
+          map.set(ent[0], merged);
+          step = iter.next();
+        }
+
+        // konversi Map ke array (tanpa chaining)
+        var values = [];
+        var it2 = map.values();
+        var s2 = it2.next();
+        while (!s2.done) {
+          values.push(s2.value);
+          s2 = it2.next();
+        }
+        payload.eventResult = values;
+      } else {
+        // dokumen baru
+        var vals = [];
+        var iter2 = incoming.values();
+        var st = iter2.next();
+        while (!st.done) {
+          var inc2 = st.value;
+          var obj = {
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              {
+                name: K.SLALOM,
+                rankedByCats: toNumOrNull(inc2.slalomCat.rankedByCats),
+                scored:
+                  toNumOrNull(inc2.slalomCat.scored) !== null
+                    ? toNumOrNull(inc2.slalomCat.scored)
+                    : 0,
+              },
+              { name: K.SPRINT, rankedByCats: null, scored: 0 },
+              { name: K.H2H, rankedByCats: null, scored: 0 },
+              { name: K.DRR, rankedByCats: null, scored: 0 },
+            ],
+            totalRanked: toNumOrNull(inc2.totalRanked),
+            totalScore:
+              toNumOrNull(inc2.totalScore) !== null
+                ? toNumOrNull(inc2.totalScore)
+                : 0,
+          };
+          vals.push(obj);
+          st = iter2.next();
+        }
+        payload.eventResult = vals;
+      }
+
+      // --- kirim upsert ---
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "SLALOM category merged successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
+          });
+        }
+      });
+    },
+
+    // --- panggil setelah insert-slalom-result sukses ---
+    saveResult() {
+      try {
+        var docs = this.buildDocs();
+        if (!docs || typeof docs !== "object" || Array.isArray(docs)) {
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            detail: "Belum ada data yang bisa disimpan.",
+            message: "Ups Sorry",
+          });
+          return;
+        }
+        ipcRenderer.send("insert-slalom-result", [docs]);
+
+        var self = this;
+        ipcRenderer.once(
+          "insert-slalom-result-reply",
+          async function (_e, res) {
+            var ok = res && res.ok ? true : false;
+            if (ok) {
+              ipcRenderer.send("get-alert-saved", {
+                type: "question",
+                detail: "Result data has been successfully saved",
+                message: "Successfully",
+              });
+
+              // merge ke event-results (kategori SLALOM saja)
+              await self.upsertEventResults();
+            } else {
+              ipcRenderer.send("get-alert", {
+                type: "error",
+                detail: res && res.error ? res.error : "Save failed",
+                message: "Failed",
+              });
+            }
+          }
+        );
+      } catch (e) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: e && e.message ? e.message : "Save failed",
+          message: "Failed",
+        });
       }
     },
   },

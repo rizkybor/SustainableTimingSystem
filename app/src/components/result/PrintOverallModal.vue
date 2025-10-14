@@ -54,13 +54,6 @@
         </div>
       </div>
 
-      <!-- TAB -->
-      <!-- <div class="overall-tabs">
-        <b-button size="sm" variant="primary" class="active"
-          >Rank Overall</b-button
-        >
-      </div> -->
-
       <!-- TABLE -->
       <div class="table-card">
         <div class="table-title">
@@ -69,12 +62,14 @@
           {{ sprintCats.division }} <span class="dot">•</span>
           {{ sprintCats.race }}
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive table-ranking-wrapper">
           <table class="table table-ranking">
             <thead>
               <tr>
                 <th rowspan="2" class="sticky-col small w-60">No</th>
-                <th rowspan="2" class="sticky-col-left">Team Name</th>
+                <th rowspan="2" class="sticky-col-left" style="width: 210px">
+                  Team Name
+                </th>
                 <th rowspan="2" class="w-70 text-center">BIB</th>
 
                 <th colspan="2" class="group sprint text-center">Sprint</th>
@@ -86,7 +81,6 @@
                 <th rowspan="2" class="w-110 text-center">Rank Overall</th>
               </tr>
               <tr>
-                <!-- subhead for each group -->
                 <th class="sub">Score</th>
                 <th class="sub">Ranked</th>
                 <th class="sub">Score</th>
@@ -103,16 +97,12 @@
                 <td>{{ r.teamName }}</td>
                 <td class="text-center">{{ r.bib }}</td>
 
-                <!-- Sprint -->
                 <td class="text-center">{{ r.sprintScore }}</td>
                 <td class="text-center">{{ r.sprintRank }}</td>
-                <!-- H2H -->
                 <td class="text-center">{{ r.h2hScore }}</td>
                 <td class="text-center">{{ r.h2hRank }}</td>
-                <!-- Slalom -->
                 <td class="text-center">{{ r.slalomScore }}</td>
                 <td class="text-center">{{ r.slalomRank }}</td>
-                <!-- DRR -->
                 <td class="text-center">{{ r.drrScore }}</td>
                 <td class="text-center">{{ r.drrRank }}</td>
 
@@ -132,19 +122,62 @@
           >Cancel</b-button
         >
         <div>
-          <b-button variant="outline-primary" class="mr-2"
-            >Download Result</b-button
+          <b-button
+            variant="outline-primary"
+            class="mr-2"
+            @click="generatePdfOverall"
           >
-          <!-- <b-button variant="primary">Print Result</b-button> -->
+            Download Result
+          </b-button>
         </div>
       </div>
     </div>
+
+    <!-- ===== Komponen PDF (hidden) ===== -->
+    <vue-html2pdf
+      v-if="showPdf"
+      ref="overallPdfRef"
+      class="pdf-sr-only"
+      :show-layout="false"
+      :float-layout="false"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :pdf-quality="2"
+      :filename="pdfFilenameOverall"
+      pdf-format="a4"
+      pdf-orientation="landscape"
+      pdf-content-width="100%"
+      aria-hidden="true"
+      @pdfGenerated="onPdfGenerated"
+    >
+      <section slot="pdf-content">
+        <OverallPdf
+          :dataEvent="dataEvent"
+          :rows="processedRows"
+          :sprintCats="sprintCats"
+          :isOfficial="isOfficial"
+        />
+      </section>
+    </vue-html2pdf>
   </b-modal>
 </template>
 
 <script>
+import VueHtml2pdf from "vue-html2pdf";
+import OverallPdf from "../../views/DetailEvent/ResultComponent/Overall/by-alltime.vue";
+
 export default {
   name: "PrintOverallModal",
+  components: {
+    VueHtml2pdf,
+    OverallPdf,
+  },
+  data() {
+    return {
+      showPdf: false,
+    };
+  },
   props: {
     show: { type: Boolean, default: false },
     centered: { type: Boolean, default: false },
@@ -157,24 +190,36 @@ export default {
       }),
     },
     sprintCats: { type: Object, required: false },
+    isOfficial: { type: Boolean, default: false },
   },
   computed: {
+    pdfFilenameOverall() {
+      const ev = this.dataEvent || {};
+      const title = ev.eventName ? String(ev.eventName).trim() : "Overall";
+
+      const sc = this.sprintCats || {};
+      const cats =
+        (sc.initial || "-") +
+        " - " +
+        (sc.division || "-") +
+        " " +
+        (sc.race || "-");
+
+      return title + " - OVERALL (" + cats + ")";
+    },
     processedRows() {
       var toNum = function (v) {
         var n = Number(v);
         return Number.isFinite(n) ? n : 0;
       };
 
-      // aman tanpa optional chaining
       var ag =
         this.aggregate && typeof this.aggregate === "object"
           ? this.aggregate
           : { rows: [] };
 
-      // clone tanpa mutasi prop
       var src = Array.isArray(ag.rows) ? ag.rows.slice() : [];
 
-      // hitung totalScore per baris
       var withTotals = src.map(function (r) {
         var sprint = toNum(r.sprintScore);
         var h2h = toNum(r.h2hScore);
@@ -191,8 +236,6 @@ export default {
         });
       });
 
-      // urutkan: totalScore tertinggi → terendah,
-      // tie-break: best rank terkecil, lalu nama tim
       withTotals.sort(function (a, b) {
         if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
 
@@ -215,12 +258,30 @@ export default {
         return an.localeCompare(bn);
       });
 
-      // assign rank 1..N sesuai urutan
       for (var i = 0; i < withTotals.length; i++) {
         withTotals[i].rank = i + 1;
       }
 
       return withTotals;
+    },
+  },
+  methods: {
+    async generatePdfOverall() {
+      try {
+        this.showPdf = true;
+        await this.$nextTick();
+        const inst = this.$refs.overallPdfRef;
+        if (!inst) return;
+        await new Promise(function (r) {
+          setTimeout(r, 150);
+        });
+        await inst.generatePdf();
+      } catch (e) {
+        this.error = "Gagal membuat PDF";
+      }
+    },
+    onPdfGenerated() {
+      this.showPdf = false;
     },
   },
 };
@@ -235,9 +296,9 @@ export default {
 
 /* Membuat modal memiliki sudut membulat */
 ::v-deep(.modal-content) {
-  border-radius: 20px !important; /* sudut lembut */
-  overflow: hidden; /* pastikan isi tidak keluar dari radius */
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); /* sedikit bayangan agar elegan */
+  border-radius: 20px !important;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* Hilangkan margin vertikal agar tetap center sempurna */
@@ -265,23 +326,6 @@ export default {
   font-weight: 700;
   color: #000;
   margin-top: 6px;
-}
-
-/* tabs */
-.overall-tabs {
-  display: flex;
-  justify-content: flex-start;
-  margin: 12px 0 16px;
-}
-.overall-tabs .btn {
-  border-radius: 8px;
-  font-weight: 700;
-  padding: 4px 12px;
-}
-.overall-tabs .btn.active {
-  background: #0069d9;
-  border-color: #0069d9;
-  color: #fff;
 }
 
 /* table */
@@ -366,10 +410,6 @@ export default {
   font-weight: 800;
   font-size: 1rem;
 }
-.status-dropdown ::v-deep .btn {
-  border-radius: 8px;
-  font-weight: 700;
-}
 
 /* bottom buttons */
 .btn-row {
@@ -381,5 +421,60 @@ export default {
   border-radius: 8px;
   font-weight: 700;
   padding: 6px 14px;
+}
+
+/* --- Batasi tampilan maksimal 10 baris tanpa ubah lebar kolom --- */
+.table-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+/* Scroll hanya di isi tabel */
+.table-ranking-wrapper {
+  position: relative;
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+/* header sticky */
+.table-ranking thead th {
+  position: sticky;
+  z-index: 3;
+  background: #f9fafb;
+}
+
+/* baris header 1 (Sprint/H2H/Slalom/DRR) nempel di atas */
+.table-ranking thead tr:first-child th {
+  top: 0;
+  z-index: 4;
+}
+
+/* baris header 2 (Score/Ranked) nempel di bawah baris 1 */
+.table-ranking {
+  --hHead1: 44px;
+}
+.table-ranking thead tr:nth-child(2) th {
+  top: var(--hHead1);
+}
+
+/* Benar-benar sembunyikan komponen PDF dari tampilan & interaksi */
+.pdf-sr-only {
+  position: absolute !important;
+  left: -99999px !important;
+  top: -99999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+/* Jangan ikut tercetak saat user print halaman */
+@media print {
+  .pdf-sr-only {
+    display: none !important;
+  }
 }
 </style>

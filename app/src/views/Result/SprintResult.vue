@@ -9,7 +9,7 @@
             <div
               class="hero-logo d-flex align-items-center justify-content-center"
             >
-               <template v-if="hasEventLogo">
+              <template v-if="hasEventLogo">
                 <img
                   :src="eventLogoUrl"
                   alt="Event Logo"
@@ -17,7 +17,7 @@
                 />
               </template>
               <template v-else>
-                 <img
+                <img
                   :src="defaultImg"
                   alt="Event Logo"
                   class="event-logo-img"
@@ -28,9 +28,7 @@
 
           <b-col>
             <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{
-                eventInfo.eventName || "-"
-              }}
+              {{ eventInfo.eventName || "-" }}
             </h2>
             <div class="meta text-white-50">
               <span class="mr-3">
@@ -70,6 +68,15 @@
           @click="generatePdf"
         >
           <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
+        </b-button>
+
+        <b-button
+          variant="outline-primary"
+          class="action-btn"
+          :disabled="loading"
+          @click="fetchEventResultsAggregate"
+        >
+          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
         </b-button>
       </div>
     </div>
@@ -146,14 +153,18 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
-                  <div class="team">{{ r.nameTeam || "-" }}</div>
-                  </td>
+                <div class="team">{{ r.nameTeam || "-" }}</div>
+              </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td class="text-center" style="color: red;">{{ r.penaltyTime || "00:00:000" }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.penaltyTime || "00:00:000" }}
+              </td>
               <td class="text-center">{{ r.startTime || "00:00:000" }}</td>
               <td class="text-center">{{ r.finishTime || "00:00:000" }}</td>
               <td class="bold text-center">{{ r.raceTime || "00:00:000" }}</td>
-              <td class="bold text-center"  style="color: green;">{{ r.resultTime || "00:00:000" }}</td>
+              <td class="bold text-center" style="color: green">
+                {{ r.resultTime || "00:00:000" }}
+              </td>
               <td class="text-center">{{ r.ranked || "-" }}</td>
               <td class="text-center">
                 {{
@@ -213,6 +224,15 @@
         />
       </section>
     </vue-html2pdf>
+
+    <PrintOverallModal
+      centered
+      :show="showOverallModal"
+      :dataEvent="eventInfo"
+      :aggregate="dataAggregate"
+                :sprintCats="sprintCats"
+      @close="showOverallModal = false"
+    />
   </div>
 </template>
 
@@ -223,6 +243,7 @@ import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
+import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 
 /* ========= Helpers localStorage ========= */
@@ -278,7 +299,13 @@ function safeParse(str, fallback) {
 
 export default {
   name: "SprintResult",
-  components: { Icon, EmptyStateFull, SprintPdf, VueHtml2pdf },
+  components: {
+    Icon,
+    EmptyStateFull,
+    SprintPdf,
+    VueHtml2pdf,
+    PrintOverallModal,
+  },
   data() {
     return {
       defaultImg,
@@ -322,11 +349,22 @@ export default {
         { ranking: 31, score: 14 },
         { ranking: 32, score: 12 },
       ],
+      showOverallModal: false,
+      dataAggregate: {
+        header: {
+          title: "",
+          subTitle: "",
+          dateStr: "",
+          chiefJudge: "",
+          official: false,
+        },
+        rows: [],
+      },
     };
   },
 
   computed: {
-     hasEventLogo() {
+    hasEventLogo() {
       var ev = this.eventInfo || {};
       var logos = ev.event_logo;
       if (Array.isArray(logos) && logos.length > 0) {
@@ -448,7 +486,7 @@ export default {
     const saved = localStorage.getItem(k);
     if (saved !== null) this.isOfficial = saved === "1";
 
-        // ambil event langsung dari IPC
+    // ambil event langsung dari IPC
     const q = this.$route.query || {};
     if (q.eventId) {
       await this.loadEventById(q.eventId);
@@ -456,14 +494,170 @@ export default {
 
     this.loadSprintResult();
   },
-
-  mounted() {},
-
+  mounted() {
+  },
   methods: {
+    // builder data untuk modal Overall (header + rows)
+    buildAggregateFromDoc: function (doc, eventInfo) {
+      var headerTitle = "";
+      if (doc && typeof doc.eventName === "string") headerTitle = doc.eventName;
+      if (
+        !headerTitle &&
+        eventInfo &&
+        typeof eventInfo.eventName === "string"
+      ) {
+        headerTitle = eventInfo.eventName;
+      }
+      var sub = "";
+      if (doc && typeof doc.divisionName === "string" && doc.divisionName)
+        sub = String(doc.divisionName);
+      if (doc && typeof doc.initialName === "string" && doc.initialName) {
+        sub = sub
+          ? sub + " • " + String(doc.initialName)
+          : String(doc.initialName);
+      }
+      var d = new Date();
+      var dateStr = d.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      var chief = "";
+      if (eventInfo && typeof eventInfo.chiefJudge === "string")
+        chief = eventInfo.chiefJudge;
+      var header = {
+        title: headerTitle || "—",
+        subTitle: sub || "—",
+        dateStr: dateStr,
+        official: false,
+        chiefJudge: chief || "",
+      };
+      var rows = [];
+      var arr = doc && Array.isArray(doc.eventResult) ? doc.eventResult : [];
+      for (var i = 0; i < arr.length; i++) {
+        var t = arr[i] || {};
+        var teamName = t && typeof t.teamName === "string" ? t.teamName : "";
+        var bib = t && typeof t.bib === "string" ? t.bib : "";
+        var cats = t && Array.isArray(t.categories) ? t.categories : [];
+        var sprintScore = 0,
+          sprintRank = 0;
+        var h2hScore = 0,
+          h2hRank = 0;
+        var slalomScore = 0,
+          slalomRank = 0;
+        var drrScore = 0,
+          drrRank = 0;
+        for (var j = 0; j < cats.length; j++) {
+          var c = cats[j] || {};
+          var nm = c && typeof c.name === "string" ? c.name.toUpperCase() : "";
+          var sc = 0;
+          var rk = 0;
+          if (c && c.scored != null) {
+            sc = Number(c.scored);
+            if (!Number.isFinite(sc)) sc = Number(c.scored) || 0;
+          }
+          if (c && c.rankedByCats != null) {
+            rk = Number(c.rankedByCats);
+            if (!Number.isFinite(rk)) rk = Number(c.rankedByCats) || 0;
+          }
+          if (nm === "SPRINT") {
+            sprintScore = sc;
+            sprintRank = rk;
+          } else if (
+            nm === "HEADTOHEAD" ||
+            nm === "HEAD TO HEAD" ||
+            nm === "H2H"
+          ) {
+            h2hScore = sc;
+            h2hRank = rk;
+          } else if (nm === "SLALOM") {
+            slalomScore = sc;
+            slalomRank = rk;
+          } else if (nm === "DRR" || nm === "DOWN RIVER RACE") {
+            drrScore = sc;
+            drrRank = rk;
+          }
+        }
+        var totalScore = 0;
+        if (t && t.totalScore != null) {
+          totalScore = Number(t.totalScore);
+          if (!Number.isFinite(totalScore))
+            totalScore = Number(t.totalScore) || 0;
+        } else {
+          totalScore = sprintScore + h2hScore + slalomScore + drrScore;
+        }
+        rows.push({
+          no: i + 1,
+          teamName: teamName,
+          bib: bib,
+          sprintScore: sprintScore,
+          sprintRank: sprintRank,
+          h2hScore: h2hScore,
+          h2hRank: h2hRank,
+          slalomScore: slalomScore,
+          slalomRank: slalomRank,
+          drrScore: drrScore,
+          drrRank: drrRank,
+          totalScore: totalScore,
+        });
+      }
+      rows.sort(function (a, b) {
+        return b.totalScore - a.totalScore;
+      });
+      for (var k = 0; k < rows.length; k++) rows[k].no = k + 1;
+      return { header: header, rows: rows };
+    },
+    // klik tombol “View Overall”
+    fetchEventResultsAggregate: function () {
+      var q = this.$route && this.$route.query ? this.$route.query : {};
+      var f = {
+        eventId: String(q.eventId || ""),
+        initialId: String(q.initialId || ""),
+        raceId: String(q.raceId || ""),
+        divisionId: String(q.divisionId || ""),
+      };
+      // fallback dari localStorage bila ada yg kosong
+      if (!f.eventId || !f.initialId || !f.raceId || !f.divisionId) {
+        var payload = safeParse(
+          localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
+          {}
+        );
+        var b = payload && payload.bucket ? payload.bucket : {};
+        if (!f.eventId) f.eventId = String(b.eventId || "");
+        if (!f.initialId) f.initialId = String(b.initialId || "");
+        if (!f.raceId) f.raceId = String(b.raceId || "");
+        if (!f.divisionId) f.divisionId = String(b.divisionId || "");
+      }
+      // validasi minimal
+      if (!f.eventId || !f.initialId || !f.raceId || !f.divisionId) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Load Overall",
+          detail: "Parameter kategori tidak lengkap.",
+        });
+        return;
+      }
+      var self = this;
+      ipcRenderer.send("event-results:get", f);
+      ipcRenderer.once("event-results:get-reply", function (_e, res) {
+        if (res && res.ok && res.doc) {
+          var agg = self.buildAggregateFromDoc(res.doc, self.eventInfo);
+          self.dataAggregate = agg;
+          self.showOverallModal = true;
+        } else {
+          var det = res && res.error ? res.error : "Tidak ada data aggregate.";
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Load Overall",
+            detail: det,
+          });
+        }
+      });
+    },
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-   // ambil detail event dari IPC
+    // ambil detail event dari IPC
     async loadEventById(eventId) {
       try {
         this.loading = true;

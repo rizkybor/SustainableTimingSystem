@@ -612,7 +612,7 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, EmptyCard, PrintOverallModal, tone, Icon },
+  components: { OperationTimePanel, EmptyCard, PrintOverallModal, Icon },
   data() {
     return {
       showOverallModal: false,

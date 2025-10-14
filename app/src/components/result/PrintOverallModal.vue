@@ -8,7 +8,7 @@
     @hide="$emit('close')"
   >
     <template #modal-title
-      ><span class="modal-title-text">Print Result</span></template
+      ><span class="modal-title-text">Print Result Overall </span></template
     >
 
     <div class="overall-wrap">
@@ -63,7 +63,12 @@
 
       <!-- TABLE -->
       <div class="table-card">
-        <div class="table-title">Rank Result Overall</div>
+        <div class="table-title">
+          RANK RESULT OVERALL <span class="dot">•</span>
+          {{ sprintCats.initial }} <span class="dot">•</span>
+          {{ sprintCats.division }} <span class="dot">•</span>
+          {{ sprintCats.race }}
+        </div>
         <div class="table-responsive">
           <table class="table table-ranking">
             <thead>
@@ -151,6 +156,7 @@ export default {
         rows: [],
       }),
     },
+    sprintCats: { type: Object, required: false },
   },
   computed: {
     processedRows() {

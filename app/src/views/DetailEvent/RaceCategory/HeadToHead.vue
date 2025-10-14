@@ -2671,12 +2671,286 @@ export default {
       const bucket = this._currentBucketOrThrow();
       const overallPkg = this.buildOverallPackage(); // kamu sudah buat
 
+      var self = this;
+
       ipcRenderer.send("h2h:overall:save", { bucket, overallPkg });
-      ipcRenderer.once("h2h:overall:save-reply", (_e, res) => {
-        if (res && res.ok)
-          this.notify("success", "Overall tersimpan.", "Saved");
-        else
-          this.notify("error", (res && res.error) || "Save failed", "Failed");
+      ipcRenderer.once("h2h:overall:save-reply", async function (_e, res) {
+        if (res && res.ok) {
+          self.notify("success", "Overall tersimpan.", "Saved");
+
+          // ⬇️⬇️ tambahkan ini: merge ke event-results kategori H2H
+          try {
+            await self.upsertEventResultsH2H();
+          } catch (err) {
+            self.notify("error", String(err), "Merge H2H Failed");
+          }
+        } else {
+          self.notify("error", (res && res.error) || "Save failed", "Failed");
+        }
+      });
+    },
+
+    // === merge hasil OVERALL H2H ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResultsH2H() {
+      // siapkan konstanta & helper
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+      };
+      var now = new Date();
+      var self = this;
+
+      function toNumOrNull(v) {
+        var n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+      function scoreForRankLocal(rank) {
+        if (!rank || !Number.isFinite(+rank)) return 0;
+        var s = self.getScoreByRanked ? self.getScoreByRanked(+rank) : null;
+        return Number.isFinite(+s) ? +s : 0;
+      }
+      function teamKeyFrom(name, bib) {
+        var nm = String(name || "").toUpperCase();
+        var bb = String(bib || "");
+        return nm + "|" + bb;
+      }
+
+      // ambil bucket aktif (harus valid)
+      var bucket = null;
+      try {
+        bucket = self._currentBucketOrThrow();
+      } catch (e) {
+        self.notify && self.notify("error", String(e), "Bucket Invalid");
+        return;
+      }
+
+      // bangun paket overall H2H yang sudah ada skornya
+      var pkg = self.buildOverallPackage ? self.buildOverallPackage() : null;
+      var overallRows =
+        pkg && pkg.overallRows && Array.isArray(pkg.overallRows)
+          ? pkg.overallRows
+          : [];
+      if (overallRows.length === 0) {
+        self.notify &&
+          self.notify(
+            "warning",
+            "Overall kosong, tidak ada yang di-merge.",
+            "H2H Merge"
+          );
+        return;
+      }
+
+      // siapkan incoming map: key = NAME|BIB → { ... }
+      var incoming = new Map();
+      var i = 0;
+      while (i < overallRows.length) {
+        var r = overallRows[i] || {};
+        var nm = String(r.name || r.team || "");
+        var bb = String(r.bib || "");
+        var rk = Number.isFinite(+r.ranked) ? +r.ranked : null;
+        var sc = Number.isFinite(+r.score) ? +r.score : scoreForRankLocal(rk);
+        var key = teamKeyFrom(nm, bb);
+        if (key) {
+          incoming.set(key, {
+            key: key,
+            teamId: "", // tidak tersedia di paket overall → biarkan kosong
+            teamName: nm,
+            bib: bb,
+            h2hCat: {
+              name: K.H2H,
+              rankedByCats: toNumOrNull(rk),
+              scored: toNumOrNull(sc) !== null ? toNumOrNull(sc) : 0,
+            },
+            totalRanked: toNumOrNull(rk),
+            totalScore: toNumOrNull(sc) !== null ? toNumOrNull(sc) : 0,
+          });
+        }
+        i = i + 1;
+      }
+
+      // filter dokumen event-results berdasarkan bucket
+      var baseFilter = {
+        eventId: String(bucket.eventId || ""),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // ambil existing doc (jika ada)
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
+
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      // payload dasar
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: "HEADTOHEAD",
+        initialName: String(bucket.initialName || "").toUpperCase(),
+        raceName: String(bucket.raceName || "").toUpperCase(),
+        divisionName: String(bucket.divisionName || "").toUpperCase(),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // set eventName ke HEADTOHEAD (uppercase)
+      payload.eventName = String(
+        payload.eventName || "HEADTOHEAD"
+      ).toUpperCase();
+
+      if (existingDoc) {
+        // pertahankan createdAt lama
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        // map existing rows: key = NAME|BIB (fallback dari doc lama)
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei = 0;
+        while (ei < safeArr.length) {
+          var row = safeArr[ei] || {};
+          var k = teamKeyFrom(row.teamName || row.team || "", row.bib || "");
+          if (!k) {
+            // fallback lama: teamId atau bib saja jika perlu
+            var alt = String(row.teamId || row.bib || "");
+            if (alt) k = alt;
+          }
+          if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          ei = ei + 1;
+        }
+
+        // merge H2H per tim
+        var it = incoming.entries();
+        var st = it.next();
+        while (!st.done) {
+          var ent = st.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci = 0;
+          while (ci < prevCats.length) {
+            var c = prevCats[ci] || {};
+            var cname = String(c.name || "").toUpperCase();
+            if (cname === K.H2H) {
+              foundIdx = ci;
+              break;
+            }
+            ci = ci + 1;
+          }
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.h2hCat;
+          else prevCats.push(inc.h2hCat);
+
+          var merged = {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            // totalRank/score diisi sesuai overall H2H (agregasi lintas nomor bisa dikerjakan di layer lain)
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          };
+
+          map.set(ent[0], merged);
+          st = it.next();
+        }
+
+        // konversi Map → Array
+        var vals = [];
+        var itv = map.values();
+        var sv = itv.next();
+        while (!sv.done) {
+          vals.push(sv.value);
+          sv = itv.next();
+        }
+        payload.eventResult = vals;
+      } else {
+        // dokumen baru
+        var vals2 = [];
+        var iv = incoming.values();
+        var sv2 = iv.next();
+        while (!sv2.done) {
+          var inc2 = sv2.value;
+          var obj = {
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              { name: K.SPRINT, rankedByCats: null, scored: 0 },
+              { name: K.SLALOM, rankedByCats: null, scored: 0 },
+              { name: K.DRR, rankedByCats: null, scored: 0 },
+              {
+                name: K.H2H,
+                rankedByCats: toNumOrNull(inc2.h2hCat.rankedByCats),
+                scored:
+                  toNumOrNull(inc2.h2hCat.scored) !== null
+                    ? toNumOrNull(inc2.h2hCat.scored)
+                    : 0,
+              },
+            ],
+            totalRanked: toNumOrNull(inc2.totalRanked),
+            totalScore:
+              toNumOrNull(inc2.totalScore) !== null
+                ? toNumOrNull(inc2.totalScore)
+                : 0,
+          };
+          vals2.push(obj);
+          sv2 = iv.next();
+        }
+        payload.eventResult = vals2;
+      }
+
+      // kirim upsert
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", function (_e, res) {
+        var ok = res && res.ok ? true : false;
+        if (ok) {
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Event Results Updated",
+            detail: "HEADTOHEAD category merged successfully",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Upsert failed",
+            detail: res && res.error ? res.error : "Unknown error",
+          });
+        }
       });
     },
     // === SERIAL CONNECTION ===

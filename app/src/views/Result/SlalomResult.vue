@@ -504,282 +504,188 @@ export default {
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
     pdfParticipants() {
-  const items = Array.isArray(this.rawResultItems) ? this.rawResultItems : [];
+      const items = Array.isArray(this.rawResultItems)
+        ? this.rawResultItems
+        : [];
 
-  // helpers
-  function norm(s) {
-    return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
-  }
-  const timeToMs = (str) => {
-    if (!str) return Infinity;
-    const parts = String(str).split(":");
-    const hh = parts[0] || "0";
-    const mm = parts[1] || "0";
-    const ssms = parts[2] || "0";
-    const ssmsParts = String(ssms).split(".");
-    const ss = ssmsParts[0] || "0";
-    const ms = ssmsParts[1] || "0";
-    return (+hh) * 3600000 + (+mm) * 60000 + (+ss) * 1000 + (+ms || 0);
-  };
-  const msToHMSms = (ms) => {
-    if (!Number.isFinite(ms)) return "";
-    function pad(n, w) { return String(n).padStart(w || 2, "0"); }
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    const mil = ms % 1000;
-    return pad(h) + ":" + pad(m) + ":" + pad(s) + "." + String(mil).padStart(3, "0");
-  };
-  const self = this;
+      // helpers
+      function norm(s) {
+        return String(s || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+      }
+      const timeToMs = (str) => {
+        if (!str) return Infinity;
+        const parts = String(str).split(":");
+        const hh = parts[0] || "0";
+        const mm = parts[1] || "0";
+        const ssms = parts[2] || "0";
+        const ssmsParts = String(ssms).split(".");
+        const ss = ssmsParts[0] || "0";
+        const ms = ssmsParts[1] || "0";
+        return +hh * 3600000 + +mm * 60000 + +ss * 1000 + (+ms || 0);
+      };
+      const msToHMSms = (ms) => {
+        if (!Number.isFinite(ms)) return "";
+        function pad(n, w) {
+          return String(n).padStart(w || 2, "0");
+        }
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        const mil = ms % 1000;
+        return (
+          pad(h) +
+          ":" +
+          pad(m) +
+          ":" +
+          pad(s) +
+          "." +
+          String(mil).padStart(3, "0")
+        );
+      };
+      const self = this;
 
-  function isBetterRun(a, b) {
-    if (!a && b) return true;
-    if (a && !b) return false;
-    if (!a && !b) return false;
-    const msA = timeToMs(a.totalTime || a.raceTime);
-    const msB = timeToMs(b.totalTime || b.raceTime);
-    const aValid = Number.isFinite(msA);
-    const bValid = Number.isFinite(msB);
-    if (aValid && bValid) return msB < msA; // b lebih cepat
-    if (!aValid && bValid) return true;
-    return false;
-  }
-
-  function sessionIndex(run, ridx) {
-    const s = run && run.session ? String(run.session).trim().toLowerCase() : "";
-    if (s === "1" || /\brun\s*1\b/.test(s) || /\b1\b/.test(s)) return 1;
-    if (s === "2" || /\brun\s*2\b/.test(s) || /\b2\b/.test(s)) return 2;
-    return (ridx === 0) ? 1 : (ridx === 1 ? 2 : null);
-  }
-
-  // ==== Kumpulkan per tim (≤2 run) ====
-  const map = Object.create(null);
-
-  for (let d = 0; d < items.length; d++) {
-    const doc = items[d];
-    const teams = (doc && Array.isArray(doc.teams)) ? doc.teams : [];
-    for (let t = 0; t < teams.length; t++) {
-      const T = teams[t] || {};
-      const nameTeam = T && T.nameTeam ? String(T.nameTeam) : "-";
-      const bibTeam = T && (T.bibTeam || T.bibNumber) ? String(T.bibTeam || T.bibNumber) : "-";
-      const statusId = Number(T && T.statusId) || 0;
-      const teamId = (T && T.teamId) ? T.teamId : (T && T.id) ? T.id : null;
-      const key = teamId ? ("id:" + teamId) : ("name:" + norm(nameTeam));
-
-      if (!map[key]) {
-        map[key] = {
-          nameTeam: nameTeam,
-          bibTeam: bibTeam,
-          statusId: statusId,
-          result: [],     // akan diisi maksimal 2 objek run
-          ranked: 0,
-          score: 0,
-          bestTime: "",
-          meta: {},
-          otr: {},
-          _slots: { 1: null, 2: null }, // internal
-        };
-      } else {
-        if (!map[key].nameTeam) map[key].nameTeam = nameTeam;
-        if (map[key].bibTeam === "-" && bibTeam && bibTeam !== "-") map[key].bibTeam = bibTeam;
-        if (!map[key].statusId) map[key].statusId = statusId;
+      function isBetterRun(a, b) {
+        if (!a && b) return true;
+        if (a && !b) return false;
+        if (!a && !b) return false;
+        const msA = timeToMs(a.totalTime || a.raceTime);
+        const msB = timeToMs(b.totalTime || b.raceTime);
+        const aValid = Number.isFinite(msA);
+        const bValid = Number.isFinite(msB);
+        if (aValid && bValid) return msB < msA; // b lebih cepat
+        if (!aValid && bValid) return true;
+        return false;
       }
 
-      const runs = Array.isArray(T && T.result) ? T.result : [];
-      for (let i = 0; i < runs.length; i++) {
-        const r = runs[i] || {};
-        const p = r.penaltyTotal || {};
-        const gates = Array.isArray(p.gates) ? p.gates : [];
-        const idx = sessionIndex(r, i); // 1 atau 2
-        if (idx !== 1 && idx !== 2) continue;
+      function sessionIndex(run, ridx) {
+        const s =
+          run && run.session ? String(run.session).trim().toLowerCase() : "";
+        if (s === "1" || /\brun\s*1\b/.test(s) || /\b1\b/.test(s)) return 1;
+        if (s === "2" || /\brun\s*2\b/.test(s) || /\b2\b/.test(s)) return 2;
+        return ridx === 0 ? 1 : ridx === 1 ? 2 : null;
+      }
 
-        const runObj = {
-          session: r.session ? String(r.session) : ("Run " + idx),
-          startTime: String(r.startTime || ""),
-          finishTime: String(r.finishTime || ""),
-          raceTime: String(r.raceTime || ""),
-          penaltyTime: String(r.penaltyTime || "00:00:00.000"),
-          penaltyTotal: {
-            start: Number(p.start) || 0,
-            gates: gates,
-            finish: Number(p.finish) || 0,
-          },
-          penalty:
-            (Number(p.start) || 0) +
-            gates.reduce(function(a, v){ return a + (Number(v) || 0); }, 0) +
-            (Number(p.finish) || 0),
-          totalTime: String(r.totalTime || r.raceTime || ""),
-          ranked: Number(r.ranked) || 0,
-          judgesBy: String(r.judgesBy || ""),
-          judgesTime: String(r.judgesTime || "")
-        };
+      // ==== Kumpulkan per tim (≤2 run) ====
+      const map = Object.create(null);
 
-        // merge ke slot idx (pilih yang lebih baik)
-        const cur = map[key]._slots[idx];
-        if (isBetterRun(cur, runObj)) {
-          map[key]._slots[idx] = runObj;
-        } else if (!cur) {
-          map[key]._slots[idx] = runObj;
-        }
+      for (let d = 0; d < items.length; d++) {
+        const doc = items[d];
+        const teams = doc && Array.isArray(doc.teams) ? doc.teams : [];
+        for (let t = 0; t < teams.length; t++) {
+          const T = teams[t] || {};
+          const nameTeam = T && T.nameTeam ? String(T.nameTeam) : "-";
+          const bibTeam =
+            T && (T.bibTeam || T.bibNumber)
+              ? String(T.bibTeam || T.bibNumber)
+              : "-";
+          const statusId = Number(T && T.statusId) || 0;
+          const teamId = T && T.teamId ? T.teamId : T && T.id ? T.id : null;
+          const key = teamId ? "id:" + teamId : "name:" + norm(nameTeam);
 
-        // simpan ranked/score tim dari run yang punya ranked
-        if (runObj.ranked > 0) {
-          map[key].ranked = runObj.ranked;
-          map[key].score = Number(r.score) || self.getScoreByRanked(runObj.ranked) || 0;
+          if (!map[key]) {
+            map[key] = {
+              nameTeam: nameTeam,
+              bibTeam: bibTeam,
+              statusId: statusId,
+              result: [], // akan diisi maksimal 2 objek run
+              ranked: 0,
+              score: 0,
+              bestTime: "",
+              meta: {},
+              otr: {},
+              _slots: { 1: null, 2: null }, // internal
+            };
+          } else {
+            if (!map[key].nameTeam) map[key].nameTeam = nameTeam;
+            if (map[key].bibTeam === "-" && bibTeam && bibTeam !== "-")
+              map[key].bibTeam = bibTeam;
+            if (!map[key].statusId) map[key].statusId = statusId;
+          }
+
+          const runs = Array.isArray(T && T.result) ? T.result : [];
+          for (let i = 0; i < runs.length; i++) {
+            const r = runs[i] || {};
+            const p = r.penaltyTotal || {};
+            const gates = Array.isArray(p.gates) ? p.gates : [];
+            const idx = sessionIndex(r, i); // 1 atau 2
+            if (idx !== 1 && idx !== 2) continue;
+
+            const runObj = {
+              session: r.session ? String(r.session) : "Run " + idx,
+              startTime: String(r.startTime || ""),
+              finishTime: String(r.finishTime || ""),
+              raceTime: String(r.raceTime || ""),
+              penaltyTime: String(r.penaltyTime || "00:00:00.000"),
+              penaltyTotal: {
+                start: Number(p.start) || 0,
+                gates: gates,
+                finish: Number(p.finish) || 0,
+              },
+              penalty:
+                (Number(p.start) || 0) +
+                gates.reduce(function (a, v) {
+                  return a + (Number(v) || 0);
+                }, 0) +
+                (Number(p.finish) || 0),
+              totalTime: String(r.totalTime || r.raceTime || ""),
+              ranked: Number(r.ranked) || 0,
+              judgesBy: String(r.judgesBy || ""),
+              judgesTime: String(r.judgesTime || ""),
+            };
+
+            // merge ke slot idx (pilih yang lebih baik)
+            const cur = map[key]._slots[idx];
+            if (isBetterRun(cur, runObj)) {
+              map[key]._slots[idx] = runObj;
+            } else if (!cur) {
+              map[key]._slots[idx] = runObj;
+            }
+
+            // simpan ranked/score tim dari run yang punya ranked
+            if (runObj.ranked > 0) {
+              map[key].ranked = runObj.ranked;
+              map[key].score =
+                Number(r.score) || self.getScoreByRanked(runObj.ranked) || 0;
+            }
+          }
         }
       }
-    }
-  }
 
-  // ==== Bentuk output, hitung bestTime dari 2 run ====
-  const out = [];
-  const keys = Object.keys(map);
-  for (let k = 0; k < keys.length; k++) {
-    const key = keys[k];
-    const entry = map[key];
+      // ==== Bentuk output, hitung bestTime dari 2 run ====
+      const out = [];
+      const keys = Object.keys(map);
+      for (let k = 0; k < keys.length; k++) {
+        const key = keys[k];
+        const entry = map[key];
 
-    // urut: Run 1 lalu Run 2 jika ada
-    if (entry._slots[1]) entry.result.push(entry._slots[1]);
-    if (entry._slots[2]) entry.result.push(entry._slots[2]);
+        // urut: Run 1 lalu Run 2 jika ada
+        if (entry._slots[1]) entry.result.push(entry._slots[1]);
+        if (entry._slots[2]) entry.result.push(entry._slots[2]);
 
-    // bestTime = min(totalTime || raceTime) dari dua run
-    let bestMs = Infinity;
-    for (let i = 0; i < entry.result.length; i++) {
-      const rr = entry.result[i];
-      const ms = timeToMs(rr.totalTime || rr.raceTime);
-      if (Number.isFinite(ms) && ms < bestMs) bestMs = ms;
-    }
-    entry.bestTime = Number.isFinite(bestMs) ? msToHMSms(bestMs) : "";
+        // bestTime = min(totalTime || raceTime) dari dua run
+        let bestMs = Infinity;
+        for (let i = 0; i < entry.result.length; i++) {
+          const rr = entry.result[i];
+          const ms = timeToMs(rr.totalTime || rr.raceTime);
+          if (Number.isFinite(ms) && ms < bestMs) bestMs = ms;
+        }
+        entry.bestTime = Number.isFinite(bestMs) ? msToHMSms(bestMs) : "";
 
-    if (!entry.ranked) entry.ranked = 0;
-    if (!entry.score) entry.score = self.getScoreByRanked(entry.ranked) || 0;
+        if (!entry.ranked) entry.ranked = 0;
+        if (!entry.score)
+          entry.score = self.getScoreByRanked(entry.ranked) || 0;
 
-    // bersihkan field internal
-    delete entry._slots;
+        // bersihkan field internal
+        delete entry._slots;
 
-    out.push(entry);
-  }
+        out.push(entry);
+      }
 
-  return out;
-},
-    // pdfParticipants() {
-    //   // Ambil langsung dari payload DB yang diisi di loadSlalomResult()
-    //   const items = Array.isArray(this.rawResultItems)
-    //     ? this.rawResultItems
-    //     : [];
-    //   const teamsMap = Object.create(null);
-
-    //   // helper waktu
-    //   const timeToMs = (str) => {
-    //     if (!str) return Infinity;
-    //     const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
-    //     const [ss = "0", ms = "0"] = String(ssms).split(".");
-    //     return +hh * 3600000 + +mm * 60000 + +ss * 1000 + (+ms || 0);
-    //   };
-    //   const msToHMSms = (ms) => {
-    //     if (!Number.isFinite(ms)) return "";
-    //     const pad = (n, w = 2) => String(n).padStart(w, "0");
-    //     const h = Math.floor(ms / 3600000);
-    //     const m = Math.floor((ms % 3600000) / 60000);
-    //     const s = Math.floor((ms % 60000) / 1000);
-    //     const mil = ms % 1000;
-    //     return `${pad(h)}:${pad(m)}:${pad(s)}.${String(mil).padStart(3, "0")}`;
-    //   };
-
-    //   // Flatten dari semua dokumen → per tim
-    //   for (const doc of items) {
-    //     const teams = Array.isArray(doc && doc.teams) ? doc.teams : [];
-    //     for (const t of teams) {
-    //       const nameTeam = String(t && t.nameTeam ? t.nameTeam : "-");
-    //       const bibTeam = String(
-    //         t && (t.bibTeam || t.bibNumber) ? t.bibTeam || t.bibNumber : "-"
-    //       );
-    //       const key = nameTeam + "|" + bibTeam;
-
-    //       if (!teamsMap[key]) {
-    //         teamsMap[key] = {
-    //           nameTeam,
-    //           bibTeam,
-    //           statusId: Number(t && t.statusId) || 0,
-    //           result: [],
-    //           ranked: 0,
-    //           score: 0,
-    //           bestTime: "",
-    //           meta: {},
-    //           otr: {},
-    //           __bestMs: Infinity, // internal
-    //         };
-    //       }
-
-    //       const runs = Array.isArray(t && t.result) ? t.result : [];
-    //       for (let i = 0; i < runs.length; i++) {
-    //         const r = runs[i] || {};
-    //         const p = r.penaltyTotal || {};
-    //         const gates = Array.isArray(p.gates) ? p.gates : [];
-
-    //         const runObj = {
-    //           session: r.session || `Run ${i + 1}`,
-    //           startTime: String(r.startTime || ""),
-    //           finishTime: String(r.finishTime || ""),
-    //           raceTime: String(r.raceTime || ""),
-    //           penaltyTime: String(r.penaltyTime || "00:00:00.000"),
-    //           penaltyTotal: {
-    //             start: Number(p.start) || 0,
-    //             gates,
-    //             finish: Number(p.finish) || 0,
-    //           },
-    //           penalty:
-    //             (Number(p.start) || 0) +
-    //             gates.reduce((a, v) => a + (Number(v) || 0), 0) +
-    //             (Number(p.finish) || 0),
-    //           totalTime: String(r.totalTime || r.raceTime || ""),
-    //           ranked: Number(r.ranked) || 0,
-    //           judgesBy: String(r.judgesBy || ""),
-    //           judgesTime: String(r.judgesTime || ""),
-    //         };
-
-    //         teamsMap[key].result.push(runObj);
-
-    //         // hitung kandidat best (pakai totalTime bila ada, else raceTime)
-    //         const ms = timeToMs(runObj.totalTime || runObj.raceTime);
-    //         if (Number.isFinite(ms) && ms < teamsMap[key].__bestMs) {
-    //           teamsMap[key].__bestMs = ms;
-    //         }
-
-    //         // isi ranked/score level tim bila run ini punya rank
-    //         if (runObj.ranked > 0) {
-    //           teamsMap[key].ranked = runObj.ranked;
-    //           teamsMap[key].score =
-    //             Number(r.score) || this.getScoreByRanked(runObj.ranked) || 0;
-    //         }
-    //       }
-    //     }
-    //   }
-
-    //   // fallback ranked/score jika belum terisi
-    //   const out = [];
-    //   for (const k of Object.keys(teamsMap)) {
-    //     const t = teamsMap[k];
-
-    //     if (
-    //       Array.isArray(t.result) &&
-    //       t.result.length >= 2 &&
-    //       Number.isFinite(t.__bestMs)
-    //     ) {
-    //       t.bestTime = msToHMSms(t.__bestMs);
-    //     } else {
-    //       t.bestTime = ""; // biar konsisten dengan PDF lama
-    //     }
-
-    //     if (!t.ranked) t.ranked = 0;
-    //     if (!t.score) t.score = this.getScoreByRanked(t.ranked) || 0;
-
-    //     delete t.__bestMs;
-    //     out.push(t);
-    //   }
-
-    //   return out;
-    // },
+      return out;
+    },
     pdfCategories() {
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
@@ -808,190 +714,272 @@ export default {
 
   methods: {
     buildResultRows(mode) {
-  const items = this.rawResultItems || [];
-  if (!Array.isArray(items) || items.length === 0) return [];
+      const items = this.rawResultItems || [];
+      if (!Array.isArray(items) || items.length === 0) return [];
 
-  // util
-  function norm(s) {
-    return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
-  }
-  const self = this;
+      // util
+      function norm(s) {
+        return String(s || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+      }
+      const self = this;
 
-  // pilih run yang "lebih baik" untuk slot run yang sama
-  function isBetterRun(a, b) {
-    if (!a && b) return true;
-    if (a && !b) return false;
-    if (!a && !b) return false;
-    // bandingkan berdasarkan resultTime -> totalTime -> raceTime
-    const msA = self.timeToMs(a.resultTime || a.totalTime || a.raceTime);
-    const msB = self.timeToMs(b.resultTime || b.totalTime || b.raceTime);
-    const aValid = Number.isFinite(msA);
-    const bValid = Number.isFinite(msB);
-    if (aValid && bValid) return msB < msA;   // b lebih cepat → b lebih baik
-    if (!aValid && bValid) return true;
-    return false; // default: pertahankan a
-  }
-
-  // deteksi index run (1 atau 2)
-  function sessionIndex(run, ridx) {
-    var s = run && run.session ? String(run.session) : "";
-    var clean = s.trim().toLowerCase();
-    // pola umum: "run 1", "run1", "1", dsb.
-    if (clean === "1" || /\brun\s*1\b/.test(clean) || /\b1\b/.test(clean)) return 1;
-    if (clean === "2" || /\brun\s*2\b/.test(clean) || /\b2\b/.test(clean)) return 2;
-    // fallback berdasarkan posisi dalam array
-    return (ridx === 0) ? 1 : (ridx === 1 ? 2 : null);
-  }
-
-  // ---- kumpulkan per tim, maksimum 2 run ----
-  var teamsObj = {};
-
-  for (var d = 0; d < items.length; d++) {
-    var doc = items[d];
-    if (!doc || !Array.isArray(doc.teams)) continue;
-
-    for (var t = 0; t < doc.teams.length; t++) {
-      var team = doc.teams[t] || {};
-
-      var rawName = (team && team.nameTeam) ? team.nameTeam : "-";
-      var rawBib  = (team && team.bibTeam) ? team.bibTeam
-                 : (team && team.bibNumber) ? team.bibNumber
-                 : "";
-      var teamId  = (team && team.teamId) ? team.teamId
-                 : (team && team.id) ? team.id
-                 : null;
-
-      var nameTeam = String(rawName).trim();
-      var bibTeam  = String(rawBib).trim();
-      var result   = Array.isArray(team.result) ? team.result : [];
-      if (result.length === 0) continue;
-
-      var key = teamId ? ("id:" + teamId) : ("name:" + norm(nameTeam));
-
-      if (!teamsObj[key]) {
-        teamsObj[key] = {
-          nameTeam: nameTeam,
-          bibTeam: bibTeam,
-          runsByIdx: { 1: null, 2: null }, // simpan maksimal 2
-          bestIdx: -1,
-          bestMs: Number.POSITIVE_INFINITY,
-          bestRank: 0
-        };
-      } else {
-        if (!teamsObj[key].nameTeam) teamsObj[key].nameTeam = nameTeam;
-        if (!teamsObj[key].bibTeam && bibTeam) teamsObj[key].bibTeam = bibTeam;
+      // pilih run yang "lebih baik" untuk slot run yang sama
+      function isBetterRun(a, b) {
+        if (!a && b) return true;
+        if (a && !b) return false;
+        if (!a && !b) return false;
+        // bandingkan berdasarkan resultTime -> totalTime -> raceTime
+        const msA = self.timeToMs(a.resultTime || a.totalTime || a.raceTime);
+        const msB = self.timeToMs(b.resultTime || b.totalTime || b.raceTime);
+        const aValid = Number.isFinite(msA);
+        const bValid = Number.isFinite(msB);
+        if (aValid && bValid) return msB < msA; // b lebih cepat → b lebih baik
+        if (!aValid && bValid) return true;
+        return false; // default: pertahankan a
       }
 
-      // iterasi semua run, taruh hanya ke slot 1/2
-      for (var r = 0; r < result.length; r++) {
-        var run = result[r] || {};
-        var idx = sessionIndex(run, r); // 1 atau 2 atau null
-        if (idx !== 1 && idx !== 2) continue; // abaikan selain 1/2
+      // deteksi index run (1 atau 2)
+      function sessionIndex(run, ridx) {
+        var s = run && run.session ? String(run.session) : "";
+        var clean = s.trim().toLowerCase();
+        // pola umum: "run 1", "run1", "1", dsb.
+        if (clean === "1" || /\brun\s*1\b/.test(clean) || /\b1\b/.test(clean))
+          return 1;
+        if (clean === "2" || /\brun\s*2\b/.test(clean) || /\b2\b/.test(clean))
+          return 2;
+        // fallback berdasarkan posisi dalam array
+        return ridx === 0 ? 1 : ridx === 1 ? 2 : null;
+      }
 
-        var R = this.normalizeResult(run);
-        var item = {
-          nameTeam: teamsObj[key].nameTeam || nameTeam,
-          bibTeam: bibTeam || teamsObj[key].bibTeam || "",
-          session: run.session ? String(run.session) : ("Run " + idx),
-          raceTime: R.raceTime,
-          startPenalty: R.startPenalty,
-          finishPenalty: R.finishPenalty,
-          sectionPenalty: R.sectionPenalty,
-          totalPenalty: R.totalPenalty,
-          penaltyTime: R.penaltyTime,
-          totalTime: R.totalTime,
-          resultTime: R.resultTime,
-          isBest: false,
-          ranked: 0,
-          score: 0,
-          gatesDetail:
-            (run.penaltyTotal && Array.isArray(run.penaltyTotal.gates))
-              ? run.penaltyTotal.gates
-              : []
-        };
+      // ---- kumpulkan per tim, maksimum 2 run ----
+      var teamsObj = {};
 
-        // jika slot kosong → isi; jika sudah ada → pilih yang lebih baik
-        var current = teamsObj[key].runsByIdx[idx];
-        if (isBetterRun(current, item)) {
-          teamsObj[key].runsByIdx[idx] = item;
-        } else if (!current) {
-          teamsObj[key].runsByIdx[idx] = item;
+      for (var d = 0; d < items.length; d++) {
+        var doc = items[d];
+        if (!doc || !Array.isArray(doc.teams)) continue;
+
+        for (var t = 0; t < doc.teams.length; t++) {
+          var team = doc.teams[t] || {};
+
+          var rawName = team && team.nameTeam ? team.nameTeam : "-";
+          var rawBib =
+            team && team.bibTeam
+              ? team.bibTeam
+              : team && team.bibNumber
+              ? team.bibNumber
+              : "";
+          var teamId =
+            team && team.teamId
+              ? team.teamId
+              : team && team.id
+              ? team.id
+              : null;
+
+          var nameTeam = String(rawName).trim();
+          var bibTeam = String(rawBib).trim();
+          var result = Array.isArray(team.result) ? team.result : [];
+          if (result.length === 0) continue;
+
+          var key = teamId ? "id:" + teamId : "name:" + norm(nameTeam);
+
+          if (!teamsObj[key]) {
+            teamsObj[key] = {
+              nameTeam: nameTeam,
+              bibTeam: bibTeam,
+              runsByIdx: { 1: null, 2: null }, // simpan maksimal 2
+              bestIdx: -1,
+              bestMs: Number.POSITIVE_INFINITY,
+              bestRank: 0,
+            };
+          } else {
+            if (!teamsObj[key].nameTeam) teamsObj[key].nameTeam = nameTeam;
+            if (!teamsObj[key].bibTeam && bibTeam)
+              teamsObj[key].bibTeam = bibTeam;
+          }
+
+          // iterasi semua run, taruh hanya ke slot 1/2
+          for (var r = 0; r < result.length; r++) {
+            var run = result[r] || {};
+            var idx = sessionIndex(run, r); // 1 atau 2 atau null
+            if (idx !== 1 && idx !== 2) continue; // abaikan selain 1/2
+
+            var R = this.normalizeResult(run);
+            var item = {
+              nameTeam: teamsObj[key].nameTeam || nameTeam,
+              bibTeam: bibTeam || teamsObj[key].bibTeam || "",
+              session: run.session ? String(run.session) : "Run " + idx,
+              raceTime: R.raceTime,
+              startPenalty: R.startPenalty,
+              finishPenalty: R.finishPenalty,
+              sectionPenalty: R.sectionPenalty,
+              totalPenalty: R.totalPenalty,
+              penaltyTime: R.penaltyTime,
+              totalTime: R.totalTime,
+              resultTime: R.resultTime,
+              isBest: false,
+              ranked: 0,
+              score: 0,
+              gatesDetail:
+                run.penaltyTotal && Array.isArray(run.penaltyTotal.gates)
+                  ? run.penaltyTotal.gates
+                  : [],
+            };
+
+            // jika slot kosong → isi; jika sudah ada → pilih yang lebih baik
+            var current = teamsObj[key].runsByIdx[idx];
+            if (isBetterRun(current, item)) {
+              teamsObj[key].runsByIdx[idx] = item;
+            } else if (!current) {
+              teamsObj[key].runsByIdx[idx] = item;
+            }
+          }
         }
       }
-    }
-  }
 
-  // ---- bentuk array runs final per tim (≤2 item), tentukan best ----
-  var keys = Object.keys(teamsObj);
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
-    var pack = teamsObj[k];
+      // ---- bentuk array runs final per tim (≤2 item), tentukan best ----
+      var keys = Object.keys(teamsObj);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var pack = teamsObj[k];
 
-    // urutkan Run 1 lalu Run 2 jika ada
-    var mergedRuns = [];
-    if (pack.runsByIdx[1]) mergedRuns.push(pack.runsByIdx[1]);
-    if (pack.runsByIdx[2]) mergedRuns.push(pack.runsByIdx[2]);
-    pack.runs = mergedRuns;
+        // urutkan Run 1 lalu Run 2 jika ada
+        var mergedRuns = [];
+        if (pack.runsByIdx[1]) mergedRuns.push(pack.runsByIdx[1]);
+        if (pack.runsByIdx[2]) mergedRuns.push(pack.runsByIdx[2]);
+        pack.runs = mergedRuns;
 
-    // tentukan best dari 1 atau 2
-    for (var j = 0; j < pack.runs.length; j++) {
-      var row = pack.runs[j];
-      var ms = this.timeToMs(row.resultTime || row.totalTime || row.raceTime);
-      if (Number.isFinite(ms) && ms < pack.bestMs) {
-        pack.bestMs = ms;
-        pack.bestIdx = j;
+        // tentukan best dari 1 atau 2
+        for (var j = 0; j < pack.runs.length; j++) {
+          var row = pack.runs[j];
+          var ms = this.timeToMs(
+            row.resultTime || row.totalTime || row.raceTime
+          );
+          if (Number.isFinite(ms) && ms < pack.bestMs) {
+            pack.bestMs = ms;
+            pack.bestIdx = j;
+          }
+        }
       }
-    }
-  }
 
-  // ---- ranking antar tim berdasarkan bestMs ----
-  var bestArray = [];
-  for (var k1 in teamsObj) {
-    if (!Object.prototype.hasOwnProperty.call(teamsObj, k1)) continue;
-    bestArray.push({ key: k1, ms: teamsObj[k1].bestMs });
-  }
-  bestArray.sort(function(a, b) { return a.ms - b.ms; });
+      // ---- ranking antar tim berdasarkan bestMs ----
+      var bestArray = [];
+      for (var k1 in teamsObj) {
+        if (!Object.prototype.hasOwnProperty.call(teamsObj, k1)) continue;
+        bestArray.push({ key: k1, ms: teamsObj[k1].bestMs });
+      }
+      bestArray.sort(function (a, b) {
+        return a.ms - b.ms;
+      });
 
-  var rankCounter = 1;
-  for (var b = 0; b < bestArray.length; b++) {
-    var ent = bestArray[b];
-    var pack2 = teamsObj[ent.key];
-    // kalau tidak ada run sama sekali, lewati rank (tetap Infinity)
-    if (!Array.isArray(pack2.runs) || pack2.runs.length === 0) continue;
+      var rankCounter = 1;
+      for (var b = 0; b < bestArray.length; b++) {
+        var ent = bestArray[b];
+        var pack2 = teamsObj[ent.key];
+        // kalau tidak ada run sama sekali, lewati rank (tetap Infinity)
+        if (!Array.isArray(pack2.runs) || pack2.runs.length === 0) continue;
 
-    pack2.bestRank = rankCounter;
-    if (pack2.bestIdx >= 0 && pack2.bestIdx < pack2.runs.length) {
-      pack2.runs[pack2.bestIdx].isBest = true;
-      pack2.runs[pack2.bestIdx].ranked = rankCounter;
-      pack2.runs[pack2.bestIdx].score = this.getScoreByRanked(rankCounter);
-    }
-    rankCounter++;
-  }
+        pack2.bestRank = rankCounter;
+        if (pack2.bestIdx >= 0 && pack2.bestIdx < pack2.runs.length) {
+          pack2.runs[pack2.bestIdx].isBest = true;
+          pack2.runs[pack2.bestIdx].ranked = rankCounter;
+          pack2.runs[pack2.bestIdx].score = this.getScoreByRanked(rankCounter);
+        }
+        rankCounter++;
+      }
 
-  // ---- susun finalRows sesuai mode ----
-  var orderedKeys = Object.keys(teamsObj).sort(function(ka, kb) {
+      // // ---- susun finalRows sesuai mode ----
+      // var orderedKeys = Object.keys(teamsObj).sort(function (ka, kb) {
+      //   var ra = teamsObj[ka].bestRank || Infinity;
+      //   var rb = teamsObj[kb].bestRank || Infinity;
+      //   return ra - rb;
+      // });
+
+      // var finalRows = [];
+      // var teamCounter = 1;
+
+      // for (var x = 0; x < orderedKeys.length; x++) {
+      //   var key = orderedKeys[x];
+      //   var pack3 = teamsObj[key];
+      //   var rows = [];
+
+      //   if (mode === "1") {
+      //     if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
+      //   } else if (mode === "2") {
+      //     if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
+      //   } else {
+      //     // "all": maksimal 2 baris (run1 lalu run2 bila ada)
+      //     if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
+      //     if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
+      //   }
+
+      //   for (var y = 0; y < rows.length; y++) {
+      //     var rrow = rows[y];
+      //     finalRows.push({
+      //       nameTeam: rrow.nameTeam,
+      //       bibTeam: rrow.bibTeam,
+      //       session: rrow.session,
+      //       raceTime: rrow.raceTime,
+      //       startPenalty: rrow.startPenalty,
+      //       finishPenalty: rrow.finishPenalty,
+      //       sectionPenalty: rrow.sectionPenalty,
+      //       totalPenalty: rrow.totalPenalty,
+      //       penaltyTime: rrow.penaltyTime,
+      //       totalTime: rrow.totalTime,
+      //       resultTime: rrow.resultTime,
+      //       isBest: rrow.isBest,
+      //       gatesDetail: rrow.gatesDetail,
+      //       ranked: rrow.isBest ? rrow.ranked || "-" : "-",
+      //       score: rrow.isBest ? rrow.score || 0 : 0,
+      //       teamIndex: teamCounter,
+      //     });
+      //   }
+      //   teamCounter++;
+      // }
+
+      // // Rowspan merge utk mode "all" (sekarang pasti ≤2 per tim)
+      // if (mode === "all") {
+      //   var groupCount = new Map();
+      //   for (var z = 0; z < finalRows.length; z++) {
+      //     var rr = finalRows[z];
+      //     groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
+      //   }
+      //   var seenFirst = new Set();
+      //   for (var z2 = 0; z2 < finalRows.length; z2++) {
+      //     var r2 = finalRows[z2];
+      //     if (!seenFirst.has(r2.teamIndex)) {
+      //       r2.__groupStart = true;
+      //       r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
+      //       seenFirst.add(r2.teamIndex);
+      //     } else {
+      //       r2.__groupStart = false;
+      //       r2.__groupSize = 0;
+      //     }
+      //   }
+      // }
+
+      // return finalRows;
+      // ---- susun finalRows sesuai mode ----
+var finalRows = [];
+
+if (mode === "all") {
+  var orderedKeys = Object.keys(teamsObj).sort(function (ka, kb) {
     var ra = teamsObj[ka].bestRank || Infinity;
     var rb = teamsObj[kb].bestRank || Infinity;
     return ra - rb;
   });
 
-  var finalRows = [];
   var teamCounter = 1;
-
   for (var x = 0; x < orderedKeys.length; x++) {
     var key = orderedKeys[x];
     var pack3 = teamsObj[key];
-    var rows = [];
 
-    if (mode === "1") {
-      if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
-    } else if (mode === "2") {
-      if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
-    } else {
-      // "all": maksimal 2 baris (run1 lalu run2 bila ada)
-      if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
-      if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
-    }
+    // urut: Run 1 lalu Run 2 (bila ada)
+    var rows = [];
+    if (pack3.runsByIdx[1]) rows.push(pack3.runsByIdx[1]);
+    if (pack3.runsByIdx[2]) rows.push(pack3.runsByIdx[2]);
 
     for (var y = 0; y < rows.length; y++) {
       var rrow = rows[y];
@@ -1017,29 +1005,71 @@ export default {
     teamCounter++;
   }
 
-  // Rowspan merge utk mode "all" (sekarang pasti ≤2 per tim)
-  if (mode === "all") {
-    var groupCount = new Map();
-    for (var z = 0; z < finalRows.length; z++) {
-      var rr = finalRows[z];
-      groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
-    }
-    var seenFirst = new Set();
-    for (var z2 = 0; z2 < finalRows.length; z2++) {
-      var r2 = finalRows[z2];
-      if (!seenFirst.has(r2.teamIndex)) {
-        r2.__groupStart = true;
-        r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
-        seenFirst.add(r2.teamIndex);
-      } else {
-        r2.__groupStart = false;
-        r2.__groupSize = 0;
-      }
+  // Rowspan merge utk mode "all"
+  var groupCount = new Map();
+  for (var z = 0; z < finalRows.length; z++) {
+    var rr = finalRows[z];
+    groupCount.set(rr.teamIndex, (groupCount.get(rr.teamIndex) || 0) + 1);
+  }
+  var seenFirst = new Set();
+  for (var z2 = 0; z2 < finalRows.length; z2++) {
+    var r2 = finalRows[z2];
+    if (!seenFirst.has(r2.teamIndex)) {
+      r2.__groupStart = true;
+      r2.__groupSize = groupCount.get(r2.teamIndex) || 1;
+      seenFirst.add(r2.teamIndex);
+    } else {
+      r2.__groupStart = false;
+      r2.__groupSize = 0;
     }
   }
 
-  return finalRows;
-},
+} else {
+  // ---- mode "1" atau "2": urutkan by waktu run spesifik ----
+  var wantedIdx = mode === "1" ? 1 : 2;
+  var pool = [];
+
+  for (var k in teamsObj) {
+    if (!Object.prototype.hasOwnProperty.call(teamsObj, k)) continue;
+    var run = teamsObj[k].runsByIdx[wantedIdx];
+    if (!run) continue;
+
+    var ms = this.timeToMs(run.resultTime || run.totalTime || run.raceTime);
+    pool.push({
+      ms: Number.isFinite(ms) ? ms : Infinity,
+      row: run
+    });
+  }
+
+  // sort by waktu tercepat
+  pool.sort(function (a, b) { return a.ms - b.ms; });
+
+  // assign teamIndex sesuai urutan ini
+  for (var i = 0; i < pool.length; i++) {
+    var rrow = pool[i].row;
+    finalRows.push({
+      nameTeam: rrow.nameTeam,
+      bibTeam: rrow.bibTeam,
+      session: rrow.session,
+      raceTime: rrow.raceTime,
+      startPenalty: rrow.startPenalty,
+      finishPenalty: rrow.finishPenalty,
+      sectionPenalty: rrow.sectionPenalty,
+      totalPenalty: rrow.totalPenalty,
+      penaltyTime: rrow.penaltyTime,
+      totalTime: rrow.totalTime,
+      resultTime: rrow.resultTime,
+      isBest: rrow.isBest,            // tidak dipakai di UI run-only
+      gatesDetail: rrow.gatesDetail,
+      ranked: "-",                    // kolom ini di UI run-only menampilkan teamIndex
+      score: 0,                       // tidak dipakai di UI run-only
+      teamIndex: i + 1                // <- ini yang jadi “urutan tercepat” untuk run tsb
+    });
+  }
+}
+
+return finalRows;
+    },
     changeSessionMode(mode) {
       if (!["all", "1", "2"].includes(mode)) return;
       this.sessionMode = mode;
@@ -1217,7 +1247,6 @@ export default {
 </script>
 
 <style scoped>
-
 /* Nonaktifkan highlight hijau pada 3 kolom ini saja */
 .best-row .no-cell,
 .best-row .team-cell,

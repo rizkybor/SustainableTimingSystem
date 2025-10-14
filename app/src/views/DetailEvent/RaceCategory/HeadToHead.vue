@@ -2329,9 +2329,9 @@ export default {
 
       // --- Konversi hasil akumulasi (object) menjadi array ---
       var arr = [];
-      for (var key in acc) {
+      for (let key in acc) {
         if (Object.prototype.hasOwnProperty.call(acc, key)) {
-          var v = acc[key];
+          let v = acc[key];
           arr.push({
             name: v.name,
             bib: v.bib,
@@ -2530,7 +2530,7 @@ export default {
       try {
         await this.$refs.html2Pdf.generatePdf();
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     },
 
@@ -2575,7 +2575,7 @@ export default {
       try {
         await this.$refs.html2Pdf.generatePdf();
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     },
 
@@ -2620,7 +2620,7 @@ export default {
       try {
         await this.$refs.html2Pdf.generatePdf();
       } catch (e) {
-        console.error(e);
+        logger.warn(e);
       }
     },
 

@@ -870,32 +870,6 @@ function penaltyMsFromValues(start, gates, finish) {
   return toMs(start) + core + toMs(finish);
 }
 
-// === Helpers untuk socket penalties ===
-function clamp05or50(v) {
-  const n = Number(v);
-  return n === 0 || n === 5 || n === 50 ? n : 0;
-}
-
-// "Gate 3" | "G3" | 3 | "3" | "Start" | "Finish" -> { kind:'gate'|'start'|'finish', gateIdx?:number }
-function parseGateIdentifier(x) {
-  if (x == null) return { kind: "gate", gateIdx: undefined };
-  const s = String(x).trim().toLowerCase();
-
-  if (s === "start" || s === "s" || s === "st") return { kind: "start" };
-  if (s === "finish" || s === "f" || s === "fin") return { kind: "finish" };
-
-  // match "gate 3", "g3", "gate-3", "3"
-  const m = s.match(/^(?:gate|g)[\s\-]*([0-9]+)$/) || s.match(/^([0-9]+)$/);
-  if (m) {
-    const idx1 = parseInt(m[1], 10);
-    if (!Number.isNaN(idx1) && idx1 > 0)
-      return { kind: "gate", gateIdx: idx1 - 1 }; // 0-based
-  }
-
-  // default: treat as gate (unknown index)
-  return { kind: "gate", gateIdx: undefined };
-}
-
 // 1/2 atau 0/1 → 0-based 0|1; fallback ke active run
 function toRunIdx(msg, fallbackIdx) {
   var v = null;
@@ -910,13 +884,6 @@ function toRunIdx(msg, fallbackIdx) {
   return typeof fallbackIdx === "number" && isFinite(fallbackIdx)
     ? fallbackIdx
     : 0;
-}
-
-function ensureLen(arr, need) {
-  const a = Array.isArray(arr) ? arr : [];
-  while (a.length < need) a.push(0);
-  if (a.length > need) a.length = need;
-  return a;
 }
 
 function recomputeSessionFields(session) {
@@ -948,7 +915,6 @@ export default {
     EmptyCard,
     VueHtml2pdf,
     SlalomSession1PdfResult,
-    tone,
     Icon,
   },
 
@@ -987,7 +953,7 @@ export default {
       penaltiesWrapped: false,
 
       // ====== SOCKET ======
-      _socket: null,
+      initSocket: null,
       selfSocketId: null,
     };
   },
@@ -1246,7 +1212,7 @@ export default {
     // ====== SOCKET INIT & LISTENERS ======
     try {
       var socket = getSocket();
-      this._socket = socket;
+      this.initSocket = socket;
 
       var onConnect = () => {
         this.selfSocketId = socket && socket.id ? socket.id : null;
@@ -1328,9 +1294,9 @@ export default {
       socket.on("custom:event", onMessage);
 
       this.$once("hook:beforeDestroy", () => {
-        if (this._socket) {
-          this._socket.off("connect", onConnect);
-          this._socket.off("custom:event", onMessage);
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
         }
       });
     } catch (err) {
@@ -1458,9 +1424,9 @@ export default {
                 .trim()
                 .toLowerCase();
               var extracted = null;
-              if (/^(?:gate|g)[\s\-]*([0-9]+)$/.test(sToken)) {
+              if (/^(?:gate|g)[\s-]*([0-9]+)$/.test(sToken)) {
                 extracted = parseInt(
-                  sToken.replace(/^(?:gate|g)[\s\-]*/, ""),
+                  sToken.replace(/^(?:gate|g)[\s-]*/, ""),
                   10
                 );
               } else if (/^[0-9]+$/.test(sToken)) {
@@ -1865,7 +1831,7 @@ export default {
 
         this.checkEndGameStatus();
       } catch (err) {
-        console.error("hydrateTeamsFromResult error:", err);
+        logger.error("hydrateTeamsFromResult error:", err);
       }
     },
     refreshSlalomCats() {

@@ -1300,17 +1300,12 @@ export default {
           _isAggregate: true,
         };
 
-        drrBuckets.forEach((b) => {
+        drrBuckets.forEach(async (b) => {
           const key = this._bucketKey(b);
           const label = this._bucketLabel(b);
-          const normalizedTeams = Array.isArray(b.teams)
-            ? b.teams.map(normalizeTeamForDRR)
-            : [];
-
-          map[key] = {
-            ...b,
-            teams: normalizedTeams,
-          };
+          const hydrated = await this.hydratePenaltiesFromRegistered(
+            b.teams || []
+          );
           opts.push({ value: key, text: label });
 
           // gabungkan ke agregat
@@ -1458,10 +1453,8 @@ export default {
         // server bisa return 1 dokumen bucket atau array dokumen.
         // Karena kita kasih filter lengkap (4 id), mestinya 0/1 dokumen.
         const doc = Array.isArray(res.items) ? res.items[0] : res.items;
-        const teams =
-          doc && Array.isArray(doc.teams)
-            ? doc.teams.map(normalizeTeamForDRR)
-            : [];
+        const teamsRaw = doc && Array.isArray(doc.teams) ? doc.teams : [];
+        const teams = await this.hydratePenaltiesFromRegistered(teamsRaw);
 
         // set participant + judul + currentBucket (buat save)
         this.participant = teams;
@@ -1479,6 +1472,8 @@ export default {
 
         // sesuaikan jumlah section penalty ke setting
         this.applyDrrSectionCount(this.drrSectionsCount);
+        await this.assignRanks(this.participant);
+        if (this.$forceUpdate) this.$forceUpdate();
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
@@ -1570,6 +1565,109 @@ export default {
       const ss = parseFloat(ssms) || 0; // boleh ada .ms, tetap aman
       const val = +hh * 3600 + +mm * 60 + ss; // detik
       return (neg ? -1 : 1) * Math.round(val); // bulatkan ke detik terdekat
+    },
+
+    // === MAP angka penalty ↔ time string (mengacu ke this.dataPenalties) ===
+    penaltyValueToTime(val) {
+      if (val == null) return "";
+      const num = Number(val);
+      if (!Number.isFinite(num)) return "";
+      const found = (this.dataPenalties || []).find(
+        (p) => Number(p.value) === num
+      );
+      return found ? String(found.timePen || "") : "";
+    },
+
+    // pastikan array section punya panjang sesuai setting (drrSectionsCount)
+    _coerceSectionArray(arr, targetLen) {
+      const n =
+        Number.isFinite(targetLen) && targetLen > 0
+          ? targetLen
+          : this.drrSectionsCount || 3;
+      if (Array.isArray(arr)) {
+        const out = arr.slice(0, n);
+        while (out.length < n) out.push(null);
+        return out;
+      }
+      // jika sumbernya angka tunggal/null, ubah jadi array length n
+      const out = [];
+      if (arr != null) out.push(arr);
+      while (out.length < n) out.push(null);
+      return out.slice(0, n);
+    },
+
+    // jumlahkan daftar time string (boleh ada tanda minus) → "HH:MM:SS.mmm"
+    async _sumPenaltyTimes(times = []) {
+      let total = "00:00:00.000";
+      for (const t of times) {
+        const v = String(t || "00:00:00.000");
+        total = v.startsWith("-")
+          ? await this.kurangiWaktu(total, v.slice(1))
+          : await this.tambahWaktu(total, v);
+      }
+      return total;
+    },
+
+    // ambil penalties dari dokumen teams-registered → set ke shape UI
+    async hydratePenaltiesFromRegistered(rawTeams = []) {
+      const secCount =
+        Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+          ? this.drrSectionsCount
+          : 3;
+
+      const normalized = (rawTeams || []).map(normalizeTeamForDRR);
+
+      for (const t of normalized) {
+        const fromDB = Array.isArray(t.result)
+          ? t.result[0] || {}
+          : t.result || {};
+        const r = t.result && !Array.isArray(t.result) ? t.result : {};
+
+        const startPenNum = Number(fromDB.startPenalty);
+        const finishPenNum = Number(fromDB.finishPenalty);
+        const sectionPenRaw = fromDB.sectionPenalty;
+
+        // angka → time string (untuk select)
+        r.penaltyStartTime = this.penaltyValueToTime(startPenNum);
+        r.penaltyFinishTime = this.penaltyValueToTime(finishPenNum);
+
+        const sectionNums = this._coerceSectionArray(sectionPenRaw, secCount);
+        const sectionTimes = sectionNums.map((n) => this.penaltyValueToTime(n));
+        if (this.$set) this.$set(r, "penaltySection", sectionTimes);
+        else r.penaltySection = sectionTimes;
+
+        // set angka numerik (fallback 0 bila NaN)
+        r.startPenalty = Number.isFinite(startPenNum) ? startPenNum : 0;
+        r.finishPenalty = Number.isFinite(finishPenNum) ? finishPenNum : 0;
+        r.sectionPenalty = sectionNums.reduce(
+          (acc, v) => acc + (Number.isFinite(Number(v)) ? Number(v) : 0),
+          0
+        );
+        r.totalPenalty =
+          (r.startPenalty || 0) +
+          (r.finishPenalty || 0) +
+          (r.sectionPenalty || 0);
+
+        // totalPenaltyTime (string)
+        r.penaltyTime = await this._sumPenaltyTimes([
+          r.penaltyStartTime || "00:00:00.000",
+          r.penaltyFinishTime || "00:00:00.000",
+          ...(r.penaltySection || []).map((x) => x || "00:00:00.000"),
+        ]);
+        r.totalPenaltyTime = r.penaltyTime;
+
+        // totalTime jika raceTime sudah ada
+        if (r.raceTime)
+          r.totalTime = await this.tambahWaktu(r.raceTime, r.penaltyTime);
+
+        // bawa info juri bila ada
+        if (fromDB.judgesBy) r.judgesBy = String(fromDB.judgesBy);
+        if (fromDB.judgesTime) r.judgesTime = String(fromDB.judgesTime);
+
+        t.result = r;
+      }
+
+      return normalized;
     },
 
     loadFromRaceStartPayload() {

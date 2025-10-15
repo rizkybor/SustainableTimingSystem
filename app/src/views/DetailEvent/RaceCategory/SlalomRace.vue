@@ -845,6 +845,7 @@ function clampPenalty(v) {
   if (n === 0 || n === 5 || n === 50) return n;
   return 0; // selain 0/5/50 dibersihkan ke 0 (contoh 10 -> 0)
 }
+
 function fitGates(arr, need) {
   var out = [];
   var i = 0;
@@ -1211,26 +1212,27 @@ export default {
 
     // ====== SOCKET INIT & LISTENERS ======
     try {
-      var socket = getSocket();
+      const socket = getSocket();
       this.initSocket = socket;
 
-      var onConnect = () => {
+      const onConnect = () => {
         this.selfSocketId = socket && socket.id ? socket.id : null;
       };
       socket.on("connect", onConnect);
 
-      var isSameEvent = (m) => {
-        var cur = this.currentSlalomEventId
+      const isSameEvent = (m) => {
+        const cur = this.currentSlalomEventId
           ? String(this.currentSlalomEventId)
           : "";
-        var ev = m && m.eventId ? String(m.eventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        // kalau salah satu kosong, jangan diblokir
         return !cur || !ev ? true : cur === ev;
       };
 
-      var onMessage = async (msgRaw) => {
-        var msg = msgRaw || {};
+      const onMessage = async (raw) => {
+        const msg = raw || {};
 
-        // cegah echo & filter event
+        // 1) cegah echo & pastikan event sama
         if (
           msg.senderId &&
           this.selfSocketId &&
@@ -1239,29 +1241,38 @@ export default {
           return;
         if (!isSameEvent(msg)) return;
 
+        // 2) notifikasi kecil (opsional)
         if (this.$bvToast && msg.text) {
-          audio.play();
-          var txt = (msg.from ? msg.from : "Realtime") + ": " + msg.text;
-          this.$bvToast.toast(txt, {
-            title: "Pesan Realtime",
-            variant: "success",
-            solid: true,
-          });
+          try {
+            new Audio(tone).play();
+          } catch {}
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
         }
 
-        // ==== Normalisasi tipe lama → baru ====
+        // 3) Normalisasi tipe:
+        // - "PenaltiesUpdated" => (Start/Finish/Gate) tergantung field gate
+        // - selain itu biarkan (PenaltyStart / PenaltyFinish / PenaltyGates)
         if (msg.type === "PenaltiesUpdated") {
           const gt = String(msg.gate || "")
             .trim()
             .toLowerCase();
-          if (gt === "start" || gt === "s" || gt === "st")
+          if (gt === "start" || gt === "s" || gt === "st") {
             msg.type = "PenaltyStart";
-          else if (gt === "finish" || gt === "f" || gt === "fin")
+          } else if (gt === "finish" || gt === "f" || gt === "fin") {
             msg.type = "PenaltyFinish";
-          else msg.type = "PenaltyGates";
+          } else {
+            msg.type = "PenaltyGates";
+          }
         }
 
-        // HANYA penalties
+        // 4) Filter: kita cuma urus penalty
         if (
           msg.type !== "PenaltyStart" &&
           msg.type !== "PenaltyFinish" &&
@@ -1269,25 +1280,45 @@ export default {
         )
           return;
 
-        // pastikan ada identitas tim
-        var hasTeamKey =
-          (msg.teamId != null && String(msg.teamId) !== "") ||
-          (msg.bib != null && String(msg.bib) !== "") ||
-          (msg.bibTeam != null && String(msg.bibTeam) !== "") ||
-          (msg.teamName && String(msg.teamName).trim() !== "");
-        if (!hasTeamKey) return;
+        // 5) Normalisasi run (dukung runNumber/run → 0-based; fallback activeRun)
+        msg.run = (function toRunIdx(m, fallbackIdx) {
+          let v =
+            m && m.runNumber != null
+              ? m.runNumber
+              : m && m.run != null
+              ? m.run
+              : null;
+          const n = parseInt(v, 10);
+          if (!isNaN(n)) {
+            if (n >= 1 && n <= 2) return n - 1; // 1/2 -> 0/1
+            if (n === 0 || n === 1) return n; // already 0/1
+          }
+          return Number.isFinite(fallbackIdx) ? fallbackIdx : 0;
+        })(msg, this.activeRun);
 
-        // normalisasi run → 0-based (fallback: activeRun)
-        msg.run = toRunIdx(msg, this.activeRun);
-
-        // khusus PenaltyGates: gate number 1-based → index 0-based
+        // 6) Gate index (khusus PenaltyGates):
         if (msg.type === "PenaltyGates") {
-          if (typeof msg.gate === "number" && Number.isFinite(msg.gate)) {
-            var gi = msg.gate > 0 ? msg.gate - 1 : msg.gate;
-            if (Number.isInteger(gi)) msg.gateIndex = gi;
+          if (Number.isFinite(msg.gateNumber)) {
+            msg.gateIndex = Math.max(0, Number(msg.gateNumber) - 1);
+          } else if (
+            typeof msg.gate === "number" &&
+            Number.isFinite(msg.gate)
+          ) {
+            msg.gateIndex = Math.max(0, Number(msg.gate) - 1);
+          } else if (msg.gate != null) {
+            const s = String(msg.gate).trim().toLowerCase(); // "Gate 1" / "G1" / "1"
+            let extracted = null;
+            if (/^(?:gate|g)\s*-*\s*([0-9]+)$/.test(s)) {
+              extracted = parseInt(s.replace(/^(?:gate|g)\s*-*\s*/, ""), 10);
+            } else if (/^[0-9]+$/.test(s)) {
+              extracted = parseInt(s, 10);
+            }
+            if (Number.isFinite(extracted) && extracted > 0)
+              msg.gateIndex = extracted - 1;
           }
         }
 
+        // 7) Apply langsung ke UI state
         await this.applyPenaltyFromSocketDirect(msg);
       };
 
@@ -1309,55 +1340,57 @@ export default {
 
     async applyPenaltyFromSocketDirect(msg) {
       try {
-        // --- 1) identifikasi tim (teamId/bib/name) ---
-        var key = "";
+        // --- identifikasi tim (teamId/bib/name) ---
+        let key = "";
         if (msg && msg.teamId != null) key = String(msg.teamId);
         else if (msg && (msg.bib != null || msg.bibTeam != null))
           key = String(msg.bib != null ? msg.bib : msg.bibTeam);
         else if (msg && msg.teamName) key = String(msg.teamName);
         if (!key) return false;
 
-        var teamIdOrBib = "";
-        if (msg && msg.teamId != null) teamIdOrBib = String(msg.teamId);
-        else if (msg && (msg.bib != null || msg.bibTeam != null))
-          teamIdOrBib = String(msg.bib != null ? msg.bib : msg.bibTeam);
+        const idOrBib =
+          msg && msg.teamId != null
+            ? String(msg.teamId)
+            : msg && (msg.bib != null || msg.bibTeam != null)
+            ? String(msg.bib != null ? msg.bib : msg.bibTeam)
+            : "";
 
-        var f = this._findTeamAndSessionIndex(teamIdOrBib, undefined);
-
-        // fallback cari by name (case-insensitive)
-        if (!f || !f.team) {
-          if (msg && msg.teamName) {
-            var nameLC = String(msg.teamName).toLowerCase();
-            var foundTeam = null,
-              foundIdx = -1;
-            for (var i = 0; i < this.teams.length; i++) {
-              var t = this.teams[i] || {};
-              if (String(t.nameTeam || "").toLowerCase() === nameLC) {
-                foundTeam = t;
-                foundIdx = i;
-                break;
-              }
-            }
-            if (foundTeam) {
-              var chosen = this.selectedSession[String(foundTeam._id)];
-              var sessIdx = 0;
-              if (typeof chosen === "number" && isFinite(chosen))
-                sessIdx = chosen;
-              else if (
-                typeof this.activeRun === "number" &&
-                isFinite(this.activeRun)
-              )
-                sessIdx = this.activeRun;
-              f = { team: foundTeam, teamIdx: foundIdx, sessionIdx: sessIdx };
+        let f = this._findTeamAndSessionIndex(idOrBib, undefined);
+        if ((!f || !f.team) && msg && msg.teamName) {
+          const nameLC = String(msg.teamName).toLowerCase();
+          for (let i = 0; i < this.teams.length; i++) {
+            const t = this.teams[i] || {};
+            if (String(t.nameTeam || "").toLowerCase() === nameLC) {
+              const chosen = this.selectedSession[String(t._id)];
+              const sessIdx = Number.isFinite(chosen)
+                ? chosen
+                : Number.isFinite(this.activeRun)
+                ? this.activeRun
+                : 0;
+              f = { team: t, teamIdx: i, sessionIdx: sessIdx };
+              break;
             }
           }
         }
         if (!f || !f.team) return false;
 
-        // --- 2) run index (1/2 → 0/1, atau pakai active) ---
-        var runIdx = toRunIdx(msg, f.sessionIdx);
+        // --- run index 0-based ---
+        const runIdx = (function toRunIdx(m, fallbackIdx) {
+          let v =
+            m && m.runNumber != null
+              ? m.runNumber
+              : m && m.run != null
+              ? m.run
+              : null;
+          const n = parseInt(v, 10);
+          if (!isNaN(n)) {
+            if (n >= 1 && n <= 2) return n - 1;
+            if (n === 0 || n === 1) return n;
+          }
+          return Number.isFinite(fallbackIdx) ? fallbackIdx : 0;
+        })(msg, f.sessionIdx);
 
-        // --- 3) pastikan sesi ada ---
+        // --- siapkan sesi (reaktif) ---
         if (!Array.isArray(f.team.sessions)) this.$set(f.team, "sessions", []);
         if (!f.team.sessions[runIdx]) {
           this.$set(f.team.sessions, runIdx, {
@@ -1374,26 +1407,29 @@ export default {
             score: 0,
           });
         }
-        var s = f.team.sessions[runIdx];
+        const s = f.team.sessions[runIdx];
 
-        // --- 4) tipe penalty ---
-        var kind = "gate";
-        if (msg && msg.type === "PenaltyStart") kind = "start";
-        else if (msg && msg.type === "PenaltyFinish") kind = "finish";
-        else if (msg && msg.type === "PenaltyGates") kind = "gate";
+        // --- tipe & nilai ---
+        const kind =
+          msg && msg.type === "PenaltyStart"
+            ? "start"
+            : msg && msg.type === "PenaltyFinish"
+            ? "finish"
+            : "gate";
 
-        // --- 5) nilai penalty (0/5/50) ---
-        var rawPenalty =
+        const raw =
           msg && msg.penalty != null
             ? msg.penalty
             : msg && msg.value != null
             ? msg.value
             : 0;
-        var np = Number(rawPenalty);
-        var value = np === 0 || np === 5 || np === 50 ? np : 0;
 
-        // --- 6) apply ke target (in-place & reactive) ---
-        var changed = false;
+        // IZINKAN 0/5/10/50
+        const ALLOWED = new Set([0, 5, 10, 50]);
+        const np = Number(raw);
+        const value = ALLOWED.has(np) ? np : 0;
+
+        let changed = false;
 
         if (kind === "start") {
           if (s.startPenalty !== value) {
@@ -1406,87 +1442,72 @@ export default {
             changed = true;
           }
         } else {
-          // GATE
-          var gateIdx = null;
-
-          if (
-            msg &&
-            typeof msg.gateIndex === "number" &&
-            isFinite(msg.gateIndex)
-          ) {
-            gateIdx = msg.gateIndex; // 0-based
-          } else if (msg && msg.gate != null) {
-            var token = msg.gate;
-            if (typeof token === "number" && isFinite(token)) {
-              gateIdx = token > 0 ? token - 1 : token; // 6 → 5
-            } else {
-              var sToken = String(token || "")
-                .trim()
-                .toLowerCase();
-              var extracted = null;
-              if (/^(?:gate|g)[\s-]*([0-9]+)$/.test(sToken)) {
-                extracted = parseInt(
-                  sToken.replace(/^(?:gate|g)[\s-]*/, ""),
-                  10
-                );
-              } else if (/^[0-9]+$/.test(sToken)) {
-                extracted = parseInt(sToken, 10);
-              }
-              if (extracted != null && !isNaN(extracted) && extracted > 0)
-                gateIdx = extracted - 1;
+          // gate
+          let gateIdx = null;
+          if (Number.isFinite(msg.gateIndex)) gateIdx = msg.gateIndex;
+          else if (Number.isFinite(msg.gateNumber))
+            gateIdx = Math.max(0, Number(msg.gateNumber) - 1);
+          else if (typeof msg.gate === "number" && Number.isFinite(msg.gate))
+            gateIdx = Math.max(0, Number(msg.gate) - 1);
+          else if (msg.gate != null) {
+            const sToken = String(msg.gate).trim().toLowerCase();
+            let extracted = null;
+            if (/^(?:gate|g)\s*-*\s*([0-9]+)$/.test(sToken)) {
+              extracted = parseInt(
+                sToken.replace(/^(?:gate|g)\s*-*\s*/, ""),
+                10
+              );
+            } else if (/^[0-9]+$/.test(sToken)) {
+              extracted = parseInt(sToken, 10);
             }
+            if (Number.isFinite(extracted) && extracted > 0)
+              gateIdx = extracted - 1;
           }
 
-          var need = this.SLALOM_GATES.length;
-
-          // === IN-PLACE ensure length (jangan ganti array) ===
+          const need = this.SLALOM_GATES.length;
           if (!Array.isArray(s.penalties)) this.$set(s, "penalties", []);
           while (s.penalties.length < need) s.penalties.push(0);
           if (s.penalties.length > need) s.penalties.length = need;
 
-          if (typeof gateIdx === "number" && gateIdx >= 0 && gateIdx < need) {
+          if (Number.isFinite(gateIdx) && gateIdx >= 0 && gateIdx < need) {
             if (s.penalties[gateIdx] !== value) {
-              this.$set(s.penalties, gateIdx, value); // penting untuk reaktivitas index array di Vue 2
+              this.$set(s.penalties, gateIdx, value);
               changed = true;
             }
           } else {
-            return false; // index gate tidak valid
+            return false; // gate index tidak valid
           }
         }
 
         if (!changed) return false;
 
-        // --- 7) hitung ulang & status ---
+        // hitung ulang + status
         this.recalcSession(s);
         this.checkEndGameStatus();
 
-        // --- 8) feedback UI (opsional) ---
+        // feedback (opsional)
         if (ipcRenderer) {
-          var label;
-          if (kind === "start") label = "START";
-          else if (kind === "finish") label = "FINISH";
-          else {
-            var gateNo = typeof gateIdx === "number" ? gateIdx + 1 : "?";
-            label = "GATE " + String(gateNo);
-          }
-          var teamNameStr =
+          const label =
+            kind === "start"
+              ? "START"
+              : kind === "finish"
+              ? "FINISH"
+              : "GATE " +
+                (Number.isFinite(msg.gateIndex)
+                  ? msg.gateIndex + 1
+                  : Number.isFinite(msg.gateNumber)
+                  ? msg.gateNumber
+                  : "?");
+          const teamNameStr =
             f.team && f.team.nameTeam ? String(f.team.nameTeam) : "";
-          var detail =
-            "Penalty updated • " +
-            teamNameStr +
-            " • Run " +
-            String(runIdx + 1) +
-            " • " +
-            label +
-            " = " +
-            String(value);
           ipcRenderer.send("get-alert", {
             type: "success",
-            detail: detail,
             message: "Realtime Penalty",
+            detail: `Penalty updated • ${teamNameStr} • Run ${
+              runIdx + 1
+            } • ${label} = ${value}`,
           });
         }
-
         return true;
       } catch (err) {
         if (logger && logger.warn)

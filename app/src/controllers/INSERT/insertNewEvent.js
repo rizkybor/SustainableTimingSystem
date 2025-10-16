@@ -122,7 +122,8 @@ async function updateEventPoster(payload) {
     var updateDoc = {
       $set: {
         poster: posterDoc,
-        poster_url: posterDoc.secure_url, // URL siap pakai
+        poster_url: posterDoc.secure_url,
+        sponsor_logo_url: [],
         updatedAt: new Date(),
       },
     };

@@ -38,17 +38,93 @@
                 <b-row>
                   <!-- KIRI: field level, event name, river name -->
                   <b-col md="8">
-                    <!-- EVENT LEVEL  -->
                     <b-form-group label="Event Level">
-                      <b-form-select
-                        size="sm"
-                        v-model="formEvent.levelName"
-                        :options="optionLevels"
-                        value-field="name"
-                        text-field="name"
-                        class="br-15"
-                      />
+                      <b-input-group size="sm">
+                        <!-- Dropdown Event Level -->
+                        <b-form-select
+                          v-model="formEvent.levelName"
+                          :options="sortedOptionLevels"
+                          value-field="name"
+                          text-field="name"
+                          class="br-15"
+                        />
+                        <!-- Button Hint -->
+                        <b-input-group-append>
+                          <b-button
+                            v-b-tooltip.hover
+                            title="Keterangan level event"
+                            variant="outline-info"
+                            size="sm"
+                            class="br-15"
+                            @click="showListModal = true"
+                          >
+                            <Icon
+                              icon="ic:outline-remove-red-eye"
+                              width="18"
+                              height="18"
+                            />
+                          </b-button>
+                        </b-input-group-append>
+                      </b-input-group>
                     </b-form-group>
+
+                    <!-- Modal List -->
+                    <b-modal
+                      id="modal-list-event"
+                      v-model="showListModal"
+                      title="Event Level Guide"
+                      size="md"
+                      hide-footer
+                      centered
+                    >
+                      <b-table
+                        striped
+                        hover
+                        small
+                        :items="sortedOptionLevels"
+                        :fields="['name', 'scope']"
+                        head-variant="light"
+                        style="width: 100%; text-align: start"
+                      >
+                        <!-- 🔹 Atur vertical align di semua cell -->
+                        <template #cell(name)="data">
+                          <div
+                            style="
+                              display: flex;
+                              justify-content: start;
+                              align-items: center;
+                              height: 100%;
+                              min-height: 40px;
+                            "
+                          >
+                            {{ data.item.name }}
+                          </div>
+                        </template>
+
+                        <template #cell(scope)="data">
+                          <div
+                            style="
+                              display: flex;
+                              flex-direction: column;
+                              justify-content: start;
+                              align-items: start;
+                              height: 100%;
+                              min-height: 40px;
+                            "
+                          >
+                            <ol style="margin: 0; padding: 0">
+                              <li
+                                v-for="(item, i) in data.item.scope"
+                                :key="i"
+                                style="padding: 2px 0"
+                              >
+                                {{ item }}
+                              </li>
+                            </ol>
+                          </div>
+                        </template>
+                      </b-table>
+                    </b-modal>
 
                     <!-- EVENT NAME  -->
                     <b-form-group label="Event Name">
@@ -146,6 +222,8 @@
                     v-model="formEvent.addressDistrict"
                     placeholder="Enter District"
                     class="br-15"
+                    v-b-tooltip.hover
+                    title="Daerah"
                   />
                 </b-form-group>
 
@@ -158,6 +236,8 @@
                         v-model="formEvent.addressSubDistrict"
                         placeholder="Enter Sub District"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Kecamatan"
                       />
                     </b-form-group>
                   </b-col>
@@ -170,6 +250,8 @@
                         v-model="formEvent.addressVillage"
                         placeholder="Enter Village"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Desa"
                       />
                     </b-form-group>
                   </b-col>
@@ -184,6 +266,8 @@
                         v-model="formEvent.addressCity"
                         placeholder="Enter City"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Kota"
                       />
                     </b-form-group>
                   </b-col>
@@ -196,6 +280,8 @@
                         v-model="formEvent.addressProvince"
                         placeholder="Enter Province"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Provinsi"
                       />
                     </b-form-group>
                   </b-col>
@@ -210,6 +296,8 @@
                         v-model="formEvent.addressZipCode"
                         placeholder="Enter ZIP Code"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Kode Pos"
                       />
                     </b-form-group>
                   </b-col>
@@ -222,6 +310,8 @@
                         v-model="formEvent.addressState"
                         placeholder="Enter State"
                         class="br-15"
+                        v-b-tooltip.hover
+                        title="Negara"
                       />
                     </b-form-group>
                   </b-col>
@@ -237,6 +327,8 @@
                         placeholder="Select start date"
                         class="mb-2 br-15"
                         :min="minDate"
+                        v-b-tooltip.hover
+                        title="Tanggal Mulai"
                       />
                     </b-form-group>
                   </b-col>
@@ -250,6 +342,8 @@
                         placeholder="Select end date"
                         class="mb-2 br-15"
                         :min="formEvent.startDateEvent"
+                        v-b-tooltip.hover
+                        title="Tanggal Berakhir"
                       />
                     </b-form-group>
                   </b-col>
@@ -392,9 +486,9 @@ export default {
 
   data() {
     return {
+      showListModal: false,
       posterPreview: "",
       isUploadingPoster: false,
-      // path / sumber file lokal yang dipilih (belum diupload)
       posterTempPath: null,
       text: "",
       name: "",
@@ -439,6 +533,14 @@ export default {
   },
 
   computed: {
+    sortedOptionLevels() {
+      // Urutkan agar 'Classification' muncul paling atas
+      return [...this.optionLevels].sort((a, b) => {
+        if (a.name === "Classification") return -1;
+        if (b.name === "Classification") return 1;
+        return a.name.localeCompare(b.name);
+      });
+    },
     currentDateTime() {
       const d = new Date();
       return (
@@ -604,30 +706,6 @@ export default {
       }
     },
 
-    // save() {
-    //   const formValid = this.validateForm();
-    //   if (!formValid) {
-    //     ipcRenderer.send("get-alert", {
-    //       type: "warning",
-    //       detail: "To create an event, all fields must be filled in",
-    //       message: "Ups Sorry",
-    //     });
-    //     return;
-    //   }
-    //   const payload = { ...this.formEvent, participant: [] }; // participant selalu kosong saat create
-    //   ipcRenderer.send("insert-new-event", payload);
-    //   ipcRenderer.once("insert-new-event-reply", (_e, _data) => {
-    //     ipcRenderer.send("get-alert-saved", {
-    //       type: "question",
-    //       detail: "Event data has been successfully saved",
-    //       message: "Successfully",
-    //     });
-    //   });
-    //   setTimeout(() => {
-    //     localStorage.removeItem("formNewEvent");
-    //     this.$router.push("/");
-    //   }, 1500);
-    // },
     // ===== helper upload khusus Cloudinary =====
     async uploadPosterToCloudinary() {
       if (!this.posterTempPath) {
@@ -761,6 +839,8 @@ export default {
           const updatePayload = {
             _id: insertedId,
             poster: up.result,
+            poster_url: up.result.url,
+            sponsor_logo_url: [],
           };
           ipcRenderer.send("update-event-poster", updatePayload);
           ipcRenderer.once(

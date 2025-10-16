@@ -129,12 +129,32 @@
               show-empty
               empty-text=""
               responsive="md"
-              :busy="loadingTeams"
             >
-              <!-- Busy -->
-              <template #table-busy>
-                <div class="text-center my-3">
-                  <b-spinner small class="mr-2" /> Loading teams…
+            
+
+              <!-- ✅ Empty State -->
+              <template #empty>
+                <div
+                  class="text-center py-5"
+                  style="
+                    color: #6c757d;
+                    font-size: 14px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <Icon
+                    icon="mdi:account-group-outline"
+                    width="40"
+                    height="40"
+                    style="opacity: 0.5; margin-bottom: 8px"
+                  />
+                  <div>No team data found</div>
+                  <small class="text-muted"
+                    >Try adjusting your filter or add a new team.</small
+                  >
                 </div>
               </template>
 
@@ -223,7 +243,6 @@
                 v-model="currentPage"
                 :total-rows="totalRows"
                 :per-page="perPage"
-                align="center"
                 size="md"
                 class="custom-pagination mb-0"
                 first-number
@@ -321,12 +340,7 @@ export default {
   components: { Icon },
   data() {
     return {
-      optionTeamTypes: [
-        { value: "club", name: "Club" },
-        { value: "pengcab", name: "Pengcab" },
-        { value: "pengprov", name: "Pengprov" },
-        { value: "country", name: "Country" },
-      ],
+      optionTeamTypes: [],
       formTeam: {
         teamType: null,
         teamName: "",
@@ -481,7 +495,7 @@ export default {
           });
           this.resetForm();
           localStorage.removeItem("formNewTeam");
-          this.loadTeams(); // ✅ refresh list
+          this.loadTeams();
         } else {
           ipcRenderer.send("get-alert", {
             type: "error",

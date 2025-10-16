@@ -1,7 +1,16 @@
-{
-  "_id": {
-    "$oid": "661517eaba5e0ae3faea671f"
+[
+  {
+    "_id": {
+      "$oid": "661517cfba5e0ae3faea671c"
+    },
+    "value": "1",
+    "name": "R4"
   },
-  "value": "2",
-  "name": "R6"
-}
+  {
+    "_id": {
+      "$oid": "661517cfba5e0ae3faea671c"
+    },
+    "value": "1",
+    "name": "R4"
+  }
+]

@@ -1,7 +1,30 @@
-{
-  "_id": {
-    "$oid": "66151621ba5e0ae3faea6715"
+[
+  {
+    "_id": {
+      "$oid": "66151621ba5e0ae3faea6715"
+    },
+    "value": "1",
+    "name": "SPRINT"
   },
-  "value": "1",
-  "name": "SPRINT"
-}
+  {
+    "_id": {
+      "$oid": "6615163bba5e0ae3faea6716"
+    },
+    "value": "2",
+    "name": "HEAD2HEAD"
+  },
+  {
+    "_id": {
+      "$oid": "66151651ba5e0ae3faea6717"
+    },
+    "value": "3",
+    "name": "SLALOM"
+  },
+  {
+    "_id": {
+      "$oid": "6615165fba5e0ae3faea6718"
+    },
+    "value": "4",
+    "name": "DRR"
+  }
+]

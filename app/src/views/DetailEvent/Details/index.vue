@@ -241,6 +241,18 @@
 </template>
 
 <script>
+const LEVEL_SCOPE_MAP = {
+  A: ["negara"], 
+  B: ["negara", "wilayah"], 
+  C: ["negara", "club"], 
+  D: ["pengprov"], 
+  E: ["pengprov"], 
+  F: ["pengprov", "pengcab", "club"],
+  G: ["pengcab"], 
+  H: ["pengcab", "club"],
+  I: ["club"],
+};
+
 import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
@@ -317,14 +329,6 @@ export default {
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
       dataTeams: [], // alias events.participant
       availableTeams: [], // sumber dropdown (opsional dari IPC)
-      useDummyTeams: false,
-      dummyTeams: [
-        { id: "t101", nameTeam: "JAKARTA PUSAT", bibTeam: "001" },
-        { id: "t102", nameTeam: "JAKARTA SELATAN", bibTeam: "002" },
-        { id: "t103", nameTeam: "JAKARTA TIMUR", bibTeam: "003" },
-        { id: "t104", nameTeam: "JAKARTA BARAT", bibTeam: "004" },
-      ],
-
       // draft baris input per kombinasi
       draftMap: { R4_MEN: null, R4_WOMEN: null, R6_MEN: null, R6_WOMEN: null },
     };
@@ -529,7 +533,7 @@ export default {
         (t) =>
           String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
           String(t.nameTeam).trim().toUpperCase() !==
-          String(row.nameTeam).trim().toUpperCase()
+            String(row.nameTeam).trim().toUpperCase()
       );
       this.dataTeams = this.dataTeams.slice();
       this.persistParticipants();
@@ -717,44 +721,64 @@ export default {
     /* =========================================================
      * AVAILABLE TEAMS (dropdown sumber)
      * =======================================================*/
+
+    // ✅ Kembalikan ARRAY kode yang diizinkan
     _allowedTypeForLevel(levelName) {
       const lv = String(levelName || "")
         .trim()
         .toUpperCase();
-      if (lv.includes("CLASSIFICATION - G")) return "club";
-      if (lv.includes("CLASSIFICATION - D")) return "club";
-      if (lv.includes("CLASSIFICATION - C")) return "pengcab";
-      if (lv.includes("CLASSIFICATION - B")) return "pengprov";
-      if (lv.includes("CLASSIFICATION - A")) return "country";
-      return null;
+      // Ambil huruf level (A–I) setelah "CLASSIFICATION - "
+      const m = lv.match(/CLASSIFICATION\s*-\s*([A-I])/);
+      const key = m ? m[1] : null;
+      if (!key || !LEVEL_SCOPE_MAP[key]) return null;
+      return LEVEL_SCOPE_MAP[key];
     },
 
+    // ✅ Loader teams yang support multi-type & typeTeam array/string
     async loadAvailableTeams() {
-      if (this.useDummyTeams) {
-        this.availableTeams = this.dummyTeams.slice();
-        return;
-      }
-
       try {
         ipcRenderer.send("teams:get-all");
         await new Promise((resolve) => {
           ipcRenderer.once("teams:get-all-reply", (_e, res) => {
             let items =
               res && res.ok && Array.isArray(res.items) ? res.items : [];
-            const allow = this._allowedTypeForLevel(this.events.levelName);
-            if (allow) {
-              const allowLC = String(allow).toLowerCase();
-              items = items.filter(
-                (t) => String(t.typeTeam || "").toLowerCase() === allowLC
+
+            // ⚠️ Pakai sumber levelName yang benar
+            const levelName =
+              (this.events && this.events.levelName) || // jika memang ada this.events
+              (this.formEvent && this.formEvent.levelName) || // fallback umum di file kamu
+              null;
+
+            const allow = this._allowedTypeForLevel(levelName); // → array atau null
+
+            if (Array.isArray(allow) && allow.length) {
+              const allowSet = new Set(
+                allow.map((s) => String(s).toLowerCase())
               );
+
+              items = items.filter((t) => {
+                const tt = t && t.typeTeam;
+                if (Array.isArray(tt)) {
+                  // jika typeTeam disimpan array di DB
+                  return tt.some((v) => allowSet.has(String(v).toLowerCase()));
+                }
+                // jika typeTeam string tunggal
+                return allowSet.has(String(tt || "").toLowerCase());
+              });
             }
+
             this.availableTeams = items.map((t) => ({
-              id: t._id && t._id.$oid ? t._id.$oid : String(t._id || ""),
-              nameTeam: t.nameTeam,
-              bibTeam: t.bibTeam || "",
+              id:
+                t && t._id && t._id.$oid
+                  ? t._id.$oid
+                  : String((t && t._id) || ""),
+              nameTeam: t && t.nameTeam ? t.nameTeam : "",
+              bibTeam: (t && t.bibTeam) || "",
             }));
-            if (!this.availableTeams.length)
+
+            if (!this.availableTeams.length) {
               this.availableTeams = this.dummyTeams.slice();
+            }
             resolve();
           });
         });

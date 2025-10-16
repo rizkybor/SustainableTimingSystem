@@ -400,7 +400,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).startPenalty"
-                        :options="dataPenalties"
+                        :options="filteredPenalties('SF')"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -419,7 +419,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).penalties[gi]"
-                        :options="dataPenalties"
+                        :options="filteredPenalties('GATE')"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -434,7 +434,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).finishPenalty"
-                        :options="dataPenalties"
+                        :options="filteredPenalties('SF')"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -453,7 +453,7 @@
                       style="min-width: 70px; border-radius: 12px"
                       class="small-select"
                       v-model="currentSession(team).startPenalty"
-                      :options="dataPenalties"
+                      :options="filteredPenalties('SF')"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -470,7 +470,7 @@
                       class="small-select"
                       style="min-width: 70px; border-radius: 12px"
                       v-model="currentSession(team).penalties[gi]"
-                      :options="dataPenalties"
+                      :options="filteredPenalties('GATE')"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -484,7 +484,7 @@
                       class="small-select"
                       style="min-width: 70px; border-radius: 12px"
                       v-model="currentSession(team).finishPenalty"
-                      :options="dataPenalties"
+                      :options="filteredPenalties('SF')"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -1336,6 +1336,19 @@ export default {
   },
 
   methods: {
+    filteredPenalties(context) {
+      // context bisa: 'SF' (untuk Start/Finish) atau 'Gate'
+      if (context === "SF") {
+        return this.dataPenalties.filter(
+          (p) => p.value === 0 || p.value === 10 || p.value === 50
+        );
+      } else {
+        // default untuk Gate
+        return this.dataPenalties.filter(
+          (p) => p.value === 0 || p.value === 5 || p.value === 50
+        );
+      }
+    },
     // helper kecil untuk memastikan panjang array penalties = jumlah gate
 
     async applyPenaltyFromSocketDirect(msg) {
@@ -1893,7 +1906,7 @@ export default {
             while (i < raw.length) {
               var it = raw[i] || {};
               var val = Number(it.value);
-              if (val === 0 || val === 5 || val === 50) {
+              if (val === 0 || val === 5 || val === 10 || val === 50) {
                 out.push({
                   label: String(it.label != null ? it.label : val),
                   value: val,
@@ -1905,6 +1918,7 @@ export default {
               out = [
                 { label: "0", value: 0 },
                 { label: "5", value: 5 },
+                { label: "10", value: 10 },
                 { label: "50", value: 50 },
               ];
             }
@@ -1915,6 +1929,7 @@ export default {
         this.dataPenalties = [
           { label: "0", value: 0 },
           { label: "5", value: 5 },
+          { label: "10", value: 10 },
           { label: "50", value: 50 },
         ];
       }

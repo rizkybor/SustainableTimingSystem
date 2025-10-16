@@ -1616,50 +1616,7 @@ export default {
       const pad = (n, w = 2) => String(n).padStart(w, "0");
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
-
-    // saveResult() {
-    //   const clean = JSON.parse(JSON.stringify(this.participantArr || []));
-    //   if (!Array.isArray(clean) || clean.length === 0) {
-    //     ipcRenderer.send("get-alert", {
-    //       type: "warning",
-    //       detail: "Belum ada data yang bisa disimpan.",
-    //       message: "Ups Sorry",
-    //     });
-    //     return;
-    //   }
-
-    //   const bucket = getBucket();
-    //   const must = ["eventId", "initialId", "raceId", "divisionId"];
-    //   const missing = must.filter((k) => !bucket[k]);
-    //   if (missing.length) {
-    //     ipcRenderer.send("get-alert", {
-    //       type: "error",
-    //       detail: `Bucket fields missing: ${missing.join(", ")}`,
-    //       message: "Failed",
-    //     });
-    //     return;
-    //   }
-
-    //   const docs = buildResultDocs(clean, bucket);
-    //   ipcRenderer.send("insert-sprint-result", docs);
-    //   ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
-    //     if (res && res.ok) {
-    //       ipcRenderer.send("get-alert-saved", {
-    //         type: "question",
-    //         detail: "Result data has been successfully saved",
-    //         message: "Successfully",
-    //       });
-    //     } else {
-    //       ipcRenderer.send("get-alert", {
-    //         type: "error",
-    //         detail: (res && res.error) || "Save failed",
-    //         message: "Failed",
-    //       });
-    //     }
-    //   });
-    // },
-
-    // === tambahkan di methods: ===
+    
     async saveResult() {
       // 1) clone aman
       var clean;

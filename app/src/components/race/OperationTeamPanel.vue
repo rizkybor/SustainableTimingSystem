@@ -20,23 +20,26 @@
                 <table class="table table-sm table-rounded mb-0 w-100">
                   <thead>
                     <tr>
-                      <th scope="col">Id Registrasi</th>
+                      <th scope="col">Registration Id</th>
                       <th scope="col">Racetime</th>
+                      <th scope="col">(hh:mm:ss.ms)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="!digitId || !digitId.length">
-                      <td colspan="2" class="text-center text-muted py-4">
-                        No data yet
+                      <td colspan="3" class="text-center text-muted py-4">
+                        Time data is not yet available
                       </td>
                     </tr>
                     <tr
                       v-else
                       v-for="(id, index) in digitId"
                       :key="'feed-' + index"
+                      :class="{ 'highlight-row': index === 0 }"
                     >
                       <td>{{ id }}</td>
                       <td>{{ digitTime[index] }}</td>
+                      <td>{{ formatTime(digitTime[index]) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -175,6 +178,11 @@
 <script>
 export default {
   name: "OperationTimePanel",
+  data() {
+    return {
+      a: null,
+    };
+  },
   props: {
     digitId: { type: Array, default: () => [] },
     digitTime: { type: Array, default: () => [] },
@@ -182,7 +190,48 @@ export default {
     digitTimeStart: { type: String, default: "" },
     digitTimeFinish: { type: String, default: "" },
   },
+  computed: {},
   methods: {
+    formatTime(v) {
+      if (v === null || v === undefined) return "—";
+      let raw = typeof v === "number" ? String(Math.trunc(v)) : String(v);
+      raw = raw.trim();
+      if (/^\d{1,2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(raw)) return raw;
+      let digits = raw.replace(/\D+/g, "");
+      if (!digits) return "—";
+      if (digits.length <= 9) {
+        const s = digits.padStart(9, "0");
+        const HH = s.slice(0, 2);
+        const MM = s.slice(2, 4);
+        const SS = s.slice(4, 6);
+        const mmm = s.slice(6, 9);
+        return `${HH}:${MM}:${SS}.${mmm}`;
+      }
+      if (digits.length >= 10 && digits.length <= 13) {
+        if (digits.length === 10) digits = digits + "000";
+        const t = Number(digits);
+        const d = new Date(t);
+        if (!isNaN(d.getTime())) {
+          return this._fmtClock(d);
+        }
+      }
+      return raw;
+    },
+
+    _pad2(n) {
+      return String(n).padStart(2, "0");
+    },
+    _pad3(n) {
+      return String(n).padStart(3, "0");
+    },
+
+    _fmtClock(d) {
+      const hh = this._pad2(d.getHours());
+      const mm = this._pad2(d.getMinutes());
+      const ss = this._pad2(d.getSeconds());
+      const ms = this._pad3(d.getMilliseconds());
+      return `${hh}:${mm}:${ss}.${ms}`;
+    },
     hasStartTime(btn) {
       return btn && btn.result && !!btn.result.startTime;
     },
@@ -202,16 +251,14 @@ export default {
 }
 
 .race-window {
-  background: #2f2f2f; 
+  background: #2f2f2f;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s ease;
 }
 
 .race-window:hover {
-  box-shadow:
-    0 0 15px rgba(0, 180, 255, 0.6),
-    0 0 30px rgba(0, 180, 255, 0.5),
+  box-shadow: 0 0 15px rgba(0, 180, 255, 0.6), 0 0 30px rgba(0, 180, 255, 0.5),
     0 0 60px rgba(0, 180, 255, 0.4);
 }
 
@@ -401,5 +448,10 @@ export default {
 
 .btn-block {
   width: 100%;
+}
+
+.highlight-row td {
+  background-color: #eef58c !important;
+  font-weight: 600;
 }
 </style>

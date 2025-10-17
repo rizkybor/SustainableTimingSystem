@@ -230,85 +230,7 @@ export default {
 </script>
 
 <style scoped>
-/* === FOOTER: 2 KOLOM (70% TTD - 30% STAMP) === */
-/* ===== SIGNATURE ===== */
-.sign {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8mm;
-  margin-bottom: 2mm;
-  text-align: center;
-  gap: 3mm;
-}
-.signature-row {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-  gap: 10mm;
-  margin-top: 20mm;
-}
-
-.sign-col {
-  text-align: center;
-  flex: 1;
-}
-.sign.sign-two {
-  display: grid;
-  grid-template-columns: 70% 30%;   /* kiri 70%, kanan 30% */
-  align-items: end;
-  margin-top: 1.5mm;                /* 5) ditempelkan ke tabel (jarak kecil) */
-  margin-bottom: 2mm;
-  page-break-inside: avoid;
-  padding-inline: 2mm;              /* 4) padding kanan-kiri agar tidak mentok */
-}
-
-/* --- KIRI: area tanda tangan (tidak rata tengah) --- */
-.sign-left {
-  display: grid;                    /* 2) tidak center */
-  grid-template-columns: repeat(3, minmax(30mm, 1fr));
-  justify-items: start;             /* kartu start dari sisi kiri kolom 70% */
-  align-items: end;
-  column-gap: 2mm;
-}
-
-/* Kartu tanda tangan: rata kiri & area kecil */
-.sig-card {
-  text-align: left;                 /* 2) konten TTD tidak center */
-  min-height: 16mm;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-/* Judul & garis TTD */
-.sign-title {
-  color: #8a95a3;
-  font-size: 9px;
-}
-
-/* 1) Panjangkan garis TTD & rata kiri */
-.sign-line {
-  height: 2px;
-  background: rgb(24, 116, 165);
-  width: 100%;
-  margin: 60px auto 6px;
-  border-radius: 2px;
-}
-
-.sign-name {
-  font-weight: 700;
-  font-size: 11px;
-  color: #1f2937;
-}
-
-/* --- KANAN: area cap/stamp (tidak center, rata kanan & bawah) --- */
-.sign-right {
-  display: flex;                    /* 3) tidak center */
-  justify-content: flex-end;        /* rata kanan dalam kolom 30% */
-  align-items: flex-end;            /* rata bawah */
-  text-align: right;                /* jika ada teks tambahan */
-}
-
+/* === LAYOUT CETAK LANDSCAPE A4 === */
 @page {
   size: A4 landscape;
   margin: 8mm;
@@ -319,189 +241,175 @@ export default {
   print-color-adjust: exact !important;
 }
 
-/* ===== PAGE AS FLEX COLUMN (baru) ===== */
+/* ==== PAGE CONTAINER ==== */
 .page {
   position: relative;
-  display: flex; /* NEW */
-  flex-direction: column; /* NEW */
-  /* tinggi area konten = tinggi A4 (210mm) - margin @page atas+bawah (8+8) */
-  min-height: calc(210mm - 16mm); /* NEW: menahan sponsor di dasar halaman */
+  display: flex;
+  flex-direction: column;
+  min-height: calc(210mm - 16mm); /* tinggi efektif setelah margin */
   padding: 5mm 8mm 0;
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 12px;
-  line-height: 1.35;
   color: #17202a;
 }
 
-.mid-image-row {
-  margin-bottom: 2mm !important;
-}
-.band {
-  margin-bottom: 1mm !important;
-}
-header {
-  margin-bottom: 0 !important;
-}
-
-/* ===== HEADER ===== */
+/* ==== HEADER ==== */
 .band {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgb(24, 116, 165);
   color: white;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 8px;
-  margin-bottom: 6mm; /* akan tertimpa oleh !important di atas → tetap hemat */
+  margin-bottom: 4mm;
   font-weight: 700;
 }
 .band .dot {
   margin: 0 4px;
   opacity: 0.9;
 }
-
 .event {
   text-align: center;
-  margin-bottom: 4mm;
+  margin-bottom: 3mm;
 }
 .event-name {
   font-weight: 800;
   font-size: 16px;
   color: rgb(24, 116, 165);
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 .event-meta {
   font-size: 9.5px;
   color: rgb(24, 116, 165);
 }
 
-/* ===== TABLE ===== */
+/* ==== TABLE ==== */
 .score-table {
   width: 100%;
   border-collapse: collapse;
   border: 1px solid #dde6ee;
   border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 6mm;
 }
 .score-table th,
 .score-table td {
   border-bottom: 1px solid #f1f4f8;
-  padding: 6px 8px;
+  padding: 5px 7px;
 }
 .score-table thead th {
   background: rgb(240, 250, 255);
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  text-align: start;
+  text-align: center;
 }
 .score-table tbody td {
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .score-table tbody tr:nth-child(odd) {
   background: #fafcff;
 }
-.text-center {
-  text-align: center;
+.text-center { text-align: center; }
+.text-strong { font-weight: 700; }
+.mono { font-family: monospace; }
+
+/* ==== FOOTER: SIGNATURE (70% - 30%) ==== */
+.sign.sign-two {
+  display: grid;
+  grid-template-columns: 70% 30%;   /* kiri 70%, kanan 30% */
+  align-items: end;
+  margin-top: 2mm;                 /* menempel pada tabel */
+  padding-inline: 4mm;             /* jaga jarak dari tepi */
+  page-break-inside: avoid;
 }
-.text-strong {
+
+/* ==== KOLOM KIRI (TTD) ==== */
+.sign-left {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(28mm, 1fr)); /* optimal utk A4 */
+  justify-items: start;
+  align-items: end;
+  column-gap: 2.5mm;               /* jarak antar kolom lebih rapat */
+}
+.sig-card {
+  text-align: left;
+  min-height: 16mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sign-title {
+  color: #8a95a3;
+  font-size: 9px;
+  margin: 0 0 3mm 0;
+}
+.sign-line {
+  height: 1.8px;
+  background: rgb(24, 116, 165);
+  width: 100%;
+  margin: 14mm 0 2mm;
+  border-radius: 2px;
+}
+.sign-name {
   font-weight: 700;
-}
-.mono {
-  font-family: monospace;
-}
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 10px 0;
+  font-size: 10.8px;
+  color: #1f2937;
 }
 
-
-/* ===== STAMP ===== */
+/* ==== KOLOM KANAN (STAMP) ==== */
+.sign-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  text-align: right;
+}
 .unofficial-stamp {
   color: #d9534f;
   text-transform: uppercase;
-  border: 2px solid #d9534f;
-  padding: 5px 12px;
-  border-radius: 2px;
-  opacity: 0.9;
+  border: 1.5px solid #d9534f;
+  padding: 5px 10px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.6px;
   display: inline-block;
-  letter-spacing: 0.8px;
+  opacity: 0.9;
 }
 .official-stamp {
   color: #148a3b;
   border-color: #148a3b;
-  transform: rotate(0deg);
-  opacity: 1;
-  box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
 }
 
-/* ===== TOP LOGOS ===== */
-.mid-image-row {
+/* ==== LOGO ATAS & SPONSOR ==== */
+.mid-image-row,
+.mid-image-sponsor-row {
   display: flex;
   justify-content: center;
   align-items: center;
-  flex-wrap: nowrap;
   gap: 2mm;
   margin: 2mm 0;
 }
-.mid-image {
-  margin: 0;
-  flex: 0 1 auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 .mid-image img {
-  width: auto;
-  height: 80px;
+  height: 70px;
   object-fit: contain;
-}
-
-/* ===== SPONSOR LOGOS (bottom) ===== */
-.mid-image-sponsor-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 2mm;
-  margin-top: auto; 
-  margin-bottom: 0 !important; 
-}
-.mid-image-sponsor {
-  margin: 0;
-  flex: 0 1 auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 .mid-image-sponsor img {
-  width: auto;
-  height: 40px;
+  height: 35px;
   object-fit: contain;
 }
-
-/* perbaikan selektor: pastikan dua baris ini tidak dipecah */
-header,
-.band,
-.mid-image-row,
 .mid-image-sponsor-row {
-  page-break-inside: avoid;
-  break-inside: avoid;
+  margin-top: auto;
 }
 
+/* ==== WATERMARK / TRADEMARK ==== */
 .trademark {
   position: absolute;
   top: 0;
   right: 0;
-  transform: translate(-9mm, 2mm);
+  transform: translate(-8mm, 2mm);
   font-family: monospace;
   font-size: 8px;
   color: #8b8b8b;
   opacity: 0.7;
-  letter-spacing: 0.5px;
 }
 </style>

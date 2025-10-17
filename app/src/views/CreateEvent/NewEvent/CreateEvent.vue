@@ -408,11 +408,11 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <b-form-group label="Chief Judge">
+                    <b-form-group label="Technical Delegate">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.chiefJudge"
-                        placeholder="Enter chief judge name"
+                        v-model="formEvent.technicalDelegate"
+                        placeholder="Enter technical delegate name"
                         class="br-15"
                       />
                     </b-form-group>
@@ -431,25 +431,16 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <b-form-group label="Safety Director">
+                    <b-form-group label="Chief Judge">
                       <b-form-input
                         size="sm"
-                        v-model="formEvent.safetyDirector"
-                        placeholder="Enter safety director name"
+                        v-model="formEvent.chiefJudge"
+                        placeholder="Enter chief judge name"
                         class="br-15"
                       />
                     </b-form-group>
                   </b-col>
-                  <b-col>
-                    <b-form-group label="Event Director">
-                      <b-form-input
-                        size="sm"
-                        v-model="formEvent.eventDirector"
-                        placeholder="Enter event director name"
-                        class="br-15"
-                      />
-                    </b-form-group>
-                  </b-col>
+                  <b-col> </b-col>
                 </b-row>
               </div>
             </form>
@@ -511,11 +502,9 @@ export default {
         categoriesInitial: [],
         chiefJudge: "",
         raceDirector: "",
-        safetyDirector: "",
-        eventDirector: "",
-        participant: [],
+        technicalDelegate: "",
         statusEvent: "Activated",
-        poster: null, // { public_id, secure_url, ... } dari Cloudinary
+        poster: null,
       },
 
       optionLevels: [],
@@ -670,8 +659,7 @@ export default {
         !(f.categoriesInitial && f.categoriesInitial.length) ||
         !f.chiefJudge ||
         !f.raceDirector ||
-        !f.safetyDirector ||
-        !f.eventDirector
+        !f.technicalDelegate
       ) {
         return false;
       }
@@ -778,7 +766,7 @@ export default {
       }
 
       // Jangan paksa null; biarkan seperti di form.
-      const payload = Object.assign({}, this.formEvent, { participant: [] });
+      const payload = JSON.parse(JSON.stringify(this.formEvent));
 
       // 1) INSERT
       ipcRenderer.send("insert-new-event", payload);
@@ -840,7 +828,8 @@ export default {
             _id: insertedId,
             poster: up.result,
             poster_url: up.result.url,
-            sponsor_logo_url: [],
+            eventFiles: [],
+            sponsorFiles: [],
           };
           ipcRenderer.send("update-event-poster", updatePayload);
           ipcRenderer.once(

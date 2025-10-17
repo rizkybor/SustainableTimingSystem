@@ -40,6 +40,8 @@ const {
 const {
   insertNewEvent,
   updateEventPoster,
+  updateBasic,
+  updateAssets
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -300,6 +302,30 @@ function setupIPCMainHandlers() {
         if (typeof err.message === "string") msg = err.message;
       }
       evt.reply("update-event-poster-reply", { ok: false, error: msg });
+    }
+  });
+
+  ipcMain.on("services:update:event-basic", async (evt, payload) => {
+    try {
+      const resp = await updateBasic(payload);
+      evt.reply("services:update:event-basic:reply", resp);
+    } catch (e) {
+      evt.reply("services:update:event-basic:reply", {
+        ok: false,
+        error: e && e.message ? e.message : String(e),
+      });
+    }
+  });
+
+  ipcMain.on("services:update:event-assets", async (evt, payload) => {
+    try {
+      const resp = await updateAssets(payload);
+      evt.reply("services:update:event-assets:reply", resp);
+    } catch (e) {
+      evt.reply("services:update:event-assets:reply", {
+        ok: false,
+        error: e && e.message ? e.message : String(e),
+      });
     }
   });
 

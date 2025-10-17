@@ -1,5 +1,12 @@
 <template>
-  <div class="sts-detail">
+  <div v-if="settingsLoading.active" class="upload-hud">
+    <div class="upload-box">
+      <b-spinner class="mb-2" label="Uploading"></b-spinner>
+      <div class="font-weight-bold">{{ settingsLoading.stage }}</div>
+      <small class="text-muted">{{ settingsLoading.percent }}%</small>
+    </div>
+  </div>
+  <div v-else class="sts-detail">
     <b-container class="mt-3">
       <div class="text-muted small mb-2">
         Events /
@@ -64,7 +71,7 @@
 
     <b-container class="mt-4 mb-5">
       <div class="mb-2 d-flex justify-content-md-end">
-         <b-button class="btn-race-settings mr-2" @click="openEventSettings">
+        <b-button class="btn-race-settings mr-2" @click="openEventSettings">
           Event Settings
         </b-button>
 
@@ -247,22 +254,124 @@
       :id="'event-settings-modal'"
       :event-id="eventId"
       :event-name="safeEventName"
+      @update-settings="handleUpdateSettings"
     />
   </div>
 </template>
 
 <script>
 const LEVEL_SCOPE_MAP = {
-  A: ["negara"], 
-  B: ["negara", "wilayah"], 
-  C: ["negara", "club"], 
-  D: ["pengprov"], 
-  E: ["pengprov"], 
+  A: ["negara"],
+  B: ["negara", "wilayah"],
+  C: ["negara", "club"],
+  D: ["pengprov"],
+  E: ["pengprov"],
   F: ["pengprov", "pengcab", "club"],
-  G: ["pengcab"], 
+  G: ["pengcab"],
   H: ["pengcab", "club"],
   I: ["club"],
 };
+
+// ===== Cloudinary config (ISI sesuai punyamu) =====
+var CLOUD_NAME = "kikiaka";
+var UPLOAD_PRESET = "stiming-preset"; 
+var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
+var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
+
+function _toCloudMeta(json) {
+  return {
+    public_id: json && json.public_id ? String(json.public_id) : "",
+    secure_url:
+      json && (json.secure_url || json.url)
+        ? String(json.secure_url || json.url)
+        : "",
+    url:
+      json && (json.secure_url || json.url)
+        ? String(json.secure_url || json.url)
+        : "",
+    width: typeof (json && json.width) === "number" ? json.width : null,
+    height: typeof (json && json.height) === "number" ? json.height : null,
+    format: json && json.format ? String(json.format) : "",
+    bytes: typeof (json && json.bytes) === "number" ? json.bytes : 0,
+    resource_type:
+      json && json.resource_type ? String(json.resource_type) : "image",
+    original_filename:
+      json && json.original_filename ? String(json.original_filename) : "",
+  };
+}
+
+async function _uploadOne(fileObj, folder) {
+  if (!fileObj) return { ok: false, error: "no-file" };
+
+  // A) lewat bridge Electron kalau ada
+  if (window.cloud && typeof window.cloud.uploadFile === "function") {
+    try {
+      var up = await window.cloud.uploadFile(fileObj, { folder: folder });
+      if (up && up.ok === true && up.result) {
+        return { ok: true, result: _toCloudMeta(up.result) };
+      }
+      return {
+        ok: false,
+        error: up && up.error ? String(up.error) : "upload-failed",
+      };
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+
+  // B) fallback unsigned upload
+  try {
+    var fd = new FormData();
+    fd.append("file", fileObj);
+    fd.append("upload_preset", UPLOAD_PRESET);
+    if (folder) fd.append("folder", folder);
+
+    var url = "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/image/upload";
+    var res = await fetch(url, { method: "POST", body: fd });
+    var json = null;
+    try {
+      json = await res.json();
+    } catch (_e) {
+      json = null;
+    }
+
+    if (!res.ok || !json || !(json.secure_url || json.url)) {
+      var det =
+        json && json.error && json.error.message
+          ? json.error.message
+          : "upload-failed";
+      return { ok: false, error: det, raw: json };
+    }
+    return { ok: true, result: _toCloudMeta(json) };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function _uploadMany(list, folder) {
+  var out = [];
+  if (!list || typeof list.length !== "number") return out;
+
+  for (var i = 0; i < list.length; i++) {
+    var f = list[i];
+
+    // kalau yang datang path string (drag&drop), minta bridge bikin File-like
+    if (
+      typeof f === "string" &&
+      window.cloud &&
+      typeof window.cloud.pathToFile === "function"
+    ) {
+      try {
+        var created = await window.cloud.pathToFile(f);
+        if (created) f = created;
+      } catch (_e) {}
+    }
+
+    var up = await _uploadOne(f, folder);
+    if (up && up.ok && up.result) out.push(up.result);
+  }
+  return out;
+}
 
 import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
@@ -279,9 +388,15 @@ import { logger } from "@/utils/logger";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { TeamPanel, RaceSettingsModal, JudgeSettingsModal, EventSettingsModal },
+  components: {
+    TeamPanel,
+    RaceSettingsModal,
+    JudgeSettingsModal,
+    EventSettingsModal,
+  },
   data() {
     return {
+      settingsLoading: { active: false, stage: "", percent: 0 },
       defaultImg,
       resultAvailMap: {
         R4_MEN: false,
@@ -425,6 +540,243 @@ export default {
   },
 
   methods: {
+    _setLoading: function (on, stage, pct) {
+      this.settingsLoading.active = !!on;
+      if (typeof stage === "string") this.settingsLoading.stage = stage;
+      if (typeof pct === "number")
+        this.settingsLoading.percent = Math.max(
+          0,
+          Math.min(100, Math.round(pct))
+        );
+    },
+
+    handleUpdateSettings: async function (payload) {
+      // === 0) Ambil & normalisasi dari payload ===
+      var eventId = "";
+      var eventName = "";
+      var signature = {};
+      var evFiles = [];
+      var spFiles = [];
+
+      if (payload && payload.eventId) eventId = String(payload.eventId);
+      if (payload && payload.eventName) eventName = String(payload.eventName);
+
+      if (
+        payload &&
+        payload.signature &&
+        typeof payload.signature === "object"
+      ) {
+        signature = payload.signature;
+      }
+
+      if (
+        payload &&
+        payload.eventFiles &&
+        typeof payload.eventFiles.length === "number"
+      ) {
+        evFiles = payload.eventFiles;
+      }
+      if (
+        payload &&
+        payload.sponsorFiles &&
+        typeof payload.sponsorFiles.length === "number"
+      ) {
+        spFiles = payload.sponsorFiles;
+      }
+
+      var safePayload = {
+        eventId: eventId,
+        eventName: eventName,
+        signature: {
+          technicalDelegate:
+            signature && signature.technicalDelegate === true ? true : false,
+          chiefJudge: signature && signature.chiefJudge === true ? true : false,
+          raceDirector:
+            signature && signature.raceDirector === true ? true : false,
+        },
+        eventFiles: [],
+        sponsorFiles: [],
+      };
+
+      // preview sederhana ke console
+      console.log(
+        "READY PAYLOAD:\n" +
+          JSON.stringify(
+            {
+              eventId: safePayload.eventId,
+              eventName: safePayload.eventName,
+              signature: safePayload.signature,
+              eventFilesCount: evFiles.length,
+              sponsorFilesCount: spFiles.length,
+            },
+            null,
+            2
+          )
+      );
+
+      if (!eventId) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Update gagal",
+          detail: "eventId kosong",
+        });
+        return;
+      }
+
+      try {
+        // === 1) UPDATE DB BASIC ===
+        this._setLoading(true, "Menyimpan data dasar…", 10);
+
+        var basicDoc = {
+          _id: eventId,
+          eventName: eventName,
+          signature: safePayload.signature,
+        };
+        ipcRenderer.send("services:update:event-basic", basicDoc);
+
+        var step1 = await new Promise(function (resolve) {
+          ipcRenderer.once(
+            "services:update:event-basic:reply",
+            function (_e, resp) {
+              resolve(resp);
+            }
+          );
+        });
+
+        var ok1 = step1 && step1.ok === true;
+        if (!ok1) {
+          var d1 = step1 && step1.error ? step1.error : "unknown-error";
+          this._setLoading(false, "", 0);
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "DB Update (basic) gagal",
+            detail: d1,
+          });
+          return;
+        }
+
+        // // === 2) UPLOAD EVENT FILES (Cloudinary) ===
+        // this._setLoading(true, "Mengunggah logo event…", 40);
+        // var eventUrls = await _uploadManyToUrlsPreferBridge(
+        //   evFiles,
+        //   FOLDER_EVENT_LOGO
+        // );
+
+        // // === 3) UPLOAD SPONSOR FILES (Cloudinary) ===
+        // this._setLoading(true, "Mengunggah logo sponsor…", 70);
+        // var sponsorUrls = await _uploadManyToUrlsPreferBridge(
+        //   spFiles,
+        //   FOLDER_EVENT_SPONSOR
+        // );
+
+        // // === 4) UPDATE DB ASSETS (hasil upload) ===
+        // this._setLoading(true, "Memperbarui aset di database…", 85);
+
+        // var assetsDoc = { _id: eventId };
+        // if (eventUrls && eventUrls.length > 0) {
+        //   assetsDoc.eventFiles = eventUrls; // array of string URL
+        // }
+        // if (sponsorUrls && sponsorUrls.length > 0) {
+        //   assetsDoc.sponsorFiles = sponsorUrls; // atau sponsorshipFiles, sesuaikan schema
+        // }
+
+        // console.log("ASSETS DOC TO SAVE:", assetsDoc);
+        // ipcRenderer.send("services:update:event-assets", assetsDoc);
+
+        // ===== 2) UPLOAD EVENT FILES =====
+        this._setLoading(true, "Mengunggah logo event…", 40);
+        const uploadedEvent = await _uploadMany(evFiles, FOLDER_EVENT_LOGO);
+
+        // ===== 3) UPLOAD SPONSOR FILES =====
+        this._setLoading(true, "Mengunggah logo sponsor…", 70);
+        const uploadedSponsor = await _uploadMany(
+          spFiles,
+          FOLDER_EVENT_SPONSOR
+        );
+
+        // Kumpulkan URL baru
+        const newEventUrls = (uploadedEvent || [])
+          .map((u) => u.secure_url || u.url)
+          .filter(Boolean);
+        const newSponsorUrls = (uploadedSponsor || [])
+          .map((u) => u.secure_url || u.url)
+          .filter(Boolean);
+
+        // Ambil URL lama yang masih dipertahankan dari payload (dari modal)
+        const keepEventUrls = Array.isArray(payload.keepEventUrls)
+          ? payload.keepEventUrls
+          : [];
+        const keepSponsorUrls = Array.isArray(payload.keepSponsorUrls)
+          ? payload.keepSponsorUrls
+          : [];
+
+        // FINAL: gabungan lama + baru (unik)
+        const finalEventUrls = Array.from(
+          new Set([...keepEventUrls, ...newEventUrls])
+        );
+        const finalSponsorUrls = Array.from(
+          new Set([...keepSponsorUrls, ...newSponsorUrls])
+        );
+
+        // ===== 4) UPDATE DB ASSETS (URL saja) =====
+        this._setLoading(true, "Memperbarui aset di database…", 85);
+        const assetsDoc = {
+          _id: eventId,
+          eventFiles: finalEventUrls,
+          sponsorFiles: finalSponsorUrls,
+        };
+        ipcRenderer.send("services:update:event-assets", assetsDoc);
+
+        var step2 = await new Promise(function (resolve) {
+          ipcRenderer.once(
+            "services:update:event-assets:reply",
+            function (_e, resp) {
+              resolve(resp);
+            }
+          );
+        });
+
+        var ok2 = step2 && step2.ok === true;
+        if (!ok2) {
+          var d2 = step2 && step2.error ? step2.error : "unknown-error";
+          this._setLoading(false, "", 0);
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "Upload sukses, tapi update DB assets gagal",
+            detail: d2,
+          });
+          return;
+        }
+
+        // === DONE ===
+        this._setLoading(true, "Selesai ✔", 100);
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Event updated",
+          detail: "Signature & files berhasil disimpan",
+        });
+
+        // Log ringkas hasil final
+        var preview = {
+          eventId: eventId,
+          signature: safePayload.signature,
+          eventFiles: eventUrls,
+          sponsorFiles: sponsorUrls,
+        };
+        console.log("UPDATED:\n" + JSON.stringify(preview, null, 2));
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Unexpected error",
+          detail: err && err.message ? err.message : String(err),
+        });
+      } finally {
+        var self = this;
+        setTimeout(function () {
+          self._setLoading(false, "", 0);
+        }, 600);
+      }
+    },
     /* =========================================================
      * UI ACTIONS
      * =======================================================*/
@@ -1761,5 +2113,23 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+.upload-hud {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.upload-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 24px;
+  min-width: 240px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  text-align: center;
 }
 </style>

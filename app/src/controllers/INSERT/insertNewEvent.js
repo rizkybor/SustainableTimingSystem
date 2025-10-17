@@ -123,7 +123,8 @@ async function updateEventPoster(payload) {
       $set: {
         poster: posterDoc,
         poster_url: posterDoc.secure_url,
-        sponsor_logo_url: [],
+        eventFiles: [],
+        sponsorFiles: [],
         updatedAt: new Date(),
       },
     };
@@ -152,7 +153,74 @@ async function updateEventPoster(payload) {
   }
 }
 
+function toObjectId(x) {
+  try {
+    return new ObjectId(String(x));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function updateBasic(payload) {
+  const id = payload && payload._id ? toObjectId(payload._id) : null;
+  if (!id) return { ok: false, error: "invalid _id" };
+
+  const sig = payload && payload.signature ? payload.signature : {};
+  const eventName =
+    payload && payload.eventName ? String(payload.eventName) : "";
+
+  const update = {
+    $set: {
+      eventName: eventName,
+      signature: {
+        technicalDelegate: sig && sig.technicalDelegate === true ? true : false,
+        chiefJudge: sig && sig.chiefJudge === true ? true : false,
+        raceDirector: sig && sig.raceDirector === true ? true : false,
+      },
+      updatedAt: new Date(),
+    },
+  };
+
+  var db = await getDb();
+  const coll = db.collection("eventsCollection");
+  const resp = await coll.updateOne({ _id: id }, update, { upsert: false });
+  return {
+    ok: true,
+    matchedCount: resp.matchedCount,
+    modifiedCount: resp.modifiedCount,
+  };
+}
+
+async function updateAssets(payload) {
+  const id = payload && payload._id ? toObjectId(payload._id) : null;
+  if (!id) return { ok: false, error: "invalid _id" };
+
+  const ev =
+    payload && Array.isArray(payload.eventFiles) ? payload.eventFiles : [];
+  const sp =
+    payload && Array.isArray(payload.sponsorFiles) ? payload.sponsorFiles : [];
+
+  const update = {
+    $set: {
+      eventFiles: ev,
+      sponsorFiles: sp,
+      updatedAt: new Date(),
+    },
+  };
+
+  var db = await getDb();
+  const coll = db.collection("eventsCollection");
+  const resp = await coll.updateOne({ _id: id }, update, { upsert: false });
+  return {
+    ok: true,
+    matchedCount: resp.matchedCount,
+    modifiedCount: resp.modifiedCount,
+  };
+}
+
 module.exports = {
   insertNewEvent,
   updateEventPoster,
+  updateBasic,
+  updateAssets,
 };

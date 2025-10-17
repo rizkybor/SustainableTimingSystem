@@ -58,9 +58,9 @@
       <div class="table-card">
         <div class="table-title">
           RANK RESULT OVERALL <span class="dot">•</span>
-          {{ sprintCats.initial }} <span class="dot">•</span>
-          {{ sprintCats.division }} <span class="dot">•</span>
-          {{ sprintCats.race }}
+          {{ raceCats.initial }} <span class="dot">•</span>
+          {{ raceCats.division }} <span class="dot">•</span>
+          {{ raceCats.race }}
         </div>
         <div class="table-responsive table-ranking-wrapper">
           <table class="table table-ranking">
@@ -155,7 +155,7 @@
         <OverallPdf
           :dataEvent="dataEvent"
           :rows="processedRows"
-          :sprintCats="sprintCats"
+          :raceCats="raceCats"
           :isOfficial="isOfficial"
         />
       </section>
@@ -189,7 +189,7 @@ export default {
         rows: [],
       }),
     },
-    sprintCats: { type: Object, required: false },
+    raceCats: { type: Object, required: false },
     isOfficial: { type: Boolean, default: false },
   },
   computed: {
@@ -197,7 +197,7 @@ export default {
       const ev = this.dataEvent || {};
       const title = ev.eventName ? String(ev.eventName).trim() : "Overall";
 
-      const sc = this.sprintCats || {};
+      const sc = this.raceCats || {};
       const cats =
         (sc.initial || "-") +
         " - " +

@@ -436,12 +436,12 @@ export default {
   },
 
   watch: {
-    gatesCount: function (n) {
-    this.ensureDraftContainers(); 
-  },
-  sectionsCount: function (n) {
-    this.ensureDraftContainers();
-  },
+    gatesCount: function () {
+      this.ensureDraftContainers();
+    },
+    sectionsCount: function () {
+      this.ensureDraftContainers();
+    },
     value: function (v) {
       this.localShow = v;
       if (v) {
@@ -1180,41 +1180,53 @@ export default {
             }
           }
 
-         // Slalom
-if (!this.isFilled(this.draft.slalom.juryStart))
-  this.draft.slalom.juryStart = incoming.slalom.juryStart || "";
-if (!this.isFilled(this.draft.slalom.juryFinish))
-  this.draft.slalom.juryFinish = incoming.slalom.juryFinish || "";
+          // Slalom
+          if (!this.isFilled(this.draft.slalom.juryStart))
+            this.draft.slalom.juryStart = incoming.slalom.juryStart || "";
+          if (!this.isFilled(this.draft.slalom.juryFinish))
+            this.draft.slalom.juryFinish = incoming.slalom.juryFinish || "";
 
-// >>> tambahkan ini:
-var maxG = incoming.slalom && incoming.slalom.totalGate ? incoming.slalom.totalGate : 1;
-this.draft.slalom.totalGate = maxG; // penting: supaya v-for n in gatesCount ikut update
-this.ensureDraftContainers();        // siapkan key sesuai jumlah baru
+          // >>> tambahkan ini:
+          var maxG =
+            incoming.slalom && incoming.slalom.totalGate
+              ? incoming.slalom.totalGate
+              : 1;
+          this.draft.slalom.totalGate = maxG; // penting: supaya v-for n in gatesCount ikut update
+          this.ensureDraftContainers(); // siapkan key sesuai jumlah baru
 
-for (var g = 1; g <= maxG; g++) {
-  var incGate = incoming.slalom && incoming.slalom.gates ? incoming.slalom.gates[g] : "";
-  if (!this.isFilled(this.draft.slalom.gates[g]) && incGate) {
-    this.$set(this.draft.slalom.gates, g, incGate);
-  }
-}
+          for (var g = 1; g <= maxG; g++) {
+            var incGate =
+              incoming.slalom && incoming.slalom.gates
+                ? incoming.slalom.gates[g]
+                : "";
+            if (!this.isFilled(this.draft.slalom.gates[g]) && incGate) {
+              this.$set(this.draft.slalom.gates, g, incGate);
+            }
+          }
 
-         // DRR
-if (!this.isFilled(this.draft.drr.juryStart))
-  this.draft.drr.juryStart = incoming.drr.juryStart || "";
-if (!this.isFilled(this.draft.drr.juryFinish))
-  this.draft.drr.juryFinish = incoming.drr.juryFinish || "";
+          // DRR
+          if (!this.isFilled(this.draft.drr.juryStart))
+            this.draft.drr.juryStart = incoming.drr.juryStart || "";
+          if (!this.isFilled(this.draft.drr.juryFinish))
+            this.draft.drr.juryFinish = incoming.drr.juryFinish || "";
 
-// >>> tambahkan ini:
-var maxS = incoming.drr && incoming.drr.totalSection ? incoming.drr.totalSection : 1;
-this.draft.drr.totalSection = maxS; // penting: supaya v-for n in sectionsCount ikut update
-this.ensureDraftContainers();        // siapkan key sesuai jumlah baru
+          // >>> tambahkan ini:
+          var maxS =
+            incoming.drr && incoming.drr.totalSection
+              ? incoming.drr.totalSection
+              : 1;
+          this.draft.drr.totalSection = maxS; 
+          this.ensureDraftContainers();
 
-for (var s = 1; s <= maxS; s++) {
-  var incSec = incoming.drr && incoming.drr.sections ? incoming.drr.sections[s] : "";
-  if (!this.isFilled(this.draft.drr.sections[s]) && incSec) {
-    this.$set(this.draft.drr.sections, s, incSec);
-  }
-}
+          for (var s = 1; s <= maxS; s++) {
+            var incSec =
+              incoming.drr && incoming.drr.sections
+                ? incoming.drr.sections[s]
+                : "";
+            if (!this.isFilled(this.draft.drr.sections[s]) && incSec) {
+              this.$set(this.draft.drr.sections, s, incSec);
+            }
+          }
 
           this.loading = false;
         });

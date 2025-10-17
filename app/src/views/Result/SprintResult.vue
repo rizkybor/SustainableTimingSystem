@@ -230,7 +230,7 @@
       :show="showOverallModal"
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
-                :sprintCats="sprintCats"
+      :raceCats="sprintCats"
       @close="showOverallModal = false"
     />
   </div>
@@ -494,8 +494,7 @@ export default {
 
     this.loadSprintResult();
   },
-  mounted() {
-  },
+  mounted() {},
   methods: {
     // builder data untuk modal Overall (header + rows)
     buildAggregateFromDoc: function (doc, eventInfo) {

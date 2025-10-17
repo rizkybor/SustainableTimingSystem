@@ -460,7 +460,7 @@ export default {
       if (!inputDate) return "-";
 
       const dt = new Date(inputDate);
-      if (isNaN(dt)) return "-"; 
+      if (isNaN(dt)) return "-";
 
       const monthNames = [
         "Januari",
@@ -800,7 +800,7 @@ export default {
 
 .event-thumb {
   width: 100%;
-  height: 180px;
+  height: 210px;
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
@@ -812,13 +812,12 @@ export default {
 .event-img {
   width: 100%;
   height: 100%;
-  border-radius: 8%;
   object-fit: cover;
   object-position: center;
   transition: transform 0.6s ease;
 }
 .event-img:hover {
-  transform: scale(1.2);
+  transform: scale(1.1);
 }
 
 .event-separator {
@@ -835,15 +834,14 @@ export default {
   place-items: center;
   overflow: hidden;
   animation: introFadeIn 300ms ease-out both;
-  pointer-events: auto; /* visible => tangkap klik */
+  pointer-events: auto;
 }
 
 .intro-overlay.intro-hide {
   animation: introFadeOut 400ms ease-in forwards;
-  pointer-events: none; /* ⬅️ klik langsung tembus saat hide */
+  pointer-events: none;
 }
 
-/* latar glowing lembut */
 .intro-glow-bg {
   position: absolute;
   inset: 0;
@@ -993,14 +991,12 @@ export default {
   }
 }
 
-
-
 /* see all styling  */
 .see-all-link {
   position: relative;
-  padding: 0;                 /* rapih seperti link */
+  padding: 0; /* rapih seperti link */
   font-weight: 700;
-  color: #0d789d;             /* brand biru */
+  color: #0d789d; /* brand biru */
   text-decoration: none !important;
   display: inline-flex;
   align-items: center;
@@ -1011,7 +1007,8 @@ export default {
 .see-all-link::after {
   content: "";
   position: absolute;
-  left: 0; bottom: -2px;
+  left: 0;
+  bottom: -2px;
   height: 2px;
   width: 100%;
   background: currentColor;
@@ -1029,7 +1026,7 @@ export default {
 .see-all-link:hover,
 .see-all-link:focus,
 .see-all-link:focus-visible {
-  color: #095a73;             /* sedikit lebih gelap saat hover */
+  color: #095a73; /* sedikit lebih gelap saat hover */
   outline: none;
 }
 
@@ -1052,13 +1049,19 @@ export default {
 }
 
 /* dukungan dark background (opsional) */
-.dark .see-all-link { color: #7dd3fc; }
-.dark .see-all-link:hover { color: #38bdf8; }
+.dark .see-all-link {
+  color: #7dd3fc;
+}
+.dark .see-all-link:hover {
+  color: #38bdf8;
+}
 
 /* prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .see-all-link,
   .see-all-icon,
-  .see-all-link::after { transition: none; }
+  .see-all-link::after {
+    transition: none;
+  }
 }
 </style>

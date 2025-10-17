@@ -60,7 +60,7 @@
     </header>
 
     <!-- TABLE -->
-    <section class="table-wrap">
+    <section>
       <table class="score-table">
         <thead>
           <tr>
@@ -143,55 +143,38 @@
     </section>
 
     <!-- SIGNATURE -->
-    <footer class="sign">
-      <div class="sign-col">
-        <div class="signature-row">
-          <!-- Technical Delegate -->
-          <div
-            v-if="data.signature && data.signature.technicalDelegate"
-            class="sign-col"
-          >
-            <div class="sign-title">Technical Delegate</div>
-            <div class="sign-line"></div>
-            <div class="sign-name">
-              {{ data.technicalDelegate || "—" }}
-            </div>
-          </div>
+   <div class="sign sign-two">
+  <!-- Kolom kiri: tiga tanda tangan -->
+  <div class="sign-left">
+    <div class="sig-card" v-if="data.signature && data.signature.technicalDelegate">
+      <div class="sign-title">Technical Delegate</div>
+      <div class="sign-line"></div>
+      <div class="sign-name">{{ data.technicalDelegate || "—" }}</div>
+    </div>
 
-          <!-- Chief Judge -->
-          <div
-            v-if="data.signature && data.signature.chiefJudge"
-            class="sign-col"
-          >
-            <div class="sign-title">Chief Judge</div>
-            <div class="sign-line"></div>
-            <div class="sign-name">
-              {{ data.chiefJudge || "—" }}
-            </div>
-          </div>
+    <div class="sig-card" v-if="data.signature && data.signature.chiefJudge">
+      <div class="sign-title">Chief Judge</div>
+      <div class="sign-line"></div>
+      <div class="sign-name">{{ data.chiefJudge || "—" }}</div>
+    </div>
 
-          <!-- Race Director -->
-          <div
-            v-if="data.signature && data.signature.raceDirector"
-            class="sign-col"
-          >
-            <div class="sign-title">Race Director</div>
-            <div class="sign-line"></div>
-            <div class="sign-name">
-              {{ data.raceDirector || "—" }}
-            </div>
-          </div>
-        </div>
+    <div class="sig-card" v-if="data.signature && data.signature.raceDirector">
+      <div class="sign-title">Race Director</div>
+      <div class="sign-line"></div>
+      <div class="sign-name">{{ data.raceDirector || "—" }}</div>
+    </div>
+  </div>
+
+  <!-- Kolom kanan: stamp -->
+  <div class="sign-right">
+    <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial }">
+      <div style="font-size: 14px; display: flex; justify-content: center;">
+        {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
       </div>
-      <div class="sign-col stamp-col">
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
-      </div>
-    </footer>
+      <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : 00:00:05.000 min</small>
+    </span>
+  </div>
+</div>
 
     <div
       class="mid-image-sponsor-row"
@@ -200,7 +183,7 @@
       <div
         v-for="(url, index) in data.sponsorFiles"
         :key="index"
-        class="mid-image-sponsor py-4"
+        class="mid-image-sponsor pt-5"
       >
         <img :src="url" alt="Event Sponsor" />
       </div>
@@ -247,6 +230,85 @@ export default {
 </script>
 
 <style scoped>
+/* === FOOTER: 2 KOLOM (70% TTD - 30% STAMP) === */
+/* ===== SIGNATURE ===== */
+.sign {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8mm;
+  margin-bottom: 2mm;
+  text-align: center;
+  gap: 3mm;
+}
+.signature-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  gap: 10mm;
+  margin-top: 20mm;
+}
+
+.sign-col {
+  text-align: center;
+  flex: 1;
+}
+.sign.sign-two {
+  display: grid;
+  grid-template-columns: 70% 30%;   /* kiri 70%, kanan 30% */
+  align-items: end;
+  margin-top: 1.5mm;                /* 5) ditempelkan ke tabel (jarak kecil) */
+  margin-bottom: 2mm;
+  page-break-inside: avoid;
+  padding-inline: 2mm;              /* 4) padding kanan-kiri agar tidak mentok */
+}
+
+/* --- KIRI: area tanda tangan (tidak rata tengah) --- */
+.sign-left {
+  display: grid;                    /* 2) tidak center */
+  grid-template-columns: repeat(3, minmax(30mm, 1fr));
+  justify-items: start;             /* kartu start dari sisi kiri kolom 70% */
+  align-items: end;
+  column-gap: 2mm;
+}
+
+/* Kartu tanda tangan: rata kiri & area kecil */
+.sig-card {
+  text-align: left;                 /* 2) konten TTD tidak center */
+  min-height: 16mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Judul & garis TTD */
+.sign-title {
+  color: #8a95a3;
+  font-size: 9px;
+}
+
+/* 1) Panjangkan garis TTD & rata kiri */
+.sign-line {
+  height: 2px;
+  background: rgb(24, 116, 165);
+  width: 100%;
+  margin: 60px auto 6px;
+  border-radius: 2px;
+}
+
+.sign-name {
+  font-weight: 700;
+  font-size: 11px;
+  color: #1f2937;
+}
+
+/* --- KANAN: area cap/stamp (tidak center, rata kanan & bawah) --- */
+.sign-right {
+  display: flex;                    /* 3) tidak center */
+  justify-content: flex-end;        /* rata kanan dalam kolom 30% */
+  align-items: flex-end;            /* rata bawah */
+  text-align: right;                /* jika ada teks tambahan */
+}
+
 @page {
   size: A4 landscape;
   margin: 8mm;
@@ -264,20 +326,13 @@ export default {
   flex-direction: column; /* NEW */
   /* tinggi area konten = tinggi A4 (210mm) - margin @page atas+bawah (8+8) */
   min-height: calc(210mm - 16mm); /* NEW: menahan sponsor di dasar halaman */
-  padding: 5mm 8mm;
+  padding: 5mm 8mm 0;
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   font-size: 12px;
   line-height: 1.35;
   color: #17202a;
-}
-
-/* biarkan area tabel jadi pengisi ruang tengah fleksibel (baru) */
-.table-wrap {
-  /* NEW */
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 .mid-image-row {
@@ -329,6 +384,7 @@ header {
   border: 1px solid #dde6ee;
   border-radius: 8px;
   overflow: hidden;
+  margin-bottom: 20px;
 }
 .score-table th,
 .score-table td {
@@ -363,64 +419,15 @@ header {
   padding: 10px 0;
 }
 
-/* ===== SIGNATURE ===== */
-.sign {
-  display: flex;
-  justify-content: space-between;
-  grid-template-columns: 1fr 1fr 1fr;
-  margin-top: 8mm;
-  margin-bottom: 2mm; /* NEW: beri ruang untuk sponsor */
-  text-align: center;
-  gap: 8mm;
-}
-.signature-row {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-  gap: 10mm;
-  margin-top: 20mm;
-}
-
-.sign-col {
-  text-align: center;
-  flex: 1;
-}
-
-.sign-line {
-  width: 100%;
-  height: 1px;
-  background: #000;
-  margin: 10px 0;
-}
-.sign-title {
-  color: #8a95a3;
-  font-size: 9px;
-  margin-bottom: 5vh;
-}
-.sign-line {
-  height: 2px;
-  background: rgb(24, 116, 165);
-  width: 75%;
-  margin: 20px auto 6px;
-  border-radius: 2px;
-}
-.sign-name {
-  font-weight: 800;
-  font-size: 12px;
-  color: #1f2937;
-}
 
 /* ===== STAMP ===== */
 .unofficial-stamp {
   color: #d9534f;
-  font-weight: bold;
   text-transform: uppercase;
   border: 2px solid #d9534f;
   padding: 5px 12px;
-  border-radius: 5px;
-  transform: rotate(5deg);
+  border-radius: 2px;
   opacity: 0.9;
-  font-size: 1rem;
   display: inline-block;
   letter-spacing: 0.8px;
 }
@@ -449,7 +456,7 @@ header {
   align-items: center;
 }
 .mid-image img {
-  width: 80px;
+  width: auto;
   height: 80px;
   object-fit: contain;
 }
@@ -461,8 +468,8 @@ header {
   align-items: center;
   flex-wrap: nowrap;
   gap: 2mm;
-  margin-top: auto; /* NEW: tempel ke bawah halaman */
-  margin-bottom: 0; /* NEW */
+  margin-top: auto; 
+  margin-bottom: 0 !important; 
 }
 .mid-image-sponsor {
   margin: 0;
@@ -482,7 +489,6 @@ header,
 .band,
 .mid-image-row,
 .mid-image-sponsor-row {
-  /* FIXED */
   page-break-inside: avoid;
   break-inside: avoid;
 }

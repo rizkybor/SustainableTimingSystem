@@ -64,6 +64,10 @@
 
     <b-container class="mt-4 mb-5">
       <div class="mb-2 d-flex justify-content-md-end">
+         <b-button class="btn-race-settings mr-2" @click="openEventSettings">
+          Event Settings
+        </b-button>
+
         <b-button class="btn-race-settings mr-2" @click="openJudgeSettings">
           Judges Settings
         </b-button>
@@ -237,6 +241,13 @@
       :event-name="safeEventName"
       @update-judges="onUpdateJudgeSettings"
     />
+
+    <event-settings-modal
+      v-model="showEventSettings"
+      :id="'event-settings-modal'"
+      :event-id="eventId"
+      :event-name="safeEventName"
+    />
   </div>
 </template>
 
@@ -261,13 +272,14 @@ import { ipcRenderer } from "electron";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
+import EventSettingsModal from "@/components/race/EventSettings.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { TeamPanel, RaceSettingsModal, JudgeSettingsModal },
+  components: { TeamPanel, RaceSettingsModal, JudgeSettingsModal, EventSettingsModal },
   data() {
     return {
       defaultImg,
@@ -279,6 +291,7 @@ export default {
       },
       lastToken: "",
       showRaceSettings: false,
+      showEventSettings: false,
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -286,7 +299,7 @@ export default {
         slalom: { totalGate: 14 },
         drr: { totalSection: 5 },
       },
-      showJudgeSettings: false, // ← kontrol buka/tutup modal
+      showJudgeSettings: false,
       judgeSettings: {
         // ← nilai awal (boleh kosong; modal akan merge default)
         h2h: { R1: true, R2: true, L1: true, L2: true },
@@ -415,6 +428,10 @@ export default {
     /* =========================================================
      * UI ACTIONS
      * =======================================================*/
+    openEventSettings() {
+      this.showEventSettings = true;
+    },
+
     openRaceSettings() {
       this.showRaceSettings = true;
     },

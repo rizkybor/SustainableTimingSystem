@@ -367,7 +367,7 @@ export default {
       loading: false,
       saving: false,
       internalJuryOptions: [],
-      draft: mergeWithDefaults(this.settings), // ← use helper
+      draft: mergeWithDefaults(this.settings),
       juryOptions: {
         type: Array,
         default: function () {

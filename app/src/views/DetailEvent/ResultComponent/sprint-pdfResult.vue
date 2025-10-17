@@ -2,10 +2,10 @@
   <div class="page">
     <!-- HEADER -->
     <header class="head">
-
-
-    <!-- TRADEMARK -->
-    <div class="trademark">@STiming.System.424.Timestamp {{ timestamp }} #-</div>
+      <!-- TRADEMARK -->
+      <div class="trademark">
+        @STiming.System.424.Timestamp {{ timestamp }} #-
+      </div>
       <div class="band">
         <div class="band-left">
           <strong>SCORE BOARD</strong>
@@ -17,8 +17,10 @@
           </span>
         </div>
         <div class="band-right">
-          <strong>{{ sprintCats.initial }} -
-            {{ sprintCats.division }} {{ sprintCats.race }}</strong>
+          <strong
+            >{{ sprintCats.initial }} - {{ sprintCats.division }}
+            {{ sprintCats.race }}</strong
+          >
           <span class="dot">•</span>
           <span>{{ today }}</span>
         </div>
@@ -27,10 +29,10 @@
       <!-- IMAGE DI ATAS EVENT NAME -->
       <div
         class="mid-image-row"
-        v-if="data && data.event_logo && data.event_logo.length > 0"
+        v-if="data && data.eventFiles && data.eventFiles.length > 0"
       >
         <div
-          v-for="(url, index) in data.event_logo"
+          v-for="(url, index) in data.eventFiles"
           :key="index"
           class="mid-image py-4"
         >
@@ -143,10 +145,42 @@
     <!-- SIGNATURE -->
     <footer class="sign">
       <div class="sign-col">
-        <div class="sign-title">Chief Judge</div>
-        <div class="sign-line"></div>
-        <div class="sign-name">
-          {{ data && data.chiefJudge ? data.chiefJudge : "—" }}
+        <div class="signature-row">
+          <!-- Technical Delegate -->
+          <div
+            v-if="data.signature && data.signature.technicalDelegate"
+            class="sign-col"
+          >
+            <div class="sign-title">Technical Delegate</div>
+            <div class="sign-line"></div>
+            <div class="sign-name">
+              {{ data.technicalDelegate || "—" }}
+            </div>
+          </div>
+
+          <!-- Chief Judge -->
+          <div
+            v-if="data.signature && data.signature.chiefJudge"
+            class="sign-col"
+          >
+            <div class="sign-title">Chief Judge</div>
+            <div class="sign-line"></div>
+            <div class="sign-name">
+              {{ data.chiefJudge || "—" }}
+            </div>
+          </div>
+
+          <!-- Race Director -->
+          <div
+            v-if="data.signature && data.signature.raceDirector"
+            class="sign-col"
+          >
+            <div class="sign-title">Race Director</div>
+            <div class="sign-line"></div>
+            <div class="sign-name">
+              {{ data.raceDirector || "—" }}
+            </div>
+          </div>
         </div>
       </div>
       <div class="sign-col stamp-col">
@@ -160,17 +194,17 @@
     </footer>
 
     <div
-        class="mid-image-sponsor-row"
-        v-if="data && data.event_logo && data.event_logo.length > 0"
+      class="mid-image-sponsor-row"
+      v-if="data && data.sponsorFiles && data.sponsorFiles.length > 0"
+    >
+      <div
+        v-for="(url, index) in data.sponsorFiles"
+        :key="index"
+        class="mid-image-sponsor py-4"
       >
-        <div
-          v-for="(url, index) in data.event_logo"
-          :key="index"
-          class="mid-image-sponsor py-4"
-        >
-          <img :src="url" alt="Event Sponsor" />
-        </div>
+        <img :src="url" alt="Event Sponsor" />
       </div>
+    </div>
   </div>
 </template>
 
@@ -226,27 +260,35 @@ export default {
 /* ===== PAGE AS FLEX COLUMN (baru) ===== */
 .page {
   position: relative;
-  display: flex;                 /* NEW */
-  flex-direction: column;        /* NEW */
+  display: flex; /* NEW */
+  flex-direction: column; /* NEW */
   /* tinggi area konten = tinggi A4 (210mm) - margin @page atas+bawah (8+8) */
-  min-height: calc(210mm - 16mm);/* NEW: menahan sponsor di dasar halaman */
+  min-height: calc(210mm - 16mm); /* NEW: menahan sponsor di dasar halaman */
   padding: 5mm 8mm;
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   font-size: 12px;
   line-height: 1.35;
   color: #17202a;
 }
 
 /* biarkan area tabel jadi pengisi ruang tengah fleksibel (baru) */
-.table-wrap {                    /* NEW */
+.table-wrap {
+  /* NEW */
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.mid-image-row { margin-bottom: 2mm !important; }
-.band { margin-bottom: 1mm !important; }
-header { margin-bottom: 0 !important; }
+.mid-image-row {
+  margin-bottom: 2mm !important;
+}
+.band {
+  margin-bottom: 1mm !important;
+}
+header {
+  margin-bottom: 0 !important;
+}
 
 /* ===== HEADER ===== */
 .band {
@@ -306,9 +348,15 @@ header { margin-bottom: 0 !important; }
 .score-table tbody tr:nth-child(odd) {
   background: #fafcff;
 }
-.text-center { text-align: center; }
-.text-strong { font-weight: 700; }
-.mono { font-family: monospace; }
+.text-center {
+  text-align: center;
+}
+.text-strong {
+  font-weight: 700;
+}
+.mono {
+  font-family: monospace;
+}
 .empty {
   text-align: center;
   color: #999;
@@ -321,11 +369,29 @@ header { margin-bottom: 0 !important; }
   justify-content: space-between;
   grid-template-columns: 1fr 1fr 1fr;
   margin-top: 8mm;
-  margin-bottom: 2mm;            /* NEW: beri ruang untuk sponsor */
+  margin-bottom: 2mm; /* NEW: beri ruang untuk sponsor */
   text-align: center;
   gap: 8mm;
 }
-.sign-col { width: 30%; }
+.signature-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  gap: 10mm;
+  margin-top: 20mm;
+}
+
+.sign-col {
+  text-align: center;
+  flex: 1;
+}
+
+.sign-line {
+  width: 100%;
+  height: 1px;
+  background: #000;
+  margin: 10px 0;
+}
 .sign-title {
   color: #8a95a3;
   font-size: 9px;
@@ -395,8 +461,8 @@ header { margin-bottom: 0 !important; }
   align-items: center;
   flex-wrap: nowrap;
   gap: 2mm;
-  margin-top: auto;              /* NEW: tempel ke bawah halaman */
-  margin-bottom: 0;              /* NEW */
+  margin-top: auto; /* NEW: tempel ke bawah halaman */
+  margin-bottom: 0; /* NEW */
 }
 .mid-image-sponsor {
   margin: 0;
@@ -406,13 +472,17 @@ header { margin-bottom: 0 !important; }
   align-items: center;
 }
 .mid-image-sponsor img {
-  width: 40px;
+  width: auto;
   height: 40px;
   object-fit: contain;
 }
 
 /* perbaikan selektor: pastikan dua baris ini tidak dipecah */
-header, .band, .mid-image-row, .mid-image-sponsor-row {   /* FIXED */
+header,
+.band,
+.mid-image-row,
+.mid-image-sponsor-row {
+  /* FIXED */
   page-break-inside: avoid;
   break-inside: avoid;
 }

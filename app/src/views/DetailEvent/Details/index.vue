@@ -497,7 +497,7 @@ export default {
     },
     hasEventLogo() {
       var ev = this.events || {};
-      var logos = ev.event_logo;
+      var logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         // string URL langsung atau objek { url: '...' }
         var first = logos[0];
@@ -514,7 +514,7 @@ export default {
     },
     eventLogoUrl() {
       var ev = this.events || {};
-      var logos = ev.event_logo;
+      var logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         var first = logos[0];
         if (typeof first === "string") return first;

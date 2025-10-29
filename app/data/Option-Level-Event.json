@@ -1,7 +1,74 @@
-{
-  "_id": {
-    "$oid": "661505eeba5e0ae3faea670b"
+[
+  {
+    "_id": {
+      "$oid": "661505eeba5e0ae3faea670b"
+    },
+    "value": "1",
+    "name": "Classification - A",
+    "scope": ["Negara"]
   },
-  "value": "1",
-  "name": "Classification - D"
-}
+  {
+    "_id": {
+      "$oid": "66150648ba5e0ae3faea670c"
+    },
+    "value": "2",
+    "name": "Classification - B",
+    "scope": ["Negara", "Wilayah"]
+  },
+  {
+    "_id": {
+      "$oid": "66150663ba5e0ae3faea670d"
+    },
+    "value": "3",
+    "name": "Classification - C",
+    "scope": ["Negara", "Club"]
+  },
+  {
+    "_id": {
+      "$oid": "6615066eba5e0ae3faea670e"
+    },
+    "value": "4",
+    "name": "Classification - D",
+    "scope": ["Pengprov"]
+  },
+  {
+    "_id": {
+      "$oid": "66150691ba5e0ae3faea670f"
+    },
+    "value": "5",
+    "name": "Classification - E",
+    "scope": ["Pengprov"]
+  },
+  {
+    "_id": {
+      "$oid": "6615069cba5e0ae3faea6710"
+    },
+    "value": "6",
+    "name": "Classification - F",
+    "scope": ["Pengprov", "Pengcab", "Club"]
+  },
+  {
+    "_id": {
+      "$oid": "674d295d8be405be4de345b4"
+    },
+    "value": "7",
+    "name": "Classification - G",
+    "scope": ["Pengcab"]
+  },
+  {
+    "_id": {
+      "$oid": "68f0c46c5e3540e4dd127192"
+    },
+    "value": "8",
+    "name": "Classification - H",
+    "scope": ["Pengcab", "Club"]
+  },
+  {
+    "_id": {
+      "$oid": "68f0c4945e3540e4dd127193"
+    },
+    "value": "9",
+    "name": "Classification - I",
+    "scope": ["Club"]
+  }
+]

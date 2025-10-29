@@ -134,7 +134,18 @@
             >
               <label class="form-label">Gate {{ n }}</label>
               <SearchableSelect
-                v-model="draft.slalom.gates[n]"
+                :key="
+                  'gate-' +
+                  n +
+                  '-' +
+                  (draft.slalom.gates && draft.slalom.gates[n]
+                    ? String(draft.slalom.gates[n])
+                    : '')
+                "
+                :value="getGateValue(n)"
+                @input="onGateInput(n, $event)"
+                @change="onGateInput(n, $event)"
+                @clear="onGateClear(n)"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -178,7 +189,18 @@
             >
               <label class="form-label">Section {{ n }}</label>
               <SearchableSelect
-                v-model="draft.drr.sections[n]"
+                :key="
+                  'section-' +
+                  n +
+                  '-' +
+                  (draft.drr.sections && draft.drr.sections[n]
+                    ? String(draft.drr.sections[n])
+                    : '')
+                "
+                :value="getSectionValue(n)"
+                @input="onSectionInput(n, $event)"
+                @change="onSectionInput(n, $event)"
+                @clear="onSectionClear(n)"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -340,11 +362,12 @@ export default {
 
   data: function () {
     return {
+      hasLocalEdits: false,
       localShow: this.value,
       loading: false,
       saving: false,
       internalJuryOptions: [],
-      draft: mergeWithDefaults(this.settings), // ← use helper
+      draft: mergeWithDefaults(this.settings),
       juryOptions: {
         type: Array,
         default: function () {
@@ -413,6 +436,12 @@ export default {
   },
 
   watch: {
+    gatesCount: function () {
+      this.ensureDraftContainers();
+    },
+    sectionsCount: function () {
+      this.ensureDraftContainers();
+    },
     value: function (v) {
       this.localShow = v;
       if (v) {
@@ -445,6 +474,56 @@ export default {
   },
 
   methods: {
+    getSectionValue: function (n) {
+      var s = "";
+      if (
+        this.draft &&
+        this.draft.drr &&
+        this.draft.drr.sections &&
+        this.draft.drr.sections.hasOwnProperty(n)
+      ) {
+        s = this.draft.drr.sections[n];
+      }
+      return s ? String(s) : "";
+    },
+    onSectionInput: function (n, val) {
+      var v = this.normalizeOptionValue(val);
+      this.$set(this.draft.drr.sections, n, v);
+      this.hasLocalEdits = true;
+    },
+    onSectionClear: function (n) {
+      this.$set(this.draft.drr.sections, n, "");
+    },
+    // normalisasi aman (string-kan value apapun)
+    normalizeOptionValue: function (val) {
+      if (val && typeof val === "object" && val.hasOwnProperty("value")) {
+        return String(val.value == null ? "" : val.value);
+      }
+      if (val == null) return "";
+      return String(val);
+    },
+
+    // SLALOM getter/setter
+    getGateValue: function (n) {
+      var g = "";
+      if (
+        this.draft &&
+        this.draft.slalom &&
+        this.draft.slalom.gates &&
+        this.draft.slalom.gates.hasOwnProperty(n)
+      ) {
+        g = this.draft.slalom.gates[n];
+      }
+      return g ? String(g) : "";
+    },
+    onGateInput: function (n, val) {
+      var v = this.normalizeOptionValue(val);
+      this.$set(this.draft.slalom.gates, n, v);
+      this.hasLocalEdits = true;
+    },
+    onGateClear: function (n) {
+      this.$set(this.draft.slalom.gates, n, "");
+    },
     /* ===== utils dasar ===== */
     getAllEmailsForUpsert: function () {
       var curr = this.collectAllEmailsForUpdate(); // dari draft saat ini
@@ -726,59 +805,36 @@ export default {
 
       if (!this.draft.sprint)
         this.draft.sprint = { juryStart: "", juryFinish: "" };
-      else {
-        if (typeof this.draft.sprint.juryStart === "undefined")
-          this.draft.sprint.juryStart = "";
-        if (typeof this.draft.sprint.juryFinish === "undefined")
-          this.draft.sprint.juryFinish = "";
-      }
-
       if (!this.draft.h2h) this.draft.h2h = { juryStart: "", juryFinish: "" };
-      else {
-        if (typeof this.draft.h2h.juryStart === "undefined")
-          this.draft.h2h.juryStart = "";
-        if (typeof this.draft.h2h.juryFinish === "undefined")
-          this.draft.h2h.juryFinish = "";
-      }
       if (!this.draft.h2hValues) this.draft.h2hValues = {};
-
       if (!this.draft.slalom)
         this.draft.slalom = { juryStart: "", juryFinish: "", gates: {} };
-      else {
-        if (typeof this.draft.slalom.juryStart === "undefined")
-          this.draft.slalom.juryStart = "";
-        if (typeof this.draft.slalom.juryFinish === "undefined")
-          this.draft.slalom.juryFinish = "";
-        if (!this.draft.slalom.gates) this.draft.slalom.gates = {};
-      }
-
+      if (!this.draft.slalom.gates) this.draft.slalom.gates = {};
       if (!this.draft.drr)
         this.draft.drr = { juryStart: "", juryFinish: "", sections: {} };
-      else {
-        if (typeof this.draft.drr.juryStart === "undefined")
-          this.draft.drr.juryStart = "";
-        if (typeof this.draft.drr.juryFinish === "undefined")
-          this.draft.drr.juryFinish = "";
-        if (!this.draft.drr.sections) this.draft.drr.sections = {};
+      if (!this.draft.drr.sections) this.draft.drr.sections = {};
+
+      // siapkan minimal 1 gate & 1 section agar binding aman
+      var gTotal = this.gatesCount || 1;
+      for (var g = 1; g <= gTotal; g++) {
+        if (!this.draft.slalom.gates.hasOwnProperty(g)) {
+          this.$set(this.draft.slalom.gates, g, "");
+        }
+      }
+
+      var sTotal = this.sectionsCount || 1;
+      for (var s = 1; s <= sTotal; s++) {
+        if (!this.draft.drr.sections.hasOwnProperty(s)) {
+          this.$set(this.draft.drr.sections, s, "");
+        }
       }
     },
 
     applyAssignmentsToDraft: function (payload) {
+      if (this.hasLocalEdits) return;
       if (!payload || !Array.isArray(payload.assignments)) return;
 
       this.ensureDraftContainers();
-
-      this.draft.sprint.juryStart = "";
-      this.draft.sprint.juryFinish = "";
-      this.draft.h2h.juryStart = "";
-      this.draft.h2h.juryFinish = "";
-      this.draft.h2hValues = {};
-      this.draft.slalom.juryStart = "";
-      this.draft.slalom.juryFinish = "";
-      this.draft.slalom.gates = {};
-      this.draft.drr.juryStart = "";
-      this.draft.drr.juryFinish = "";
-      this.draft.drr.sections = {};
 
       for (var i = 0; i < payload.assignments.length; i++) {
         var a = payload.assignments[i] || {};
@@ -790,32 +846,62 @@ export default {
         if (uid === "") continue;
 
         if (disc === "sprint") {
-          if (pos === "start") this.draft.sprint.juryStart = uid;
-          else if (pos === "finish") this.draft.sprint.juryFinish = uid;
+          if (pos === "start" && !this.isFilled(this.draft.sprint.juryStart)) {
+            this.draft.sprint.juryStart = uid;
+          } else if (
+            pos === "finish" &&
+            !this.isFilled(this.draft.sprint.juryFinish)
+          ) {
+            this.draft.sprint.juryFinish = uid;
+          }
         } else if (disc === "h2h") {
-          if (pos === "start") this.draft.h2h.juryStart = uid;
-          else if (pos === "finish") this.draft.h2h.juryFinish = uid;
-          else if (
+          if (pos === "start" && !this.isFilled(this.draft.h2h.juryStart)) {
+            this.draft.h2h.juryStart = uid;
+          } else if (
+            pos === "finish" &&
+            !this.isFilled(this.draft.h2h.juryFinish)
+          ) {
+            this.draft.h2h.juryFinish = uid;
+          } else if (
             pos === "R1" ||
             pos === "R2" ||
             pos === "L1" ||
             pos === "L2"
           ) {
-            this.draft.h2hValues[pos] = uid;
+            if (!this.draft.h2hValues) this.draft.h2hValues = {};
+            if (!this.isFilled(this.draft.h2hValues[pos])) {
+              this.$set(this.draft.h2hValues, pos, uid);
+            }
           }
         } else if (disc === "slalom") {
-          if (pos === "start") this.draft.slalom.juryStart = uid;
-          else if (pos === "finish") this.draft.slalom.juryFinish = uid;
-          else if (pos === "gate" && idx !== null) {
-            if (idx >= 1 && idx <= this.gatesCount)
-              this.draft.slalom.gates[idx] = uid;
+          if (pos === "start" && !this.isFilled(this.draft.slalom.juryStart)) {
+            this.draft.slalom.juryStart = uid;
+          } else if (
+            pos === "finish" &&
+            !this.isFilled(this.draft.slalom.juryFinish)
+          ) {
+            this.draft.slalom.juryFinish = uid;
+          } else if (pos === "gate" && idx != null) {
+            if (idx >= 1 && idx <= this.gatesCount) {
+              if (!this.isFilled(this.draft.slalom.gates[idx])) {
+                this.$set(this.draft.slalom.gates, idx, uid);
+              }
+            }
           }
         } else if (disc === "drr") {
-          if (pos === "start") this.draft.drr.juryStart = uid;
-          else if (pos === "finish") this.draft.drr.juryFinish = uid;
-          else if (pos === "section" && idx !== null) {
-            if (idx >= 1 && idx <= this.sectionsCount)
-              this.draft.drr.sections[idx] = uid;
+          if (pos === "start" && !this.isFilled(this.draft.drr.juryStart)) {
+            this.draft.drr.juryStart = uid;
+          } else if (
+            pos === "finish" &&
+            !this.isFilled(this.draft.drr.juryFinish)
+          ) {
+            this.draft.drr.juryFinish = uid;
+          } else if (pos === "section" && idx != null) {
+            if (idx >= 1 && idx <= this.sectionsCount) {
+              if (!this.isFilled(this.draft.drr.sections[idx])) {
+                this.$set(this.draft.drr.sections, idx, uid);
+              }
+            }
           }
         }
       }
@@ -1059,11 +1145,89 @@ export default {
         ipcRenderer.send("race-settings:get", this.eventId);
 
         ipcRenderer.once("race-settings:get-reply", (_e, res) => {
-          if (res && res.ok && res.settings) {
-            this.draft = mergeWithDefaults(res.settings);
-          } else {
-            this.draft = mergeWithDefaults({});
+          var incoming =
+            res && res.ok && res.settings
+              ? mergeWithDefaults(res.settings)
+              : mergeWithDefaults({});
+
+          if (this.hasLocalEdits) {
+            this.loading = false;
+            return;
           }
+          this.ensureDraftContainers();
+
+          // Sprint
+          if (!this.isFilled(this.draft.sprint.juryStart))
+            this.draft.sprint.juryStart = incoming.sprint.juryStart || "";
+          if (!this.isFilled(this.draft.sprint.juryFinish))
+            this.draft.sprint.juryFinish = incoming.sprint.juryFinish || "";
+
+          // H2H
+          if (!this.isFilled(this.draft.h2h.juryStart))
+            this.draft.h2h.juryStart = incoming.h2h.juryStart || "";
+          if (!this.isFilled(this.draft.h2h.juryFinish))
+            this.draft.h2h.juryFinish = incoming.h2h.juryFinish || "";
+          if (!this.draft.h2hValues) this.draft.h2hValues = {};
+          var keys = ["R1", "R2", "L1", "L2"];
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (
+              !this.isFilled(this.draft.h2hValues[k]) &&
+              incoming.h2hValues &&
+              incoming.h2hValues[k]
+            ) {
+              this.$set(this.draft.h2hValues, k, incoming.h2hValues[k]);
+            }
+          }
+
+          // Slalom
+          if (!this.isFilled(this.draft.slalom.juryStart))
+            this.draft.slalom.juryStart = incoming.slalom.juryStart || "";
+          if (!this.isFilled(this.draft.slalom.juryFinish))
+            this.draft.slalom.juryFinish = incoming.slalom.juryFinish || "";
+
+          // >>> tambahkan ini:
+          var maxG =
+            incoming.slalom && incoming.slalom.totalGate
+              ? incoming.slalom.totalGate
+              : 1;
+          this.draft.slalom.totalGate = maxG; // penting: supaya v-for n in gatesCount ikut update
+          this.ensureDraftContainers(); // siapkan key sesuai jumlah baru
+
+          for (var g = 1; g <= maxG; g++) {
+            var incGate =
+              incoming.slalom && incoming.slalom.gates
+                ? incoming.slalom.gates[g]
+                : "";
+            if (!this.isFilled(this.draft.slalom.gates[g]) && incGate) {
+              this.$set(this.draft.slalom.gates, g, incGate);
+            }
+          }
+
+          // DRR
+          if (!this.isFilled(this.draft.drr.juryStart))
+            this.draft.drr.juryStart = incoming.drr.juryStart || "";
+          if (!this.isFilled(this.draft.drr.juryFinish))
+            this.draft.drr.juryFinish = incoming.drr.juryFinish || "";
+
+          // >>> tambahkan ini:
+          var maxS =
+            incoming.drr && incoming.drr.totalSection
+              ? incoming.drr.totalSection
+              : 1;
+          this.draft.drr.totalSection = maxS; 
+          this.ensureDraftContainers();
+
+          for (var s = 1; s <= maxS; s++) {
+            var incSec =
+              incoming.drr && incoming.drr.sections
+                ? incoming.drr.sections[s]
+                : "";
+            if (!this.isFilled(this.draft.drr.sections[s]) && incSec) {
+              this.$set(this.draft.drr.sections, s, incSec);
+            }
+          }
+
           this.loading = false;
         });
       } catch (err) {

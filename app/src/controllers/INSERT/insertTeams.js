@@ -99,11 +99,12 @@ async function deleteTeamById(id) {
 async function getOptionTeamTypes() {
   // Bisa diganti read dari DB bila perlu
   return [
-    { value: "club",     name: "Club" },
-    { value: "pengcab",  name: "Pengcab" },
-    { value: "pengprov", name: "Pengprov" },
-    { value: "country",  name: "Country" },
-  ];
+        { value: "club", name: "Club" },
+        { value: "pengcab", name: "Pengcab" },
+        { value: "pengprov", name: "Pengprov" },
+        { value: "wilayah", name: "Wilayah" },
+        { value: "negara", name: "Negara" },
+      ];
 }
 
 /** Helper: updateOne dengan guard */

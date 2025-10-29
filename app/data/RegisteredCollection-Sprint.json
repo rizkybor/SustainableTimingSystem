@@ -1,53 +1,20 @@
 {
   "_id": {
-    "$oid": "68b9c0baba49fd2bcc3ff8ae"
+    "$oid": "68f0dae6f201613f4f51f697"
   },
-  "eventId": "68b5bf07a338efc467bf4850",
-  "initialId": "6",
+  "eventId": "68f0cbb10285e03294c39d99",
+  "initialId": "4",
   "raceId": "1",
   "divisionId": "1",
   "eventName": "SPRINT",
-  "initialName": "OPEN NATIONAL",
+  "initialName": "MASTER",
   "raceName": "MEN",
   "divisionName": "R4",
   "teams": [
     {
-      "teamId": "68b9e1a06cedfe55d3607fd1",
-      "nameTeam": "CILEDUG CLUB",
-      "bibTeam": "50",
-      "startOrder": "",
-      "praStart": "",
-      "intervalRace": "",
-      "statusId": 0,
-      "result": {
-        "startTime": "",
-        "finishTime": "",
-        "raceTime": "",
-        "startPenalty": "50",
-        "finishPenalty": "",
-        "penalty": "",
-        "penaltyTime": "",
-        "totalTime": "",
-        "ranked": "",
-        "score": "",
-        "judgesBy": "",
-        "judgesTime": ""
-      },
-      "otr": {
-        "startTime": "",
-        "finishTime": "",
-        "raceTime": "",
-        "penaltyTime": "",
-        "penalty": "",
-        "totalTime": "",
-        "ranked": "",
-        "score": ""
-      }
-    },
-    {
-      "teamId": "68bfff5d2156dd45ca9d879d",
-      "nameTeam": "BALI CLUB",
-      "bibTeam": "30",
+      "teamId": "68f0d3cef201613f4f51f696",
+      "nameTeam": "FAJI JAKARTA TIMUR",
+      "bibTeam": "10",
       "startOrder": "",
       "praStart": "",
       "intervalRace": "",
@@ -58,29 +25,19 @@
         "raceTime": "",
         "startPenalty": "",
         "finishPenalty": "",
-        "penalty": "",
         "penaltyTime": "",
+        "penalty": "",
         "totalTime": "",
         "ranked": "",
         "score": "",
         "judgesBy": "",
         "judgesTime": ""
-      },
-      "otr": {
-        "startTime": "",
-        "finishTime": "",
-        "raceTime": "",
-        "penaltyTime": "",
-        "penalty": "",
-        "totalTime": "",
-        "ranked": "",
-        "score": ""
       }
     },
     {
-      "teamId": "68bfff542156dd45ca9d879c",
-      "nameTeam": "YOGYAKARTA CLUB",
-      "bibTeam": "40",
+      "teamId": "68f0d3bef201613f4f51f695",
+      "nameTeam": "FAJI JAKARTA UTARA",
+      "bibTeam": "11",
       "startOrder": "",
       "praStart": "",
       "intervalRace": "",
@@ -91,29 +48,19 @@
         "raceTime": "",
         "startPenalty": "",
         "finishPenalty": "",
-        "penalty": "",
         "penaltyTime": "",
+        "penalty": "",
         "totalTime": "",
         "ranked": "",
         "score": "",
         "judgesBy": "",
         "judgesTime": ""
-      },
-      "otr": {
-        "startTime": "",
-        "finishTime": "",
-        "raceTime": "",
-        "penaltyTime": "",
-        "penalty": "",
-        "totalTime": "",
-        "ranked": "",
-        "score": ""
       }
     },
     {
-      "teamId": "68bfff3e2156dd45ca9d879a",
-      "nameTeam": "SEMARANG CLUB",
-      "bibTeam": "60",
+      "teamId": "68f0d3b1f201613f4f51f694",
+      "nameTeam": "FAJI JAKARTA BARAT",
+      "bibTeam": "12",
       "startOrder": "",
       "praStart": "",
       "intervalRace": "",
@@ -124,23 +71,36 @@
         "raceTime": "",
         "startPenalty": "",
         "finishPenalty": "",
-        "penalty": "",
         "penaltyTime": "",
+        "penalty": "",
         "totalTime": "",
         "ranked": "",
         "score": "",
         "judgesBy": "",
         "judgesTime": ""
-      },
-      "otr": {
+      }
+    },
+    {
+      "teamId": "68f0d3a5f201613f4f51f693",
+      "nameTeam": "FAJI JAKARTA SELATAN",
+      "bibTeam": "13",
+      "startOrder": "",
+      "praStart": "",
+      "intervalRace": "",
+      "statusId": 0,
+      "result": {
         "startTime": "",
         "finishTime": "",
         "raceTime": "",
+        "startPenalty": "",
+        "finishPenalty": "",
         "penaltyTime": "",
         "penalty": "",
         "totalTime": "",
         "ranked": "",
-        "score": ""
+        "score": "",
+        "judgesBy": "",
+        "judgesTime": ""
       }
     }
   ]

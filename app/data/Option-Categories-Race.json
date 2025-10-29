@@ -1,3 +1,11 @@
+[{
+  "_id": {
+    "$oid": "66151830ba5e0ae3faea6726"
+  },
+  "value": "1",
+  "name": "MEN",
+  "keterangan": "LAKI-LAKI"
+},
 {
   "_id": {
     "$oid": "66151864ba5e0ae3faea6727"
@@ -5,4 +13,4 @@
   "value": "2",
   "name": "WOMEN",
   "keterangan": "PEREMPUAN"
-}
+}]

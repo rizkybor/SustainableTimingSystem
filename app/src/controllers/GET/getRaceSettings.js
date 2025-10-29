@@ -3,7 +3,7 @@ const { getDb } = require("../index");
 
 /**
  * Ambil race settings berdasar eventId (string).
- * Koleksi: raceSettingsCollection
+ * Koleksi: raceSettings
  * Dokumen: { eventId: "<eventId>", settings: {...}, updatedAt: Date }
  */
 async function getRaceSettingsByEventId(eventId) {

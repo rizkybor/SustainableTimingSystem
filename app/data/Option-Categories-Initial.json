@@ -1,7 +1,79 @@
-{
-  "_id": {
-    "$oid": "66530f74c686d3003d2ef713"
+[
+  {
+    "_id": {
+      "$oid": "66151807ba5e0ae3faea6722"
+    },
+    "value": "3",
+    "name": "OPEN"
   },
-  "value": "1",
-  "name": "YOUTH"
-}
+  {
+    "_id": {
+      "$oid": "66530f74c686d3003d2ef713"
+    },
+    "value": "1",
+    "name": "YOUTH"
+  },
+  {
+    "_id": {
+      "$oid": "66530f9bc686d3003d2ef714"
+    },
+    "value": "2",
+    "name": "JUNIOR"
+  },
+  {
+    "_id": {
+      "$oid": "66530fd2c686d3003d2ef715"
+    },
+    "value": "4",
+    "name": "MASTER"
+  },
+  {
+    "_id": {
+      "$oid": "674e7b5d4c1aa235aa011c06"
+    },
+    "value": "5",
+    "name": "OPEN INTERNATIONAL"
+  },
+  {
+    "_id": {
+      "$oid": "674e7b724c1aa235aa011c07"
+    },
+    "value": "6",
+    "name": "OPEN NATIONAL"
+  },
+  {
+    "_id": {
+      "$oid": "674e7b864c1aa235aa011c08"
+    },
+    "value": "7",
+    "name": "MIX REGIONAL"
+  },
+  {
+    "_id": {
+      "$oid": "674e7ba44c1aa235aa011c09"
+    },
+    "value": "8",
+    "name": "OPEN WATER RESCUE"
+  },
+  {
+    "_id": {
+      "$oid": "674e7bb74c1aa235aa011c0a"
+    },
+    "value": "9",
+    "name": "OPEN RIVER BOARDING"
+  },
+  {
+    "_id": {
+      "$oid": "674e7c514c1aa235aa011c0f"
+    },
+    "value": "10",
+    "name": "OPEN KAYAK"
+  },
+  {
+    "_id": {
+      "$oid": "674ef9c04c1aa235aa011c20"
+    },
+    "value": "11",
+    "name": "OPEN PITCANO"
+  }
+]

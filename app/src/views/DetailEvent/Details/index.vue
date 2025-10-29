@@ -1,5 +1,12 @@
 <template>
-  <div class="sts-detail">
+  <div v-if="settingsLoading.active" class="upload-hud">
+    <div class="upload-box">
+      <b-spinner class="mb-2" label="Uploading"></b-spinner>
+      <div class="font-weight-bold">{{ settingsLoading.stage }}</div>
+      <small class="text-muted">{{ settingsLoading.percent }}%</small>
+    </div>
+  </div>
+  <div v-else class="sts-detail">
     <b-container class="mt-3">
       <div class="text-muted small mb-2">
         Events /
@@ -64,6 +71,10 @@
 
     <b-container class="mt-4 mb-5">
       <div class="mb-2 d-flex justify-content-md-end">
+        <b-button class="btn-race-settings mr-2" @click="openEventSettings">
+          Event Settings
+        </b-button>
+
         <b-button class="btn-race-settings mr-2" @click="openJudgeSettings">
           Judges Settings
         </b-button>
@@ -237,10 +248,131 @@
       :event-name="safeEventName"
       @update-judges="onUpdateJudgeSettings"
     />
+
+    <event-settings-modal
+      v-model="showEventSettings"
+      :id="'event-settings-modal'"
+      :event-id="eventId"
+      :event-name="safeEventName"
+      @update-settings="handleUpdateSettings"
+    />
   </div>
 </template>
 
 <script>
+const LEVEL_SCOPE_MAP = {
+  A: ["negara"],
+  B: ["negara", "wilayah"],
+  C: ["negara", "club"],
+  D: ["pengprov"],
+  E: ["pengprov"],
+  F: ["pengprov", "pengcab", "club"],
+  G: ["pengcab"],
+  H: ["pengcab", "club"],
+  I: ["club"],
+};
+
+// ===== Cloudinary config (ISI sesuai punyamu) =====
+var CLOUD_NAME = "kikiaka";
+var UPLOAD_PRESET = "stiming-preset"; 
+var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
+var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
+
+function _toCloudMeta(json) {
+  return {
+    public_id: json && json.public_id ? String(json.public_id) : "",
+    secure_url:
+      json && (json.secure_url || json.url)
+        ? String(json.secure_url || json.url)
+        : "",
+    url:
+      json && (json.secure_url || json.url)
+        ? String(json.secure_url || json.url)
+        : "",
+    width: typeof (json && json.width) === "number" ? json.width : null,
+    height: typeof (json && json.height) === "number" ? json.height : null,
+    format: json && json.format ? String(json.format) : "",
+    bytes: typeof (json && json.bytes) === "number" ? json.bytes : 0,
+    resource_type:
+      json && json.resource_type ? String(json.resource_type) : "image",
+    original_filename:
+      json && json.original_filename ? String(json.original_filename) : "",
+  };
+}
+
+async function _uploadOne(fileObj, folder) {
+  if (!fileObj) return { ok: false, error: "no-file" };
+
+  // A) lewat bridge Electron kalau ada
+  if (window.cloud && typeof window.cloud.uploadFile === "function") {
+    try {
+      var up = await window.cloud.uploadFile(fileObj, { folder: folder });
+      if (up && up.ok === true && up.result) {
+        return { ok: true, result: _toCloudMeta(up.result) };
+      }
+      return {
+        ok: false,
+        error: up && up.error ? String(up.error) : "upload-failed",
+      };
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+
+  // B) fallback unsigned upload
+  try {
+    var fd = new FormData();
+    fd.append("file", fileObj);
+    fd.append("upload_preset", UPLOAD_PRESET);
+    if (folder) fd.append("folder", folder);
+
+    var url = "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/image/upload";
+    var res = await fetch(url, { method: "POST", body: fd });
+    var json = null;
+    try {
+      json = await res.json();
+    } catch (_e) {
+      json = null;
+    }
+
+    if (!res.ok || !json || !(json.secure_url || json.url)) {
+      var det =
+        json && json.error && json.error.message
+          ? json.error.message
+          : "upload-failed";
+      return { ok: false, error: det, raw: json };
+    }
+    return { ok: true, result: _toCloudMeta(json) };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function _uploadMany(list, folder) {
+  var out = [];
+  if (!list || typeof list.length !== "number") return out;
+
+  for (var i = 0; i < list.length; i++) {
+    var f = list[i];
+
+    // kalau yang datang path string (drag&drop), minta bridge bikin File-like
+    if (
+      typeof f === "string" &&
+      window.cloud &&
+      typeof window.cloud.pathToFile === "function"
+    ) {
+      try {
+        var created = await window.cloud.pathToFile(f);
+        if (created) f = created;
+      } catch (_e) {}
+    }
+
+    var up = await _uploadOne(f, folder);
+    if (up && up.ok && up.result) out.push(up.result);
+  }
+  return out;
+}
+
 import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
@@ -249,15 +381,22 @@ import { ipcRenderer } from "electron";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
+import EventSettingsModal from "@/components/race/EventSettings.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
 
 export default {
   name: "SustainableTimingSystemRaftingDetails",
-  components: { TeamPanel, RaceSettingsModal, JudgeSettingsModal },
+  components: {
+    TeamPanel,
+    RaceSettingsModal,
+    JudgeSettingsModal,
+    EventSettingsModal,
+  },
   data() {
     return {
+      settingsLoading: { active: false, stage: "", percent: 0 },
       defaultImg,
       resultAvailMap: {
         R4_MEN: false,
@@ -267,6 +406,7 @@ export default {
       },
       lastToken: "",
       showRaceSettings: false,
+      showEventSettings: false,
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -274,7 +414,7 @@ export default {
         slalom: { totalGate: 14 },
         drr: { totalSection: 5 },
       },
-      showJudgeSettings: false, // ← kontrol buka/tutup modal
+      showJudgeSettings: false,
       judgeSettings: {
         // ← nilai awal (boleh kosong; modal akan merge default)
         h2h: { R1: true, R2: true, L1: true, L2: true },
@@ -317,14 +457,6 @@ export default {
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
       dataTeams: [], // alias events.participant
       availableTeams: [], // sumber dropdown (opsional dari IPC)
-      useDummyTeams: false,
-      dummyTeams: [
-        { id: "t101", nameTeam: "JAKARTA PUSAT", bibTeam: "001" },
-        { id: "t102", nameTeam: "JAKARTA SELATAN", bibTeam: "002" },
-        { id: "t103", nameTeam: "JAKARTA TIMUR", bibTeam: "003" },
-        { id: "t104", nameTeam: "JAKARTA BARAT", bibTeam: "004" },
-      ],
-
       // draft baris input per kombinasi
       draftMap: { R4_MEN: null, R4_WOMEN: null, R6_MEN: null, R6_WOMEN: null },
     };
@@ -365,7 +497,7 @@ export default {
     },
     hasEventLogo() {
       var ev = this.events || {};
-      var logos = ev.event_logo;
+      var logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         // string URL langsung atau objek { url: '...' }
         var first = logos[0];
@@ -382,7 +514,7 @@ export default {
     },
     eventLogoUrl() {
       var ev = this.events || {};
-      var logos = ev.event_logo;
+      var logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         var first = logos[0];
         if (typeof first === "string") return first;
@@ -408,9 +540,250 @@ export default {
   },
 
   methods: {
+    _setLoading: function (on, stage, pct) {
+      this.settingsLoading.active = !!on;
+      if (typeof stage === "string") this.settingsLoading.stage = stage;
+      if (typeof pct === "number")
+        this.settingsLoading.percent = Math.max(
+          0,
+          Math.min(100, Math.round(pct))
+        );
+    },
+
+    handleUpdateSettings: async function (payload) {
+      // === 0) Ambil & normalisasi dari payload ===
+      var eventId = "";
+      var eventName = "";
+      var signature = {};
+      var evFiles = [];
+      var spFiles = [];
+
+      if (payload && payload.eventId) eventId = String(payload.eventId);
+      if (payload && payload.eventName) eventName = String(payload.eventName);
+
+      if (
+        payload &&
+        payload.signature &&
+        typeof payload.signature === "object"
+      ) {
+        signature = payload.signature;
+      }
+
+      if (
+        payload &&
+        payload.eventFiles &&
+        typeof payload.eventFiles.length === "number"
+      ) {
+        evFiles = payload.eventFiles;
+      }
+      if (
+        payload &&
+        payload.sponsorFiles &&
+        typeof payload.sponsorFiles.length === "number"
+      ) {
+        spFiles = payload.sponsorFiles;
+      }
+
+      var safePayload = {
+        eventId: eventId,
+        eventName: eventName,
+        signature: {
+          technicalDelegate:
+            signature && signature.technicalDelegate === true ? true : false,
+          chiefJudge: signature && signature.chiefJudge === true ? true : false,
+          raceDirector:
+            signature && signature.raceDirector === true ? true : false,
+        },
+        eventFiles: [],
+        sponsorFiles: [],
+      };
+
+      // preview sederhana ke console
+      console.log(
+        "READY PAYLOAD:\n" +
+          JSON.stringify(
+            {
+              eventId: safePayload.eventId,
+              eventName: safePayload.eventName,
+              signature: safePayload.signature,
+              eventFilesCount: evFiles.length,
+              sponsorFilesCount: spFiles.length,
+            },
+            null,
+            2
+          )
+      );
+
+      if (!eventId) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Update gagal",
+          detail: "eventId kosong",
+        });
+        return;
+      }
+
+      try {
+        // === 1) UPDATE DB BASIC ===
+        this._setLoading(true, "Menyimpan data dasar…", 10);
+
+        var basicDoc = {
+          _id: eventId,
+          eventName: eventName,
+          signature: safePayload.signature,
+        };
+        ipcRenderer.send("services:update:event-basic", basicDoc);
+
+        var step1 = await new Promise(function (resolve) {
+          ipcRenderer.once(
+            "services:update:event-basic:reply",
+            function (_e, resp) {
+              resolve(resp);
+            }
+          );
+        });
+
+        var ok1 = step1 && step1.ok === true;
+        if (!ok1) {
+          var d1 = step1 && step1.error ? step1.error : "unknown-error";
+          this._setLoading(false, "", 0);
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "DB Update (basic) gagal",
+            detail: d1,
+          });
+          return;
+        }
+
+        // // === 2) UPLOAD EVENT FILES (Cloudinary) ===
+        // this._setLoading(true, "Mengunggah logo event…", 40);
+        // var eventUrls = await _uploadManyToUrlsPreferBridge(
+        //   evFiles,
+        //   FOLDER_EVENT_LOGO
+        // );
+
+        // // === 3) UPLOAD SPONSOR FILES (Cloudinary) ===
+        // this._setLoading(true, "Mengunggah logo sponsor…", 70);
+        // var sponsorUrls = await _uploadManyToUrlsPreferBridge(
+        //   spFiles,
+        //   FOLDER_EVENT_SPONSOR
+        // );
+
+        // // === 4) UPDATE DB ASSETS (hasil upload) ===
+        // this._setLoading(true, "Memperbarui aset di database…", 85);
+
+        // var assetsDoc = { _id: eventId };
+        // if (eventUrls && eventUrls.length > 0) {
+        //   assetsDoc.eventFiles = eventUrls; // array of string URL
+        // }
+        // if (sponsorUrls && sponsorUrls.length > 0) {
+        //   assetsDoc.sponsorFiles = sponsorUrls; // atau sponsorshipFiles, sesuaikan schema
+        // }
+
+        // console.log("ASSETS DOC TO SAVE:", assetsDoc);
+        // ipcRenderer.send("services:update:event-assets", assetsDoc);
+
+        // ===== 2) UPLOAD EVENT FILES =====
+        this._setLoading(true, "Mengunggah logo event…", 40);
+        const uploadedEvent = await _uploadMany(evFiles, FOLDER_EVENT_LOGO);
+
+        // ===== 3) UPLOAD SPONSOR FILES =====
+        this._setLoading(true, "Mengunggah logo sponsor…", 70);
+        const uploadedSponsor = await _uploadMany(
+          spFiles,
+          FOLDER_EVENT_SPONSOR
+        );
+
+        // Kumpulkan URL baru
+        const newEventUrls = (uploadedEvent || [])
+          .map((u) => u.secure_url || u.url)
+          .filter(Boolean);
+        const newSponsorUrls = (uploadedSponsor || [])
+          .map((u) => u.secure_url || u.url)
+          .filter(Boolean);
+
+        // Ambil URL lama yang masih dipertahankan dari payload (dari modal)
+        const keepEventUrls = Array.isArray(payload.keepEventUrls)
+          ? payload.keepEventUrls
+          : [];
+        const keepSponsorUrls = Array.isArray(payload.keepSponsorUrls)
+          ? payload.keepSponsorUrls
+          : [];
+
+        // FINAL: gabungan lama + baru (unik)
+        const finalEventUrls = Array.from(
+          new Set([...keepEventUrls, ...newEventUrls])
+        );
+        const finalSponsorUrls = Array.from(
+          new Set([...keepSponsorUrls, ...newSponsorUrls])
+        );
+
+        // ===== 4) UPDATE DB ASSETS (URL saja) =====
+        this._setLoading(true, "Memperbarui aset di database…", 85);
+        const assetsDoc = {
+          _id: eventId,
+          eventFiles: finalEventUrls,
+          sponsorFiles: finalSponsorUrls,
+        };
+        ipcRenderer.send("services:update:event-assets", assetsDoc);
+
+        var step2 = await new Promise(function (resolve) {
+          ipcRenderer.once(
+            "services:update:event-assets:reply",
+            function (_e, resp) {
+              resolve(resp);
+            }
+          );
+        });
+
+        var ok2 = step2 && step2.ok === true;
+        if (!ok2) {
+          var d2 = step2 && step2.error ? step2.error : "unknown-error";
+          this._setLoading(false, "", 0);
+          ipcRenderer.send("get-alert", {
+            type: "warning",
+            message: "Upload sukses, tapi update DB assets gagal",
+            detail: d2,
+          });
+          return;
+        }
+
+        // === DONE ===
+        this._setLoading(true, "Selesai ✔", 100);
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Event updated",
+          detail: "Signature & files berhasil disimpan",
+        });
+
+        // Log ringkas hasil final
+        var preview = {
+          eventId: eventId,
+          signature: safePayload.signature,
+          eventFiles: eventUrls,
+          sponsorFiles: sponsorUrls,
+        };
+        console.log("UPDATED:\n" + JSON.stringify(preview, null, 2));
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Unexpected error",
+          detail: err && err.message ? err.message : String(err),
+        });
+      } finally {
+        var self = this;
+        setTimeout(function () {
+          self._setLoading(false, "", 0);
+        }, 600);
+      }
+    },
     /* =========================================================
      * UI ACTIONS
      * =======================================================*/
+    openEventSettings() {
+      this.showEventSettings = true;
+    },
+
     openRaceSettings() {
       this.showRaceSettings = true;
     },
@@ -529,7 +902,7 @@ export default {
         (t) =>
           String(t.bibTeam).trim() !== String(row.bibTeam).trim() ||
           String(t.nameTeam).trim().toUpperCase() !==
-          String(row.nameTeam).trim().toUpperCase()
+            String(row.nameTeam).trim().toUpperCase()
       );
       this.dataTeams = this.dataTeams.slice();
       this.persistParticipants();
@@ -717,44 +1090,64 @@ export default {
     /* =========================================================
      * AVAILABLE TEAMS (dropdown sumber)
      * =======================================================*/
+
+    // ✅ Kembalikan ARRAY kode yang diizinkan
     _allowedTypeForLevel(levelName) {
       const lv = String(levelName || "")
         .trim()
         .toUpperCase();
-      if (lv.includes("CLASSIFICATION - G")) return "club";
-      if (lv.includes("CLASSIFICATION - D")) return "club";
-      if (lv.includes("CLASSIFICATION - C")) return "pengcab";
-      if (lv.includes("CLASSIFICATION - B")) return "pengprov";
-      if (lv.includes("CLASSIFICATION - A")) return "country";
-      return null;
+      // Ambil huruf level (A–I) setelah "CLASSIFICATION - "
+      const m = lv.match(/CLASSIFICATION\s*-\s*([A-I])/);
+      const key = m ? m[1] : null;
+      if (!key || !LEVEL_SCOPE_MAP[key]) return null;
+      return LEVEL_SCOPE_MAP[key];
     },
 
+    // ✅ Loader teams yang support multi-type & typeTeam array/string
     async loadAvailableTeams() {
-      if (this.useDummyTeams) {
-        this.availableTeams = this.dummyTeams.slice();
-        return;
-      }
-
       try {
         ipcRenderer.send("teams:get-all");
         await new Promise((resolve) => {
           ipcRenderer.once("teams:get-all-reply", (_e, res) => {
             let items =
               res && res.ok && Array.isArray(res.items) ? res.items : [];
-            const allow = this._allowedTypeForLevel(this.events.levelName);
-            if (allow) {
-              const allowLC = String(allow).toLowerCase();
-              items = items.filter(
-                (t) => String(t.typeTeam || "").toLowerCase() === allowLC
+
+            // ⚠️ Pakai sumber levelName yang benar
+            const levelName =
+              (this.events && this.events.levelName) || // jika memang ada this.events
+              (this.formEvent && this.formEvent.levelName) || // fallback umum di file kamu
+              null;
+
+            const allow = this._allowedTypeForLevel(levelName); // → array atau null
+
+            if (Array.isArray(allow) && allow.length) {
+              const allowSet = new Set(
+                allow.map((s) => String(s).toLowerCase())
               );
+
+              items = items.filter((t) => {
+                const tt = t && t.typeTeam;
+                if (Array.isArray(tt)) {
+                  // jika typeTeam disimpan array di DB
+                  return tt.some((v) => allowSet.has(String(v).toLowerCase()));
+                }
+                // jika typeTeam string tunggal
+                return allowSet.has(String(tt || "").toLowerCase());
+              });
             }
+
             this.availableTeams = items.map((t) => ({
-              id: t._id && t._id.$oid ? t._id.$oid : String(t._id || ""),
-              nameTeam: t.nameTeam,
-              bibTeam: t.bibTeam || "",
+              id:
+                t && t._id && t._id.$oid
+                  ? t._id.$oid
+                  : String((t && t._id) || ""),
+              nameTeam: t && t.nameTeam ? t.nameTeam : "",
+              bibTeam: (t && t.bibTeam) || "",
             }));
-            if (!this.availableTeams.length)
+
+            if (!this.availableTeams.length) {
               this.availableTeams = this.dummyTeams.slice();
+            }
             resolve();
           });
         });
@@ -1720,5 +2113,23 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+.upload-hud {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.upload-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 24px;
+  min-width: 240px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  text-align: center;
 }
 </style>

@@ -1621,10 +1621,12 @@ async mounted() {
       try {
         if (typeof ipcRenderer === "undefined") return;
 
-        const bucket = getBucket(); // sudah ada di file-mu
-        const eventId = String(bucket.eventId || "");
-        if (!eventId) return;
+        const bucket = getBucket();
 
+        // const eventId = String(bucket.eventId || "");
+        const eventId = this.currentEventId
+        
+        if (!eventId) return;
         // token untuk cegah balasan lama nindih
         const token = Date.now();
         this._lastRSFetchToken = token;
@@ -1638,6 +1640,7 @@ async mounted() {
             const c = parseInt(res.settings.drr.totalSection, 10);
             if (Number.isFinite(c) && c > 0) count = c;
           }
+        
           this.applyDrrSectionCount(count);
         });
       } catch (err) {

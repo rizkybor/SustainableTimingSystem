@@ -871,245 +871,259 @@ export default {
         : [];
     },
   },
-async mounted() {
+  async mounted() {
     const audio = new Audio(tone);
 
-  await this.loadDataScore("DRR");
-  await this.loadDataPenalties("DRR");
+    await this.loadDataScore("DRR");
+    await this.loadDataPenalties("DRR");
 
-  this.dataEvent = readEventDetailsFromLS();
-  this.buildStaticDrrOptions();
+    this.dataEvent = readEventDetailsFromLS();
+    this.buildStaticDrrOptions();
 
-  if (this.drrBucketOptions.length) {
-    const savedKey = localStorage.getItem("currentDRRBucketKey");
-    this.selectedDrrKey =
-      savedKey && this.drrBucketMap[savedKey]
-        ? savedKey
-        : this.drrBucketOptions[0].value;
+    if (this.drrBucketOptions.length) {
+      const savedKey = localStorage.getItem("currentDRRBucketKey");
+      this.selectedDrrKey =
+        savedKey && this.drrBucketMap[savedKey]
+          ? savedKey
+          : this.drrBucketOptions[0].value;
 
-    await this.fetchBucketTeamsByKey(this.selectedDrrKey);
-  } else {
-    await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
-  }
+      await this.fetchBucketTeamsByKey(this.selectedDrrKey);
+    } else {
+      await this.loadAllDrrBucketsFromEvent(); // fallback lama kalau perlu
+    }
 
-  this.fetchDrrSectionCountFromSettings();
+    this.fetchDrrSectionCountFromSettings();
 
-  // ====== SOCKET INIT & LISTENERS (inline di mounted) ======
-  try {
-    const socket = getSocket();
-    this.initSocket = socket;
+    // ====== SOCKET INIT & LISTENERS (inline di mounted) ======
+    try {
+      const socket = getSocket();
+      this.initSocket = socket;
 
-    // simpan id utk cegah echo (jaga-jaga kalau pengirim pakai senderId)
-    const onConnect = () => {
-      this.selfSocketId = socket && socket.id ? socket.id : null;
-    };
-    socket.on("connect", onConnect);
+      // simpan id utk cegah echo (jaga-jaga kalau pengirim pakai senderId)
+      const onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
 
-    // Validasi event harus match dgn halaman ini
-    const isSameEvent = (m) => {
-      const cur = this.currentEventId ? String(this.currentEventId) : "";
-      const ev = m && m.eventId ? String(m.eventId) : "";
-      return !cur || !ev ? true : cur === ev;
-    };
+      // Validasi event harus match dgn halaman ini
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
 
-    // Handler pesan masuk
-    const onMessage = async (msgRaw) => {
-      let msg = msgRaw || {};
+      // Handler pesan masuk
+      const onMessage = async (msgRaw) => {
+        let msg = msgRaw || {};
 
-      // cegah echo dari diri sendiri (kalau pengirim ikut kirim senderId)
-      if (msg.senderId && this.selfSocketId && msg.senderId === this.selfSocketId) return;
-      if (!isSameEvent(msg)) return;
+        // cegah echo dari diri sendiri (kalau pengirim ikut kirim senderId)
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
 
-      // notifikasi realtime + audio
-      if (this.$bvToast && msg.text) {
-        try {
-          audio.currentTime = 0;
-          audio.play();
-        } catch {}
-        this.$bvToast.toast(
-          (msg.from ? msg.from : "Realtime") + ": " + msg.text,
-          {
-            title: "Pesan Realtime",
-            variant: "success",
-            solid: true,
-          }
-        );
-      }
-console.log(msg.type,'<<')
-      // Normalisasi tipe lama → baru (opsional)
-      if (msg.type === "PenaltiesUpdated") {
-        const gt = String(msg.gate || "").trim().toLowerCase();
-        console.log(gt,'<<< cek')
-        if (gt === "start" || gt === "s" || gt === "st") msg.type = "PenaltyStart";
-        else if (gt === "finish" || gt === "f" || gt === "fin") msg.type = "PenaltyFinish";
-        else msg.type = "PenaltyGates";
-      }
-
-      // Kumpulkan updates (bisa array tunggal / batch)
-      let updates;
-      if (Array.isArray(msg)) updates = msg;
-      else if (Array.isArray(msg.updates)) updates = msg.updates;
-      else updates = [msg];
-
-      // Normalisasi PenaltyGates → gateIndex 0-based, serta filter tipe lain
-      for (let i = 0; i < updates.length; i++) {
-        const u = updates[i] || {};
-        const t = String(u.type || "").toLowerCase();
-        if (t !== "penaltystart" && t !== "penaltyfinish" && t !== "penaltygates") {
-          updates[i] = null; // hanya proses penalty
-          continue;
+        // notifikasi realtime + audio
+        if (this.$bvToast && msg.text) {
+          try {
+            audio.currentTime = 0;
+            audio.play();
+          } catch {}
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
         }
-        if (t === "penaltygates") {
-          if (typeof u.gate === "number" && Number.isFinite(u.gate)) {
-            const gi = u.gate > 0 ? u.gate - 1 : u.gate;
-            if (Number.isInteger(gi)) u.gateIndex = gi;
+        console.log(msg.type, "<<");
+        // Normalisasi tipe lama → baru (opsional)
+        if (msg.type === "PenaltiesUpdated") {
+          const gt = String(msg.gate || "")
+            .trim()
+            .toLowerCase();
+          console.log(gt, "<<< cek");
+          if (gt === "start" || gt === "s" || gt === "st")
+            msg.type = "PenaltyStart";
+          else if (gt === "finish" || gt === "f" || gt === "fin")
+            msg.type = "PenaltyFinish";
+          else msg.type = "PenaltyGates";
+        }
+
+        // Kumpulkan updates (bisa array tunggal / batch)
+        let updates;
+        if (Array.isArray(msg)) updates = msg;
+        else if (Array.isArray(msg.updates)) updates = msg.updates;
+        else updates = [msg];
+
+        // Normalisasi PenaltyGates → gateIndex 0-based, serta filter tipe lain
+        for (let i = 0; i < updates.length; i++) {
+          const u = updates[i] || {};
+          const t = String(u.type || "").toLowerCase();
+          if (
+            t !== "penaltystart" &&
+            t !== "penaltyfinish" &&
+            t !== "penaltygates"
+          ) {
+            updates[i] = null; // hanya proses penalty
+            continue;
+          }
+          if (t === "penaltygates") {
+            if (typeof u.gate === "number" && Number.isFinite(u.gate)) {
+              const gi = u.gate > 0 ? u.gate - 1 : u.gate;
+              if (Number.isInteger(gi)) u.gateIndex = gi;
+            }
           }
         }
-      }
-      updates = updates.filter(Boolean);
-      if (!updates.length) return;
+        updates = updates.filter(Boolean);
+        if (!updates.length) return;
 
-      // Terapkan semua update dulu…
-      for (const u of updates) {
-        await this.applyPenaltyFromSocketDirect(u);
-      }
+        // Terapkan semua update dulu…
+        for (const u of updates) {
+          console.log("HAHA", u),
+          await this.applyPenaltyFromSocketDirect(u);
+        }
 
-      // …baru re-rank sekali (hemat render)
-      await this.assignRanks(this.participant);
-      this.$forceUpdate && this.$forceUpdate();
-    };
+        // …baru re-rank sekali (hemat render)
+        await this.assignRanks(this.participant);
+        this.$forceUpdate && this.$forceUpdate();
+      };
 
-    socket.on("custom:event", onMessage);
+      socket.on("custom:event", onMessage);
 
-    // cleanup saat komponen di-destroy
-    this.$once("hook:beforeDestroy", () => {
-      if (this.initSocket) {
-        this.initSocket.off("connect", onConnect);
-        this.initSocket.off("custom:event", onMessage);
-      }
-    });
-  } catch (err) {
-    if (logger && logger.warn) logger.warn("socket init failed:", err);
-  }
-},
+      // cleanup saat komponen di-destroy
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
+  },
   methods: {
     // ===== SOCKET: handler utama (langsung konsumsi format "custom:event") =====
-    async applyPenaltyFromSocketDirect(msg) {
-      try {
-        // Normalisasi tipe (Start / Finish / Section)
-        var rawType = "";
-        if (msg && msg.type) rawType = String(msg.type).toLowerCase();
+   async applyPenaltyFromSocketDirect(msg) {
+  try {
+    if (!msg) return;
 
-        var normType = ""; // "start" | "finish" | "section"
-        if (rawType === "penaltystart") normType = "start";
-        else if (rawType === "penaltyfinish") normType = "finish";
-        else if (rawType === "penaltygates") normType = "section";
-        else if (rawType === "penaltiesupdated") {
-          // fallback lawas
-          var gt = "";
-          if (msg && msg.gate != null)
-            gt = String(msg.gate).trim().toLowerCase();
-          if (gt === "start" || gt === "s" || gt === "st") normType = "start";
-          else if (gt === "finish" || gt === "f" || gt === "fin")
-            normType = "finish";
-          else normType = "section";
-        } else {
-          return; // bukan tipe yang kita proses
-        }
+    // --- Normalisasi tipe ---
+    var rawType = "";
+    if (msg.type) rawType = String(msg.type).toLowerCase();
 
-        // Identitas tim (teamId | bib | bibTeam | teamName | rowIndex)
-        var teamId = msg && msg.teamId != null ? msg.teamId : null;
-        var bib = null;
-        if (msg && msg.bib != null) bib = msg.bib;
-        else if (msg && msg.bibTeam != null) bib = msg.bibTeam;
-        var teamName = msg && msg.teamName ? msg.teamName : "";
-        var rowIndex = msg && msg.rowIndex != null ? msg.rowIndex : null;
+    var rawSection = "";
+    if (msg.section) rawSection = String(msg.section).toLowerCase();
 
-        var team = this.resolveTeamByKey(teamId, bib, teamName, rowIndex);
-        if (!team) return;
+    var normType = ""; // start | finish | section
 
-        // Section index (0-based) untuk "section"
-        var sectionIndex = null;
-        if (normType === "section") {
-          if (
-            msg &&
-            msg.gateIndex != null &&
-            Number.isFinite(Number(msg.gateIndex))
-          ) {
-            sectionIndex = Number(msg.gateIndex);
-          } else if (
-            msg &&
-            msg.index != null &&
-            Number.isFinite(Number(msg.index))
-          ) {
-            sectionIndex = Number(msg.index);
-          } else if (
-            msg &&
-            msg.gate != null &&
-            Number.isFinite(Number(msg.gate))
-          ) {
-            // gate 1-based → 0-based
-            var gi = Number(msg.gate);
-            sectionIndex = gi > 0 ? gi - 1 : gi;
-          }
-          if (sectionIndex != null) {
-            var maxIdx =
-              this.drrSectionsCount > 0 ? this.drrSectionsCount - 1 : 0;
-            if (sectionIndex < 0) sectionIndex = 0;
-            if (sectionIndex > maxIdx) sectionIndex = maxIdx;
-          }
-        }
+    // ✅ Prioritas ke msg.section (format baru dari DRR)
+    if (rawSection === "start") {
+      normType = "start";
+    } else if (rawSection === "finish") {
+      normType = "finish";
+    } else if (rawSection.indexOf("gate") === 0) {
+      normType = "section";
+    } else {
+      // fallback lawas
+      if (rawType === "penaltystart") normType = "start";
+      else if (rawType === "penaltyfinish") normType = "finish";
+      else if (rawType === "penaltygates") normType = "section";
+      else if (rawType === "penaltiesupdated") normType = "section";
+      else return; // bukan tipe penalti yang diproses
+    }
 
-        // Ambil nilai penalti dari salah satu: timePen (string) → value (angka) → label (teks)
-        var timePenMaybe = msg && msg.timePen ? msg.timePen : null;
-        var valueMaybe = null;
-        if (msg && msg.value != null) valueMaybe = msg.value;
-        else if (msg && msg.penalty && msg.penalty.value != null)
-          valueMaybe = msg.penalty.value;
+    // --- Identitas tim ---
+    var teamId = null;
+    if (msg.teamId != null) teamId = msg.teamId;
 
-        var labelMaybe = null;
-        if (msg && msg.label) labelMaybe = msg.label;
-        else if (msg && msg.penalty && msg.penalty.label)
-          labelMaybe = msg.penalty.label;
+    var bib = null;
+    if (msg.bib != null) bib = msg.bib;
+    else if (msg.bibTeam != null) bib = msg.bibTeam;
 
-        var timeStr = this.coercePenaltyTimeStr(
-          timePenMaybe,
-          valueMaybe,
-          labelMaybe
-        );
-        if (!timeStr) return;
+    var teamName = "";
+    if (msg.teamName) teamName = msg.teamName;
 
-        // Terapkan ke UI (pakai updateTimePen agar semua perhitungan ikut jalan)
-        if (normType === "start") {
-          await this.updateTimePen(timeStr, team, "penaltyStartTime", null);
-        } else if (normType === "finish") {
-          await this.updateTimePen(timeStr, team, "penaltyFinishTime", null);
-        } else if (normType === "section") {
-          if (sectionIndex != null) {
-            await this.updateTimePen(
-              timeStr,
-              team,
-              "penaltySection",
-              sectionIndex
-            );
-          } else if (this.drrSectionsCount > 0) {
-            await this.updateTimePen(timeStr, team, "penaltySection", 0);
-          }
-        }
+    var rowIndex = null;
+    if (msg.rowIndex != null) rowIndex = msg.rowIndex;
 
-        // Info juri kalau ada
-        if (msg && msg.judge) {
-          if (!team.result) team.result = {};
-          team.result.judgesBy = String(msg.judge);
-        }
-        if (msg && msg.at) {
-          if (!team.result) team.result = {};
-          team.result.judgesTime = String(msg.at);
-        }
-      } catch (e) {
-        this.notifyError(e, "Apply penalty (direct) failed");
+    var team = this.resolveTeamByKey(teamId, bib, teamName, rowIndex);
+    if (!team) return;
+
+    // --- Section index untuk gate ---
+    var sectionIndex = null;
+    if (normType === "section") {
+      if (msg.gateIndex != null && !isNaN(Number(msg.gateIndex))) {
+        sectionIndex = Number(msg.gateIndex);
+      } else if (msg.index != null && !isNaN(Number(msg.index))) {
+        sectionIndex = Number(msg.index);
+      } else if (msg.gate != null && !isNaN(Number(msg.gate))) {
+        var gi = Number(msg.gate);
+        if (gi > 0) sectionIndex = gi - 1;
+        else sectionIndex = gi;
       }
-    },
+
+      if (sectionIndex != null) {
+        var maxIdx = 0;
+        if (this.drrSectionsCount > 0) maxIdx = this.drrSectionsCount - 1;
+        if (sectionIndex < 0) sectionIndex = 0;
+        if (sectionIndex > maxIdx) sectionIndex = maxIdx;
+      }
+    }
+
+    // --- Ambil nilai penalti ---
+    var timePenMaybe = null;
+    if (msg.timePen) timePenMaybe = msg.timePen;
+
+    var valueMaybe = null;
+    if (msg.value != null) valueMaybe = msg.value;
+    else if (msg.penalty && msg.penalty.value != null)
+      valueMaybe = msg.penalty.value;
+    else if (msg.penalty != null && typeof msg.penalty === "number")
+      valueMaybe = msg.penalty;
+
+    var labelMaybe = null;
+    if (msg.label) labelMaybe = msg.label;
+    else if (msg.penalty && msg.penalty.label) labelMaybe = msg.penalty.label;
+
+    var timeStr = this.coercePenaltyTimeStr(
+      timePenMaybe,
+      valueMaybe,
+      labelMaybe
+    );
+    if (!timeStr) return;
+
+    // --- Terapkan ke UI ---
+    if (normType === "start") {
+      await this.updateTimePen(timeStr, team, "penaltyStartTime", null);
+    } else if (normType === "finish") {
+      await this.updateTimePen(timeStr, team, "penaltyFinishTime", null);
+    } else if (normType === "section") {
+      if (sectionIndex != null) {
+        await this.updateTimePen(timeStr, team, "penaltySection", sectionIndex);
+      } else if (this.drrSectionsCount > 0) {
+        await this.updateTimePen(timeStr, team, "penaltySection", 0);
+      }
+    }
+
+    // --- Info juri ---
+    if (msg.judge) {
+      if (!team.result) team.result = {};
+      team.result.judgesBy = String(msg.judge);
+    }
+
+    if (msg.at) {
+      if (!team.result) team.result = {};
+      team.result.judgesTime = String(msg.at);
+    }
+  } catch (e) {
+    this.notifyError(e, "Apply penalty (direct) failed");
+  }
+},
 
     // ==== helper: cari tim by teamId / bib / teamName / rowIndex ====
     resolveTeamByKey(teamId, bib, teamName, rowIndex) {
@@ -1644,8 +1658,8 @@ console.log(msg.type,'<<')
         const bucket = getBucket();
 
         // const eventId = String(bucket.eventId || "");
-        const eventId = this.currentEventId
-        
+        const eventId = this.currentEventId;
+
         if (!eventId) return;
         // token untuk cegah balasan lama nindih
         const token = Date.now();
@@ -1660,7 +1674,7 @@ console.log(msg.type,'<<')
             const c = parseInt(res.settings.drr.totalSection, 10);
             if (Number.isFinite(c) && c > 0) count = c;
           }
-        
+
           this.applyDrrSectionCount(count);
         });
       } catch (err) {

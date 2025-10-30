@@ -984,8 +984,7 @@ export default {
 
         // Terapkan semua update dulu…
         for (const u of updates) {
-          console.log("HAHA", u),
-          await this.applyPenaltyFromSocketDirect(u);
+          console.log("HAHA", u), await this.applyPenaltyFromSocketDirect(u);
         }
 
         // …baru re-rank sekali (hemat render)
@@ -1008,156 +1007,397 @@ export default {
   },
   methods: {
     // ===== SOCKET: handler utama (langsung konsumsi format "custom:event") =====
-   async applyPenaltyFromSocketDirect(msg) {
-  try {
-    if (!msg) return;
+    async applyPenaltyFromSocketDirect(msg) {
+      try {
+        // --- identifikasi kunci tim ---
+        var key = "";
+        if (msg && msg.teamId != null) {
+          key = String(msg.teamId);
+        } else if (msg && (msg.bib != null || msg.bibTeam != null)) {
+          key = String(msg.bib != null ? msg.bib : msg.bibTeam);
+        } else if (msg && msg.teamName) {
+          key = String(msg.teamName);
+        }
+        if (!key) return false;
 
-    // --- Normalisasi tipe ---
-    var rawType = "";
-    if (msg.type) rawType = String(msg.type).toLowerCase();
+        // --- resolve team menggunakan helper (dapatkan index juga) ---
+        var resolved = this.resolveTeamByKey(
+          msg && msg.teamId != null ? msg.teamId : null,
+          msg && (msg.bib != null || msg.bibTeam != null)
+            ? msg.bib != null
+              ? msg.bib
+              : msg.bibTeam
+            : null,
+          msg && msg.teamName ? msg.teamName : null,
+          msg && msg.rowIndex != null ? msg.rowIndex : null
+        );
 
-    var rawSection = "";
-    if (msg.section) rawSection = String(msg.section).toLowerCase();
+        var team = resolved && resolved.team ? resolved.team : null;
+        var teamIndex = Number.isFinite(resolved && resolved.index)
+          ? resolved.index
+          : -1;
 
-    var normType = ""; // start | finish | section
+        // fallback: cari di this.participant (by _id/teamId) jika helper gagal
+        if (!team && Array.isArray(this.participant)) {
+          for (var pi = 0; pi < this.participant.length; pi++) {
+            var p = this.participant[pi] || {};
+            if (
+              String(p._id || "") === String(key) ||
+              String(p.teamId || "") === String(key)
+            ) {
+              team = p;
+              teamIndex = pi;
+              break;
+            }
+          }
+        }
 
-    // ✅ Prioritas ke msg.section (format baru dari DRR)
-    if (rawSection === "start") {
-      normType = "start";
-    } else if (rawSection === "finish") {
-      normType = "finish";
-    } else if (rawSection.indexOf("gate") === 0) {
-      normType = "section";
-    } else {
-      // fallback lawas
-      if (rawType === "penaltystart") normType = "start";
-      else if (rawType === "penaltyfinish") normType = "finish";
-      else if (rawType === "penaltygates") normType = "section";
-      else if (rawType === "penaltiesupdated") normType = "section";
-      else return; // bukan tipe penalti yang diproses
-    }
+        if (!team) return false;
 
-    // --- Identitas tim ---
-    var teamId = null;
-    if (msg.teamId != null) teamId = msg.teamId;
+        // --- tentukan sessionIdx (mirip behavior sebelumnya) ---
+        var sessionIdx = 0;
+        if (
+          this.selectedSession &&
+          team &&
+          team._id != null &&
+          this.selectedSession[String(team._id)] != null
+        ) {
+          var ch = this.selectedSession[String(team._id)];
+          if (Number.isFinite(ch)) sessionIdx = ch;
+        } else if (Number.isFinite(this.activeRun)) {
+          sessionIdx = this.activeRun;
+        }
 
-    var bib = null;
-    if (msg.bib != null) bib = msg.bib;
-    else if (msg.bibTeam != null) bib = msg.bibTeam;
+        // --- pastikan team.result ada & penaltySection inisialisasi ---
+        if (!team.result || typeof team.result !== "object") {
+          this.$set(team, "result", {
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            penaltyStartTime: "00:00:00.000",
+            penaltyFinishTime: "00:00:00.000",
+            penaltySection: [],
+            startPenalty: 0,
+            finishPenalty: 0,
+            sectionPenalty: 0,
+            totalPenalty: 0,
+            penaltyTime: "00:00:00.000",
+            totalTime: "",
+            ranked: "",
+            score: "",
+          });
+        }
 
-    var teamName = "";
-    if (msg.teamName) teamName = msg.teamName;
+        var need = 3;
+        if (
+          Number.isFinite(this.drrSectionsCount) &&
+          this.drrSectionsCount > 0
+        ) {
+          need = this.drrSectionsCount;
+        }
+        if (!Array.isArray(team.result.penaltySection)) {
+          this.$set(team.result, "penaltySection", []);
+        }
+        while (team.result.penaltySection.length < need) {
+          team.result.penaltySection.push("00:00:00.000");
+        }
+        if (team.result.penaltySection.length > need) {
+          team.result.penaltySection.length = need;
+        }
 
-    var rowIndex = null;
-    if (msg.rowIndex != null) rowIndex = msg.rowIndex;
+        // --- tentukan jenis penalti ---
+        var kind = "section";
+        if (msg && msg.type === "PenaltyStart") kind = "start";
+        else if (msg && msg.type === "PenaltyFinish") kind = "finish";
+        else {
+          if (msg && msg.section != null) {
+            var sraw = String(msg.section).trim();
+            var slow = sraw.toLowerCase();
+            if (slow === "start") kind = "start";
+            else if (slow === "finish") kind = "finish";
+            else kind = "section";
+          }
+        }
 
-    var team = this.resolveTeamByKey(teamId, bib, teamName, rowIndex);
-    if (!team) return;
+        // --- numeric value ---
+        var rawVal = 0;
+        if (msg && msg.penalty != null) rawVal = msg.penalty;
+        else if (msg && msg.value != null) rawVal = msg.value;
+        var ALLOWED = [0, 5, 10, 50];
+        var numericValue =
+          ALLOWED.indexOf(Number(rawVal)) >= 0 ? Number(rawVal) : 0;
 
-    // --- Section index untuk gate ---
-    var sectionIndex = null;
-    if (normType === "section") {
-      if (msg.gateIndex != null && !isNaN(Number(msg.gateIndex))) {
-        sectionIndex = Number(msg.gateIndex);
-      } else if (msg.index != null && !isNaN(Number(msg.index))) {
-        sectionIndex = Number(msg.index);
-      } else if (msg.gate != null && !isNaN(Number(msg.gate))) {
-        var gi = Number(msg.gate);
-        if (gi > 0) sectionIndex = gi - 1;
-        else sectionIndex = gi;
+        // --- map numeric -> time string ---
+        var timeStr = "";
+        if (
+          Array.isArray(this.dataPenalties) &&
+          this.dataPenalties.length > 0
+        ) {
+          for (var dpi = 0; dpi < this.dataPenalties.length; dpi++) {
+            var dp = this.dataPenalties[dpi];
+            if (dp && Number(dp.value) === numericValue) {
+              timeStr = String(dp.timePen || "");
+              break;
+            }
+          }
+        }
+        if (!timeStr && msg && msg.timePen) timeStr = String(msg.timePen);
+        if (!timeStr) {
+          if (typeof this.hhmmssFromSeconds === "function") {
+            timeStr = this.hhmmssFromSeconds(Number(numericValue));
+          } else {
+            var secs = Math.max(0, Math.floor(Number(numericValue) || 0));
+            var hh = Math.floor(secs / 3600);
+            var mm = Math.floor((secs % 3600) / 60);
+            var ss = secs % 60;
+            timeStr =
+              String(hh).padStart(2, "0") +
+              ":" +
+              String(mm).padStart(2, "0") +
+              ":" +
+              String(ss).padStart(2, "0") +
+              ".000";
+          }
+        }
+
+        // --- tentukan section index bila perlu ---
+        var sectionIdx = null;
+        if (kind === "section") {
+          if (msg && Number.isFinite(msg.gateIndex)) {
+            sectionIdx = msg.gateIndex;
+          } else if (msg && Number.isFinite(msg.gateNumber)) {
+            sectionIdx = Math.max(0, msg.gateNumber - 1);
+          } else if (msg && Number.isFinite(msg.gate)) {
+            sectionIdx = Math.max(0, msg.gate - 1);
+          } else if (msg && msg.section != null) {
+            var sr = String(msg.section).trim();
+            var m = sr.match(/^[sS]ection\s*(\d+)$/);
+            if (m && m[1]) sectionIdx = Math.max(0, parseInt(m[1], 10) - 1);
+            else if (/^\d+$/.test(sr))
+              sectionIdx = Math.max(0, parseInt(sr, 10) - 1);
+            else sectionIdx = null;
+          }
+        }
+
+        // --- apply to team.result (string times) ---
+        var changed = false;
+        if (kind === "start") {
+          var cur = team.result.penaltyStartTime || "";
+          if (cur !== timeStr) {
+            this.$set(team.result, "penaltyStartTime", timeStr);
+            changed = true;
+          }
+        } else if (kind === "finish") {
+          var curf = team.result.penaltyFinishTime || "";
+          if (curf !== timeStr) {
+            this.$set(team.result, "penaltyFinishTime", timeStr);
+            changed = true;
+          }
+        } else {
+          if (
+            !Number.isFinite(sectionIdx) ||
+            sectionIdx < 0 ||
+            sectionIdx >= need
+          ) {
+            return false;
+          }
+          var cursec =
+            (team.result.penaltySection &&
+              team.result.penaltySection[sectionIdx]) ||
+            "";
+          if (cursec !== timeStr) {
+            this.$set(team.result.penaltySection, sectionIdx, timeStr);
+            changed = true;
+          }
+        }
+
+        if (!changed) return false;
+
+        // --- recalc numeric penalties dari time strings ---
+        var startPenalty = 0;
+        var finishPenalty = 0;
+        var sectionPenalty = 0;
+        if (team.result.penaltyStartTime) {
+          startPenalty = this.timeToPenaltyValue(
+            team.result.penaltyStartTime || "00:00:00.000"
+          );
+        }
+        if (team.result.penaltyFinishTime) {
+          finishPenalty = this.timeToPenaltyValue(
+            team.result.penaltyFinishTime || "00:00:00.000"
+          );
+        }
+        var secArr = Array.isArray(team.result.penaltySection)
+          ? team.result.penaltySection
+          : [];
+        for (var sidx = 0; sidx < secArr.length; sidx++) {
+          sectionPenalty += this.timeToPenaltyValue(
+            secArr[sidx] || "00:00:00.000"
+          );
+        }
+        var totalPenalty =
+          Number(startPenalty || 0) +
+          Number(finishPenalty || 0) +
+          Number(sectionPenalty || 0);
+
+        this.$set(team.result, "startPenalty", startPenalty);
+        this.$set(team.result, "finishPenalty", finishPenalty);
+        this.$set(team.result, "sectionPenalty", sectionPenalty);
+        this.$set(team.result, "totalPenalty", totalPenalty);
+
+        // --- hitung total penalty time (string) ---
+        var totalPenaltyTime = "00:00:00.000";
+        var fields = [];
+        fields.push(team.result.penaltyStartTime || "00:00:00.000");
+        fields.push(team.result.penaltyFinishTime || "00:00:00.000");
+        for (var fi = 0; fi < secArr.length; fi++)
+          fields.push(secArr[fi] || "00:00:00.000");
+
+        for (var gi = 0; gi < fields.length; gi++) {
+          var p = String(fields[gi] || "00:00:00.000");
+          if (p.charAt(0) === "-") {
+            var plus = p.replace("-", "");
+            totalPenaltyTime = await this.kurangiWaktu(totalPenaltyTime, plus);
+          } else {
+            totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, p);
+          }
+        }
+
+        this.$set(team.result, "penaltyTime", totalPenaltyTime);
+        this.$set(team.result, "totalPenaltyTime", totalPenaltyTime);
+
+        // --- update totalTime apabila raceTime ada ---
+        if (team.result.raceTime) {
+          var tot = await this.tambahWaktu(
+            team.result.raceTime,
+            totalPenaltyTime
+          );
+          this.$set(team.result, "totalTime", tot);
+        }
+
+        // --- sinkron ke sessions supaya session summary konsisten ---
+        if (!Array.isArray(team.sessions)) this.$set(team, "sessions", []);
+        if (!team.sessions[sessionIdx]) {
+          this.$set(team.sessions, sessionIdx, {
+            startPenalty: 0,
+            penalties: [],
+            finishPenalty: 0,
+            totalPenalty: 0,
+            penaltyTime: "00:00:00.000",
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            totalTime: "",
+            ranked: 0,
+            score: 0,
+            penaltySection: [],
+          });
+        }
+        var sObj = team.sessions[sessionIdx];
+
+        this.$set(sObj, "startPenalty", Number(team.result.startPenalty || 0));
+        this.$set(
+          sObj,
+          "finishPenalty",
+          Number(team.result.finishPenalty || 0)
+        );
+        this.$set(sObj, "totalPenalty", Number(team.result.totalPenalty || 0));
+        if (!Array.isArray(sObj.penalties)) sObj.penalties = [];
+        if (!Array.isArray(sObj.penaltySection)) sObj.penaltySection = [];
+        while (sObj.penalties.length < need) sObj.penalties.push(0);
+        while (sObj.penaltySection.length < need)
+          sObj.penaltySection.push("00:00:00.000");
+        for (var zi = 0; zi < need; zi++) {
+          this.$set(
+            sObj.penalties,
+            zi,
+            Number(
+              this.timeToPenaltyValue(
+                team.result.penaltySection[zi] || "00:00:00.000"
+              ) || 0
+            )
+          );
+          this.$set(
+            sObj.penaltySection,
+            zi,
+            team.result.penaltySection[zi] || "00:00:00.000"
+          );
+        }
+        this.$set(
+          sObj,
+          "penaltyTime",
+          team.result.penaltyTime || "00:00:00.000"
+        );
+        this.$set(sObj, "totalTime", team.result.totalTime || sObj.totalTime);
+
+        // --- akhir: set edit flag + re-rank ---
+        this.editResult = true;
+        if (typeof this.assignRanks === "function") {
+          await this.assignRanks(this.participant);
+        }
+        if (typeof this.checkEndGameStatus === "function")
+          this.checkEndGameStatus();
+        if (typeof this.$forceUpdate === "function") this.$forceUpdate();
+
+        return true;
+      } catch (err) {
+        console.warn("applyPenaltyFromSocketDirect DRR error:", err);
+        return false;
       }
-
-      if (sectionIndex != null) {
-        var maxIdx = 0;
-        if (this.drrSectionsCount > 0) maxIdx = this.drrSectionsCount - 1;
-        if (sectionIndex < 0) sectionIndex = 0;
-        if (sectionIndex > maxIdx) sectionIndex = maxIdx;
-      }
-    }
-
-    // --- Ambil nilai penalti ---
-    var timePenMaybe = null;
-    if (msg.timePen) timePenMaybe = msg.timePen;
-
-    var valueMaybe = null;
-    if (msg.value != null) valueMaybe = msg.value;
-    else if (msg.penalty && msg.penalty.value != null)
-      valueMaybe = msg.penalty.value;
-    else if (msg.penalty != null && typeof msg.penalty === "number")
-      valueMaybe = msg.penalty;
-
-    var labelMaybe = null;
-    if (msg.label) labelMaybe = msg.label;
-    else if (msg.penalty && msg.penalty.label) labelMaybe = msg.penalty.label;
-
-    var timeStr = this.coercePenaltyTimeStr(
-      timePenMaybe,
-      valueMaybe,
-      labelMaybe
-    );
-    if (!timeStr) return;
-
-    // --- Terapkan ke UI ---
-    if (normType === "start") {
-      await this.updateTimePen(timeStr, team, "penaltyStartTime", null);
-    } else if (normType === "finish") {
-      await this.updateTimePen(timeStr, team, "penaltyFinishTime", null);
-    } else if (normType === "section") {
-      if (sectionIndex != null) {
-        await this.updateTimePen(timeStr, team, "penaltySection", sectionIndex);
-      } else if (this.drrSectionsCount > 0) {
-        await this.updateTimePen(timeStr, team, "penaltySection", 0);
-      }
-    }
-
-    // --- Info juri ---
-    if (msg.judge) {
-      if (!team.result) team.result = {};
-      team.result.judgesBy = String(msg.judge);
-    }
-
-    if (msg.at) {
-      if (!team.result) team.result = {};
-      team.result.judgesTime = String(msg.at);
-    }
-  } catch (e) {
-    this.notifyError(e, "Apply penalty (direct) failed");
-  }
-},
+    },
 
     // ==== helper: cari tim by teamId / bib / teamName / rowIndex ====
+    // ==== helper: cari tim by teamId / bib / teamName / rowIndex ====
+    // returns { team: <object> or null, index: <number> or -1 }
     resolveTeamByKey(teamId, bib, teamName, rowIndex) {
       var arr = this.participantArr || [];
-
-      if (Number.isFinite(Number(rowIndex)) && arr[Number(rowIndex)]) {
-        return arr[Number(rowIndex)];
+      // try rowIndex first (explicit)
+      if (rowIndex != null) {
+        var ri = Number(rowIndex);
+        if (Number.isFinite(ri) && arr[ri]) {
+          return { team: arr[ri], index: ri };
+        }
       }
 
+      // prefer exact _id or teamId match (scan through arr)
       var tid = teamId != null ? String(teamId).trim() : "";
       if (tid) {
-        var byId = arr.find(function (t) {
-          return String(t.teamId || "") === tid;
-        });
-        if (byId) return byId;
+        for (var i = 0; i < arr.length; i++) {
+          var t = arr[i] || {};
+          // compare both _id and teamId (some records use _id, some use teamId)
+          if (
+            String(t._id || "").trim() === tid ||
+            String(t.teamId || "").trim() === tid
+          ) {
+            return { team: t, index: i };
+          }
+        }
       }
 
+      // match by bib
       var bb = bib != null ? String(bib).trim() : "";
       if (bb) {
-        var byBib = arr.find(function (t) {
-          return String(t.bibTeam || "") === bb;
-        });
-        if (byBib) return byBib;
+        for (var j = 0; j < arr.length; j++) {
+          var tt = arr[j] || {};
+          if (String(tt.bibTeam || "").trim() === bb) {
+            return { team: tt, index: j };
+          }
+        }
       }
 
+      // match by name (case-insensitive)
       var nm = teamName ? String(teamName).trim().toUpperCase() : "";
       if (nm) {
-        var byName = arr.find(function (t) {
-          return String(t.nameTeam || "").toUpperCase() === nm;
-        });
-        if (byName) return byName;
+        for (var k = 0; k < arr.length; k++) {
+          var tx = arr[k] || {};
+          if (String(tx.nameTeam || "").toUpperCase() === nm) {
+            return { team: tx, index: k };
+          }
+        }
       }
 
-      return null;
+      // not found
+      return { team: null, index: -1 };
     },
 
     // ==== helper: jadikan "HH:MM:SS.mmm" dari timePen/value/label ====

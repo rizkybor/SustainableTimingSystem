@@ -533,6 +533,7 @@ import EmptyCard from "@/components/cards/card-empty.vue";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 function getBucket() {
@@ -871,6 +872,8 @@ export default {
     },
   },
 async mounted() {
+    const audio = new Audio(tone);
+
   await this.loadDataScore("DRR");
   await this.loadDataPenalties("DRR");
 
@@ -917,9 +920,26 @@ async mounted() {
       if (msg.senderId && this.selfSocketId && msg.senderId === this.selfSocketId) return;
       if (!isSameEvent(msg)) return;
 
+      // notifikasi realtime + audio
+      if (this.$bvToast && msg.text) {
+        try {
+          audio.currentTime = 0;
+          audio.play();
+        } catch {}
+        this.$bvToast.toast(
+          (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+          {
+            title: "Pesan Realtime",
+            variant: "success",
+            solid: true,
+          }
+        );
+      }
+console.log(msg.type,'<<')
       // Normalisasi tipe lama → baru (opsional)
       if (msg.type === "PenaltiesUpdated") {
         const gt = String(msg.gate || "").trim().toLowerCase();
+        console.log(gt,'<<< cek')
         if (gt === "start" || gt === "s" || gt === "st") msg.type = "PenaltyStart";
         else if (gt === "finish" || gt === "f" || gt === "fin") msg.type = "PenaltyFinish";
         else msg.type = "PenaltyGates";

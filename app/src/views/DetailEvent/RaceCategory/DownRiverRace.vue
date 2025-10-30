@@ -315,7 +315,7 @@
                           Select Penalty Start Time
                         </option>
                         <option
-                          v-for="p in dataPenalties"
+                          v-for="p in penaltiesStartFinish"
                           :key="p.value"
                           :value="p.timePen"
                         >
@@ -369,7 +369,7 @@
                           Select Penalty Finish Time
                         </option>
                         <option
-                          v-for="p in dataPenalties"
+                          v-for="p in penaltiesStartFinish"
                           :key="p.value"
                           :value="p.timePen"
                         >
@@ -781,6 +781,21 @@ export default {
     };
   },
   computed: {
+    // Opsi yang hanya boleh dipakai untuk Start & Finish
+  penaltiesStartFinish() {
+    if (!Array.isArray(this.dataPenalties)) return [];
+    const allowed = new Set([0, 10, 50]);
+    return this.dataPenalties.filter(function (p) {
+      return p && allowed.has(Number(p.value));
+    });
+  },
+
+  // Opsi lengkap untuk Section (boleh pakai langsung dataPenalties,
+  // tapi ini safe fallback jadi tetap array)
+  penaltiesSection() {
+    if (!Array.isArray(this.dataPenalties)) return [];
+    return this.dataPenalties.slice();
+  },
     hasEventLogo() {
       var ev = this.dataEventSafe || {};
       var logos = ev.eventFiles;

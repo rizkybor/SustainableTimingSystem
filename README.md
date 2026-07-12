@@ -12,5 +12,15 @@ install packages : yarn install
 
 install vue-router : yarn vue-router@2
 
-serve : yarn electron:serve
+Start System on dev
 
+Start mongo DB on terminal
+-brew services start mongodb/brew/mongodb-community
+-brew services stop mongodb/brew/mongodb-community
+
+Connect mongodb compass
+-open mongodb compass
+-connect
+
+Run on terminal in folder app
+serve : yarn electron:serve

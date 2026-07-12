@@ -1,7 +1,7 @@
 "use strict";
 
 import { app, protocol, BrowserWindow, ipcMain, nativeImage, screen } from "electron";
-import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
+import createProtocol from "vue-cli-plugin-electron-builder/lib/createProtocol";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 import path from "path";
 import { pathToFileURL } from "url";

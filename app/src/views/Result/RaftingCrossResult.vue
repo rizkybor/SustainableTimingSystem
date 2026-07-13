@@ -68,6 +68,25 @@
         >
           <Icon icon="mdi:table-large" class="mr-2" /> View Overall
         </b-button>
+
+        <b-button
+          variant="outline-secondary"
+          class="action-btn"
+          :disabled="loading"
+          @click="generateBracketPdf"
+        >
+          <Icon icon="mdi:sitemap" class="mr-2" /> Print Bracket
+        </b-button>
+
+        <b-button
+          variant="outline-secondary"
+          class="action-btn"
+          :disabled="loading"
+          @click="generateAllOverallPdf"
+        >
+          <Icon icon="mdi:trophy-outline" class="mr-2" /> Print Overall (All
+          Categories)
+        </b-button>
       </div>
     </div>
 
@@ -199,6 +218,73 @@
       </section>
     </vue-html2pdf>
 
+    <vue-html2pdf
+      v-if="showBracketPdf"
+      ref="bracketHtml2Pdf"
+      :show-layout="false"
+      :float-layout="false"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :pdf-quality="2"
+      :filename="bracketPdfFilename"
+      pdf-format="a4"
+      pdf-orientation="landscape"
+      pdf-content-width="100%"
+      style="
+        position: absolute;
+        left: -99999px;
+        top: 0;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      "
+      @pdfGenerated="onBracketPdfGenerated"
+      @beforeDownload="onBeforeDownload"
+    >
+      <section slot="pdf-content">
+        <RaftingCrossByBracketPdf
+          :data="pdfEventData"
+          :bracket="bracketDoc"
+          :isOfficial="isOfficial"
+          :rxCats="rxCats"
+        />
+      </section>
+    </vue-html2pdf>
+
+    <vue-html2pdf
+      v-if="showAllOverallPdf"
+      ref="allOverallHtml2Pdf"
+      :show-layout="false"
+      :float-layout="false"
+      :enable-download="true"
+      :preview-modal="false"
+      :paginate-elements-by-height="1400"
+      :pdf-quality="2"
+      :filename="allOverallPdfFilename"
+      pdf-format="a4"
+      pdf-orientation="landscape"
+      pdf-content-width="100%"
+      style="
+        position: absolute;
+        left: -99999px;
+        top: 0;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      "
+      @pdfGenerated="onAllOverallPdfGenerated"
+      @beforeDownload="onBeforeDownload"
+    >
+      <section slot="pdf-content">
+        <RaftingCrossOverallPdf
+          :data="pdfEventData"
+          :categories="allCategoriesOverall"
+          :isOfficial="isOfficial"
+        />
+      </section>
+    </vue-html2pdf>
+
     <PrintOverallModal
       centered
       :show="showOverallModal"
@@ -213,6 +299,8 @@
 <script>
 import { ipcRenderer } from "electron";
 import RaftingCrossPdf from "../DetailEvent/ResultComponent/rafting-cross-pdfResult.vue";
+import RaftingCrossByBracketPdf from "../DetailEvent/ResultComponent/RaftingCross/by-bracket-pdfResult.vue";
+import RaftingCrossOverallPdf from "../DetailEvent/ResultComponent/RaftingCross/overall-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
@@ -236,6 +324,8 @@ export default {
     Icon,
     EmptyStateFull,
     RaftingCrossPdf,
+    RaftingCrossByBracketPdf,
+    RaftingCrossOverallPdf,
     VueHtml2pdf,
     PrintOverallModal,
   },
@@ -251,6 +341,10 @@ export default {
       eventInfo: {},
       showOverallModal: false,
       dataAggregate: null,
+      bracketDoc: [],
+      allCategoriesOverall: [],
+      showBracketPdf: false,
+      showAllOverallPdf: false,
     };
   },
   computed: {
@@ -303,6 +397,30 @@ export default {
     },
     pdfEventData() {
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+    },
+    bracketPdfFilename() {
+      const parts = [];
+      if (this.eventInfo && this.eventInfo.eventName) {
+        parts.push(this.eventInfo.eventName);
+      }
+      parts.push(
+        "RAFTING CROSS BRACKET (" +
+          (this.rxCats.initial || "-") +
+          " - " +
+          (this.rxCats.division || "-") +
+          " " +
+          (this.rxCats.race || "-") +
+          ")"
+      );
+      return parts.join(" - ");
+    },
+    allOverallPdfFilename() {
+      const parts = [];
+      if (this.eventInfo && this.eventInfo.eventName) {
+        parts.push(this.eventInfo.eventName);
+      }
+      parts.push("RAFTING CROSS OVERALL - ALL CATEGORIES");
+      return parts.join(" - ");
     },
     pdfCategories() {
       const payload = safeParse(
@@ -547,6 +665,127 @@ export default {
     onBeforeDownload() {},
     onPdfGenerated() {
       this.showPdf = false;
+    },
+
+    // bucket kategori RX yang sedang dibuka (dipakai untuk bracket & overall lintas kategori)
+    resolveBucket() {
+      const q = this.$route.query || {};
+      const payload = safeParse(
+        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      return {
+        eventId: String(q.eventId || b.eventId || ""),
+        initialId: String(q.initialId || b.initialId || ""),
+        raceId: String(q.raceId || b.raceId || ""),
+        divisionId: String(q.divisionId || b.divisionId || ""),
+      };
+    },
+
+    async loadBracketDoc() {
+      const bucket = this.resolveBucket();
+      if (
+        !bucket.eventId ||
+        !bucket.initialId ||
+        !bucket.raceId ||
+        !bucket.divisionId
+      ) {
+        this.bracketDoc = [];
+        return;
+      }
+      if (typeof ipcRenderer === "undefined") return;
+
+      await new Promise((resolve) => {
+        ipcRenderer.once("rx:bracket:get-reply", (_e, res) => {
+          this.bracketDoc =
+            res && res.ok && res.item && Array.isArray(res.item.rounds)
+              ? res.item.rounds
+              : [];
+          resolve();
+        });
+        ipcRenderer.send("rx:bracket:get", bucket);
+      });
+    },
+
+    async loadAllCategoriesOverall() {
+      const bucket = this.resolveBucket();
+      if (!bucket.eventId || typeof ipcRenderer === "undefined") {
+        this.allCategoriesOverall = [];
+        return;
+      }
+
+      await new Promise((resolve) => {
+        ipcRenderer.once("rx:overalls:byEvent-reply", (_e, res) => {
+          const items = res && res.ok && Array.isArray(res.items) ? res.items : [];
+          const mapped = items.map((doc) => {
+            const b = doc.bucket || {};
+            const placements = Array.isArray(doc.placements)
+              ? doc.placements
+              : [];
+            const podium = {
+              gold: placements.find((p) => p.overallRank === 1) || null,
+              silver: placements.find((p) => p.overallRank === 2) || null,
+              bronze: placements.find((p) => p.overallRank === 3) || null,
+              fourth: placements.find((p) => p.overallRank === 4) || null,
+            };
+            const rows = Array.isArray(doc.overallRows)
+              ? doc.overallRows
+                  .slice()
+                  .sort((a, b2) => (a.ranked || 999) - (b2.ranked || 999))
+              : [];
+            return {
+              initialName: b.initialName || "-",
+              raceName: b.raceName || "-",
+              divisionName: b.divisionName || "-",
+              podium,
+              rows,
+            };
+          });
+          mapped.sort((a, b2) => {
+            const ka = `${a.divisionName}|${a.raceName}|${a.initialName}`;
+            const kb = `${b2.divisionName}|${b2.raceName}|${b2.initialName}`;
+            return ka.localeCompare(kb);
+          });
+          this.allCategoriesOverall = mapped;
+          resolve();
+        });
+        ipcRenderer.send("rx:overalls:byEvent", bucket.eventId);
+      });
+    },
+
+    async generateBracketPdf() {
+      try {
+        await this.loadBracketDoc();
+        this.showBracketPdf = true;
+        await this.$nextTick();
+        const inst = this.$refs.bracketHtml2Pdf;
+        if (!inst) return logger.warn("ref bracketHtml2Pdf tidak ditemukan");
+        await new Promise((r) => setTimeout(r, 200));
+        await inst.generatePdf();
+      } catch (e) {
+        this.error = "Gagal membuat PDF bracket";
+      }
+    },
+    onBracketPdfGenerated() {
+      this.showBracketPdf = false;
+    },
+
+    async generateAllOverallPdf() {
+      try {
+        await this.loadAllCategoriesOverall();
+        this.showAllOverallPdf = true;
+        await this.$nextTick();
+        const inst = this.$refs.allOverallHtml2Pdf;
+        if (!inst) return logger.warn("ref allOverallHtml2Pdf tidak ditemukan");
+        await new Promise((r) => setTimeout(r, 200));
+        await inst.generatePdf();
+      } catch (e) {
+        this.error = "Gagal membuat PDF overall semua kategori";
+      }
+    },
+    onAllOverallPdfGenerated() {
+      this.showAllOverallPdf = false;
     },
   },
 };

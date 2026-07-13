@@ -218,7 +218,11 @@ async function upsertOverall(bucket, overallPkg = {}) {
       eventId: String(bucket.eventId || ""),
       initialId: String(bucket.initialId || ""),
       raceId: String(bucket.raceId || ""),
-      divisionId: String(bucket.divisionId || "")
+      divisionId: String(bucket.divisionId || ""),
+      eventName: String(bucket.eventName || "RX"),
+      initialName: String(bucket.initialName || ""),
+      raceName: String(bucket.raceName || ""),
+      divisionName: String(bucket.divisionName || "")
     },
     placements: Array.isArray(overallPkg.placements) ? overallPkg.placements : [],
     finalRows: Array.isArray(overallPkg.finalRows) ? overallPkg.finalRows : [],
@@ -244,11 +248,38 @@ async function getOverall(bucket) {
   return { ok: true, item };
 }
 
+/** =========================================
+ *  EVENT-WIDE QUERIES (semua kategori RX pada 1 event)
+ *  ========================================= */
+async function getBracketsByEventId(eventId) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const items = await db
+    .collection(COL_BRACKETS)
+    .find({ "bucket.eventId": String(eventId || "") })
+    .toArray();
+  return { ok: true, items };
+}
+
+async function getOverallsByEventId(eventId) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const items = await db
+    .collection(COL_OVERALL)
+    .find({ "bucket.eventId": String(eventId || "") })
+    .toArray();
+  return { ok: true, items };
+}
+
 module.exports = {
   upsertBracket,
   getBracket,
   upsertHeatRows,
   upsertAllRounds,
   upsertOverall,
-  getOverall
+  getOverall,
+  getBracketsByEventId,
+  getOverallsByEventId
 };

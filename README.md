@@ -24,3 +24,6 @@ Connect mongodb compass
 
 Run on terminal in folder app
 serve : yarn electron:serve
+
+yarn electron:build (.dmg)
+yarn electron:build --win --x64 (.exe)

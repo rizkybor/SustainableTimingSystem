@@ -249,15 +249,6 @@
               </button>
 
               <button
-                v-if="visibleParticipants && visibleParticipants.length"
-                class="btn-action btn-outline-danger"
-                @click="clearFirstRoundAssignments"
-                v-b-tooltip.hover="'Kosongkan ronde pertama'"
-              >
-                <Icon icon="mdi:eraser-variant" class="mr-1" /> Clear First
-              </button>
-
-              <button
                 v-if="
                   (visibleParticipants && visibleParticipants.length) ||
                   currentRound == 'Semifinals'
@@ -270,19 +261,13 @@
               </button>
 
               <button
-                class="btn-action"
-                :class="
-                  editBracketTeams ? 'btn-success' : 'btn-outline-success'
-                "
-                @click="editBracketTeams = !editBracketTeams"
-                v-b-tooltip.hover="
-                  editBracketTeams
-                    ? 'Bracket edit finished'
-                    : 'The first round bracket edit'
-                "
+                v-if="currentRound && !currentRound.bronze"
+                class="btn-action btn-outline-success"
+                @click="advanceToNextRound"
+                v-b-tooltip.hover="'Pindahkan semua pemenang babak ini ke babak berikutnya'"
               >
-                <Icon icon="mdi:pencil-outline" class="mr-1" />
-                {{ editBracketTeams ? "Done" : "Edit Bracket" }}
+                <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
+                Advance to Next Round
               </button>
             </div>
           </div>
@@ -344,6 +329,23 @@
               <span class="bracket__round-title">{{ round.name }}</span>
             </div>
 
+            <!-- Tim yang belum punya nomor Heat / belum berpasangan -->
+            <div class="bracket__pool" v-if="round.pool && round.pool.length">
+              <div class="bracket__pool-title">
+                <Icon icon="mdi:timer-sand" class="mr-1" />
+                Menunggu Heat ({{ round.pool.length }})
+              </div>
+              <div class="bracket__pool-list">
+                <span
+                  class="bracket__pool-chip"
+                  v-for="(t, tIdx) in round.pool"
+                  :key="'pool-' + rIdx + '-' + tIdx"
+                >
+                  {{ t.name }}
+                </span>
+              </div>
+            </div>
+
             <div class="bracket__list">
               <div
                 v-for="(m, mIdx) in round.matches"
@@ -351,42 +353,23 @@
                 class="bracket__match"
                 :aria-label="`Match ${m.id}`"
               >
-                <div class="bracket__winner" v-if="m.winner && m.winner.name">
-                  <Icon icon="mdi:trophy-variant-outline" />
-                  <span class="ml-1">{{ m.winner.name }}</span>
+                <div class="bracket__heat" v-if="m.heat">Heat {{ m.heat }}</div>
+                <div
+                  class="bracket__winner"
+                  :class="{ 'bracket__winner--bye': m.bye }"
+                  v-if="m.winner && m.winner.name"
+                >
+                  <Icon :icon="m.bye ? 'mdi:transfer-right' : 'mdi:trophy-variant-outline'" />
+                  <span class="ml-1"
+                    >{{ m.winner.name }}{{ m.bye ? " — BYE, menunggu babak berikutnya" : "" }}</span
+                  >
                 </div>
                 <!-- Team 1 -->
                 <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
                   <div class="bracket__team-main">
-                    <span class="bracket__seed" v-if="m.team1.seed">{{
-                      m.team1.seed
-                    }}</span>
-                    <span
-                      class="bracket__name"
-                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                    >
-                      {{ m.team1.name || "—" }}
+                    <span class="bracket__name">
+                      {{ m.team1.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
                     </span>
-
-                    <!-- Editor slot Team 1 (ronde pertama saja) -->
-                    <div v-else class="w-100">
-                      <b-form-select
-                        :value="m.team1.__pid || ''"
-                        @change="setTeamAtFirstRound(mIdx, 'team1', $event)"
-                        class="w-100"
-                      >
-                        <option :value="''">— pilih tim —</option>
-                        <option
-                          v-for="opt in availableTeamOptions(
-                            m.team1 && m.team1.__pid
-                          )"
-                          :key="'t1-' + opt.id"
-                          :value="opt.id"
-                        >
-                          {{ opt.label }}
-                        </option>
-                      </b-form-select>
-                    </div>
                   </div>
                   <span class="bracket__score" v-if="m.score1 != null">{{
                     m.score1
@@ -399,35 +382,9 @@
                 <!-- Team 2 -->
                 <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
                   <div class="bracket__team-main">
-                    <span class="bracket__seed" v-if="m.team2.seed">{{
-                      m.team2.seed
-                    }}</span>
-                    <span
-                      class="bracket__name"
-                      v-if="!editBracketTeams || rIdx !== firstRoundIndex"
-                    >
-                      {{ m.team2.name || "—" }}
+                    <span class="bracket__name">
+                      {{ m.team2.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
                     </span>
-
-                    <!-- Editor slot Team 2 (ronde pertama saja) -->
-                    <div v-else class="w-100">
-                      <b-form-select
-                        :value="m.team2.__pid || ''"
-                        @change="setTeamAtFirstRound(mIdx, 'team2', $event)"
-                        class="w-100"
-                      >
-                        <option :value="''">— pilih tim —</option>
-                        <option
-                          v-for="opt in availableTeamOptions(
-                            m.team2 && m.team2.__pid
-                          )"
-                          :key="'t2-' + opt.id"
-                          :value="opt.id"
-                        >
-                          {{ opt.label }}
-                        </option>
-                      </b-form-select>
-                    </div>
                   </div>
                   <span class="bracket__score" v-if="m.score2 != null">{{
                     m.score2
@@ -441,49 +398,20 @@
                     v-if="m.team1.name && m.team2.name"
                   >
                     <button
-                      v-if="!editBracketTeams"
                       class="btn-action btn-xs btn-outline-success"
-                      @click="advanceWinner(rIdx, mIdx, 1)"
+                      @click="declareMatchWinner(round, mIdx, 1)"
                       title="Set winner: top"
-                      :disabled="editBracketTeams"
                     >
                       <Icon icon="mdi:crown-outline" /> Top Win
                     </button>
                     <button
-                      v-if="!editBracketTeams"
                       class="btn-action btn-xs btn-outline-primary"
-                      @click="advanceWinner(rIdx, mIdx, 2)"
+                      @click="declareMatchWinner(round, mIdx, 2)"
                       title="Set winner: bottom"
-                      :disabled="editBracketTeams"
                     >
                       <Icon icon="mdi:crown-outline" /> Bottom Win
                     </button>
                   </div>
-
-                  <!-- Toggle BYE (hanya saat edit tim) -->
-                  <button
-                    v-if="
-                      editBracketTeams &&
-                      !['Final A', 'Final B', 'Semifinals'].includes(
-                        (round.name || '').trim()
-                      )
-                    "
-                    class="btn-action btn-xs btn-outline-dark"
-                    @click="toggleBye(rIdx, mIdx)"
-                    :title="
-                      round.matches[mIdx] && round.matches[mIdx].bye
-                        ? 'Batalkan BYE'
-                        : 'Set BYE'
-                    "
-                  >
-                    <Icon icon="mdi:transfer-right" />
-                    {{
-                      round.matches[mIdx] && round.matches[mIdx].bye
-                        ? "Un-BYE"
-                        : "Set BYE"
-                    }}
-                    {{ round.name }}
-                  </button>
                 </div>
               </div>
               <!-- /match -->
@@ -1084,9 +1012,10 @@ import { Icon } from "@iconify/vue2";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
-const MAX_HEAT_NUMBER = 24;
-const HEAT_GLOBAL_KEY = "h2hHeatUsage:page"; // session-scoped
-const HEAT_GLOBAL_LIMIT = 2; // tiap nomor dipakai max 2 tim
+// setiap nomor heat hanya boleh dipakai oleh maksimal 2 tim (1 match) —
+// 2 tim yang berbagi nomor Heat yang sama OTOMATIS jadi lawan satu sama lain
+// (lihat syncMatchesFromHeat()), divalidasi di onHeatChanged()
+const HEAT_MAX_TEAMS = 2;
 const SHOW_BRACKET_KEY = "h2h:ui:showBracket";
 
 function safeParse(str, fallback) {
@@ -1095,28 +1024,6 @@ function safeParse(str, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function readGlobalHeatUsage() {
-  try {
-    const raw = sessionStorage.getItem(HEAT_GLOBAL_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeGlobalHeatUsage(obj) {
-  sessionStorage.setItem(HEAT_GLOBAL_KEY, JSON.stringify(obj || {}));
-}
-
-// tambah/kurang 1 untuk nomor heat tertentu
-function bumpGlobalHeat(heat, delta) {
-  const usage = readGlobalHeatUsage();
-  const h = Number(heat);
-  if (!Number.isFinite(h) || h <= 0) return;
-  usage[h] = Math.max(0, (usage[h] || 0) + (Number(delta) || 0));
-  writeGlobalHeatUsage(usage);
 }
 
 // gabungkan kunci unik berdasar bucket (event/initial/race/division)
@@ -1293,20 +1200,6 @@ function loadRaceStartPayloadForH2H() {
   return { bucket };
 }
 
-// === SEED GLOBAL HEAT USAGE DARI DATA YANG SUDAH ADA ===
-function seedGlobalHeatFromList(list, { reset = false } = {}) {
-  const usage = reset ? {} : readGlobalHeatUsage();
-  (list || []).forEach((p) => {
-    const h = p && p.result && Number(p.result.heat);
-    if (Number.isFinite(h) && h > 0) {
-      usage[h] = (usage[h] || 0) + 1;
-      // simpan sebagai prev agar onHeatChanged tidak salah hitung
-      p.__prevHeat = h;
-    }
-  });
-  writeGlobalHeatUsage(usage);
-}
-
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
@@ -1351,7 +1244,6 @@ export default {
         fourth: null, // Juara 4
       },
       currentRoundIndex: -1,
-      editBracketTeams: false,
       rounds: [],
       showBronze: true,
       editForm: "",
@@ -1521,49 +1413,12 @@ export default {
       });
       return map;
     },
-    // ... (computed lain tetap)
-    allHeatChoices() {
-      const usage = readGlobalHeatUsage();
-      const maxUsed = Math.max(0, ...Object.keys(usage).map(Number));
-      const cap = Math.max(MAX_HEAT_NUMBER, maxUsed + 4); // kasih spare 3-4 nomor
-      return Array.from({ length: cap }, (_, i) => i + 1);
-    },
     penaltyChoices() {
       // opsi untuk semua dropdown penalty (S, CL, R1, R2, L1, L2, PB, F)
       // ambil dari dataPenalties supaya satu sumber data
       return (this.dataPenalties || []).map((p) => ({
         value: Number(p.value) || 0,
         text: `${p.label} (${p.value}s)`,
-      }));
-    },
-    globalHeatOffsets() {
-      // offset heat kumulatif per round index (hanya round kompetitif; bronze ikut offset berjalan)
-      let offset = 0;
-      const offsets = [];
-      (this.rounds || []).forEach((r, i) => {
-        offsets[i] = offset;
-        if (!r.bronze) {
-          offset += r.matches ? r.matches.length : 0;
-        } else {
-          // bronze tidak menambah jumlah heat total di babak kompetitif
-          // tapi tetap memakai offset yang sudah berjalan
-        }
-      });
-      return offsets;
-    },
-    heatOptions() {
-      const r = this.currentRound;
-      const n = r && r.matches ? r.matches.length : 0;
-      const base = (this.globalHeatOffsets[this.currentRoundIndex] || 0) + 1;
-      return Array.from({ length: n }, (_, i) => ({
-        value: base + i,
-        text: base + i,
-      }));
-    },
-    heatOptionsLabeled() {
-      return this.heatOptions.map((o) => ({
-        value: o.value,
-        text: `Heat ${o.text}`,
       }));
     },
     participantArr() {
@@ -1588,26 +1443,6 @@ export default {
       });
       return idx;
     },
-    teamOptionsAll() {
-      // opsi dropdown: ambil dari participants, tentukan seed otomatis
-      return (this.participantArr || []).map((p, i) => {
-        const seed =
-          Number(p.seed) || Number(p.startOrder) || Number(p.bibTeam) || i + 1;
-        const id = i + 1; // id internal sederhana (index+1)
-        const name = String(p.nameTeam || p.teamName || `Team ${id}`);
-        return { id, seed, name, label: `${seed ? `#${seed} ` : ""}${name}` };
-      });
-    },
-    assignedIdsFirstRound() {
-      const ids = new Set();
-      const fr = this.rounds[this.firstRoundIndex];
-      if (!fr) return ids;
-      fr.matches.forEach((m) => {
-        if (m.team1 && m.team1.__pid) ids.add(m.team1.__pid);
-        if (m.team2 && m.team2.__pid) ids.add(m.team2.__pid);
-      });
-      return ids;
-    },
 
     // NEW: opsi dropdown babak (ikut urutan this.rounds)
     roundOptions() {
@@ -1624,10 +1459,16 @@ export default {
     },
 
     // NEW: tim (nama) yang tampil pada babak aktif → array of strings (nama tim)
+    // termasuk tim yang masih menunggu dipasangkan (round.pool), supaya mereka
+    // tetap muncul di tabel hasil & bisa diberi nomor Heat sebelum berpasangan
     teamsInCurrentRound() {
       const r = this.currentRound;
       if (!r) return [];
       const names = [];
+      (r.pool || []).forEach((t) => {
+        const n = t && (t.name || t.nameTeam || t.teamName);
+        if (n) names.push(String(n));
+      });
       (r.matches || []).forEach((m) => {
         if (m.team1 && m.team1.name) names.push(String(m.team1.name));
         if (m.team2 && m.team2.name) names.push(String(m.team2.name));
@@ -1725,7 +1566,6 @@ export default {
 
   beforeRouteLeave(to, from, next) {
     this.clearAllRoundResults();
-    sessionStorage.removeItem(HEAT_GLOBAL_KEY);
     next();
   },
 
@@ -1756,23 +1596,27 @@ export default {
           : this.h2hBucketOptions[0].value;
 
       await this.fetchH2HBucketTeamsByKey(this.selectedH2HKey);
-      await this.tryLoadBracketFromDB();
+      const loadedFromDB = await this.tryLoadBracketFromDB();
+      if (!loadedFromDB) {
+        // hanya bangun bracket kosong dari awal kalau memang belum ada
+        // bracket tersimpan di DB — supaya bracket yang sudah dipasangkan
+        // lewat Heat tidak tertimpa setiap kali halaman ini dibuka ulang
+        const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
+        this.rebuildBracketDynamic(n);
+      }
+      this.syncWinLoseFromBracketToParticipants();
     } else {
       // fallback: baca seluruh bucket H2H dari eventDetails (mode offline)
       this.loadAllH2HBucketsFromEvent();
+      const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
+      this.rebuildBracketDynamic(n);
+      this.syncWinLoseFromBracketToParticipants();
     }
-
-    // === (lanjutan logic H2H lama kamu) ===
-    // const ok = this.participantArr && this.participantArr.length > 0;
-    const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
-    this.rebuildBracketDynamic(n);
-    this.syncWinLoseFromBracketToParticipants();
 
     this.roundResultsRootKey = getResultsRootKey();
     this.loadRoundResultsForCurrentRound();
     this.computeWinLoseByHeat();
 
-    seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     this.fetchBooyanActiveFromSettings();
   },
 
@@ -2039,7 +1883,6 @@ export default {
             this.computePodium();
             this.syncWinLoseFromBracketToParticipants();
             this.persistRoundResults();
-            seedGlobalHeatFromList(this.visibleParticipants, { reset: true });
             resolve(true);
           } else {
             resolve(false);
@@ -3117,13 +2960,6 @@ export default {
       }
     },
 
-    getNextAvailableHeat() {
-      const usage = readGlobalHeatUsage();
-      // cari heat bernomor paling kecil yang usage < LIMIT
-      for (let h = 1; ; h++) {
-        if ((usage[h] || 0) < HEAT_GLOBAL_LIMIT) return h;
-      }
-    },
     // --- load semua bucket H2H dari eventDetails (offline/fallback) ---
     loadAllH2HBucketsFromEvent() {
       try {
@@ -3259,8 +3095,6 @@ export default {
       this.roundResultsRootKey = getResultsRootKey();
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat();
-
-      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     },
 
     // --- handler perubahan select ---
@@ -3457,97 +3291,6 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.assignRanks(this.visibleParticipants);
     },
-    pushWinnerToNext(roundIndex, matchIndex, winner) {
-      const round = this.rounds[roundIndex];
-      if (!round || round.bronze) return;
-
-      // cari ronde kompetitif berikutnya
-      let nextRoundIndex = -1;
-      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
-        if (!this.rounds[i].bronze) {
-          nextRoundIndex = i;
-          break;
-        }
-      }
-      if (nextRoundIndex === -1) return;
-
-      const next = this.rounds[nextRoundIndex];
-      const slot = Math.floor(matchIndex / 2);
-      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
-      if (next && next.matches[slot]) {
-        next.matches[slot][pos] =
-          winner && winner.name ? winner : { id: null, seed: null, name: "" };
-      }
-    },
-
-    pullWinnerFromNext(roundIndex, matchIndex, prevWinner) {
-      const round = this.rounds[roundIndex];
-      if (!round || round.bronze) return;
-
-      let nextRoundIndex = -1;
-      for (let i = roundIndex + 1; i < this.rounds.length; i++) {
-        if (!this.rounds[i].bronze) {
-          nextRoundIndex = i;
-          break;
-        }
-      }
-      if (nextRoundIndex === -1) return;
-
-      const next = this.rounds[nextRoundIndex];
-      const slot = Math.floor(matchIndex / 2);
-      const pos = matchIndex % 2 === 0 ? "team1" : "team2";
-      const cell = next && next.matches[slot] && next.matches[slot][pos];
-
-      // hanya kosongkan jika sama dengan prevWinner (hindari menghapus isian manual)
-      if (cell && prevWinner && cell.name === prevWinner.name) {
-        next.matches[slot][pos] = { id: null, seed: null, name: "" };
-      }
-    },
-    toggleBye(roundIndex, matchIndex) {
-      const round = this.rounds[roundIndex];
-      if (!round) return;
-      const match = round.matches[matchIndex];
-      if (!match) return;
-
-      // flip status
-      match.bye = !match.bye;
-
-      // kalau set BYE: tentukan pemenang (tim yang ada)
-      if (match.bye) {
-        const has1 = match.team1 && match.team1.name;
-        const has2 = match.team2 && match.team2.name;
-        if (has1 && !has2) {
-          match.winner = match.team1;
-        } else if (!has1 && has2) {
-          match.winner = match.team2;
-        } else if (!has1 && !has2) {
-          // tidak ada tim, BYE tidak bermakna → batal
-          match.bye = false;
-          this.$bvToast &&
-            this.$bvToast.toast("Tidak ada tim di match ini.", {
-              variant: "warning",
-              autoHideDelay: 2000,
-              title: "BYE dibatalkan",
-            });
-          return;
-        } else {
-          // dua-duanya ada → tetap boleh BYE kalau kamu memang mau auto-lolos salah satu
-          // default pemenang = team1 (atau bisa munculkan modal pilih)
-          match.winner = match.team1;
-        }
-        // dorong ke ronde kompetitif berikutnya
-        this.pushWinnerToNext(roundIndex, matchIndex, match.winner);
-      } else {
-        // un-BYE → hapus winner & cabut dari ronde berikutnya
-        const prevWin = match.winner;
-        match.winner = null;
-        this.pullWinnerFromNext(roundIndex, matchIndex, prevWin);
-      }
-
-      this.syncWinLoseFromBracketToParticipants();
-      this.persistRoundResults();
-      this.computePodium();
-    },
     // FUNCTION OTHERS PENALTY
     getOthersValue(item) {
       if (!item || !item.result) return "0";
@@ -3727,23 +3470,80 @@ export default {
       });
       this.editResult = true;
     },
-    getGlobalHeatUsageCount() {
-      return readGlobalHeatUsage();
+    // Kumpulkan pemakaian nomor heat lintas SEMUA Head to Head Category pada
+    // event yang sama (bukan cuma bracket/kategori yang sedang dibuka), dengan
+    // membaca seluruh localStorage `h2hRoundResults:<eventId>|...` — setiap
+    // key berbeda kategori (initial/race/division) tapi eventId sama tetap
+    // dihitung, supaya penomoran heat benar-benar berlanjut di semua kategori.
+    // Method (bukan computed) supaya selalu baca data terbaru setiap dipanggil
+    // — localStorage bukan reactive source jadi computed akan basi.
+    getEventHeatUsage() {
+      const usage = {};
+      let maxHeat = 0;
+      try {
+        const bucket = getBucket();
+        const eventId = bucket && bucket.eventId ? String(bucket.eventId) : "";
+        if (!eventId) return { usage, maxHeat };
+
+        const prefix = RESULTS_KEY_PREFIX + eventId + "|";
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || key.indexOf(prefix) !== 0) continue;
+
+          const allRounds = readAllRoundResults(key) || {};
+          Object.keys(allRounds).forEach((roundId) => {
+            const rows = Array.isArray(allRounds[roundId]) ? allRounds[roundId] : [];
+            rows.forEach((row) => {
+              const h = row && row.result ? Number(row.result.heat) : null;
+              if (Number.isFinite(h) && h > 0) {
+                usage[h] = (usage[h] || 0) + 1;
+                if (h > maxHeat) maxHeat = h;
+              }
+            });
+          });
+        }
+      } catch (e) {
+        // localStorage tidak tersedia / data korup → anggap kosong
+      }
+      return { usage, maxHeat };
     },
 
-    // opsi heat per baris (sembunyikan yang sudah 2x dipakai global,
-    // tapi pertahankan nilai milik baris itu sendiri agar tetap terlihat)
+    // opsi heat per baris: nomor yang sudah dipakai di babak aktif (kategori
+    // ini) tetap ditawarkan agar terlihat, ditambah nomor BARU yang melanjutkan
+    // dari heat tertinggi yang sudah dipakai di SELURUH kategori H2H event ini.
     heatOptionsForItem(item) {
+      const { usage, maxHeat } = this.getEventHeatUsage();
+
+      const usedInThisRound = new Set(
+        (this.visibleParticipants || [])
+          .map((p) => (p && p.result ? Number(p.result.heat) : null))
+          .filter((h) => Number.isFinite(h) && h > 0)
+      );
+
       const keep =
         item && item.result && item.result.heat != null
           ? Number(item.result.heat)
           : null;
+      if (keep != null) usedInThisRound.add(keep);
 
-      const usage = this.getGlobalHeatUsageCount();
+      const totalNeeded =
+        this.currentRound && this.currentRound.matches
+          ? this.currentRound.matches.length
+          : 0;
+      const freshSlotsNeeded = Math.max(0, totalNeeded - usedInThisRound.size);
 
-      const allowed = this.allHeatChoices.filter((h) => {
+      const freshNumbers = [];
+      for (let i = 1; i <= freshSlotsNeeded + 2; i++) {
+        freshNumbers.push(maxHeat + i);
+      }
+
+      const candidates = Array.from(
+        new Set([...usedInThisRound, ...freshNumbers])
+      ).sort((a, b) => a - b);
+
+      const allowed = candidates.filter((h) => {
         const used = usage[h] || 0;
-        return used < HEAT_GLOBAL_LIMIT || keep === h;
+        return used < HEAT_MAX_TEAMS || keep === h;
       });
 
       return allowed.map((v) => ({ value: v, text: "Heat " + v }));
@@ -3752,54 +3552,71 @@ export default {
     onHeatChanged(item, newVal) {
       if (!item || !item.result) return;
 
-      const prev = Number.isFinite(item.__prevHeat)
-        ? item.__prevHeat
-        : Number(item.result.heat) || null;
+      const prev = Number.isFinite(Number(item.result.heat))
+        ? Number(item.result.heat)
+        : null;
 
       let val = newVal === "" || newVal == null ? null : Number(newVal);
       if (val != null && (!Number.isFinite(val) || val <= 0)) val = null;
 
-      // kalau tidak berubah, cukup persist & evaluasi
-      if (prev !== null && val === prev) {
+      if (val === prev) {
         this.persistRoundResults();
         this.computeWinLoseByHeat();
         this.evaluateHeatWinnersForCurrentRound();
         return;
       }
 
-      // cek limit global (kecuali kalau mempertahankan heat lama)
       if (val !== null) {
-        const usage = readGlobalHeatUsage();
+        // maksimal 2 tim per nomor heat, dihitung lintas SEMUA kategori H2H
+        // pada event ini (bukan cuma babak/kategori yang sedang dibuka) — 2 tim
+        // yang berbagi 1 nomor Heat OTOMATIS jadi lawan (lihat syncMatchesFromHeat),
+        // jadi cukup pastikan nomornya belum dipakai tim lain di kategori LAIN.
+        const { usage } = this.getEventHeatUsage();
         const used = usage[val] || 0;
-        if (used >= HEAT_GLOBAL_LIMIT && val !== prev) {
-          // revert ke sebelumnya
-          this.$set(item.result, "heat", prev);
-          item.__prevHeat = prev;
+        if (used >= HEAT_MAX_TEAMS) {
           this.$bvToast &&
             this.$bvToast.toast(
-              `Heat ${val} sudah terpakai ${HEAT_GLOBAL_LIMIT}× secara global.`,
+              `Heat ${val} sudah dipakai ${HEAT_MAX_TEAMS}× di event ini.`,
               {
                 variant: "warning",
                 autoHideDelay: 2500,
                 title: "Limit heat tercapai",
               }
             );
+          this.$forceUpdate && this.$forceUpdate();
           return;
+        }
+
+        if (used === 1) {
+          const heldInThisRound = (this.visibleParticipants || []).some(
+            (p) => p !== item && p.result && Number(p.result.heat) === val
+          );
+          if (!heldInThisRound) {
+            this.$bvToast &&
+              this.$bvToast.toast(
+                `Heat ${val} sudah dipakai oleh tim dari Head to Head Category lain.`,
+                {
+                  variant: "danger",
+                  autoHideDelay: 3000,
+                  title: "Heat tidak tersedia",
+                }
+              );
+            this.$forceUpdate && this.$forceUpdate();
+            return;
+          }
         }
       }
 
-      // release heat lama
-      if (prev != null) bumpGlobalHeat(prev, -1);
-      // set nilai baru & reserve
       this.$set(item.result, "heat", val);
-      item.__prevHeat = val;
-      if (val != null) bumpGlobalHeat(val, +1);
 
-      // simpan & hitung ulang
+      // simpan & hitung ulang; syncMatchesFromHeat membentuk/menata ulang
+      // pasangan match babak aktif sesuai tim mana saja yang kini berbagi
+      // nomor Heat yang sama
       this.persistRoundResults();
       this.computeWinLoseByHeat();
       this.evaluateHeatWinnersForCurrentRound();
       this.assignRanks(this.visibleParticipants);
+      this.syncMatchesFromHeat(this.currentRound);
       this.$nextTick &&
         this.$nextTick(() => this.$forceUpdate && this.$forceUpdate());
     },
@@ -4073,18 +3890,6 @@ export default {
       return map;
     },
 
-    // Pastikan setiap item punya result.heat; jika kosong → isi dari bracket
-    ensureDefaultHeatForVisible() {
-      var heatMap = this.buildHeatMapFromBracket();
-      this.visibleParticipants.forEach(function (p) {
-        if (!p.result) p.result = {};
-        if (!p.result.heat || Number(p.result.heat) <= 0) {
-          var key = String(p.nameTeam || p.teamName || "").toUpperCase();
-          p.result.heat = heatMap[key] || 1;
-        }
-      });
-    },
-
     // mapping tim -> nomor heat (index match + 1) pada babak aktif
     getPB(item, key) {
       const has = item && item.result;
@@ -4171,8 +3976,6 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants();
       this.computeWinLoseByHeat();
-
-      seedGlobalHeatFromList(this.visibleParticipants, { reset: false });
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)
@@ -4382,9 +4185,8 @@ export default {
     // CHANGED: setelah build, set currentRoundIndex = round awal terbesar (firstRoundIndex)
     rebuildBracketDynamic(nTeams) {
       this.rounds = this.buildEmptyBracket(nTeams);
-      this.populateFirstRoundWithSeeds(nTeams);
-      // set babak aktif ke ronde kompetitif paling awal (bukan bronze)
       this.currentRoundIndex = this.firstRoundIndex;
+      this.syncMatchesFromHeat(this.currentRound);
       this.computePodium();
     },
 
@@ -4418,18 +4220,9 @@ export default {
       return `Round of ${size}`;
     },
 
-    /** Buat satu kolom ronde kosong dengan jumlah match = size/2 */
+    /** Buat satu kolom ronde kosong — team1/team2 diisi belakangan oleh Heat */
     makeEmptyRound(id, size) {
-      const matches = Array.from({ length: size / 2 }, (_, i) => ({
-        id: id * 100 + (i + 1),
-        team1: { id: null, seed: null, name: "" },
-        team2: { id: null, seed: null, name: "" },
-        score1: null,
-        score2: null,
-        winner: null, // nanti diisi object tim pemenang
-        bye: false, // jika match berisi BYE auto-advance
-      }));
-      return { id: `R${id}`, name: this.roundName(size), size, matches };
+      return { id: `R${id}`, name: this.roundName(size), size, matches: [], pool: [] };
     },
 
     /** Bangun struktur default kosong (kolom dari besar → final) */
@@ -4441,6 +4234,11 @@ export default {
       for (let size = base; size >= 2; size >>= 1) {
         rounds.push(this.makeEmptyRound(id++, size));
       }
+      // babak pertama diisi seluruh tim terdaftar — pasangan lawannya baru
+      // terbentuk begitu 2 tim mendapat nomor Heat yang sama (syncMatchesFromHeat)
+      if (rounds.length) {
+        rounds[0].pool = this.collectRegisteredTeams();
+      }
       // Tambah Final B bila size awal >= 4
       if (this.showBronze && base >= 4) {
         rounds.splice(rounds.length - 1, 0, {
@@ -4448,157 +4246,191 @@ export default {
           id: "R_B",
           name: "Final B",
           size: 2,
-          matches: [
-            {
-              id: 3001,
-              team1: { id: null, seed: null, name: "" },
-              team2: { id: null, seed: null, name: "" },
-              score1: null,
-              score2: null,
-              winner: null,
-              bye: false,
-            },
-          ],
+          matches: [],
+          pool: [],
           bronze: true,
         });
       }
       return rounds;
     },
 
-    /** Ambil 32 tim max dari participant + tentukan seed */
-    collectTeamsForSeeding(limit = 32) {
-      const src = (this.participantArr || []).slice(0, limit).map((p, idx) => ({
-        id: idx + 1,
-        seed:
-          Number(p.seed) ||
-          Number(p.startOrder) ||
-          Number(p.bibTeam) ||
-          idx + 1,
-        name: String(p.nameTeam || p.teamName || `Team ${idx + 1}`),
+    /** Ambil daftar tim terdaftar (unik by nama) — tanpa urutan seeding */
+    collectRegisteredTeams(limit = 32) {
+      const src = (this.participantArr || []).slice(0, limit).map((p) => ({
+        name: String(p.nameTeam || p.teamName || ""),
+        bibTeam: String(p.bibTeam || ""),
       }));
-      // unik + sort by seed
       const seen = new Set();
-      const uniq = src.filter(
-        (t) => t && !seen.has(t.name) && seen.add(t.name)
-      );
-      uniq.sort((a, b) => a.seed - b.seed);
-      return uniq;
-    },
-
-    /** Pairing sederhana: 1vsN, 2vsN-1, dst (cukup baik untuk seeding dasar) */
-    pairSeedsOrdered(seeds) {
-      const pairs = [];
-      for (let i = 0; i < Math.floor(seeds.length / 2); i++) {
-        pairs.push([seeds[i], seeds[seeds.length - 1 - i]]);
-      }
-      return pairs;
+      return src.filter((t) => t.name && !seen.has(t.name) && seen.add(t.name));
     },
 
     /**
-     * Populate kolom pertama (round awal) dengan seeding + BYE
-     * - Jika n bukan pangkat dua → tambahkan BYE (slot kosong) untuk top seeds
-     * - BYE artinya lawan kosong → auto-advance ke ronde berikutnya
+     * Susun ulang round.matches dari round.pool (tim yang menunggu dipasangkan)
+     * + tim yang sudah berpasangan sebelumnya, dikelompokkan berdasarkan nomor
+     * Heat yang sama (result.heat pada babak aktif), diurutkan menaik. Match
+     * yang pasangannya tidak berubah mempertahankan id/winner/score1/score2
+     * supaya hasil yang sudah diisi tidak hilang saat resync.
      */
-    populateFirstRoundWithSeeds(nTeams) {
-      const teams = this.collectTeamsForSeeding(nTeams);
-      const base = this.nextPow2(Math.min(Math.max(4, nTeams), 32));
-      const byes = base - teams.length; // jumlah bye (0 jika pas pangkat 2)
-
-      // Tambahkan dummy "BYE" di ujung (seed teratas akan berpasangan dengannya)
-      const fillers = Array.from({ length: byes }, () => ({
-        id: null,
-        seed: null,
-        name: "",
-      }));
-      const padded = teams.concat(fillers);
-
-      // susun pasangan
-      const pairs = this.pairSeedsOrdered(padded);
-
-      const first = this.rounds.find((r) => !r.bronze && r.size === base);
-      if (!first) return;
-
-      // isi kolom pertama
-      first.matches.forEach((m, i) => {
-        const [t1, t2] = pairs[i] || [{}, {}];
-        m.team1 = t1 || { id: null, seed: null, name: "" };
-        m.team2 = t2 || { id: null, seed: null, name: "" };
-      });
-    },
-
-    /** Advance otomatis untuk match yang bye (tanpa sentuh Bronze/Final) */
-    autoAdvanceByes() {
-      for (let i = 0; i < this.rounds.length; i++) {
-        const round = this.rounds[i];
-        if (round.bronze) continue;
-        // round terakhir (Final) tidak perlu advance
-        const nextIdx = this.rounds.findIndex((r, idx) => idx > i && !r.bronze);
-        if (nextIdx === -1) break;
-
-        const next = this.rounds[nextIdx];
-        round.matches.forEach((m, idxMatch) => {
-          if (m.bye) {
-            // jika t2 kosong → pemenang = t1, atau sebaliknya
-            const win = m.team1 && m.team1.name ? m.team1 : m.team2;
-            m.winner = win && win.name ? win : null;
-
-            // map ke slot next round:
-            const slot = Math.floor(idxMatch / 2);
-            const pos = idxMatch % 2 === 0 ? "team1" : "team2";
-            if (next && next.matches[slot]) {
-              next.matches[slot][pos] =
-                win && win.name ? win : { id: null, seed: null, name: "" };
-            }
-          }
-        });
-      }
-      this.syncWinLoseFromBracketToParticipants(); // NEW
-      this.persistRoundResults(); // NEW
-    },
-
-    /** Pindahkan pemenang secara manual ke ronde berikutnya (untuk non-BYE) */
-    advanceWinner(roundIndex, matchIndex, winnerIdx /* 1 atau 2 */) {
-      const round = this.rounds[roundIndex];
+    syncMatchesFromHeat(round) {
       if (!round) return;
 
+      const toKey = (t) =>
+        String((t && (t.nameTeam || t.teamName || t.name)) || "").toUpperCase();
+
+      // kumpulkan semua tim yang relevan: pool (belum berpasangan) + tim yang
+      // sudah ada di match manapun sebelumnya (supaya tidak hilang saat resync)
+      const teamMap = new Map(); // KEY -> { name, bibTeam }
+      (round.pool || []).forEach((t) => {
+        const key = toKey(t);
+        if (key)
+          teamMap.set(key, {
+            name: t.name || t.nameTeam || t.teamName,
+            bibTeam: t.bibTeam || "",
+          });
+      });
+      (round.matches || []).forEach((m) => {
+        [m.team1, m.team2].forEach((t) => {
+          const key = toKey(t);
+          if (key && !teamMap.has(key)) {
+            teamMap.set(key, { name: t.name, bibTeam: t.bibTeam || "" });
+          }
+        });
+      });
+
+      // ambil result.heat tim (sumbernya: participantArr, hasil babak aktif)
+      const getHeat = (key) => {
+        const p = (this.participantArr || []).find((pp) => toKey(pp) === key);
+        const h = p && p.result ? Number(p.result.heat) : null;
+        return Number.isFinite(h) && h > 0 ? h : null;
+      };
+
+      const groups = new Map(); // heat -> [{name,bibTeam}, ...]
+      const unassigned = [];
+      teamMap.forEach((team, key) => {
+        const h = getHeat(key);
+        if (h) {
+          if (!groups.has(h)) groups.set(h, []);
+          groups.get(h).push(team);
+        } else {
+          unassigned.push(team);
+        }
+      });
+
+      const sortedHeats = Array.from(groups.keys()).sort((a, b) => a - b);
+
+      const prevMatches = round.matches || [];
+      const findPrevMatch = (n1, n2) =>
+        prevMatches.find((m) => {
+          const a = String((m.team1 && m.team1.name) || "").toUpperCase();
+          const b = String((m.team2 && m.team2.name) || "").toUpperCase();
+          const target1 = String(n1 || "").toUpperCase();
+          const target2 = String(n2 || "").toUpperCase();
+          return (
+            (a === target1 && b === target2) || (a === target2 && b === target1)
+          );
+        });
+
+      let nextId =
+        Math.max(0, ...prevMatches.map((m) => Number(m.id) || 0)) + 1;
+
+      const newMatches = sortedHeats.map((h) => {
+        const teams = groups.get(h);
+        const t1 = teams[0];
+        const t2 = teams[1] || null;
+        const prev = findPrevMatch(t1.name, t2 && t2.name);
+        // nomor Heat yang cuma diisi 1 tim otomatis berstatus BYE — tim itu
+        // langsung dianggap menang & menunggu di babak berikutnya, tanpa
+        // perlu tindakan manual apa pun.
+        const isLone = !t2;
+        return {
+          id: prev ? prev.id : nextId++,
+          team1: { name: t1.name, bibTeam: t1.bibTeam || "" },
+          team2: t2
+            ? { name: t2.name, bibTeam: t2.bibTeam || "" }
+            : { name: "", bibTeam: "" },
+          score1: prev ? prev.score1 : null,
+          score2: prev ? prev.score2 : null,
+          winner: prev
+            ? prev.winner
+            : isLone
+            ? { name: t1.name, bibTeam: t1.bibTeam || "" }
+            : null,
+          bye: prev ? !!prev.bye : isLone,
+          heat: h,
+        };
+      });
+
+      round.matches = newMatches;
+      round.pool = unassigned;
+    },
+
+    /** Set pemenang satu match secara manual (override / untuk kasus seri) */
+    declareMatchWinner(round, matchIndex, winnerIdx /* 1 atau 2 */) {
+      if (!round) return;
       const match = round.matches[matchIndex];
       if (!match) return;
 
-      // set pemenang match ini
-      const winner = winnerIdx === 1 ? match.team1 : match.team2;
-      match.winner = winner;
+      match.winner = winnerIdx === 1 ? match.team1 : match.team2;
 
-      // Jika ini BUKAN bronze, dorong pemenang ke ronde kompetitif berikutnya (kalau ada)
-      if (!round.bronze) {
-        let nextRoundIndex = -1;
-        for (let i = roundIndex + 1; i < this.rounds.length; i++) {
-          if (!this.rounds[i].bronze) {
-            nextRoundIndex = i;
-            break;
-          }
-        }
-
-        if (nextRoundIndex !== -1) {
-          const next = this.rounds[nextRoundIndex];
-          const slot = Math.floor(matchIndex / 2);
-          const pos = matchIndex % 2 === 0 ? "team1" : "team2";
-          if (next && next.matches[slot]) {
-            next.matches[slot][pos] = winner;
-          }
-        }
-      }
-
-      // Jika ini Final (size==2 & non-bronze) atau Bronze, hitung podium (Juara 1–4)
       const isFinal = !round.bronze && round.size === 2;
       const isBronze = !!round.bronze;
       if (isFinal || isBronze) {
         this.computePodium();
       }
-      this.syncWinLoseFromBracketToParticipants(); // NEW
-      this.persistRoundResults(); // NEW: simpan setiap ada perubahan pemenang
+      this.syncWinLoseFromBracketToParticipants();
+      this.persistRoundResults();
     },
 
-    /** Isi Bronze (3rd place) setelah SF selesai */
+    /** Pindahkan semua pemenang babak aktif ke pool babak kompetitif berikutnya */
+    advanceToNextRound() {
+      const round = this.currentRound;
+      if (!round || round.bronze) return;
+
+      if (!round.matches.length || (round.pool || []).length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Masih ada tim yang belum dipasangkan Heat pada babak ini.",
+            { variant: "warning", autoHideDelay: 2500, title: "Belum lengkap" }
+          );
+        return;
+      }
+
+      const undecided = round.matches.filter(
+        (m) => m.team1.name && m.team2.name && !m.winner
+      );
+      if (undecided.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            `Masih ada ${undecided.length} match yang belum punya pemenang.`,
+            { variant: "warning", autoHideDelay: 2500, title: "Belum lengkap" }
+          );
+        return;
+      }
+
+      let nextRoundIndex = -1;
+      for (let i = this.currentRoundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return;
+
+      const winners = round.matches
+        .map((m) => m.winner)
+        .filter((w) => w && w.name);
+
+      const next = this.rounds[nextRoundIndex];
+      next.pool = (next.pool || []).concat(
+        winners.map((w) => ({ name: w.name, bibTeam: w.bibTeam || "" }))
+      );
+
+      this.currentRoundIndex = nextRoundIndex;
+      this.syncMatchesFromHeat(this.rounds[nextRoundIndex]);
+      this.persistRoundResults();
+    },
+
+    /** Isi Bronze (3rd place) setelah SF selesai — 2 tim kalah menunggu Heat */
     populateBronzeFromSemis() {
       const sfIdx = this.rounds.findIndex((r) => !r.bronze && r.size === 4);
       const bronzeIdx = this.rounds.findIndex((r) => r.bronze);
@@ -4619,77 +4451,13 @@ export default {
       });
 
       if (losers[0] && losers[1]) {
-        bronze.matches[0].team1 = losers[0];
-        bronze.matches[0].team2 = losers[1];
+        bronze.pool = [
+          { name: losers[0].name, bibTeam: losers[0].bibTeam || "" },
+          { name: losers[1].name, bibTeam: losers[1].bibTeam || "" },
+        ];
+        this.syncMatchesFromHeat(bronze);
+        this.persistRoundResults();
       }
-    },
-
-    /** Ambil opsi yang masih tersedia (bebas duplikat kecuali id yang sedang dipilih) */
-    availableTeamOptions(keepId = null) {
-      const used = this.assignedIdsFirstRound;
-      return this.teamOptionsAll.filter(
-        (opt) => !used.has(opt.id) || opt.id === keepId
-      );
-    },
-
-    /** Helper: buat objek tim untuk bracket dari option */
-    toBracketTeam(opt) {
-      if (!opt) return { id: null, seed: null, name: "" };
-      return {
-        id: opt.id,
-        seed: opt.seed || null,
-        name: opt.name || "",
-        __pid: opt.id,
-      };
-    },
-
-    /** Set tim ke slot (team1/team2) di match ronde pertama */
-    setTeamAtFirstRound(matchIndex, slot /* 'team1' | 'team2' */, pickedId) {
-      const rIdx = this.firstRoundIndex;
-      const round = this.rounds[rIdx];
-      if (!round) return;
-
-      const match = round.matches[matchIndex];
-      if (!match) return;
-
-      // kosongkan
-      if (!pickedId) {
-        match[slot] = { id: null, seed: null, name: "" };
-        match.winner = null;
-        return;
-      }
-
-      // cegah duplikat (kecuali mengganti dirinya sendiri)
-      const current =
-        match[slot] && match[slot].__pid ? match[slot].__pid : null;
-      const options = this.availableTeamOptions(current);
-      const opt = options.find((o) => o.id === Number(pickedId));
-      if (!opt) {
-        // kalau sudah dipakai tempat lain → keluarkan alert
-        this.$bvToast &&
-          this.$bvToast.toast("Tim sudah terpasang di pertandingan lain.", {
-            variant: "warning",
-            autoHideDelay: 2000,
-            title: "Duplicate block",
-          });
-        return;
-      }
-
-      match[slot] = this.toBracketTeam(opt);
-      match.winner = null; // reset winner ketika ada perubahan pasangan
-    },
-
-    /** Hapus semua assignment di ronde pertama (quick clear) */
-    clearFirstRoundAssignments() {
-      const rIdx = this.firstRoundIndex;
-      const round = this.rounds[rIdx];
-      if (!round) return;
-      round.matches.forEach((m) => {
-        m.team1 = { id: null, seed: null, name: "" };
-        m.team2 = { id: null, seed: null, name: "" };
-        m.winner = null;
-        m.bye = false;
-      });
     },
 
     /** SIGN BRACKET */
@@ -5261,18 +5029,43 @@ td {
   align-items: center;
   gap: 8px;
 }
-.bracket__seed {
-  min-width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: #eef6ff;
-  color: #2563eb;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.bracket__pool {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  background: #fffbeb;
+}
+.bracket__pool-title {
+  font-size: 12px;
   font-weight: 800;
-  font-size: 13px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  color: #92400e;
+  margin-bottom: 6px;
+}
+.bracket__pool-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bracket__pool-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid rgba(146, 64, 14, 0.15);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.bracket__heat {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #2563eb;
+  background: #eef6ff;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 6px;
 }
 .bracket__name {
   font-weight: 700;
@@ -5326,6 +5119,11 @@ td {
   border: 1px solid rgba(16, 185, 129, 0.18);
   padding: 2px 8px;
   border-radius: 999px;
+}
+.bracket__winner--bye {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: rgba(146, 64, 14, 0.18);
 }
 
 .bracket__team.is-bye {

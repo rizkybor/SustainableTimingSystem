@@ -22,6 +22,8 @@ const {
   upsertAllRounds: rxUpsertAllRounds,
   upsertOverall: rxUpsertOverall,
   getOverall: rxGetOverall,
+  getBracketsByEventId: rxGetBracketsByEventId,
+  getOverallsByEventId: rxGetOverallsByEventId,
 } = require("../controllers/INSERT/upsertRaftingCross.js");
 
 const {
@@ -880,6 +882,22 @@ ipcMain.on("rx:overall:get", async (e, bucket) => {
     e.reply("rx:overall:get-reply", await rxGetOverall(bucket));
   } catch (err) {
     e.reply("rx:overall:get-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:brackets:byEvent", async (e, eventId) => {
+  try {
+    e.reply("rx:brackets:byEvent-reply", await rxGetBracketsByEventId(eventId));
+  } catch (err) {
+    e.reply("rx:brackets:byEvent-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:overalls:byEvent", async (e, eventId) => {
+  try {
+    e.reply("rx:overalls:byEvent-reply", await rxGetOverallsByEventId(eventId));
+  } catch (err) {
+    e.reply("rx:overalls:byEvent-reply", { ok: false, error: String(err) });
   }
 });
 

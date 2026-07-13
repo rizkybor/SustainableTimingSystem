@@ -24,3 +24,6 @@ yarn-error.log*
 
 #Electron-builder output
 /dist_electron
+
+# generated installer key (contains the real secret, see scripts/generate-installer-key.js)
+/nsis/installer-key.nsh

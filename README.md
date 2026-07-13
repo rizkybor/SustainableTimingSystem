@@ -27,3 +27,4 @@ serve : yarn electron:serve
 
 yarn electron:build (.dmg)
 yarn electron:build --win --x64 (.exe)
+yarn electron:build --win --x64 2>&1 | tail -30

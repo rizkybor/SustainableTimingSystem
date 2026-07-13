@@ -31,6 +31,11 @@ module.exports = {
         win: {
           icon: "src/assets/icons/icon.ico",
         },
+        nsis: {
+          oneClick: false,
+          perMachine: true,
+          include: "nsis/installer.nsh",
+        },
         linux: {
           icon: "src/assets/icons/icon.png",
           target: ["AppImage", "deb", "rpm"],

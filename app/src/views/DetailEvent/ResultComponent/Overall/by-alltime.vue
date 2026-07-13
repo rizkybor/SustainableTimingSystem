@@ -83,11 +83,14 @@
               <th colspan="2" class="group h2h text-center">H2H</th>
               <th colspan="2" class="group slalom text-center">Slalom</th>
               <th colspan="2" class="group drr text-center">DRR</th>
+              <th colspan="2" class="group rx text-center">Rafting Cross</th>
 
               <th rowspan="2" class="w-110 text-center">Total Score</th>
               <th rowspan="2" class="w-110 text-center">Rank Overall</th>
             </tr>
             <tr>
+              <th class="sub">Score</th>
+              <th class="sub">Ranked</th>
               <th class="sub">Score</th>
               <th class="sub">Ranked</th>
               <th class="sub">Score</th>
@@ -116,6 +119,9 @@
 
               <td class="text-center">{{ r.drrScore }}</td>
               <td class="text-center">{{ r.drrRank }}</td>
+
+              <td class="text-center">{{ r.rxScore }}</td>
+              <td class="text-center">{{ r.rxRank }}</td>
 
               <td class="text-center bold">{{ r.totalScore }}</td>
               <td class="text-center bold">{{ r.rank }}</td>
@@ -195,9 +201,10 @@ export default {
         const h2h = toNum(r.h2hScore);
         const slalom = toNum(r.slalomScore);
         const drr = toNum(r.drrScore);
+        const rx = toNum(r.rxScore);
         const total = Number.isFinite(Number(r.totalScore))
           ? Number(r.totalScore)
-          : sprint + h2h + slalom + drr;
+          : sprint + h2h + slalom + drr + rx;
 
         return {
           teamName: String(r.teamName || ""),
@@ -210,6 +217,8 @@ export default {
           slalomRank: toNum(r.slalomRank),
           drrScore: drr,
           drrRank: toNum(r.drrRank),
+          rxScore: rx,
+          rxRank: toNum(r.rxRank),
           totalScore: total,
         };
       });

@@ -797,6 +797,8 @@ export default {
           slalomRank = 0;
         var drrScore = 0,
           drrRank = 0;
+        var rxScore = 0,
+          rxRank = 0;
         for (var j = 0; j < cats.length; j++) {
           var c = cats[j] || {};
           var nm = c && typeof c.name === "string" ? c.name.toUpperCase() : "";
@@ -826,6 +828,9 @@ export default {
           } else if (nm === "DRR" || nm === "DOWN RIVER RACE") {
             drrScore = sc;
             drrRank = rk;
+          } else if (nm === "RX" || nm === "RAFTING CROSS") {
+            rxScore = sc;
+            rxRank = rk;
           }
         }
         var totalScore = 0;
@@ -834,7 +839,7 @@ export default {
           if (!Number.isFinite(totalScore))
             totalScore = Number(t.totalScore) || 0;
         } else {
-          totalScore = sprintScore + h2hScore + slalomScore + drrScore;
+          totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         }
         rows.push({
           no: i + 1,
@@ -848,6 +853,8 @@ export default {
           slalomRank: slalomRank,
           drrScore: drrScore,
           drrRank: drrRank,
+          rxScore: rxScore,
+          rxRank: rxRank,
           totalScore: totalScore,
         });
       }

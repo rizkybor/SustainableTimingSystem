@@ -30,6 +30,33 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
         Math.min(6, parseInt(incoming.drr && incoming.drr.totalSection, 10) || 5)
       ),
     },
+    rx: (() => {
+      const teamsPerHeat = Math.max(
+        3,
+        Math.min(8, parseInt(incoming.rx && incoming.rx.teamsPerHeat, 10) || 4)
+      );
+      const qualifiersPerHeat = Math.max(
+        1,
+        Math.min(
+          teamsPerHeat - 1,
+          parseInt(incoming.rx && incoming.rx.qualifiersPerHeat, 10) || 2
+        )
+      );
+      const gate1Enabled =
+        incoming.rx && incoming.rx.gate1 && incoming.rx.gate1.enabled !== undefined
+          ? !!incoming.rx.gate1.enabled
+          : true;
+      const gate2Enabled =
+        incoming.rx && incoming.rx.gate2 && incoming.rx.gate2.enabled !== undefined
+          ? !!incoming.rx.gate2.enabled
+          : true;
+      return {
+        teamsPerHeat,
+        qualifiersPerHeat,
+        gate1: { enabled: gate1Enabled },
+        gate2: { enabled: gate2Enabled },
+      };
+    })(),
   };
 
   const db = await getDb();

@@ -161,6 +161,15 @@ function toObjectId(x) {
   }
 }
 
+function cleanCategoryArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((e) => {
+    const c = e && typeof e === "object" ? { ...e } : {};
+    delete c._id;
+    return c;
+  });
+}
+
 async function updateBasic(payload) {
   const id = payload && payload._id ? toObjectId(payload._id) : null;
   if (!id) return { ok: false, error: "invalid _id" };
@@ -169,17 +178,48 @@ async function updateBasic(payload) {
   const eventName =
     payload && payload.eventName ? String(payload.eventName) : "";
 
-  const update = {
-    $set: {
-      eventName: eventName,
-      signature: {
-        technicalDelegate: sig && sig.technicalDelegate === true ? true : false,
-        chiefJudge: sig && sig.chiefJudge === true ? true : false,
-        raceDirector: sig && sig.raceDirector === true ? true : false,
-      },
-      updatedAt: new Date(),
+  const set = {
+    eventName: eventName,
+    signature: {
+      technicalDelegate: sig && sig.technicalDelegate === true ? true : false,
+      chiefJudge: sig && sig.chiefJudge === true ? true : false,
+      raceDirector: sig && sig.raceDirector === true ? true : false,
     },
+    updatedAt: new Date(),
   };
+
+  if (payload && payload.levelName != null)
+    set.levelName = String(payload.levelName);
+  if (payload && payload.riverName != null)
+    set.riverName = String(payload.riverName);
+  if (payload && payload.addressDistrict != null)
+    set.addressDistrict = String(payload.addressDistrict);
+  if (payload && payload.addressSubDistrict != null)
+    set.addressSubDistrict = String(payload.addressSubDistrict);
+  if (payload && payload.addressVillage != null)
+    set.addressVillage = String(payload.addressVillage);
+  if (payload && payload.addressCity != null)
+    set.addressCity = String(payload.addressCity);
+  if (payload && payload.addressProvince != null)
+    set.addressProvince = String(payload.addressProvince);
+  if (payload && payload.addressZipCode != null)
+    set.addressZipCode = String(payload.addressZipCode);
+  if (payload && payload.addressState != null)
+    set.addressState = String(payload.addressState);
+  if (payload && payload.startDateEvent != null)
+    set.startDateEvent = String(payload.startDateEvent);
+  if (payload && payload.endDateEvent != null)
+    set.endDateEvent = String(payload.endDateEvent);
+  if (payload && Array.isArray(payload.categoriesEvent))
+    set.categoriesEvent = cleanCategoryArray(payload.categoriesEvent);
+  if (payload && Array.isArray(payload.categoriesDivision))
+    set.categoriesDivision = cleanCategoryArray(payload.categoriesDivision);
+  if (payload && Array.isArray(payload.categoriesRace))
+    set.categoriesRace = cleanCategoryArray(payload.categoriesRace);
+  if (payload && Array.isArray(payload.categoriesInitial))
+    set.categoriesInitial = cleanCategoryArray(payload.categoriesInitial);
+
+  const update = { $set: set };
 
   var db = await getDb();
   const coll = db.collection("eventsCollection");

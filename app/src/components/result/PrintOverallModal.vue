@@ -76,11 +76,14 @@
                 <th colspan="2" class="group h2h text-center">H2H</th>
                 <th colspan="2" class="group slalom text-center">Slalom</th>
                 <th colspan="2" class="group drr text-center">DRR</th>
+                <th colspan="2" class="group rx text-center">Rafting Cross</th>
 
                 <th rowspan="2" class="w-110 text-center">Total Score</th>
                 <th rowspan="2" class="w-110 text-center">Rank Overall</th>
               </tr>
               <tr>
+                <th class="sub">Score</th>
+                <th class="sub">Ranked</th>
                 <th class="sub">Score</th>
                 <th class="sub">Ranked</th>
                 <th class="sub">Score</th>
@@ -105,6 +108,8 @@
                 <td class="text-center">{{ r.slalomRank }}</td>
                 <td class="text-center">{{ r.drrScore }}</td>
                 <td class="text-center">{{ r.drrRank }}</td>
+                <td class="text-center">{{ r.rxScore }}</td>
+                <td class="text-center">{{ r.rxRank }}</td>
 
                 <td class="text-center font-weight-bold">{{ r.totalScore }}</td>
                 <td class="text-center font-weight-bold">{{ r.rank }}</td>
@@ -225,13 +230,15 @@ export default {
         var h2h = toNum(r.h2hScore);
         var slalom = toNum(r.slalomScore);
         var drr = toNum(r.drrScore);
-        var total = sprint + h2h + slalom + drr;
+        var rx = toNum(r.rxScore);
+        var total = sprint + h2h + slalom + drr + rx;
 
         return Object.assign({}, r, {
           sprintScore: sprint,
           h2hScore: h2h,
           slalomScore: slalom,
           drrScore: drr,
+          rxScore: rx,
           totalScore: total,
         });
       });

@@ -89,6 +89,60 @@
           </div>
         </div>
 
+        <!-- RAFTING CROSS -->
+        <div class="rs-card mb-3">
+          <div class="px-3 py-3">
+            <div class="h4 font-weight-bold mb-3">Rafting Cross</div>
+            <div class="font-weight-bold mb-2">Heat Setting</div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="mb-0 font-weight-500">Teams per Heat</label>
+            </div>
+            <b-form-spinbutton
+              style="border-radius: 10px"
+              v-model="draft.rx.teamsPerHeat"
+              :min="minTeamsPerHeat"
+              :max="maxTeamsPerHeat"
+              step="1"
+              class="w-100"
+            />
+            <div class="d-flex justify-content-between mb-3">
+              <small class="text-danger">Min {{ minTeamsPerHeat }} Teams</small>
+              <small class="text-danger">Max {{ maxTeamsPerHeat }} Teams</small>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="mb-0 font-weight-500">Qualifiers per Heat</label>
+            </div>
+            <b-form-spinbutton
+              style="border-radius: 10px"
+              v-model="draft.rx.qualifiersPerHeat"
+              :min="1"
+              :max="draft.rx.teamsPerHeat - 1"
+              step="1"
+              class="w-100"
+            />
+            <div class="d-flex justify-content-between mb-3">
+              <small class="text-muted"
+                >Must be less than Teams per Heat</small
+              >
+            </div>
+            <div class="font-weight-bold mb-2">Gate Penalty</div>
+            <div class="d-flex flex-wrap align-items-center" style="gap: 28px">
+              <b-form-checkbox
+                class="rs-switch"
+                switch
+                v-model="draft.rx.gate1.enabled"
+                >Gate 1</b-form-checkbox
+              >
+              <b-form-checkbox
+                class="rs-switch"
+                switch
+                v-model="draft.rx.gate2.enabled"
+                >Gate 2</b-form-checkbox
+              >
+            </div>
+          </div>
+        </div>
+
         <!-- Footer -->
         <div class="d-flex justify-content-between align-items-center mt-4">
           <b-button
@@ -119,6 +173,12 @@ const DEFAULT_SETTINGS = {
   h2h: { R1: true, R2: true, L1: true, L2: true },
   slalom: { totalGate: 14 },
   drr: { totalSection: 5 },
+  rx: {
+    teamsPerHeat: 4,
+    qualifiersPerHeat: 2,
+    gate1: { enabled: true },
+    gate2: { enabled: true },
+  },
 };
 
 export default {
@@ -131,6 +191,8 @@ export default {
     maxGate: { type: Number, default: 14 },
     minSection: { type: Number, default: 3 },
     maxSection: { type: Number, default: 6 },
+    minTeamsPerHeat: { type: Number, default: 3 },
+    maxTeamsPerHeat: { type: Number, default: 8 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
   },
@@ -193,6 +255,36 @@ export default {
         drr: {
           totalSection: toInt(src.drr && src.drr.totalSection, 5),
         },
+        rx: (() => {
+          const teamsPerHeat = Math.max(
+            this.minTeamsPerHeat,
+            Math.min(
+              this.maxTeamsPerHeat,
+              toInt(src.rx && src.rx.teamsPerHeat, 4)
+            )
+          );
+          const qualifiersPerHeat = Math.max(
+            1,
+            Math.min(
+              teamsPerHeat - 1,
+              toInt(src.rx && src.rx.qualifiersPerHeat, 2)
+            )
+          );
+          const gate1Enabled =
+            src.rx && src.rx.gate1 && src.rx.gate1.enabled !== undefined
+              ? !!src.rx.gate1.enabled
+              : true;
+          const gate2Enabled =
+            src.rx && src.rx.gate2 && src.rx.gate2.enabled !== undefined
+              ? !!src.rx.gate2.enabled
+              : true;
+          return {
+            teamsPerHeat,
+            qualifiersPerHeat,
+            gate1: { enabled: gate1Enabled },
+            gate2: { enabled: gate2Enabled },
+          };
+        })(),
       };
     },
 
@@ -247,6 +339,21 @@ export default {
       this.draft.drr.totalSection = Math.max(
         this.minSection,
         Math.min(this.maxSection, s)
+      );
+
+      const tRaw = this.draft && this.draft.rx && this.draft.rx.teamsPerHeat;
+      const t = Number.isFinite(parseInt(tRaw, 10)) ? parseInt(tRaw, 10) : 4;
+      this.draft.rx.teamsPerHeat = Math.max(
+        this.minTeamsPerHeat,
+        Math.min(this.maxTeamsPerHeat, t)
+      );
+
+      const qRaw =
+        this.draft && this.draft.rx && this.draft.rx.qualifiersPerHeat;
+      const q = Number.isFinite(parseInt(qRaw, 10)) ? parseInt(qRaw, 10) : 2;
+      this.draft.rx.qualifiersPerHeat = Math.max(
+        1,
+        Math.min(this.draft.rx.teamsPerHeat - 1, q)
       );
 
       const payload = {

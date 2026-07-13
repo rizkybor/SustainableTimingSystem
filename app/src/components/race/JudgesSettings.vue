@@ -156,6 +156,54 @@
           </b-row>
         </section>
 
+        <!-- RAFTING CROSS -->
+        <section class="rs-card mb-3">
+          <div class="rs-section-title">Rafting Cross Judges</div>
+          <b-row>
+            <b-col md="6" class="mb-3">
+              <label class="form-label">Jury Start</label>
+              <SearchableSelect
+                v-model="draft.rx.juryStart"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="false"
+              />
+            </b-col>
+            <b-col md="6" class="mb-3">
+              <label class="form-label">Jury Finish</label>
+              <SearchableSelect
+                v-model="draft.rx.juryFinish"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="false"
+              />
+            </b-col>
+          </b-row>
+
+          <b-row>
+            <b-col
+              md="3"
+              class="mb-3"
+              v-for="key in enabledRxGateKeys"
+              :key="key"
+            >
+              <label class="form-label">{{ rxGateLabel(key) }}</label>
+              <SearchableSelect
+                v-model="draft.rxValues[key]"
+                :options="selectOptions"
+                placeholder="Select jury name"
+                search-placeholder="Search jury…"
+                :clearable="true"
+                :show-empty-option="false"
+              />
+            </b-col>
+          </b-row>
+        </section>
+
         <!-- DOWN RIVER RACE -->
         <section class="rs-card mb-3">
           <div class="rs-section-title">Down River Race Judges</div>
@@ -283,6 +331,18 @@ function mergeWithDefaults(incoming) {
   var hv =
     src.h2hValues && typeof src.h2hValues === "object" ? src.h2hValues : {};
 
+  var fGate1 =
+    src.rx && src.rx.gate1 && typeof src.rx.gate1.enabled !== "undefined"
+      ? !!src.rx.gate1.enabled
+      : false;
+  var fGate2 =
+    src.rx && src.rx.gate2 && typeof src.rx.gate2.enabled !== "undefined"
+      ? !!src.rx.gate2.enabled
+      : false;
+
+  var rv =
+    src.rxValues && typeof src.rxValues === "object" ? src.rxValues : {};
+
   var totalGate = src.slalom && src.slalom.totalGate ? src.slalom.totalGate : 1;
   var totalSection = src.drr && src.drr.totalSection ? src.drr.totalSection : 1;
 
@@ -302,6 +362,15 @@ function mergeWithDefaults(incoming) {
       R2: hv.R2 ? hv.R2 : "",
       L1: hv.L1 ? hv.L1 : "",
       L2: hv.L2 ? hv.L2 : "",
+    },
+    rx: {
+      juryStart: src.rx && src.rx.juryStart ? src.rx.juryStart : "",
+      juryFinish: src.rx && src.rx.juryFinish ? src.rx.juryFinish : "",
+    },
+    rxFlags: { gate1: fGate1, gate2: fGate2 },
+    rxValues: {
+      gate1: rv.gate1 ? rv.gate1 : "",
+      gate2: rv.gate2 ? rv.gate2 : "",
     },
     slalom: {
       juryStart: src.slalom && src.slalom.juryStart ? src.slalom.juryStart : "",
@@ -401,6 +470,17 @@ export default {
       var out = [];
       var flags = this.draft && this.draft.h2hFlags ? this.draft.h2hFlags : {};
       var keys = ["R1", "R2", "L1", "L2"];
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (flags[k] === true) out.push(k);
+      }
+      return out;
+    },
+    // tampilkan hanya gate RX yang enabled (true) dari race-settings
+    enabledRxGateKeys: function () {
+      var out = [];
+      var flags = this.draft && this.draft.rxFlags ? this.draft.rxFlags : {};
+      var keys = ["gate1", "gate2"];
       for (var i = 0; i < keys.length; i++) {
         var k = keys[i];
         if (flags[k] === true) out.push(k);
@@ -581,6 +661,10 @@ export default {
       return out;
     },
 
+    rxGateLabel: function (key) {
+      return key === "gate1" ? "Gate 1" : key === "gate2" ? "Gate 2" : key;
+    },
+
     isFilled: function (v) {
       return v !== null && v !== undefined && String(v).trim() !== "";
     },
@@ -638,6 +722,18 @@ export default {
           for (var s = 1; s <= this.sectionsCount; s++) {
             pushValue(this.draft.drr.sections[s]);
           }
+        }
+      }
+
+      // RX
+      if (this.draft && this.draft.rx) {
+        pushValue(this.draft.rx.juryStart);
+        pushValue(this.draft.rx.juryFinish);
+      }
+      if (this.draft && this.draft.rxValues) {
+        var rxKeys = ["gate1", "gate2"];
+        for (var ri = 0; ri < rxKeys.length; ri++) {
+          pushValue(this.draft.rxValues[rxKeys[ri]]);
         }
       }
 
@@ -702,6 +798,21 @@ export default {
             if (this.isFilled(this.draft.drr.sections[s]))
               emails.push(String(this.draft.drr.sections[s]));
           }
+        }
+      }
+
+      if (this.draft && this.draft.rx) {
+        if (this.isFilled(this.draft.rx.juryStart))
+          emails.push(String(this.draft.rx.juryStart));
+        if (this.isFilled(this.draft.rx.juryFinish))
+          emails.push(String(this.draft.rx.juryFinish));
+      }
+      if (this.draft && this.draft.rxValues) {
+        var rxKeys2 = ["gate1", "gate2"];
+        for (var rj = 0; rj < rxKeys2.length; rj++) {
+          var rk = rxKeys2[rj];
+          if (this.isFilled(this.draft.rxValues[rk]))
+            emails.push(String(this.draft.rxValues[rk]));
         }
       }
 
@@ -790,12 +901,31 @@ export default {
           drr.finish = true;
       }
 
+      var rx = { start: false, finish: false, gate1: false, gate2: false };
+      if (this.draft && this.draft.rx) {
+        if (this.equalsEmail(this.draft.rx.juryStart, email)) rx.start = true;
+        if (this.equalsEmail(this.draft.rx.juryFinish, email))
+          rx.finish = true;
+      }
+      if (
+        this.enabledRxGateKeys &&
+        Array.isArray(this.enabledRxGateKeys) &&
+        this.draft &&
+        this.draft.rxValues
+      ) {
+        for (var ri2 = 0; ri2 < this.enabledRxGateKeys.length; ri2++) {
+          var rk2 = this.enabledRxGateKeys[ri2];
+          if (this.equalsEmail(this.draft.rxValues[rk2], email)) rx[rk2] = true;
+        }
+      }
+
       return {
         eventId: String(this.eventId),
         sprint: sprint,
         h2h: h2h,
         slalom: slalom,
         drr: drr,
+        rx: rx,
       };
     },
 
@@ -813,6 +943,10 @@ export default {
       if (!this.draft.drr)
         this.draft.drr = { juryStart: "", juryFinish: "", sections: {} };
       if (!this.draft.drr.sections) this.draft.drr.sections = {};
+      if (!this.draft.rx) this.draft.rx = { juryStart: "", juryFinish: "" };
+      if (!this.draft.rxValues) this.draft.rxValues = {};
+      if (!this.draft.rxFlags)
+        this.draft.rxFlags = { gate1: false, gate2: false };
 
       // siapkan minimal 1 gate & 1 section agar binding aman
       var gTotal = this.gatesCount || 1;
@@ -901,6 +1035,20 @@ export default {
               if (!this.isFilled(this.draft.drr.sections[idx])) {
                 this.$set(this.draft.drr.sections, idx, uid);
               }
+            }
+          }
+        } else if (disc === "rx") {
+          if (pos === "start" && !this.isFilled(this.draft.rx.juryStart)) {
+            this.draft.rx.juryStart = uid;
+          } else if (
+            pos === "finish" &&
+            !this.isFilled(this.draft.rx.juryFinish)
+          ) {
+            this.draft.rx.juryFinish = uid;
+          } else if (pos === "gate1" || pos === "gate2") {
+            if (!this.draft.rxValues) this.draft.rxValues = {};
+            if (!this.isFilled(this.draft.rxValues[pos])) {
+              this.$set(this.draft.rxValues, pos, uid);
             }
           }
         }
@@ -1096,6 +1244,38 @@ export default {
                     }
                   }
                 }
+
+                var rx = jg.rx || null;
+                if (rx) {
+                  if (rx.start === true)
+                    list.push({
+                      discipline: "rx",
+                      position: "start",
+                      userId: email2,
+                      name: "",
+                    });
+                  if (rx.finish === true)
+                    list.push({
+                      discipline: "rx",
+                      position: "finish",
+                      userId: email2,
+                      name: "",
+                    });
+                  if (rx.gate1 === true)
+                    list.push({
+                      discipline: "rx",
+                      position: "gate1",
+                      userId: email2,
+                      name: "",
+                    });
+                  if (rx.gate2 === true)
+                    list.push({
+                      discipline: "rx",
+                      position: "gate2",
+                      userId: email2,
+                      name: "",
+                    });
+                }
               }
             }
             this.applyAssignmentsToDraft({ eventId: evId, assignments: list });
@@ -1225,6 +1405,25 @@ export default {
                 : "";
             if (!this.isFilled(this.draft.drr.sections[s]) && incSec) {
               this.$set(this.draft.drr.sections, s, incSec);
+            }
+          }
+
+          // RX
+          if (!this.draft.rx) this.draft.rx = { juryStart: "", juryFinish: "" };
+          if (!this.isFilled(this.draft.rx.juryStart))
+            this.draft.rx.juryStart = incoming.rx.juryStart || "";
+          if (!this.isFilled(this.draft.rx.juryFinish))
+            this.draft.rx.juryFinish = incoming.rx.juryFinish || "";
+          if (!this.draft.rxValues) this.draft.rxValues = {};
+          var rxKeys3 = ["gate1", "gate2"];
+          for (var ri3 = 0; ri3 < rxKeys3.length; ri3++) {
+            var rk3 = rxKeys3[ri3];
+            if (
+              !this.isFilled(this.draft.rxValues[rk3]) &&
+              incoming.rxValues &&
+              incoming.rxValues[rk3]
+            ) {
+              this.$set(this.draft.rxValues, rk3, incoming.rxValues[rk3]);
             }
           }
 

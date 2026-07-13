@@ -18,6 +18,11 @@ module.exports = {
         productName: "STiming System 424",
         directories: { buildResources: "assets/icons" },
         extraResources: [{ from: "assets/icons", to: "assets/icons" }],
+        asarUnpack: ["**/*.node"],
+        files: [
+          "**/*",
+          "!node_modules/@serialport/bindings-cpp/build/**",
+        ],
 
         mac: {
           icon: "src/assets/icons/icon.png",

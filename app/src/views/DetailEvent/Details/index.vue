@@ -71,6 +71,14 @@
 
     <b-container class="mt-4 mb-5">
       <div class="mb-2 d-flex justify-content-md-end">
+        <b-button
+          class="btn-race-settings mr-2"
+          @click="goToEventOverallResult"
+        >
+          <Icon icon="mdi:trophy-outline" class="mr-1" />
+          Event Overall Result
+        </b-button>
+
         <b-button class="btn-race-settings mr-2" @click="openEventSettings">
           Event Settings
         </b-button>
@@ -1028,6 +1036,12 @@ export default {
           });
         }
       });
+    },
+
+    goToEventOverallResult() {
+      this.$router.push(
+        `/event-detail/${this.$route.params.id}/event-overall-result`
+      );
     },
 
     showResult(div, race) {

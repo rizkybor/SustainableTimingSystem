@@ -342,6 +342,7 @@
                   :key="'pool-' + rIdx + '-' + tIdx"
                 >
                   {{ t.name }}
+                  <CountryFlag :code="flagFor(t.name)" />
                 </span>
               </div>
             </div>
@@ -361,7 +362,7 @@
                 >
                   <Icon :icon="m.bye ? 'mdi:transfer-right' : 'mdi:trophy-variant-outline'" />
                   <span class="ml-1"
-                    >{{ m.winner.name }}{{ m.bye ? " — BYE, menunggu babak berikutnya" : "" }}</span
+                    >{{ m.winner.name }}{{ m.bye ? " — BYE, menunggu babak berikutnya" : "" }}<CountryFlag :code="flagFor(m.winner.name)" /></span
                   >
                 </div>
                 <!-- Team 1 -->
@@ -369,6 +370,7 @@
                   <div class="bracket__team-main">
                     <span class="bracket__name">
                       {{ m.team1.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
+                      <CountryFlag :code="flagFor(m.team1.name)" />
                     </span>
                   </div>
                   <span class="bracket__score" v-if="m.score1 != null">{{
@@ -384,6 +386,7 @@
                   <div class="bracket__team-main">
                     <span class="bracket__name">
                       {{ m.team2.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
+                      <CountryFlag :code="flagFor(m.team2.name)" />
                     </span>
                   </div>
                   <span class="bracket__score" v-if="m.score2 != null">{{
@@ -622,6 +625,7 @@
                       <!-- nama tim di bawah -->
                       <div>
                         {{ item.nameTeam }}
+                        <CountryFlag :code="flagFor(item.nameTeam)" />
                         <span
                           v-if="isByeTeam(item)"
                           class="badge badge-light ml-2"
@@ -968,6 +972,7 @@
             :categories="titleCategories"
             :isOfficial="false"
             :headToHeadCats="headToHeadCats"
+            :countryMap="_teamCountryMap"
           />
         </section>
 
@@ -980,6 +985,7 @@
             :categories="titleCategories"
             :isOfficial="false"
             :headToHeadCats="headToHeadCats"
+            :countryMap="_teamCountryMap"
           />
         </section>
 
@@ -992,6 +998,7 @@
             :categories="titleCategories"
             :isOfficial="false"
             :headToHeadCats="headToHeadCats"
+            :countryMap="_teamCountryMap"
           />
         </section>
       </template>
@@ -1009,6 +1016,8 @@ import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1208,7 +1217,9 @@ export default {
     VueHtml2pdf,
     HeadToHeadPdfResult,
     Icon,
+    CountryFlag,
   },
+  mixins: [teamFlagMixin],
   data() {
     return {
       pdfMode: "round",

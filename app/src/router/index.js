@@ -15,7 +15,7 @@ import HeadToHeadResult from "@/views/Result/HeadToHeadResult.vue";
 import SlalomResult from "@/views/Result/SlalomResult.vue";
 import DrrResult from "@/views/Result/DrrResult.vue";
 import RaftingCrossResult from "@/views/Result/RaftingCrossResult.vue";
-import OverallResult from "@/views/Result/OverallResult.vue";
+import EventOverallResult from "@/views/Result/EventOverallResult.vue";
 import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
 import AllEvent from "../views/Event/AllEvent.vue";
 import Unlock from "@/views/Unlock.vue";
@@ -35,7 +35,6 @@ const routes = [
   { path: "/events", name: "events", component: AllEvent },
   { path: "/create-new", name: "create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
-  { path: "/slalom-race", name: "slalom-race-page", component: SlalomRace },
 
   {
     path: "/event-detail/:id",
@@ -53,7 +52,7 @@ const routes = [
       { path: "drr-result", name: "DrrResult", component: DrrResult, props: true },
       { path: "headtohead-result", name: "HeadToHeadResult", component: HeadToHeadResult, props: true },
       { path: "rx-result", name: "RxResult", component: RaftingCrossResult, props: true },
-      { path: "overall-result", name: "OverallResult", component: OverallResult, props: true },
+      { path: "event-overall-result", name: "EventOverallResult", component: EventOverallResult, props: true },
     ],
   },
 

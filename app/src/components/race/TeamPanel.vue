@@ -100,7 +100,10 @@
           <!-- rows tersimpan -->
           <tr v-for="(r, idx) in rows" :key="r.bibTeam || idx" class="row-card">
             <td class="muted">{{ idx + 1 }}</td>
-            <td>{{ r.nameTeam }}</td>
+            <td>
+              {{ r.nameTeam }}
+              <CountryFlag :code="flagFor(r.nameTeam)" />
+            </td>
             <td>{{ r.bibTeam }}</td>
             <td class="text-right">
               <button
@@ -134,10 +137,13 @@
 <script>
 import { Icon } from "@iconify/vue2";
 import SearchableSelect from "@/components/SearchableSelect.vue";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 export default {
   name: "TeamPanel",
-  components: { Icon, SearchableSelect },
+  components: { Icon, SearchableSelect, CountryFlag },
+  mixins: [teamFlagMixin],
   props: {
     title: String,
     division: String,

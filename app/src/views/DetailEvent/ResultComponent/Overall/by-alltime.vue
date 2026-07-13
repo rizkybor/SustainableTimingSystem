@@ -105,7 +105,10 @@
           <tbody>
             <tr v-for="r in pageRows" :key="r.rank">
               <td class="text-center">{{ r.rank }}</td>
-              <td>{{ r.teamName }}</td>
+              <td>
+                {{ r.teamName }}
+                <CountryFlag :code="r.countryCode" />
+              </td>
               <td class="text-center">{{ r.bib }}</td>
 
               <td class="text-center">{{ r.sprintScore }}</td>
@@ -150,9 +153,11 @@
 
 <script>
 import defaultImg from "@/assets/images/default-second.jpeg";
+import CountryFlag from "@/components/common/CountryFlag.vue";
 
 export default {
   name: "OverallResult",
+  components: { CountryFlag },
   props: {
     dataEvent: { type: Object, default: () => ({}) },
     rows: { type: Array, default: () => [] },
@@ -209,6 +214,7 @@ export default {
         return {
           teamName: String(r.teamName || ""),
           bib: String(r.bib || ""),
+          countryCode: r.countryCode || "",
           sprintScore: sprint,
           sprintRank: toNum(r.sprintRank),
           h2hScore: h2h,

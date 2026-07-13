@@ -124,6 +124,7 @@
                 <td class="text-center">{{ r.heat || "" }}</td>
                 <td class="text-strong">
                   {{ r.team }}
+                  <CountryFlag :code="flagFor(r.team)" />
                   <span v-if="r.flag" class="flag-badge">{{ r.flag }}</span>
                 </td>
                 <td class="text-center">{{ r.bib }}</td>
@@ -171,7 +172,10 @@
                 :key="'ovr-' + (r.ranked || i)"
               >
                 <td class="text-center">{{ i + 1 }}</td>
-                <td class="text-center text-strong">{{ r.name }}</td>
+                <td class="text-center text-strong">
+                  {{ r.name }}
+                  <CountryFlag :code="flagFor(r.name)" />
+                </td>
                 <td class="text-center">{{ r.bib }}</td>
                 <td class="text-center">{{ r.score }}</td>
                 <td class="text-center">{{ r.ranked }}</td>
@@ -347,7 +351,10 @@
               <tr v-for="row in R.rows || []" :key="row.no">
                 <td class="text-center">{{ row.no }}</td>
                 <td class="text-center">{{ row.heat || "" }}</td>
-                <td class="text-strong">{{ row.team }}</td>
+                <td class="text-strong">
+                  {{ row.team }}
+                  <CountryFlag :code="flagFor(row.team)" />
+                </td>
                 <td class="text-center">{{ row.bib }}</td>
                 <td class="mono">{{ row.penaltyTime }}</td>
                 <td class="mono">{{ row.penaltySum }}</td>
@@ -406,8 +413,11 @@
 </template>
 
 <script>
+import CountryFlag from "@/components/common/CountryFlag.vue";
+
 export default {
   name: "HeadToHeadPdfResult",
+  components: { CountryFlag },
   props: {
     data: { type: Object, default: null },
     dataEventSafe: { type: Object, default: null },
@@ -419,6 +429,7 @@ export default {
     titleCategories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
     headToHeadCats: { type: Object, default: () => ({}) },
+    countryMap: { type: Object, default: () => ({}) },
   },
   computed: {
     eventData() {
@@ -442,6 +453,14 @@ export default {
       const mi = String(d.getMinutes()).padStart(2, "0");
       const ss = String(d.getSeconds()).padStart(2, "0");
       return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + mi + ":" + ss;
+    },
+  },
+  methods: {
+    flagFor(name) {
+      var key = String(name || "")
+        .trim()
+        .toUpperCase();
+      return (this.countryMap && this.countryMap[key]) || "";
     },
   },
 };

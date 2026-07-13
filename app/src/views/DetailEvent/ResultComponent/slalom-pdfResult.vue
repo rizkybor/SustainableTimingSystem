@@ -104,7 +104,10 @@
           <!-- RUN 1 -->
           <tr>
             <td class="center" :rowspan="2">{{ i + 1 }}</td>
-            <td class="text-strong" :rowspan="2">{{ teamName(t) }}</td>
+            <td class="text-strong" :rowspan="2">
+              {{ teamName(t) }}
+              <CountryFlag :code="t && t.countryCode" />
+            </td>
             <td class="center" :rowspan="2">{{ firstRunRank(t) }}</td>
             <td class="center" :rowspan="2">{{ bib(t) }}</td>
 
@@ -203,8 +206,11 @@
 </template>
 
 <script>
+import CountryFlag from "@/components/common/CountryFlag.vue";
+
 export default {
   name: "SlalomPdfResult",
+  components: { CountryFlag },
   props: {
     data: {
       type: Object,

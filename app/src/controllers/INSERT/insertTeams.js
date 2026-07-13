@@ -29,6 +29,7 @@ function sanitizeTeam(t = {}) {
     praStart:      String(t.praStart || "").trim(),
     intervalRace:  String(t.intervalRace || "").trim(),
     statusId:      n(t.statusId),
+    countryCode:   String(t.countryCode || "").trim().toUpperCase(),
     createdAt:     new Date(),
     updatedAt:     new Date(),
   };
@@ -81,6 +82,7 @@ async function updateTeamById(payload = {}) {
   if (payload.nameTeam !== undefined) $set.nameTeam = String(payload.nameTeam || "").trim().toUpperCase();
   if (payload.bibTeam  !== undefined) $set.bibTeam  = String(payload.bibTeam  || "").trim();
   if (payload.statusId!== undefined) $set.statusId = n(payload.statusId);
+  if (payload.countryCode !== undefined) $set.countryCode = String(payload.countryCode || "").trim().toUpperCase();
 
   const result = await collUpdateOneSafe(oid, $set);
   return result;

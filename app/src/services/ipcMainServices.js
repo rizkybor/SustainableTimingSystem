@@ -13,6 +13,7 @@ const {
   upsertRoundRows,
   upsertAllRounds,
   upsertOverall,
+  getOverall,
 } = require("../controllers/INSERT/upsertHeadToHead.js");
 
 const {
@@ -53,7 +54,8 @@ const {
   insertNewEvent,
   updateEventPoster,
   updateBasic,
-  updateAssets
+  updateAssets,
+  setResultsOfficial,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -65,6 +67,7 @@ const {
 const {
   upsertEventResultsDoc,
   getEventResultsAggregate,
+  getEventResultsByEventId,
 } = require("../controllers/INSERT/insertResultOverall.js");
 
 const {
@@ -104,6 +107,7 @@ const {
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
+const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -218,6 +222,18 @@ function setupIPCMainHandlers() {
       event.reply("get-events-byid-reply", data);
     } catch (error) {
       event.reply("get-events-byid-reply", []);
+    }
+  });
+
+  ipcMain.on("delete-event", async (event, id) => {
+    try {
+      const ok = await deleteEventById(id);
+      event.reply("delete-event-reply", { ok });
+    } catch (error) {
+      event.reply("delete-event-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
     }
   });
 
@@ -341,6 +357,20 @@ function setupIPCMainHandlers() {
     }
   });
 
+  ipcMain.on("event:set-official", async (evt, payload) => {
+    try {
+      const eventId = payload && payload.eventId;
+      const value = payload && payload.value;
+      const resp = await setResultsOfficial(eventId, value);
+      evt.reply("event:set-official-reply", resp);
+    } catch (e) {
+      evt.reply("event:set-official-reply", {
+        ok: false,
+        error: e && e.message ? e.message : String(e),
+      });
+    }
+  });
+
   // SAVE SPRINT RESULT
   ipcMain.on("insert-sprint-result", async (event, datas) => {
     try {
@@ -381,7 +411,7 @@ function setupIPCMainHandlers() {
   // LOAD SLALOM RESULT
   ipcMain.on("get-slalom-result", async (event, query = {}) => {
     try {
-      const data = await getSlalomResult(query.eventId);
+      const data = await getSlalomResult(query);
       event.reply("get-slalom-result-reply", { ok: true, items: data });
     } catch (error) {
       event.reply("get-slalom-result-reply", {
@@ -405,7 +435,7 @@ function setupIPCMainHandlers() {
   // LOAD DRR RESULT
   ipcMain.on("get-drr-result", async (event, query = {}) => {
     try {
-      const data = await getDrrResult(query.eventId);
+      const data = await getDrrResult(query);
       event.reply("get-drr-result-reply", { ok: true, items: data });
     } catch (error) {
       event.reply("get-drr-result-reply", {
@@ -769,6 +799,23 @@ ipcMain.on("event-results:get", async function (event, filters) {
   }
 });
 
+// GET: semua dokumen Overall (semua bucket division/race/initial) dalam satu event
+ipcMain.on("event-results:get-all-by-event", async function (event, eventId) {
+  try {
+    var items = await getEventResultsByEventId(eventId);
+    event.reply("event-results:get-all-by-event-reply", {
+      ok: true,
+      items: items,
+    });
+  } catch (error) {
+    event.reply("event-results:get-all-by-event-reply", {
+      ok: false,
+      items: [],
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+});
+
 // HEAD 2 HEAD
 ipcMain.on("h2h:bracket:get", async (e, bucket) => {
   try {
@@ -820,6 +867,14 @@ ipcMain.on("h2h:overall:save", async (e, payload) => {
     e.reply("h2h:overall:save-reply", await upsertOverall(bucket, overallPkg));
   } catch (err) {
     e.reply("h2h:overall:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:overall:get", async (e, bucket) => {
+  try {
+    e.reply("h2h:overall:get-reply", await getOverall(bucket));
+  } catch (err) {
+    e.reply("h2h:overall:get-reply", { ok: false, error: String(err) });
   }
 });
 

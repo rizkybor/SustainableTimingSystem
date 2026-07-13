@@ -82,6 +82,7 @@
             <td class="text-center">{{ i + 1 }}</td>
             <td class="text-strong">
               {{ row && row.nameTeam ? row.nameTeam : "-" }}
+              <CountryFlag :code="row && row.countryCode" />
             </td>
             <td class="text-center">
               {{ row && row.bibTeam ? row.bibTeam : "-" }}
@@ -192,8 +193,11 @@
 </template>
 
 <script>
+import CountryFlag from "@/components/common/CountryFlag.vue";
+
 export default {
   name: "SprintPdfResult",
+  components: { CountryFlag },
   props: {
     data: { type: Object, required: true },
     dataParticipant: { type: Array, required: true },

@@ -47,26 +47,17 @@
           Dashboard
         </router-link>
         <span class="sep">›</span>
-        <span class="muted">Head to Head Result</span>
+        <span class="muted">Event Overall Result</span>
       </div>
 
       <div class="right-actions">
         <b-button
-          :disabled="results.length === 0 || loading"
+          :disabled="buckets.length === 0 || loading"
           variant="primary"
           class="action-btn"
           @click="generatePdf"
         >
           <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
-
-        <b-button
-          variant="outline-primary"
-          class="action-btn"
-          :disabled="loading"
-          @click="fetchEventResultsAggregate"
-        >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
         </b-button>
       </div>
     </div>
@@ -74,12 +65,10 @@
     <!-- Card -->
     <div class="card">
       <div class="card-back d-flex justify-content-between align-items-center">
-        <!-- Back di kiri -->
         <b-button variant="link" class="p-0 back-link" @click="goBack">
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <!-- Stamp di kanan: klik untuk toggle -->
         <span
           class="unofficial-stamp"
           :class="{ 'official-stamp': isOfficial }"
@@ -93,13 +82,9 @@
         </span>
       </div>
 
-      <!-- EVENT HEADER -->
       <div class="event-header">
         <h2 class="event-name">
-          <span class="muted"
-            >HEAD TO HEAD RESULT | {{ h2hCats.initial }} -
-            {{ h2hCats.division }} {{ h2hCats.race }}
-          </span>
+          <span class="muted">EVENT OVERALL RESULT — SELURUH KATEGORI</span>
         </h2>
       </div>
 
@@ -110,60 +95,91 @@
         <b-spinner small class="mr-2" /> Loading results...
       </div>
 
-      <!-- PODIUM -->
-      <div class="rx-podium mb-4" v-if="!loading && podium.length">
-        <b-row>
-          <b-col md="3" v-for="p in podium" :key="p.ranked">
-            <div class="rx-podium-card">
-              <div class="rx-podium-place">#{{ p.ranked }}</div>
-              <div class="rx-podium-name">
-                {{ p.name || "-" }}
-                <CountryFlag :code="flagFor(p.name)" />
-              </div>
-              <div class="rx-podium-bib">BIB {{ p.bib || "-" }}</div>
-            </div>
-          </b-col>
-        </b-row>
-      </div>
-
-      <!-- Empty state -->
       <EmptyStateFull
-        v-if="!loading && results.length === 0"
+        v-if="!loading && buckets.length === 0"
         :img-src="require('@/assets/images/404.png')"
         title="No data available"
-        subtitle="Hasil Head to Head belum tersedia untuk kategori ini."
+        subtitle="Belum ada Overall Score yang tersimpan untuk event ini."
         primary-text="Kembali ke Event"
         @primary="goBack"
       />
 
-      <!-- Table -->
-      <div v-else class="table-wrap">
-        <table class="result-table">
-          <thead>
-            <tr>
-              <th class="text-center">No</th>
-              <th class="text-start">Team Name</th>
-              <th class="text-center">BIB</th>
-              <th class="text-center">Ranked</th>
-              <th class="text-center">Score</th>
-            </tr>
-          </thead>
+      <div v-else class="bucket-list">
+        <div
+          class="bucket-block"
+          v-for="(b, bIdx) in buckets"
+          :key="bIdx"
+        >
+          <div class="bucket-title">
+            {{ b.divisionName }} {{ b.raceName }} – {{ b.initialName }}
+          </div>
 
-          <tbody>
-            <tr v-for="(r, idx) in results" :key="idx">
-              <td class="text-center">{{ idx + 1 }}</td>
-              <td>
-                <div class="team">
-                  {{ r.name || "-" }}
-                  <CountryFlag :code="flagFor(r.name)" />
-                </div>
-              </td>
-              <td class="text-center">{{ r.bib || "-" }}</td>
-              <td class="text-center">{{ r.ranked || "-" }}</td>
-              <td class="text-center">{{ r.score || 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="table-wrap">
+            <table class="result-table-overall">
+              <thead>
+                <tr>
+                  <th rowspan="2" class="w-60 text-center">No</th>
+                  <th rowspan="2" class="team-col">Team Name</th>
+                  <th rowspan="2" class="w-70 text-center">BIB</th>
+
+                  <th colspan="2" class="group sprint text-center">Sprint</th>
+                  <th colspan="2" class="group h2h text-center">H2H</th>
+                  <th colspan="2" class="group slalom text-center">Slalom</th>
+                  <th colspan="2" class="group drr text-center">DRR</th>
+                  <th colspan="2" class="group rx text-center">
+                    Rafting Cross
+                  </th>
+
+                  <th rowspan="2" class="w-110 text-center">Total Score</th>
+                  <th rowspan="2" class="w-110 text-center">Rank Overall</th>
+                </tr>
+                <tr>
+                  <th class="sub">Score</th>
+                  <th class="sub">Ranked</th>
+                  <th class="sub">Score</th>
+                  <th class="sub">Ranked</th>
+                  <th class="sub">Score</th>
+                  <th class="sub">Ranked</th>
+                  <th class="sub">Score</th>
+                  <th class="sub">Ranked</th>
+                  <th class="sub">Score</th>
+                  <th class="sub">Ranked</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in b.rows" :key="i">
+                  <td class="text-center">{{ i + 1 }}</td>
+                  <td>
+                    {{ row.teamName || "-" }}
+                    <CountryFlag :code="flagFor(row.teamName)" />
+                  </td>
+                  <td class="text-center">{{ row.bib || "-" }}</td>
+
+                  <td class="text-center">{{ row.sprintScore || 0 }}</td>
+                  <td class="text-center">{{ row.sprintRank || "-" }}</td>
+                  <td class="text-center">{{ row.h2hScore || 0 }}</td>
+                  <td class="text-center">{{ row.h2hRank || "-" }}</td>
+                  <td class="text-center">{{ row.slalomScore || 0 }}</td>
+                  <td class="text-center">{{ row.slalomRank || "-" }}</td>
+                  <td class="text-center">{{ row.drrScore || 0 }}</td>
+                  <td class="text-center">{{ row.drrRank || "-" }}</td>
+                  <td class="text-center">{{ row.rxScore || 0 }}</td>
+                  <td class="text-center">{{ row.rxRank || "-" }}</td>
+
+                  <td class="text-center font-weight-bold">
+                    {{ row.totalScore || 0 }}
+                  </td>
+                  <td class="text-center font-weight-bold">
+                    {{ row.rank || "-" }}
+                  </td>
+                </tr>
+                <tr v-if="!b.rows.length">
+                  <td class="empty" colspan="15">No data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -193,77 +209,48 @@
       @beforeDownload="onBeforeDownload"
     >
       <section slot="pdf-content">
-        <HeadToHeadPdf
+        <EventOverallPdf
           :data="pdfEventData"
-          pdfMode="overall"
-          :pdfOverallPkg="pdfOverallPkg"
+          :buckets="buckets"
           :isOfficial="isOfficial"
-          :headToHeadCats="h2hCats"
-          :countryMap="_teamCountryMap"
         />
       </section>
     </vue-html2pdf>
-
-    <PrintOverallModal
-      centered
-      :show="showOverallModal"
-      :dataEvent="eventInfo"
-      :aggregate="dataAggregate"
-      :raceCats="h2hCats"
-      @close="showOverallModal = false"
-    />
   </div>
 </template>
 
 <script>
 import { ipcRenderer } from "electron";
-import HeadToHeadPdf from "../DetailEvent/ResultComponent/head-to-head-pdfResult.vue";
+import EventOverallPdf from "../DetailEvent/ResultComponent/Overall/event-overall-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
-import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 
-const RACE_PAYLOAD_KEY = "raceStartPayload";
-
-function safeParse(str, fallback) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
-  }
-}
-
 export default {
-  name: "HeadToHeadResult",
+  name: "EventOverallResult",
   components: {
     Icon,
     EmptyStateFull,
-    HeadToHeadPdf,
+    EventOverallPdf,
     VueHtml2pdf,
-    PrintOverallModal,
     CountryFlag,
   },
   mixins: [teamFlagMixin],
-
   data() {
     return {
       defaultImg,
       isOfficial: false,
       loading: false,
       error: "",
-      results: [],
-      podium: [],
-      showPdf: false,
       eventInfo: {},
-      showOverallModal: false,
-      dataAggregate: null,
+      buckets: [],
+      showPdf: false,
     };
   },
-
   computed: {
     hasEventLogo() {
       var logos = this.eventInfo.eventFiles;
@@ -283,58 +270,25 @@ export default {
       }
       return "";
     },
-    h2hCats() {
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      const q = this.$route.query || {};
-      return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
-      };
-    },
     pdfFilename() {
-      const parts = [];
+      var parts = [];
       if (this.eventInfo && this.eventInfo.eventName) {
         parts.push(this.eventInfo.eventName);
       }
-      parts.push(
-        "HEAD TO HEAD (" +
-          (this.h2hCats.initial || "-") +
-          " - " +
-          (this.h2hCats.division || "-") +
-          " " +
-          (this.h2hCats.race || "-") +
-          ")"
-      );
+      parts.push("EVENT OVERALL - SELURUH KATEGORI");
       return parts.join(" - ");
     },
     pdfEventData() {
       return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
     },
-    pdfOverallPkg() {
-      return {
-        overallRows: (this.results || []).map((r) => ({
-          name: r.name,
-          bib: r.bib,
-          ranked: r.ranked,
-          score: r.score,
-        })),
-      };
-    },
   },
-
   async created() {
-    const q = this.$route.query || {};
-    if (q.eventId) {
-      await this.loadEventById(q.eventId);
+    var eventId = String(this.$route.params.id || "");
+    if (eventId) {
+      await this.loadEventById(eventId);
+      await this.loadAllBuckets(eventId);
     }
-    await this.loadH2HResult();
   },
-
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
@@ -359,16 +313,19 @@ export default {
     },
 
     async toggleOfficial() {
-      const q = this.$route.query || {};
-      const eventId = String(q.eventId || this.eventInfo._id || "");
+      var eventId = String(this.$route.params.id || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
 
-      const nextValue = !this.isOfficial;
+      var nextValue = !this.isOfficial;
+      var self = this;
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
-            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+            self.isOfficial = nextValue;
+            self.eventInfo = {
+              ...self.eventInfo,
+              resultsOfficial: nextValue,
+            };
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
@@ -385,113 +342,8 @@ export default {
       });
     },
 
-    resolveBucket() {
-      const q = this.$route.query || {};
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      return {
-        eventId: String(q.eventId || b.eventId || ""),
-        initialId: String(q.initialId || b.initialId || ""),
-        raceId: String(q.raceId || b.raceId || ""),
-        divisionId: String(q.divisionId || b.divisionId || ""),
-      };
-    },
-
-    async loadH2HResult() {
-      const bucket = this.resolveBucket();
-      if (
-        !bucket.eventId ||
-        !bucket.initialId ||
-        !bucket.raceId ||
-        !bucket.divisionId
-      ) {
-        this.error = "Parameter hasil tidak lengkap.";
-        return;
-      }
-      if (typeof ipcRenderer === "undefined") return;
-
-      this.loading = true;
-      this.error = "";
-      await new Promise((resolve) => {
-        ipcRenderer.once("h2h:overall:get-reply", (_e, res) => {
-          this.loading = false;
-          if (res && res.ok && res.item) {
-            const overallRows = Array.isArray(res.item.overallRows)
-              ? res.item.overallRows
-              : [];
-            this.results = overallRows
-              .slice()
-              .sort((a, b) => (a.ranked || 999) - (b.ranked || 999));
-            this.podium = this.results.filter(
-              (r) => Number(r.ranked) > 0 && Number(r.ranked) <= 4
-            );
-          } else {
-            this.results = [];
-            this.podium = [];
-            this.error = (res && res.error) || "";
-          }
-          resolve();
-        });
-        ipcRenderer.send("h2h:overall:get", bucket);
-      });
-    },
-
-    fetchEventResultsAggregate() {
-      var f = this.resolveBucket();
-      if (!f.eventId || !f.initialId || !f.raceId || !f.divisionId) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          message: "Load Overall",
-          detail: "Parameter kategori tidak lengkap.",
-        });
-        return;
-      }
-      var self = this;
-      ipcRenderer.send("event-results:get", f);
-      ipcRenderer.once("event-results:get-reply", function (_e, res) {
-        if (res && res.ok && res.doc) {
-          self.dataAggregate = self.buildAggregateFromDoc(
-            res.doc,
-            self.eventInfo
-          );
-          self.showOverallModal = true;
-        } else {
-          var det = res && res.error ? res.error : "Tidak ada data aggregate.";
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            message: "Load Overall",
-            detail: det,
-          });
-        }
-      });
-    },
-
-    buildAggregateFromDoc(doc, eventInfo) {
-      var headerTitle =
-        (doc && doc.eventName) || (eventInfo && eventInfo.eventName) || "";
-      var sub = "";
-      if (doc && doc.divisionName) sub = String(doc.divisionName);
-      if (doc && doc.initialName)
-        sub = sub
-          ? sub + " • " + String(doc.initialName)
-          : String(doc.initialName);
-      var d = new Date();
-      var dateStr = d.toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-      var header = {
-        title: headerTitle || "—",
-        subTitle: sub || "—",
-        dateStr: dateStr,
-        official: false,
-        chiefJudge:
-          eventInfo && eventInfo.chiefJudge ? eventInfo.chiefJudge : "",
-      };
+    // bangun rows satu bucket (per Division/Race/Initial) dari dokumen eventResult
+    buildBucketRows(doc) {
       var rows = [];
       var arr = doc && Array.isArray(doc.eventResult) ? doc.eventResult : [];
       for (var i = 0; i < arr.length; i++) {
@@ -537,8 +389,8 @@ export default {
           t && t.totalScore != null
             ? Number(t.totalScore) || 0
             : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+
         rows.push({
-          no: i + 1,
           teamName: t.teamName || "",
           bib: t.bib || "",
           countryCode: this.flagFor(t.teamName),
@@ -555,11 +407,59 @@ export default {
           totalScore: totalScore,
         });
       }
+
       rows.sort(function (a, b) {
-        return b.totalScore - a.totalScore;
+        if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+        var aBest = Math.min(
+          a.sprintRank || Infinity,
+          a.h2hRank || Infinity,
+          a.slalomRank || Infinity,
+          a.drrRank || Infinity,
+          a.rxRank || Infinity
+        );
+        var bBest = Math.min(
+          b.sprintRank || Infinity,
+          b.h2hRank || Infinity,
+          b.slalomRank || Infinity,
+          b.drrRank || Infinity,
+          b.rxRank || Infinity
+        );
+        if (aBest !== bBest) return aBest - bBest;
+        return String(a.teamName || "").localeCompare(String(b.teamName || ""));
       });
-      for (var k = 0; k < rows.length; k++) rows[k].no = k + 1;
-      return { header: header, rows: rows };
+
+      for (var k = 0; k < rows.length; k++) rows[k].rank = k + 1;
+      return rows;
+    },
+
+    async loadAllBuckets(eventId) {
+      if (typeof ipcRenderer === "undefined") return;
+      this.loading = true;
+      this.error = "";
+      await new Promise((resolve) => {
+        ipcRenderer.once(
+          "event-results:get-all-by-event-reply",
+          (_e, res) => {
+            this.loading = false;
+            if (res && res.ok && Array.isArray(res.items)) {
+              var self = this;
+              this.buckets = res.items.map(function (doc) {
+                return {
+                  divisionName: doc.divisionName || "-",
+                  raceName: doc.raceName || "-",
+                  initialName: doc.initialName || "-",
+                  rows: self.buildBucketRows(doc),
+                };
+              });
+            } else {
+              this.buckets = [];
+              this.error = (res && res.error) || "";
+            }
+            resolve();
+          }
+        );
+        ipcRenderer.send("event-results:get-all-by-event", eventId);
+      });
     },
 
     async generatePdf() {
@@ -583,7 +483,6 @@ export default {
 </script>
 
 <style scoped>
-/* ===== Page Layout ===== */
 .result-wrap {
   padding: 18px;
   background: #f7f7f9;
@@ -634,43 +533,93 @@ export default {
   margin: 16px 0 20px;
 }
 .event-name {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   color: #2d2d2d;
   margin: 0;
+}
+
+.loading-row {
+  display: inline-flex;
+  align-items: center;
+  margin: 8px 0 12px;
+  color: #6a6f7a;
+}
+
+.bucket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 16px;
+}
+.bucket-block {
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.bucket-title {
+  padding: 10px 16px;
+  font-weight: 800;
+  background: #f4f6f9;
+  border-bottom: 1px solid #e8e8e8;
+  text-transform: uppercase;
 }
 
 .table-wrap {
   width: 100%;
   overflow-x: auto;
 }
-.result-table {
+.result-table-overall {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 8px;
+  border-collapse: collapse;
 }
-.result-table thead th {
-  background: #f4f5f7;
-  color: #6a6f7a;
-  font-weight: 700;
-  font-size: 14px;
-  padding: 12px 14px;
-  border-bottom: 1px solid #eceef2;
-}
-.result-table tbody tr {
-  background: #fff;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
-}
-.result-table tbody td {
-  padding: 14px;
-  border-top: 1px solid #f0f2f6;
-}
-.team {
-  font-weight: 600;
-  color: #2b2f38;
-}
-.bold {
+.result-table-overall thead th {
+  border: 1px solid #ddd;
+  padding: 8px 6px;
+  background: #f9fafb;
+  vertical-align: middle;
   font-weight: 800;
+  font-size: 12px;
+}
+.result-table-overall thead th.group.sprint {
+  background: #d9e8ff;
+}
+.result-table-overall thead th.group.h2h {
+  background: #ffe0c7;
+}
+.result-table-overall thead th.group.slalom {
+  background: #fff2b8;
+}
+.result-table-overall thead th.group.drr {
+  background: #ccf7d9;
+}
+.result-table-overall thead th.group.rx {
+  background: #f3d9ff;
+}
+.result-table-overall thead th.sub {
+  background: #ffffff;
+  font-weight: 700;
+}
+.result-table-overall tbody td {
+  border: 1px solid #eee;
+  padding: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.result-table-overall tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+.team-col {
+  min-width: 180px;
+}
+.w-60 {
+  width: 50px;
+}
+.w-70 {
+  width: 60px;
+}
+.w-110 {
+  width: 90px;
 }
 .text-center {
   text-align: center;
@@ -679,13 +628,6 @@ export default {
   text-align: center;
   color: #9aa0aa;
   padding: 16px;
-}
-
-.loading-row {
-  display: inline-flex;
-  align-items: center;
-  margin: 8px 0 12px;
-  color: #6a6f7a;
 }
 
 .unofficial-stamp {
@@ -701,7 +643,6 @@ export default {
   letter-spacing: 1px;
   display: inline-block;
 }
-
 .official-stamp {
   color: #148a3b;
   border-color: #148a3b;
@@ -760,30 +701,10 @@ export default {
   justify-content: center;
   box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
 }
-
 .event-logo-img {
   width: 140px;
   height: 140px;
   object-fit: contain;
   border-radius: 10px;
-}
-
-.rx-podium-card {
-  border: 1px solid #e6ebf4;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
-  margin-bottom: 12px;
-}
-.rx-podium-place {
-  font-weight: 800;
-  color: #325a8f;
-}
-.rx-podium-name {
-  font-weight: 700;
-}
-.rx-podium-bib {
-  color: #6c7a93;
-  font-size: 12px;
 }
 </style>

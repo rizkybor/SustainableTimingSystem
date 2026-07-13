@@ -131,7 +131,10 @@
           <b-col md="3" v-for="p in podium" :key="p.overallRank">
             <div class="rx-podium-card">
               <div class="rx-podium-place">#{{ p.overallRank }}</div>
-              <div class="rx-podium-name">{{ p.nameTeam || "-" }}</div>
+              <div class="rx-podium-name">
+                {{ p.nameTeam || "-" }}
+                <CountryFlag :code="flagFor(p.nameTeam)" />
+              </div>
               <div class="rx-podium-bib">BIB {{ p.bibTeam || "-" }}</div>
             </div>
           </b-col>
@@ -165,7 +168,10 @@
             <tr v-for="(r, idx) in rows" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
-                <div class="team">{{ r.nameTeam || "-" }}</div>
+                <div class="team">
+                  {{ r.nameTeam || "-" }}
+                  <CountryFlag :code="flagFor(r.nameTeam)" />
+                </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
               <td class="text-center">{{ r.raceTime || "-" }}</td>
@@ -210,7 +216,7 @@
       <section slot="pdf-content">
         <RaftingCrossPdf
           :data="pdfEventData"
-          :dataParticipant="rows"
+          :dataParticipant="pdfRows"
           :categories="pdfCategories"
           :isOfficial="isOfficial"
           :rxCats="rxCats"
@@ -248,6 +254,7 @@
           :bracket="bracketDoc"
           :isOfficial="isOfficial"
           :rxCats="rxCats"
+          :countryMap="_teamCountryMap"
         />
       </section>
     </vue-html2pdf>
@@ -307,6 +314,8 @@ import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -328,7 +337,9 @@ export default {
     RaftingCrossOverallPdf,
     VueHtml2pdf,
     PrintOverallModal,
+    CountryFlag,
   },
+  mixins: [teamFlagMixin],
   data() {
     return {
       defaultImg,
@@ -422,6 +433,12 @@ export default {
       parts.push("RAFTING CROSS OVERALL - ALL CATEGORIES");
       return parts.join(" - ");
     },
+    pdfRows() {
+      return (this.rows || []).map((r) => ({
+        ...r,
+        countryCode: this.flagFor(r.nameTeam),
+      }));
+    },
     pdfCategories() {
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
@@ -445,13 +462,31 @@ export default {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
-    officialKey() {
+    async toggleOfficial() {
       const q = this.$route.query || {};
-      return `resultOfficialMode:${q.eventId || "global"}`;
-    },
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
+      const eventId = String(q.eventId || this.eventInfo._id || "");
+      if (!eventId || typeof ipcRenderer === "undefined") return;
+
+      const nextValue = !this.isOfficial;
+      await new Promise((resolve) => {
+        ipcRenderer.once("event:set-official-reply", (_e, res) => {
+          if (res && res.ok) {
+            this.isOfficial = nextValue;
+            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Update Status",
+              detail:
+                res && res.error
+                  ? res.error
+                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+      });
     },
     async loadEventById(eventId) {
       try {
@@ -461,6 +496,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
+            this.isOfficial = !!this.eventInfo.resultsOfficial;
             resolve();
           });
         });
@@ -631,6 +667,7 @@ export default {
           no: i + 1,
           teamName: t.teamName || "",
           bib: t.bib || "",
+          countryCode: this.flagFor(t.teamName),
           sprintScore: sprintScore,
           sprintRank: sprintRank,
           h2hScore: h2hScore,
@@ -733,6 +770,10 @@ export default {
               ? doc.overallRows
                   .slice()
                   .sort((a, b2) => (a.ranked || 999) - (b2.ranked || 999))
+                  .map((r) => ({
+                    ...r,
+                    countryCode: this.flagFor(r.nameTeam),
+                  }))
               : [];
             return {
               initialName: b.initialName || "-",

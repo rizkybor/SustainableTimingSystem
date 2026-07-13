@@ -309,7 +309,10 @@
               :key="team.id || 'slot-' + idx"
             >
               <td class="text-center">{{ team.seed || "-" }}</td>
-              <td class="text-left large-bold">{{ team.name || "-" }}</td>
+              <td class="text-left large-bold">
+                {{ team.name || "-" }}
+                <CountryFlag :code="flagFor(team.name)" />
+              </td>
               <td class="text-center">{{ team.bibTeam || "-" }}</td>
               <td class="text-center text-monospace">
                 {{ heat.results[idx].startTime || "-" }}
@@ -441,13 +444,16 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 const PREFERRED_PATH = "/dev/tty.usbserial-120";
 
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
-  components: { Icon, EmptyCard, OperationTimePanel },
+  components: { Icon, EmptyCard, OperationTimePanel, CountryFlag },
+  mixins: [teamFlagMixin],
   data() {
     return {
       isLoading: false,
@@ -1309,29 +1315,7 @@ export default {
 
       if (typeof ipcRenderer !== "undefined") {
         ipcRenderer.send("rx:overall:save", { bucket, overallPkg });
-
-        const K_RX = "RX";
-        const evPayload = {
-          eventId: bucket.eventId,
-          initialId: bucket.initialId,
-          raceId: bucket.raceId,
-          divisionId: bucket.divisionId,
-          eventName: bucket.eventName,
-          initialName: bucket.initialName,
-          raceName: bucket.raceName,
-          divisionName: bucket.divisionName,
-          eventResult: overallPkg.overallRows.map((r) => ({
-            teamId: r.teamId,
-            teamName: r.nameTeam,
-            bib: r.bibTeam,
-            categories: [
-              { name: K_RX, rankedByCats: r.ranked, scored: r.score || 0 },
-            ],
-            totalRanked: r.ranked,
-            totalScore: r.score || 0,
-          })),
-        };
-        ipcRenderer.send("event-results:upsert", evPayload);
+        await this.upsertEventResultsRX(bucket, overallPkg.overallRows);
       }
 
       if (this.$bvToast) {
@@ -1341,6 +1325,150 @@ export default {
           solid: true,
         });
       }
+    },
+
+    // === merge hasil RX ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResultsRX(bucket, overallRows) {
+      if (typeof ipcRenderer === "undefined") return;
+      const now = new Date();
+      const K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+
+      const baseFilter = {
+        eventId: String(bucket.eventId || ""),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      const incoming = new Map();
+      (overallRows || []).forEach((r) => {
+        const key = String(r.teamId || r.bibTeam || "");
+        if (!key) return;
+        incoming.set(key, {
+          teamId: r.teamId || "",
+          teamName: r.nameTeam || "",
+          bib: r.bibTeam || "",
+          rxCat: {
+            name: K.RX,
+            rankedByCats: r.ranked,
+            scored: r.score || 0,
+          },
+          totalRanked: r.ranked,
+          totalScore: r.score || 0,
+        });
+      });
+
+      const getExisting = () =>
+        new Promise((resolve) => {
+          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+
+      let existingDoc = null;
+      try {
+        const gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      const payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: bucket.eventName || "",
+        initialName: bucket.initialName || "",
+        raceName: bucket.raceName || "",
+        divisionName: bucket.divisionName || "",
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
+
+        const map = new Map();
+        const safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        safeArr.forEach((row) => {
+          const k = String((row && row.teamId) || (row && row.bib) || "");
+          if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+        });
+
+        incoming.forEach((inc, k) => {
+          let prev = map.get(k);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: null,
+              totalScore: 0,
+            };
+          }
+
+          const prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          const foundIdx = prevCats.findIndex(
+            (c) => String((c && c.name) || "").toUpperCase() === K.RX
+          );
+          if (foundIdx >= 0) {
+            prevCats[foundIdx] = inc.rxCat;
+          } else {
+            prevCats.push(inc.rxCat);
+          }
+
+          map.set(k, {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+        });
+
+        payload.eventResult = Array.from(map.values());
+      } else {
+        payload.eventResult = Array.from(incoming.values()).map((inc) => ({
+          teamId: inc.teamId,
+          teamName: inc.teamName,
+          bib: inc.bib,
+          categories: [
+            inc.rxCat,
+            { name: K.SPRINT, rankedByCats: null, scored: 0 },
+            { name: K.H2H, rankedByCats: null, scored: 0 },
+            { name: K.SLALOM, rankedByCats: null, scored: 0 },
+            { name: K.DRR, rankedByCats: null, scored: 0 },
+          ],
+          totalRanked: inc.totalRanked,
+          totalScore: inc.totalScore,
+        }));
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", (_e, res) => {
+        const ok = res && res.ok ? true : false;
+        if (!ok && this.$bvToast) {
+          this.$bvToast.toast(res && res.error ? res.error : "Unknown error", {
+            title: "Upsert failed",
+            variant: "danger",
+            solid: true,
+          });
+        }
+      });
     },
 
     /* ============ PERSISTENCE ============ */

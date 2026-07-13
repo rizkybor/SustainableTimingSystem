@@ -208,6 +208,7 @@
               >
                 <div class="team">
                   {{ r.nameTeam || "-" }}
+                  <CountryFlag :code="flagFor(r.nameTeam)" />
                 </div>
               </td>
 
@@ -397,6 +398,8 @@ import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 /* ========= Helpers ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -416,7 +419,9 @@ export default {
     SlalomPdf,
     PrintOverallModal,
     VueHtml2pdf,
+    CountryFlag,
   },
+  mixins: [teamFlagMixin],
   data() {
     return {
       showOverallModal: false,
@@ -624,6 +629,7 @@ export default {
             map[key] = {
               nameTeam: nameTeam,
               bibTeam: bibTeam,
+              countryCode: self.flagFor(nameTeam),
               statusId: statusId,
               result: [], // akan diisi maksimal 2 objek run
               ranked: 0,
@@ -735,11 +741,6 @@ export default {
   },
 
   async created() {
-    // OFFICIAL toggle per event
-    const k = this.officialKey();
-    const saved = localStorage.getItem(k);
-    if (saved !== null) this.isOfficial = saved === "1";
-
     const q = this.$route.query || {};
     if (q.eventId) await this.loadEventById(q.eventId);
 
@@ -845,6 +846,7 @@ export default {
           no: i + 1,
           teamName: teamName,
           bib: bib,
+          countryCode: this.flagFor(teamName),
           sprintScore: sprintScore,
           sprintRank: sprintRank,
           h2hScore: h2hScore,
@@ -1215,6 +1217,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
+            this.isOfficial = !!this.eventInfo.resultsOfficial;
             if (!this.eventInfo.eventName) this.error = this.error || "";
             resolve();
           });
@@ -1226,13 +1229,31 @@ export default {
       }
     },
 
-    officialKey() {
+    async toggleOfficial() {
       const q = this.$route.query || {};
-      return `resultOfficialMode:${q.eventId || "global"}`;
-    },
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
+      const eventId = String(q.eventId || this.eventInfo._id || "");
+      if (!eventId || typeof ipcRenderer === "undefined") return;
+
+      const nextValue = !this.isOfficial;
+      await new Promise((resolve) => {
+        ipcRenderer.once("event:set-official-reply", (_e, res) => {
+          if (res && res.ok) {
+            this.isOfficial = nextValue;
+            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Update Status",
+              detail:
+                res && res.error
+                  ? res.error
+                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+      });
     },
     openEdit(row) {
       this.$emit("edit-row", row);

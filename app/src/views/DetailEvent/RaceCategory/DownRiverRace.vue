@@ -290,6 +290,7 @@
                     <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
                       {{ item.nameTeam }}
+                      <CountryFlag :code="flagFor(item.nameTeam)" />
                     </td>
 
                     <!-- BIB NUMBER  -->
@@ -534,6 +535,8 @@ import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 function getBucket() {
@@ -743,7 +746,8 @@ function readEventDetailsFromLS() {
 
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, EmptyCard, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
+  mixins: [teamFlagMixin],
   data() {
     return {
       initSocket: null,
@@ -2089,8 +2093,17 @@ export default {
           this.parsesTime(a.result.totalTime || a.result.raceTime) -
           this.parsesTime(b.result.totalTime || b.result.raceTime)
       );
+      // standard competition ranking ("1224"): waktu sama → rank sama,
+      // rank berikutnya lompat sejumlah tim yang seri (sama seperti ranksMap Slalom)
+      let prevMs = null;
+      let rank = 0;
       itemsWith.forEach((it, idx) => {
-        it.result.ranked = idx + 1;
+        const ms = this.parsesTime(it.result.totalTime || it.result.raceTime);
+        if (prevMs === null || ms !== prevMs) {
+          rank = idx + 1;
+          prevMs = ms;
+        }
+        it.result.ranked = rank;
       });
     },
 

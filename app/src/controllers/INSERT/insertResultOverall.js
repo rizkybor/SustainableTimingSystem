@@ -56,4 +56,20 @@ async function getEventResultsAggregate(f) {
   return doc;
 }
 
-module.exports = { upsertEventResultsDoc, getEventResultsAggregate };
+async function getEventResultsByEventId(eventId) {
+  const db = await getDb();
+  const col = db.collection("temporaryOverallEventResults");
+
+  const items = await col
+    .find({ eventId: String(eventId || "") })
+    .sort({ divisionName: 1, raceName: 1, initialName: 1 })
+    .toArray();
+
+  return items;
+}
+
+module.exports = {
+  upsertEventResultsDoc,
+  getEventResultsAggregate,
+  getEventResultsByEventId,
+};

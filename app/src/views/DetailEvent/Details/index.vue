@@ -84,13 +84,13 @@
         </b-button>
       </div>
 
-      <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR) -->
+      <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR/RAFTINGCROSS) -->
       <h5 class="font-weight-bold mb-3">Race Categories</h5>
       <b-row>
         <b-col
           cols="12"
           md="3"
-          v-for="c in raceCategories"
+          v-for="c in availableRaceCategories"
           :key="c.key"
           class="mb-3"
         >
@@ -413,6 +413,12 @@ export default {
         h2h: { R1: true, R2: true, L1: true, L2: true },
         slalom: { totalGate: 14 },
         drr: { totalSection: 5 },
+        rx: {
+          teamsPerHeat: 4,
+          qualifiersPerHeat: 2,
+          gate1: { enabled: true },
+          gate2: { enabled: true },
+        },
       },
       showJudgeSettings: false,
       judgeSettings: {
@@ -420,6 +426,12 @@ export default {
         h2h: { R1: true, R2: true, L1: true, L2: true },
         slalom: { totalGate: 14 },
         drr: { totalSection: 5 },
+        rx: {
+          teamsPerHeat: 4,
+          qualifiersPerHeat: 2,
+          gate1: { enabled: true },
+          gate2: { enabled: true },
+        },
       },
       // kategori UI
       raceCategories: [
@@ -447,6 +459,12 @@ export default {
           icon: drrPng,
           desc: "Long-distance endurance race through  varied river conditions",
         },
+        {
+          key: "RX",
+          title: "Rafting Cross",
+          icon: h2hPng,
+          desc: "Multi-team knockout heats racing side-by-side  through gates to qualify",
+        },
       ],
 
       // state
@@ -472,6 +490,18 @@ export default {
 
     safeEventName() {
       return this.events && this.events.eventName ? this.events.eventName : "";
+    },
+
+    // hanya tampilkan kartu kategori yang aktif di categoriesEvent event ini
+    availableRaceCategories() {
+      const enabled = Array.isArray(this.events && this.events.categoriesEvent)
+        ? this.events.categoriesEvent
+        : [];
+      const enabledKeys = new Set(
+        enabled.map((e) => String((e && e.name) || "").toUpperCase())
+      );
+      if (!enabledKeys.size) return this.raceCategories;
+      return this.raceCategories.filter((c) => enabledKeys.has(c.key));
     },
     // ambil rows berdasar kombinasi & initial aktif
     teamsMenR4() {
@@ -535,6 +565,7 @@ export default {
     ) {
       this.initialActive.selected = this.events.categoriesInitial[0];
     }
+    this._ensureValidRaceSelection();
     await this.$nextTick();
     this.refreshVisibleBuckets();
   },
@@ -596,6 +627,44 @@ export default {
         },
         eventFiles: [],
         sponsorFiles: [],
+        levelName: payload && payload.levelName ? String(payload.levelName) : "",
+        riverName: payload && payload.riverName ? String(payload.riverName) : "",
+        addressDistrict:
+          payload && payload.addressDistrict ? String(payload.addressDistrict) : "",
+        addressSubDistrict:
+          payload && payload.addressSubDistrict
+            ? String(payload.addressSubDistrict)
+            : "",
+        addressVillage:
+          payload && payload.addressVillage ? String(payload.addressVillage) : "",
+        addressCity:
+          payload && payload.addressCity ? String(payload.addressCity) : "",
+        addressProvince:
+          payload && payload.addressProvince ? String(payload.addressProvince) : "",
+        addressZipCode:
+          payload && payload.addressZipCode ? String(payload.addressZipCode) : "",
+        addressState:
+          payload && payload.addressState ? String(payload.addressState) : "",
+        startDateEvent:
+          payload && payload.startDateEvent ? String(payload.startDateEvent) : "",
+        endDateEvent:
+          payload && payload.endDateEvent ? String(payload.endDateEvent) : "",
+        categoriesEvent:
+          payload && Array.isArray(payload.categoriesEvent)
+            ? payload.categoriesEvent
+            : [],
+        categoriesDivision:
+          payload && Array.isArray(payload.categoriesDivision)
+            ? payload.categoriesDivision
+            : [],
+        categoriesRace:
+          payload && Array.isArray(payload.categoriesRace)
+            ? payload.categoriesRace
+            : [],
+        categoriesInitial:
+          payload && Array.isArray(payload.categoriesInitial)
+            ? payload.categoriesInitial
+            : [],
       };
 
       // preview sederhana ke console
@@ -631,6 +700,21 @@ export default {
           _id: eventId,
           eventName: eventName,
           signature: safePayload.signature,
+          levelName: safePayload.levelName,
+          riverName: safePayload.riverName,
+          addressDistrict: safePayload.addressDistrict,
+          addressSubDistrict: safePayload.addressSubDistrict,
+          addressVillage: safePayload.addressVillage,
+          addressCity: safePayload.addressCity,
+          addressProvince: safePayload.addressProvince,
+          addressZipCode: safePayload.addressZipCode,
+          addressState: safePayload.addressState,
+          startDateEvent: safePayload.startDateEvent,
+          endDateEvent: safePayload.endDateEvent,
+          categoriesEvent: safePayload.categoriesEvent,
+          categoriesDivision: safePayload.categoriesDivision,
+          categoriesRace: safePayload.categoriesRace,
+          categoriesInitial: safePayload.categoriesInitial,
         };
         ipcRenderer.send("services:update:event-basic", basicDoc);
 
@@ -749,21 +833,16 @@ export default {
         }
 
         // === DONE ===
+        this._setLoading(true, "Memuat ulang data event…", 95);
+        await this.loadEvent(eventId);
+        this._ensureValidRaceSelection();
+
         this._setLoading(true, "Selesai ✔", 100);
         ipcRenderer.send("get-alert-saved", {
           type: "info",
           message: "Event updated",
           detail: "Signature & files berhasil disimpan",
         });
-
-        // Log ringkas hasil final
-        var preview = {
-          eventId: eventId,
-          signature: safePayload.signature,
-          eventFiles: eventUrls,
-          sponsorFiles: sponsorUrls,
-        };
-        console.log("UPDATED:\n" + JSON.stringify(preview, null, 2));
       } catch (err) {
         ipcRenderer.send("get-alert", {
           type: "error",
@@ -823,6 +902,18 @@ export default {
       await this.refreshVisibleBuckets();
     },
 
+    // pastikan kategori yang sedang aktif masih ada di availableRaceCategories;
+    // kalau tidak (mis. dihapus dari categoriesEvent lewat Event Settings), pindah ke yang pertama tersedia
+    _ensureValidRaceSelection() {
+      const list = this.availableRaceCategories;
+      if (!list.length) return;
+      const current = this._safeSelectedName(this.raceActive).toUpperCase();
+      const stillValid = list.some((c) => c.key === current);
+      if (!stillValid) {
+        this.raceActive.selected = { name: list[0].key };
+      }
+    },
+
     async selectInitial(i) {
       this.initialActive.selected = i;
       await this.refreshVisibleBuckets();
@@ -866,6 +957,7 @@ export default {
       if (e === "SLALOM") return "slalom-race";
       if (e === "DRR") return "drr-race";
       if (e === "HEAD2HEAD") return "head2head-race";
+      if (e === "RX") return "rx-race";
       return e.toLowerCase(); // fallback
     },
 
@@ -954,6 +1046,7 @@ export default {
         DRR: "drr-result",
         SLALOM: "slalom-result",
         HEAD2HEAD: "headtohead-result",
+        RX: "rx-result",
       };
       const path = pathMap[idt.eventName] || "";
 
@@ -1356,6 +1449,32 @@ export default {
           ranked: "",
           score: "",
           winLose: "",
+          heat: null,
+          judgesBy: "",
+          judgesTime: "",
+        };
+      }
+      if (ev === "RX") {
+        return {
+          ...base,
+          result: [
+            {
+              startTime: "",
+              finishTime: "",
+              raceTime: "",
+              penaltyTime: "",
+              penaltyTotal: null,
+              penalties: { gate1: null, gate2: null },
+            },
+          ],
+          roundId: "",
+          roundName: "",
+          heatId: "",
+          totalTime: "",
+          finishPosition: null,
+          ranked: "",
+          score: "",
+          qualified: null,
           heat: null,
           judgesBy: "",
           judgesTime: "",

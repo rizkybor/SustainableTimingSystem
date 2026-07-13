@@ -23,6 +23,190 @@
       </div>
 
       <div class="cardish">
+        <!-- ===================== Event Information ===================== -->
+        <section class="uploader-section">
+          <div class="section-title">Event Information</div>
+
+          <b-row>
+            <b-col md="4">
+              <b-form-group label="Event Level">
+                <b-form-select
+                  v-model="form.levelName"
+                  :options="sortedOptionLevels"
+                  value-field="name"
+                  text-field="name"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="4">
+              <b-form-group label="Event Name">
+                <b-form-input
+                  size="sm"
+                  v-model="form.eventName"
+                  placeholder="Enter your event name"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="4">
+              <b-form-group label="River Name">
+                <b-form-input
+                  size="sm"
+                  v-model="form.riverName"
+                  placeholder="Enter river name"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+          </b-row>
+
+          <b-row>
+            <b-col md="4">
+              <b-form-group label="District">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressDistrict"
+                  placeholder="Enter District"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="4">
+              <b-form-group label="Sub District">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressSubDistrict"
+                  placeholder="Enter Sub District"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="4">
+              <b-form-group label="Village">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressVillage"
+                  placeholder="Enter Village"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+          </b-row>
+
+          <b-row>
+            <b-col md="3">
+              <b-form-group label="City">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressCity"
+                  placeholder="Enter City"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="3">
+              <b-form-group label="Province">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressProvince"
+                  placeholder="Enter Province"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="3">
+              <b-form-group label="ZIP Code">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressZipCode"
+                  placeholder="Enter ZIP Code"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="3">
+              <b-form-group label="State">
+                <b-form-input
+                  size="sm"
+                  v-model="form.addressState"
+                  placeholder="Enter State"
+                  class="br-15"
+                />
+              </b-form-group>
+            </b-col>
+          </b-row>
+
+          <b-row>
+            <b-col md="6">
+              <b-form-group label="Start Date">
+                <b-form-datepicker
+                  size="sm"
+                  v-model="form.startDateEvent"
+                  placeholder="Select start date"
+                  class="mb-2 br-15"
+                />
+              </b-form-group>
+            </b-col>
+            <b-col md="6">
+              <b-form-group label="End Date">
+                <b-form-datepicker
+                  :disabled="form.startDateEvent === ''"
+                  size="sm"
+                  v-model="form.endDateEvent"
+                  placeholder="Select end date"
+                  class="mb-2 br-15"
+                  :min="form.startDateEvent"
+                />
+              </b-form-group>
+            </b-col>
+          </b-row>
+
+          <b-form-group label="Event Categories" label-cols="3">
+            <multiselect
+              v-model="form.categoriesEvent"
+              :options="optionCategories"
+              placeholder="Select event categories"
+              multiple
+              track-by="value"
+              label="name"
+            />
+          </b-form-group>
+
+          <b-form-group label="Division Categories" label-cols="3">
+            <multiselect
+              v-model="form.categoriesDivision"
+              :options="optionDivisions"
+              placeholder="Select division categories"
+              multiple
+              track-by="value"
+              label="name"
+            />
+          </b-form-group>
+
+          <b-form-group label="Race Categories" label-cols="3">
+            <multiselect
+              v-model="form.categoriesRace"
+              :options="optionRaces"
+              placeholder="Select race categories"
+              multiple
+              track-by="value"
+              label="name"
+            />
+          </b-form-group>
+
+          <b-form-group label="Initial Categories" label-cols="3">
+            <multiselect
+              v-model="form.categoriesInitial"
+              :options="optionInitials"
+              placeholder="Select initial categories"
+              multiple
+              track-by="value"
+              label="name"
+            />
+          </b-form-group>
+        </section>
+
         <!-- ===================== Event Logo ===================== -->
         <section class="uploader-section">
           <div class="section-title">Event Logo</div>
@@ -184,9 +368,11 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import Multiselect from "vue-multiselect";
 
 export default {
   name: "EventSettingsModal",
+  components: { Multiselect },
   props: {
     value: { type: Boolean, default: false },
     id: { type: String, default: "event-settings-modal" },
@@ -197,6 +383,31 @@ export default {
   },
   data() {
     return {
+      // ===== Event Information (eventsCollection) =====
+      form: {
+        levelName: "",
+        eventName: "",
+        riverName: "",
+        addressDistrict: "",
+        addressSubDistrict: "",
+        addressVillage: "",
+        addressCity: "",
+        addressProvince: "",
+        addressZipCode: "",
+        addressState: "",
+        startDateEvent: "",
+        endDateEvent: "",
+        categoriesEvent: [],
+        categoriesDivision: [],
+        categoriesRace: [],
+        categoriesInitial: [],
+      },
+      optionLevels: [],
+      optionCategories: [],
+      optionDivisions: [],
+      optionRaces: [],
+      optionInitials: [],
+
       // file baru (File[])
       eventFiles: [],
       sponsorFiles: [],
@@ -225,6 +436,17 @@ export default {
       get: function () { return this.value; },
       set: function (v) { this.$emit("input", v); },
     },
+    sortedOptionLevels() {
+      return [...this.optionLevels].sort((a, b) => {
+        if (a.name === "Classification") return -1;
+        if (b.name === "Classification") return 1;
+        return a.name.localeCompare(b.name);
+      });
+    },
+  },
+
+  mounted() {
+    this.loadOptions();
   },
 
   watch: {
@@ -250,6 +472,25 @@ export default {
           self.signatureChiefJudge = !!sig.chiefJudge;
           self.signatureRaceDirector = !!sig.raceDirector;
 
+          self.form = {
+            levelName: ev && ev.levelName ? String(ev.levelName) : "",
+            eventName: ev && ev.eventName ? String(ev.eventName) : "",
+            riverName: ev && ev.riverName ? String(ev.riverName) : "",
+            addressDistrict: ev && ev.addressDistrict ? String(ev.addressDistrict) : "",
+            addressSubDistrict: ev && ev.addressSubDistrict ? String(ev.addressSubDistrict) : "",
+            addressVillage: ev && ev.addressVillage ? String(ev.addressVillage) : "",
+            addressCity: ev && ev.addressCity ? String(ev.addressCity) : "",
+            addressProvince: ev && ev.addressProvince ? String(ev.addressProvince) : "",
+            addressZipCode: ev && ev.addressZipCode ? String(ev.addressZipCode) : "",
+            addressState: ev && ev.addressState ? String(ev.addressState) : "",
+            startDateEvent: ev && ev.startDateEvent ? String(ev.startDateEvent) : "",
+            endDateEvent: ev && ev.endDateEvent ? String(ev.endDateEvent) : "",
+            categoriesEvent: ev && Array.isArray(ev.categoriesEvent) ? ev.categoriesEvent.slice() : [],
+            categoriesDivision: ev && Array.isArray(ev.categoriesDivision) ? ev.categoriesDivision.slice() : [],
+            categoriesRace: ev && Array.isArray(ev.categoriesRace) ? ev.categoriesRace.slice() : [],
+            categoriesInitial: ev && Array.isArray(ev.categoriesInitial) ? ev.categoriesInitial.slice() : [],
+          };
+
           self.existingEventUrls   = ev && ev.eventFiles && Array.isArray(ev.eventFiles) ? ev.eventFiles.slice() : [];
           self.existingSponsorUrls = ev && ev.sponsorFiles && Array.isArray(ev.sponsorFiles) ? ev.sponsorFiles.slice() : [];
 
@@ -271,6 +512,31 @@ export default {
   },
 
   methods: {
+    /* ---------------- Options (Event Information) ---------------- */
+    loadOptions: function () {
+      var self = this;
+      ipcRenderer.send("option-level");
+      ipcRenderer.on("option-level-reply", function (_e, data) {
+        self.optionLevels = data || [];
+      });
+      ipcRenderer.send("option-categories-event");
+      ipcRenderer.on("option-categories-event-reply", function (_e, data) {
+        self.optionCategories = data || [];
+      });
+      ipcRenderer.send("option-categories-division");
+      ipcRenderer.on("option-categories-division-reply", function (_e, data) {
+        self.optionDivisions = data || [];
+      });
+      ipcRenderer.send("option-categories-initial");
+      ipcRenderer.on("option-categories-initial-reply", function (_e, data) {
+        self.optionInitials = data || [];
+      });
+      ipcRenderer.send("option-categories-race");
+      ipcRenderer.on("option-categories-race-reply", function (_e, data) {
+        self.optionRaces = data || [];
+      });
+    },
+
     /* ---------------- Existing thumbnail helpers ---------------- */
     fileNameFromUrl: function (url) {
       try {
@@ -452,7 +718,7 @@ export default {
 
       var payload = {
         eventId: this.eventId,
-        eventName: this.eventName,
+        eventName: this.form.eventName || this.eventName,
         signature: {
           technicalDelegate: this.signatureTechnicalDelegate,
           chiefJudge: this.signatureChiefJudge,
@@ -462,6 +728,23 @@ export default {
         sponsorFiles: this.sponsorFiles,   // File[] baru
         keepEventUrls: this.keepEventUrls, // URL lama yang dipertahankan
         keepSponsorUrls: this.keepSponsorUrls,
+
+        // ===== Event Information =====
+        levelName: this.form.levelName,
+        riverName: this.form.riverName,
+        addressDistrict: this.form.addressDistrict,
+        addressSubDistrict: this.form.addressSubDistrict,
+        addressVillage: this.form.addressVillage,
+        addressCity: this.form.addressCity,
+        addressProvince: this.form.addressProvince,
+        addressZipCode: this.form.addressZipCode,
+        addressState: this.form.addressState,
+        startDateEvent: this.form.startDateEvent,
+        endDateEvent: this.form.endDateEvent,
+        categoriesEvent: this.form.categoriesEvent,
+        categoriesDivision: this.form.categoriesDivision,
+        categoriesRace: this.form.categoriesRace,
+        categoriesInitial: this.form.categoriesInitial,
       };
 
       this.$emit("update-settings", payload);

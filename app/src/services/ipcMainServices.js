@@ -16,6 +16,15 @@ const {
 } = require("../controllers/INSERT/upsertHeadToHead.js");
 
 const {
+  upsertBracket: rxUpsertBracket,
+  getBracket: rxGetBracket,
+  upsertHeatRows: rxUpsertHeatRows,
+  upsertAllRounds: rxUpsertAllRounds,
+  upsertOverall: rxUpsertOverall,
+  getOverall: rxGetOverall,
+} = require("../controllers/INSERT/upsertRaftingCross.js");
+
+const {
   getAllEvents,
   getEventById,
 } = require("../controllers/GET/getEvent.js");
@@ -25,6 +34,7 @@ const {
   getRegisteredH2H,
   getRegisteredSprint,
   getRegisteredSlalom,
+  getRegisteredRX,
 } = require("../controllers/GET/getRegistered.js");
 
 const {
@@ -613,6 +623,11 @@ function setupIPCMainHandlers() {
     event.sender.send("teams-slalom-registered:find-reply", res);
   });
 
+  ipcMain.on("teams-rx-registered:find", async (event, filters) => {
+    const res = await getRegisteredRX(filters || {});
+    event.sender.send("teams-rx-registered:find-reply", res);
+  });
+
   // =========================
   // Race Settings (GET/UPSERT)
   // =========================
@@ -805,6 +820,69 @@ ipcMain.on("h2h:overall:save", async (e, payload) => {
     e.reply("h2h:overall:save-reply", { ok: false, error: String(err) });
   }
 });
+
+// RAFTING CROSS
+ipcMain.on("rx:bracket:get", async (e, bucket) => {
+  try {
+    e.reply("rx:bracket:get-reply", await rxGetBracket(bucket));
+  } catch (err) {
+    e.reply("rx:bracket:get-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:bracket:save", async (e, payload) => {
+  try {
+    const { bucket, rounds, settings } = payload;
+    e.reply(
+      "rx:bracket:save-reply",
+      await rxUpsertBracket(bucket, rounds, { settings })
+    );
+  } catch (err) {
+    e.reply("rx:bracket:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:heat:save", async (e, payload) => {
+  try {
+    const { bucket, roundId, roundName, heatId, rows } = payload;
+    e.reply(
+      "rx:heat:save-reply",
+      await rxUpsertHeatRows(bucket, roundId, roundName, heatId, rows)
+    );
+  } catch (err) {
+    e.reply("rx:heat:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:rounds:saveMany", async (e, payload) => {
+  try {
+    const { bucket, roundsSheets } = payload;
+    e.reply(
+      "rx:rounds:saveMany-reply",
+      await rxUpsertAllRounds(bucket, roundsSheets)
+    );
+  } catch (err) {
+    e.reply("rx:rounds:saveMany-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:overall:save", async (e, payload) => {
+  try {
+    const { bucket, overallPkg } = payload;
+    e.reply("rx:overall:save-reply", await rxUpsertOverall(bucket, overallPkg));
+  } catch (err) {
+    e.reply("rx:overall:save-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("rx:overall:get", async (e, bucket) => {
+  try {
+    e.reply("rx:overall:get-reply", await rxGetOverall(bucket));
+  } catch (err) {
+    e.reply("rx:overall:get-reply", { ok: false, error: String(err) });
+  }
+});
+
 module.exports = {
   setupIPCMainHandlers,
 };

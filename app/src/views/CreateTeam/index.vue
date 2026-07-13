@@ -70,6 +70,25 @@
               />
             </b-form-group>
 
+            <!-- COUNTRY (optional) -->
+            <b-form-group label="Country (optional)" label-class="label-strong">
+              <b-form-select
+                size="sm"
+                v-model="formTeam.countryCode"
+                :options="countryOptions"
+                value-field="code"
+                text-field="name"
+                class="input-soft"
+                style="border-radius: 12px"
+              >
+                <template #first>
+                  <b-form-select-option :value="''"
+                    >No country</b-form-select-option
+                  >
+                </template>
+              </b-form-select>
+            </b-form-group>
+
             <!-- Actions -->
             <div class="d-flex mt-4 justify-content-end">
               <b-button
@@ -170,6 +189,7 @@
                 <span class="font-weight-bold text-dark">
                   {{ row.item.nameTeam || "-" }}
                 </span>
+                <CountryFlag :code="row.item.countryCode" />
               </template>
 
               <!-- BIB -->
@@ -326,6 +346,22 @@
             class="input-soft"
           />
         </b-form-group>
+
+        <b-form-group label="Country (optional)" label-class="label-strong">
+          <b-form-select
+            v-model="editForm.countryCode"
+            :options="countryOptions"
+            value-field="code"
+            text-field="name"
+            class="input-soft"
+          >
+            <template #first>
+              <b-form-select-option :value="''"
+                >No country</b-form-select-option
+              >
+            </template>
+          </b-form-select>
+        </b-form-group>
       </b-form>
     </b-modal>
   </div>
@@ -334,16 +370,20 @@
 <script>
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import { COUNTRIES } from "@/utils/countries";
 
 export default {
   name: "SustainableTimingSystemCreateTeam",
-  components: { Icon },
+  components: { Icon, CountryFlag },
   data() {
     return {
+      countryOptions: COUNTRIES,
       optionTeamTypes: [],
       formTeam: {
         teamType: null,
         teamName: "",
+        countryCode: "",
         statusTeam: "Active",
       },
       teams: [], // ✅ list teams
@@ -369,6 +409,7 @@ export default {
         nameTeam: "",
         bibTeam: "",
         statusId: 0,
+        countryCode: "",
       },
     };
   },
@@ -454,6 +495,7 @@ export default {
       this.formTeam = {
         teamType: null,
         teamName: "",
+        countryCode: "",
         statusTeam: "Active",
       };
     },
@@ -483,6 +525,7 @@ export default {
         praStart: "",
         intervalRace: "",
         statusId: 0,
+        countryCode: String(this.formTeam.countryCode || "").trim(),
       };
 
       ipcRenderer.send("insert-new-team", doc);
@@ -527,6 +570,7 @@ export default {
         nameTeam: item.nameTeam || "",
         bibTeam: item.bibTeam || "",
         statusId: Number(item.statusId) || 0, // ≤ pastikan number
+        countryCode: item.countryCode || "",
       };
       this.$root.$emit("bv::show::modal", "modal-edit-team");
     },
@@ -552,6 +596,7 @@ export default {
         nameTeam: String(this.editForm.nameTeam || "").trim(),
         bibTeam: String(this.editForm.bibTeam || "").trim(),
         statusId: Number(this.editForm.statusId) || 0,
+        countryCode: String(this.editForm.countryCode || "").trim(),
       };
 
       ipcRenderer.send("teams:update", payload);

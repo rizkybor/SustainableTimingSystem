@@ -286,6 +286,7 @@
                     class="large-bold text-strong max-char"
                   >
                     {{ item.nameTeam }}
+                    <CountryFlag :code="flagFor(item.nameTeam)" />
                   </td>
 
                   <!-- BIB NUMBER  -->
@@ -424,6 +425,8 @@ import {
   debounce,
 } from "@/utils/localStoreSprint";
 import tone from "../../../assets/tone/tone_message.mp3";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -594,7 +597,8 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, EmptyCard, Icon },
+  components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
+  mixins: [teamFlagMixin],
   data() {
     return {
       isLoading: false,
@@ -1494,66 +1498,184 @@ export default {
       });
     },
 
-    // // === dipanggil setelah insert-sprint-result sukses ===
-    upsertEventResults(bucket, participantArr) {
-      var payload = {
-        eventId: bucket.eventId,
-        initialId: bucket.initialId,
-        raceId: bucket.raceId,
-        divisionId: bucket.divisionId,
-        eventName: bucket.eventName,
-        initialName: bucket.initialName,
-        raceName: bucket.raceName,
-        divisionName: bucket.divisionName,
-        eventResult: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    // === merge hasil SPRINT ke dokumen event-results (kategori lain aman) ===
+    async upsertEventResults(bucket, participantArr) {
+      var now = new Date();
+      var K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
       };
 
-      for (var i = 0; i < participantArr.length; i++) {
-        var t = participantArr[i];
+      var self = this;
+      function toNumOrEmpty(v) {
+        return v || v === 0 ? v : "";
+      }
 
-        // Ambil ranked dari sumber data tim (kalau ada)
-        var rankedTotal =
+      var baseFilter = {
+        eventId: String(bucket.eventId || ""),
+        initialId: String(bucket.initialId || ""),
+        raceId: String(bucket.raceId || ""),
+        divisionId: String(bucket.divisionId || ""),
+      };
+
+      // --- siapkan incoming (rank/score per tim, dari hasil sprint) ---
+      var incoming = new Map();
+      var i, t;
+      for (i = 0; i < participantArr.length; i++) {
+        t = participantArr[i];
+        var key = String(
+          (t && t.teamId) || (t && t.bibTeam) || ""
+        );
+        if (!key) continue;
+
+        var ranked =
           t && t.result && (t.result.ranked || t.result.ranked === 0)
             ? t.result.ranked
             : "";
+        var scored = ranked !== "" ? self.getScoreByRanked(ranked) : "";
 
-        // Hitung score berdasarkan ranked via getScoreByRanked
-        var computedTotalScore =
-          rankedTotal !== "" ? this.getScoreByRanked(rankedTotal) : "";
+        incoming.set(key, {
+          teamId: (t && t.teamId) || "",
+          teamName: (t && t.nameTeam) || "",
+          bib: (t && t.bibTeam) || "",
+          sprintCat: {
+            name: K.SPRINT,
+            rankedByCats: toNumOrEmpty(ranked),
+            scored: toNumOrEmpty(scored),
+          },
+          totalRanked: toNumOrEmpty(ranked),
+          totalScore: toNumOrEmpty(scored),
+        });
+      }
 
-        var teamData = {
-          teamId: t && t.teamId ? t.teamId : "",
-          teamName: t && t.nameTeam ? t.nameTeam : "",
-          bib: t && t.bibTeam ? t.bibTeam : "",
-          categories: [],
-          totalScore: computedTotalScore,
-          totalRanked: rankedTotal,
-        };
+      // --- ambil dokumen event-results yang lama (kalau ada) ---
+      function getExisting() {
+        return new Promise(function (resolve) {
+          ipcRenderer.once("event-results:get-reply", function (_e, res) {
+            resolve(res);
+          });
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+      }
 
-        // --- Per kategori ---
-        // SPRINT (pakai ranked dari t.result jika memang kategori ini yang diisi)
-        var cat1Ranked =
-          t && t.result && (t.result.ranked || t.result.ranked === 0)
-            ? t.result.ranked
-            : "";
-        var cat1Scored =
-          cat1Ranked !== "" ? this.getScoreByRanked(cat1Ranked) : "";
+      var existingDoc = null;
+      try {
+        var gres = await getExisting();
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e2) {
+        existingDoc = null;
+      }
 
-        var cat1 = {
-          name: "SPRINT",
-          scored: cat1Scored,
-          rankedByCats: cat1Ranked,
-        };
+      var payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: bucket.eventName || "",
+        initialName: bucket.initialName || "",
+        raceName: bucket.raceName || "",
+        divisionName: bucket.divisionName || "",
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
 
-        // HEADTOHEAD, SLALOM, DRR (placeholder, tinggal isi ranked masing-masing jika ada)
-        var cat2 = { name: "HEADTOHEAD", scored: "", rankedByCats: "" };
-        var cat3 = { name: "SLALOM", scored: "", rankedByCats: "" };
-        var cat4 = { name: "DRR", scored: "", rankedByCats: "" };
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+        payload.updatedAt = now;
 
-        teamData.categories.push(cat1, cat2, cat3, cat4);
-        payload.eventResult.push(teamData);
+        var map = new Map();
+        var safeArr = Array.isArray(existingDoc.eventResult)
+          ? existingDoc.eventResult
+          : [];
+        var ei;
+        for (ei = 0; ei < safeArr.length; ei++) {
+          var row = safeArr[ei] || {};
+          var k = String(row.teamId || row.bib || "");
+          if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+        }
+
+        var iter = incoming.entries();
+        var step = iter.next();
+        while (!step.done) {
+          var ent = step.value;
+          var inc = ent[1];
+
+          var prev = map.get(ent[0]);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: "",
+              totalScore: "",
+            };
+          }
+
+          var prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          var foundIdx = -1;
+          var ci;
+          for (ci = 0; ci < prevCats.length; ci++) {
+            var c = prevCats[ci] || {};
+            if (String(c.name || "").toUpperCase() === K.SPRINT) {
+              foundIdx = ci;
+              break;
+            }
+          }
+          if (foundIdx >= 0) {
+            prevCats[foundIdx] = inc.sprintCat;
+          } else {
+            prevCats.push(inc.sprintCat);
+          }
+
+          map.set(ent[0], {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+          step = iter.next();
+        }
+
+        var values = [];
+        var it2 = map.values();
+        var s2 = it2.next();
+        while (!s2.done) {
+          values.push(s2.value);
+          s2 = it2.next();
+        }
+        payload.eventResult = values;
+      } else {
+        var vals = [];
+        var iter2 = incoming.values();
+        var st = iter2.next();
+        while (!st.done) {
+          var inc2 = st.value;
+          vals.push({
+            teamId: inc2.teamId,
+            teamName: inc2.teamName,
+            bib: inc2.bib,
+            categories: [
+              inc2.sprintCat,
+              { name: K.H2H, rankedByCats: "", scored: "" },
+              { name: K.SLALOM, rankedByCats: "", scored: "" },
+              { name: K.DRR, rankedByCats: "", scored: "" },
+              { name: K.RX, rankedByCats: "", scored: "" },
+            ],
+            totalRanked: inc2.totalRanked,
+            totalScore: inc2.totalScore,
+          });
+          st = iter2.next();
+        }
+        payload.eventResult = vals;
       }
 
       ipcRenderer.send("event-results:upsert", payload);
@@ -1564,7 +1686,7 @@ export default {
           ipcRenderer.send("get-alert-saved", {
             type: "info",
             message: "Event Results Updated",
-            detail: "Successfully upserted event result document",
+            detail: "SPRINT category merged successfully",
           });
         } else {
           ipcRenderer.send("get-alert", {

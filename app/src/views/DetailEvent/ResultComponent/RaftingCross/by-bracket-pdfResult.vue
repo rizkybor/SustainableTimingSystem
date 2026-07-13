@@ -88,7 +88,10 @@
             >
               <td class="text-center">{{ team.seed || "-" }}</td>
               <td class="text-center">{{ team.bibTeam || "-" }}</td>
-              <td class="text-strong">{{ team.name || "-" }}</td>
+              <td class="text-strong">
+                {{ team.name || "-" }}
+                <CountryFlag :code="flagFor(team.name)" />
+              </td>
               <td class="mono">{{ resultOf(heat, idx).raceTime || "-" }}</td>
               <td class="text-center">
                 {{ gatePenaltyOf(heat, idx, "gate1") }}
@@ -178,13 +181,17 @@
 </template>
 
 <script>
+import CountryFlag from "@/components/common/CountryFlag.vue";
+
 export default {
   name: "RaftingCrossByBracketPdfResult",
+  components: { CountryFlag },
   props: {
     data: { type: Object, required: true },
     bracket: { type: Array, default: () => [] },
     isOfficial: { type: Boolean, default: false },
     rxCats: { type: Object, required: true },
+    countryMap: { type: Object, default: () => ({}) },
   },
   computed: {
     rounds() {
@@ -209,6 +216,12 @@ export default {
     },
   },
   methods: {
+    flagFor(name) {
+      var key = String(name || "")
+        .trim()
+        .toUpperCase();
+      return (this.countryMap && this.countryMap[key]) || "";
+    },
     resultOf(heat, idx) {
       return (heat.results && heat.results[idx]) || {};
     },

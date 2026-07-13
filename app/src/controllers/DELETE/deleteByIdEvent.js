@@ -1,4 +1,5 @@
 const { getDb } = require("../index");
+const { ObjectId } = require("mongodb");
 
 // Delete event by ID
 async function deleteEventById(id) {

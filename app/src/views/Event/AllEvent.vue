@@ -168,7 +168,7 @@
                   size="sm"
                   variant="outline-danger"
                   class="btn-icon"
-                  @click="$emit('delete', row.item)"
+                  @click="confirmDeleteEvent(row.item)"
                 >
                   <Icon icon="mdi:delete" width="16" height="16" />
                 </b-button>
@@ -369,6 +369,45 @@ export default {
     goBack() {
       if (this.$router) this.$router.back();
       else this.$emit("back");
+    },
+
+    async confirmDeleteEvent(item) {
+      const id = item && item._id ? String(item._id) : "";
+      if (!id) return;
+
+      const name = (item && item.name) || "event ini";
+      let ok = false;
+      try {
+        ok = await this.$bvModal.msgBoxConfirm(
+          `Hapus "${name}"? Tindakan ini tidak bisa dibatalkan.`,
+          {
+            title: "Konfirmasi Hapus",
+            okVariant: "danger",
+            okTitle: "Hapus",
+            cancelTitle: "Batal",
+            centered: true,
+          }
+        );
+      } catch (e) {
+        ok = false;
+      }
+      if (!ok) return;
+
+      this.loading = true;
+      ipcRenderer.removeAllListeners("delete-event-reply");
+      ipcRenderer.send("delete-event", id);
+      ipcRenderer.once("delete-event-reply", (_e, res) => {
+        this.loading = false;
+        if (res && res.ok) {
+          this.getEvents();
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Gagal menghapus event",
+            detail: res && res.error ? res.error : "Terjadi kesalahan.",
+          });
+        }
+      });
     },
   },
 };

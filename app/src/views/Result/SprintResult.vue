@@ -153,7 +153,10 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
-                <div class="team">{{ r.nameTeam || "-" }}</div>
+                <div class="team">
+                  {{ r.nameTeam || "-" }}
+                  <CountryFlag :code="flagFor(r.nameTeam)" />
+                </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
               <td class="text-center" style="color: red">
@@ -245,6 +248,8 @@ import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -305,7 +310,9 @@ export default {
     SprintPdf,
     VueHtml2pdf,
     PrintOverallModal,
+    CountryFlag,
   },
+  mixins: [teamFlagMixin],
   data() {
     return {
       defaultImg,
@@ -452,6 +459,7 @@ export default {
       return (this.results || []).map((r) => ({
         nameTeam: r.nameTeam,
         bibTeam: r.bibTeam,
+        countryCode: this.flagFor(r.nameTeam),
         result: {
           startTime: r.startTime || "",
           finishTime: r.finishTime || "",
@@ -481,11 +489,6 @@ export default {
   },
 
   async created() {
-    // load mode OFFICIAL dari localStorage (per event)
-    const k = this.officialKey();
-    const saved = localStorage.getItem(k);
-    if (saved !== null) this.isOfficial = saved === "1";
-
     // ambil event langsung dari IPC
     const q = this.$route.query || {};
     if (q.eventId) {
@@ -594,6 +597,7 @@ export default {
           no: i + 1,
           teamName: teamName,
           bib: bib,
+          countryCode: this.flagFor(teamName),
           sprintScore: sprintScore,
           sprintRank: sprintRank,
           h2hScore: h2hScore,
@@ -674,6 +678,7 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res; // langsung simpan hasil ke data
+              this.isOfficial = !!this.eventInfo.resultsOfficial;
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -688,14 +693,31 @@ export default {
       }
     },
 
-    officialKey() {
+    async toggleOfficial() {
       const q = this.$route.query || {};
-      return `resultOfficialMode:${q.eventId || "global"}`;
-    },
+      const eventId = String(q.eventId || this.eventInfo._id || "");
+      if (!eventId || typeof ipcRenderer === "undefined") return;
 
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
+      const nextValue = !this.isOfficial;
+      await new Promise((resolve) => {
+        ipcRenderer.once("event:set-official-reply", (_e, res) => {
+          if (res && res.ok) {
+            this.isOfficial = nextValue;
+            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Update Status",
+              detail:
+                res && res.error
+                  ? res.error
+                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+      });
     },
 
     openEdit(row) {

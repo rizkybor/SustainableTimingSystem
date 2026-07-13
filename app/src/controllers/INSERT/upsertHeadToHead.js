@@ -211,7 +211,11 @@ async function upsertOverall(bucket, overallPkg = {}) {
       eventId: String(bucket.eventId || ""),
       initialId: String(bucket.initialId || ""),
       raceId: String(bucket.raceId || ""),
-      divisionId: String(bucket.divisionId || "")
+      divisionId: String(bucket.divisionId || ""),
+      eventName: String(bucket.eventName || "HEAD2HEAD"),
+      initialName: String(bucket.initialName || ""),
+      raceName: String(bucket.raceName || ""),
+      divisionName: String(bucket.divisionName || "")
     },
     placements: Array.isArray(overallPkg.placements) ? overallPkg.placements : [],
     finalRows: Array.isArray(overallPkg.finalRows) ? overallPkg.finalRows : [],
@@ -228,10 +232,20 @@ async function upsertOverall(bucket, overallPkg = {}) {
   return { ok: true };
 }
 
+async function getOverall(bucket) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const key = makeKey(bucket);
+  const item = await db.collection(COL_OVERALL).findOne({ key });
+  return { ok: true, item };
+}
+
 module.exports = {
   upsertBracket,
   getBracket,
   upsertRoundRows,
   upsertAllRounds,
-  upsertOverall
+  upsertOverall,
+  getOverall
 };

@@ -380,6 +380,7 @@
                 <!-- TEAM NAME  -->
                 <td class="large-bold text-strong max-char text-left">
                   {{ team.nameTeam }}
+                  <CountryFlag :code="flagFor(team.nameTeam)" />
                 </td>
 
                 <!-- BIB NUMBER  -->
@@ -611,7 +612,10 @@
                   <tbody>
                     <tr v-for="(r, i) in session1Rows" :key="i">
                       <td>{{ i + 1 }}</td>
-                      <td class="text-left">{{ r.nameTeam }}</td>
+                      <td class="text-left">
+                        {{ r.nameTeam }}
+                        <CountryFlag :code="flagFor(r.nameTeam)" />
+                      </td>
                       <td>{{ r.bibTeam }}</td>
                       <td>{{ r.startPenalty }}</td>
                       <td>{{ r.gatesSum }}</td>
@@ -702,6 +706,8 @@ import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -917,7 +923,9 @@ export default {
     VueHtml2pdf,
     SlalomSession1PdfResult,
     Icon,
+    CountryFlag,
   },
+  mixins: [teamFlagMixin],
 
   data() {
     return {

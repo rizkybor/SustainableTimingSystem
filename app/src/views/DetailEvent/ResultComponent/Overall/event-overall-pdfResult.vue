@@ -5,20 +5,11 @@
     </div>
     <div class="band">
       <div class="band-left">
-        <strong>SCORE BOARD</strong>
+        <strong>OVERALL RESULT</strong>
         <span class="dot">•</span>
-        <span class="cat">{{ categories || "RAFTING CROSS" }}</span>
-        <span class="dot">•</span>
-        <span class="cat">
-          {{ data && data.levelName ? data.levelName : "Classification" }}
-        </span>
+        <span class="cat">SELURUH KATEGORI EVENT</span>
       </div>
       <div class="band-right">
-        <strong
-          >{{ rxCats.initial }} - {{ rxCats.division }}
-          {{ rxCats.race }}</strong
-        >
-        <span class="dot">•</span>
         <span>{{ today }}</span>
       </div>
     </div>
@@ -53,36 +44,82 @@
       </div>
     </div>
 
-    <section>
+    <section
+      v-for="(b, bIdx) in buckets"
+      :key="bIdx"
+      class="bucket-section"
+      :class="{ 'bucket-break': bIdx < buckets.length - 1 }"
+    >
+      <div class="bucket-heading">
+        {{ b.divisionName }} {{ b.raceName }} – {{ b.initialName }}
+      </div>
+
       <table class="score-table">
         <thead>
           <tr>
-            <th>No</th>
-            <th>Team</th>
-            <th>BIB</th>
-            <th>Race Time</th>
-            <th>Penalty Time</th>
-            <th>Total Time</th>
-            <th>Rank</th>
-            <th>Score</th>
+            <th rowspan="2" class="w-40">No</th>
+            <th rowspan="2" class="team-col">Team Name</th>
+            <th rowspan="2" class="w-60">BIB</th>
+
+            <th colspan="2" class="group sprint">Sprint</th>
+            <th colspan="2" class="group h2h">H2H</th>
+            <th colspan="2" class="group slalom">Slalom</th>
+            <th colspan="2" class="group drr">DRR</th>
+            <th colspan="2" class="group rx">Rafting Cross</th>
+
+            <th rowspan="2" class="w-80">Total Score</th>
+            <th rowspan="2" class="w-80">Rank</th>
+          </tr>
+          <tr>
+            <th class="sub">Score</th>
+            <th class="sub">Rank</th>
+            <th class="sub">Score</th>
+            <th class="sub">Rank</th>
+            <th class="sub">Score</th>
+            <th class="sub">Rank</th>
+            <th class="sub">Score</th>
+            <th class="sub">Rank</th>
+            <th class="sub">Score</th>
+            <th class="sub">Rank</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in rows" :key="i">
+          <tr v-for="(row, i) in b.rows || []" :key="i">
             <td class="text-center">{{ i + 1 }}</td>
             <td class="text-strong">
-              {{ row.nameTeam || "-" }}
+              {{ row.teamName || "-" }}
               <CountryFlag :code="row.countryCode" />
             </td>
-            <td class="text-center">{{ row.bibTeam || "-" }}</td>
-            <td class="mono">{{ row.raceTime || "-" }}</td>
-            <td class="mono">{{ row.penaltyTime || "-" }}</td>
-            <td class="mono text-strong">{{ row.totalTime || "-" }}</td>
-            <td class="text-center">{{ row.ranked || "-" }}</td>
-            <td class="text-center">{{ row.score || 0 }}</td>
+            <td class="text-center">{{ row.bib || "-" }}</td>
+
+            <td class="text-center">{{ row.sprintScore || 0 }}</td>
+            <td class="text-center">{{ row.sprintRank || "-" }}</td>
+            <td class="text-center">{{ row.h2hScore || 0 }}</td>
+            <td class="text-center">{{ row.h2hRank || "-" }}</td>
+            <td class="text-center">{{ row.slalomScore || 0 }}</td>
+            <td class="text-center">{{ row.slalomRank || "-" }}</td>
+            <td class="text-center">{{ row.drrScore || 0 }}</td>
+            <td class="text-center">{{ row.drrRank || "-" }}</td>
+            <td class="text-center">{{ row.rxScore || 0 }}</td>
+            <td class="text-center">{{ row.rxRank || "-" }}</td>
+
+            <td class="text-center text-strong">{{ row.totalScore || 0 }}</td>
+            <td class="text-center text-strong">{{ row.rank || "-" }}</td>
           </tr>
-          <tr v-if="rows.length === 0">
-            <td class="empty" colspan="8">No data</td>
+          <tr v-if="!(b.rows || []).length">
+            <td class="empty" colspan="15">No data</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="!buckets.length">
+      <table class="score-table">
+        <tbody>
+          <tr>
+            <td class="empty">
+              Belum ada Overall Score yang tersimpan untuk event ini.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -146,19 +183,14 @@
 import CountryFlag from "@/components/common/CountryFlag.vue";
 
 export default {
-  name: "RaftingCrossPdfResult",
+  name: "EventOverallPdfResult",
   components: { CountryFlag },
   props: {
     data: { type: Object, required: true },
-    dataParticipant: { type: Array, required: true },
-    categories: { type: String, default: "" },
+    buckets: { type: Array, default: () => [] },
     isOfficial: { type: Boolean, default: false },
-    rxCats: { type: Object, required: true },
   },
   computed: {
-    rows() {
-      return Array.isArray(this.dataParticipant) ? this.dataParticipant : [];
-    },
     today() {
       const d = new Date();
       const dd = String(d.getDate()).padStart(2, "0");
@@ -199,7 +231,7 @@ export default {
   padding: 5mm 8mm 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   color: #17202a;
 }
 
@@ -233,6 +265,22 @@ export default {
   color: rgb(24, 116, 165);
 }
 
+.bucket-section {
+  margin-bottom: 6mm;
+}
+.bucket-break {
+  page-break-after: always;
+}
+.bucket-heading {
+  font-weight: 800;
+  font-size: 13px;
+  color: rgb(24, 116, 165);
+  text-transform: uppercase;
+  border-bottom: 1.5px solid rgb(24, 116, 165);
+  padding-bottom: 2px;
+  margin-bottom: 3mm;
+}
+
 .score-table {
   width: 100%;
   border-collapse: collapse;
@@ -244,20 +292,48 @@ export default {
 .score-table th,
 .score-table td {
   border-bottom: 1px solid #f1f4f8;
-  padding: 5px 7px;
+  border-right: 1px solid #f1f4f8;
+  padding: 4px 6px;
 }
 .score-table thead th {
   background: rgb(240, 250, 255);
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 800;
   text-align: center;
 }
+.score-table thead th.group.sprint {
+  background: #d9e8ff;
+}
+.score-table thead th.group.h2h {
+  background: #ffe0c7;
+}
+.score-table thead th.group.slalom {
+  background: #fff2b8;
+}
+.score-table thead th.group.drr {
+  background: #ccf7d9;
+}
+.score-table thead th.group.rx {
+  background: #f3d9ff;
+}
 .score-table tbody td {
-  font-size: 11.5px;
+  font-size: 10.5px;
 }
 .score-table tbody tr:nth-child(odd) {
   background: #fafcff;
+}
+.w-40 {
+  width: 30px;
+}
+.w-60 {
+  width: 50px;
+}
+.w-80 {
+  width: 70px;
+}
+.team-col {
+  width: 150px;
 }
 .text-center {
   text-align: center;
@@ -265,8 +341,10 @@ export default {
 .text-strong {
   font-weight: 700;
 }
-.mono {
-  font-family: monospace;
+.empty {
+  text-align: center;
+  color: #9aa0aa;
+  padding: 12px;
 }
 
 .sign.sign-two {

@@ -85,7 +85,10 @@
         <tbody>
           <tr v-for="(row, i) in cat.rows || []" :key="i">
             <td class="text-center">{{ i + 1 }}</td>
-            <td class="text-strong">{{ row.nameTeam || "-" }}</td>
+            <td class="text-strong">
+              {{ row.nameTeam || "-" }}
+              <CountryFlag :code="row.countryCode" />
+            </td>
             <td class="text-center">{{ row.bibTeam || "-" }}</td>
             <td class="mono">{{ row.raceTime || "-" }}</td>
             <td class="mono">{{ row.penaltyTime || "-" }}</td>
@@ -167,8 +170,11 @@
 </template>
 
 <script>
+import CountryFlag from "@/components/common/CountryFlag.vue";
+
 export default {
   name: "RaftingCrossOverallPdfResult",
+  components: { CountryFlag },
   props: {
     data: { type: Object, required: true },
     categories: { type: Array, default: () => [] },

@@ -16,8 +16,6 @@
     "electron:build": "vue-cli-service electron:build",
     "electron:serve": "vue-cli-service electron:serve",
     "electron:serve:lan": "vue-cli-service electron:serve --mode lan",
-
-
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps"
   },
@@ -30,6 +28,7 @@
     "cloudinary": "^2.7.0",
     "core-js": "^2.6.5",
     "dotenv": "^17.2.2",
+    "flag-icons": "^7.5.0",
     "mongodb": "^4",
     "regenerator-runtime": "^0.13",
     "serialport": "^12.0.0",

@@ -1,6 +1,7 @@
 <template>
   <div>
     <b-navbar
+      ref="navbarEl"
       toggleable="lg"
       type="dark"
       class="navbar navbar-expand-lg navbar-dark fixed-top shadow-s"
@@ -56,9 +57,33 @@ export default {
 
   computed: {},
 
-  async mounted() {},
+  mounted() {
+    this.syncNavHeight();
+    this.resizeHandler = () => this.syncNavHeight();
+    window.addEventListener("resize", this.resizeHandler);
+    // ukuran bisa berubah sesaat setelah font/logo selesai render
+    this.$nextTick(() => this.syncNavHeight());
+  },
+
+  beforeDestroy() {
+    if (this.resizeHandler) {
+      window.removeEventListener("resize", this.resizeHandler);
+    }
+  },
 
   methods: {
+    // samakan --nav-h dengan tinggi navbar yang sesungguhnya dirender,
+    // supaya .app-main (App.vue) memberi padding-top yang pas dan konten
+    // halaman tidak ketutup navbar (fixed-top-nya bisa lebih tinggi dari
+    // asumsi statis 64px, mis. karena logo/menu lebih besar)
+    syncNavHeight() {
+      const el = this.$refs.navbarEl && this.$refs.navbarEl.$el;
+      if (!el) return;
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) {
+        document.documentElement.style.setProperty("--nav-h", `${h}px`);
+      }
+    },
     goTo(path) {
       if (!path) return this.$router.push("/");
       this.$router.push("/" + path);

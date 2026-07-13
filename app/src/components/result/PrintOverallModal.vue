@@ -97,7 +97,10 @@
             <tbody>
               <tr v-for="r in processedRows" :key="r.rank">
                 <td class="text-center">{{ r.rank }}</td>
-                <td>{{ r.teamName }}</td>
+                <td>
+                  {{ r.teamName }}
+                  <CountryFlag :code="r.countryCode" />
+                </td>
                 <td class="text-center">{{ r.bib }}</td>
 
                 <td class="text-center">{{ r.sprintScore }}</td>
@@ -171,12 +174,14 @@
 <script>
 import VueHtml2pdf from "vue-html2pdf";
 import OverallPdf from "../../views/DetailEvent/ResultComponent/Overall/by-alltime.vue";
+import CountryFlag from "@/components/common/CountryFlag.vue";
 
 export default {
   name: "PrintOverallModal",
   components: {
     VueHtml2pdf,
     OverallPdf,
+    CountryFlag,
   },
   data() {
     return {

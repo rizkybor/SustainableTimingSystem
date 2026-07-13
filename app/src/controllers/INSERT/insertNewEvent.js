@@ -258,9 +258,28 @@ async function updateAssets(payload) {
   };
 }
 
+async function setResultsOfficial(eventId, value) {
+  const id = toObjectId(eventId);
+  if (!id) return { ok: false, error: "invalid eventId" };
+
+  var db = await getDb();
+  const coll = db.collection("eventsCollection");
+  const resp = await coll.updateOne(
+    { _id: id },
+    { $set: { resultsOfficial: !!value, updatedAt: new Date() } },
+    { upsert: false }
+  );
+  return {
+    ok: true,
+    matchedCount: resp.matchedCount,
+    modifiedCount: resp.modifiedCount,
+  };
+}
+
 module.exports = {
   insertNewEvent,
   updateEventPoster,
   updateBasic,
   updateAssets,
+  setResultsOfficial,
 };

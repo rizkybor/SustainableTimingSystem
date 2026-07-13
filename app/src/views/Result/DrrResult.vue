@@ -69,6 +69,15 @@
         >
           <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
         </b-button>
+
+        <b-button
+          variant="outline-primary"
+          class="action-btn"
+          :disabled="loading"
+          @click="fetchEventResultsAggregate"
+        >
+          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+        </b-button>
       </div>
     </div>
 
@@ -146,7 +155,10 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
-                <div class="team">{{ r.nameTeam || "-" }}</div>
+                <div class="team">
+                  {{ r.nameTeam || "-" }}
+                  <CountryFlag :code="flagFor(r.nameTeam)" />
+                </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
               <td class="text-center" style="color: red">
@@ -288,6 +300,15 @@
         />
       </section>
     </vue-html2pdf>
+
+    <PrintOverallModal
+      centered
+      :show="showOverallModal"
+      :dataEvent="eventInfo"
+      :aggregate="dataAggregate"
+      :raceCats="drrCats"
+      @close="showOverallModal = false"
+    />
   </div>
 </template>
 
@@ -298,6 +319,9 @@ import VueHtml2pdf from "vue-html2pdf";
 import DrrPdf from "../DetailEvent/ResultComponent/drr-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import CountryFlag from "@/components/common/CountryFlag.vue";
+import teamFlagMixin from "@/mixins/teamFlagMixin";
+import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -360,7 +384,15 @@ function pickEventFromStore() {
 
 export default {
   name: "DrrResult",
-  components: { Icon, EmptyStateFull, DrrPdf, VueHtml2pdf },
+  components: {
+    Icon,
+    EmptyStateFull,
+    DrrPdf,
+    VueHtml2pdf,
+    PrintOverallModal,
+    CountryFlag,
+  },
+  mixins: [teamFlagMixin],
 
   data() {
     return {
@@ -377,6 +409,8 @@ export default {
       results: [],
       showPdf: false,
       eventInfo: {},
+      showOverallModal: false,
+      dataAggregate: null,
 
       // DRR score table
       dataScore: [
@@ -542,6 +576,7 @@ export default {
         arr.push({
           nameTeam: r.nameTeam || "",
           bibTeam: r.bibTeam || "",
+          countryCode: this.flagFor(r.nameTeam),
           result: {
             startTime: rr.startTime || "",
             finishTime: rr.finishTime || "",
@@ -597,11 +632,6 @@ export default {
   },
 
   async created() {
-    // OFFICIAL mode (per event)
-    const k = this.officialKey();
-    const saved = localStorage.getItem(k);
-    if (saved !== null) this.isOfficial = saved === "1";
-
     // Event info dari IPC atau localStorage
     const q = this.$route.query || {};
     if (q.eventId) {
@@ -625,6 +655,7 @@ export default {
         chiefJudge: ev.chiefJudge || "",
         event_logo: ev.event_logo || [],
       };
+      this.isOfficial = !!this.eventInfo.resultsOfficial;
     }
 
     this.loadDrrResult();
@@ -690,6 +721,7 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res;
+              this.isOfficial = !!this.eventInfo.resultsOfficial;
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -704,14 +736,169 @@ export default {
       }
     },
 
-    officialKey() {
+    async toggleOfficial() {
       const q = this.$route.query || {};
-      return "resultOfficialMode:" + (q.eventId || "global");
+      const eventId = String(q.eventId || this.eventInfo._id || "");
+      if (!eventId || typeof ipcRenderer === "undefined") return;
+
+      const nextValue = !this.isOfficial;
+      await new Promise((resolve) => {
+        ipcRenderer.once("event:set-official-reply", (_e, res) => {
+          if (res && res.ok) {
+            this.isOfficial = nextValue;
+            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+          } else {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Update Status",
+              detail:
+                res && res.error
+                  ? res.error
+                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+      });
     },
 
-    toggleOfficial() {
-      this.isOfficial = !this.isOfficial;
-      localStorage.setItem(this.officialKey(), this.isOfficial ? "1" : "0");
+    resolveBucket() {
+      const q = this.$route.query || {};
+      const payload = safeParse(
+        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
+        {}
+      );
+      const b = payload.bucket || {};
+      return {
+        eventId: String(q.eventId || b.eventId || ""),
+        initialId: String(q.initialId || b.initialId || ""),
+        raceId: String(q.raceId || b.raceId || ""),
+        divisionId: String(q.divisionId || b.divisionId || ""),
+      };
+    },
+
+    fetchEventResultsAggregate() {
+      var f = this.resolveBucket();
+      if (!f.eventId || !f.initialId || !f.raceId || !f.divisionId) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Load Overall",
+          detail: "Parameter kategori tidak lengkap.",
+        });
+        return;
+      }
+      var self = this;
+      ipcRenderer.send("event-results:get", f);
+      ipcRenderer.once("event-results:get-reply", function (_e, res) {
+        if (res && res.ok && res.doc) {
+          self.dataAggregate = self.buildAggregateFromDoc(
+            res.doc,
+            self.eventInfo
+          );
+          self.showOverallModal = true;
+        } else {
+          var det = res && res.error ? res.error : "Tidak ada data aggregate.";
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Load Overall",
+            detail: det,
+          });
+        }
+      });
+    },
+
+    buildAggregateFromDoc(doc, eventInfo) {
+      var headerTitle =
+        (doc && doc.eventName) || (eventInfo && eventInfo.eventName) || "";
+      var sub = "";
+      if (doc && doc.divisionName) sub = String(doc.divisionName);
+      if (doc && doc.initialName)
+        sub = sub
+          ? sub + " • " + String(doc.initialName)
+          : String(doc.initialName);
+      var d = new Date();
+      var dateStr = d.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      var header = {
+        title: headerTitle || "—",
+        subTitle: sub || "—",
+        dateStr: dateStr,
+        official: false,
+        chiefJudge:
+          eventInfo && eventInfo.chiefJudge ? eventInfo.chiefJudge : "",
+      };
+      var rows = [];
+      var arr = doc && Array.isArray(doc.eventResult) ? doc.eventResult : [];
+      for (var i = 0; i < arr.length; i++) {
+        var t = arr[i] || {};
+        var cats = t && Array.isArray(t.categories) ? t.categories : [];
+        var sprintScore = 0,
+          sprintRank = 0,
+          h2hScore = 0,
+          h2hRank = 0,
+          slalomScore = 0,
+          slalomRank = 0,
+          drrScore = 0,
+          drrRank = 0,
+          rxScore = 0,
+          rxRank = 0;
+        for (var j = 0; j < cats.length; j++) {
+          var c = cats[j] || {};
+          var nm = c && typeof c.name === "string" ? c.name.toUpperCase() : "";
+          var sc = Number(c.scored) || 0;
+          var rk = Number(c.rankedByCats) || 0;
+          if (nm === "SPRINT") {
+            sprintScore = sc;
+            sprintRank = rk;
+          } else if (
+            nm === "HEADTOHEAD" ||
+            nm === "HEAD TO HEAD" ||
+            nm === "H2H"
+          ) {
+            h2hScore = sc;
+            h2hRank = rk;
+          } else if (nm === "SLALOM") {
+            slalomScore = sc;
+            slalomRank = rk;
+          } else if (nm === "DRR" || nm === "DOWN RIVER RACE") {
+            drrScore = sc;
+            drrRank = rk;
+          } else if (nm === "RX" || nm === "RAFTING CROSS") {
+            rxScore = sc;
+            rxRank = rk;
+          }
+        }
+        var totalScore =
+          t && t.totalScore != null
+            ? Number(t.totalScore) || 0
+            : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        rows.push({
+          no: i + 1,
+          teamName: t.teamName || "",
+          bib: t.bib || "",
+          countryCode: this.flagFor(t.teamName),
+          sprintScore: sprintScore,
+          sprintRank: sprintRank,
+          h2hScore: h2hScore,
+          h2hRank: h2hRank,
+          slalomScore: slalomScore,
+          slalomRank: slalomRank,
+          drrScore: drrScore,
+          drrRank: drrRank,
+          rxScore: rxScore,
+          rxRank: rxRank,
+          totalScore: totalScore,
+        });
+      }
+      rows.sort(function (a, b) {
+        return b.totalScore - a.totalScore;
+      });
+      for (var k = 0; k < rows.length; k++) rows[k].no = k + 1;
+      return { header: header, rows: rows };
     },
 
     openEdit(row) {

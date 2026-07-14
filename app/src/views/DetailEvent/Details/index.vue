@@ -153,6 +153,7 @@
         :rows="teamsMenR4"
         :teams-available="availableFor('R4', 'MEN')"
         :draft="draftMap['R4_MEN']"
+        :loading="loadingByPanel['R4_MEN']"
         @add-draft="addDraft('R4', 'MEN')"
         @draft-change="onDraftChange('R4', 'MEN', $event)"
         @draft-save="saveDraft('R4', 'MEN')"
@@ -173,6 +174,7 @@
         :rows="teamsWomenR4"
         :teams-available="availableFor('R4', 'WOMEN')"
         :draft="draftMap['R4_WOMEN']"
+        :loading="loadingByPanel['R4_WOMEN']"
         @add-draft="addDraft('R4', 'WOMEN')"
         @draft-change="onDraftChange('R4', 'WOMEN', $event)"
         @draft-save="saveDraft('R4', 'WOMEN')"
@@ -193,6 +195,7 @@
         :rows="teamsMenR6"
         :teams-available="availableFor('R6', 'MEN')"
         :draft="draftMap['R6_MEN']"
+        :loading="loadingByPanel['R6_MEN']"
         @add-draft="addDraft('R6', 'MEN')"
         @draft-change="onDraftChange('R6', 'MEN', $event)"
         @draft-save="saveDraft('R6', 'MEN')"
@@ -213,6 +216,7 @@
         :rows="teamsWomenR6"
         :teams-available="availableFor('R6', 'WOMEN')"
         :draft="draftMap['R6_WOMEN']"
+        :loading="loadingByPanel['R6_WOMEN']"
         @add-draft="addDraft('R6', 'WOMEN')"
         @draft-change="onDraftChange('R6', 'WOMEN', $event)"
         @draft-save="saveDraft('R6', 'WOMEN')"
@@ -372,7 +376,9 @@ async function _uploadMany(list, folder) {
       try {
         var created = await window.cloud.pathToFile(f);
         if (created) f = created;
-      } catch (_e) {}
+      } catch (_e) {
+        logger.warn("pathToFile gagal, pakai nilai asli:", _e);
+      }
     }
 
     var up = await _uploadOne(f, folder);
@@ -412,7 +418,15 @@ export default {
         R6_MEN: false,
         R6_WOMEN: false,
       },
-      lastToken: "",
+      // per-panel (div_race) token, bukan satu field bersama — supaya refresh
+      // beberapa panel yang berjalan bersamaan tidak saling menimpa token guard
+      lastTokenByPanel: {},
+      loadingByPanel: {
+        R4_MEN: false,
+        R4_WOMEN: false,
+        R6_MEN: false,
+        R6_WOMEN: false,
+      },
       showRaceSettings: false,
       showEventSettings: false,
       MAX_GATE: 14,
@@ -477,7 +491,10 @@ export default {
 
       // state
       raceActive: { selected: { name: "SPRINT" } },
-      initialActive: { selected: { name: "Silakan Pilih Initial" } },
+      // name kosong (bukan placeholder) supaya guard "belum ada yang dipilih"
+      // di created() (!initialActive.selected.name) benar-benar bisa true dan
+      // auto-select initial category pertama berjalan seperti seharusnya.
+      initialActive: { selected: { name: "" } },
 
       // data
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
@@ -676,7 +693,7 @@ export default {
       };
 
       // preview sederhana ke console
-      console.log(
+      logger.info(
         "READY PAYLOAD:\n" +
           JSON.stringify(
             {
@@ -844,6 +861,7 @@ export default {
         this._setLoading(true, "Memuat ulang data event…", 95);
         await this.loadEvent(eventId);
         this._ensureValidRaceSelection();
+        this._ensureValidInitialSelection();
 
         this._setLoading(true, "Selesai ✔", 100);
         ipcRenderer.send("get-alert-saved", {
@@ -925,6 +943,23 @@ export default {
     async selectInitial(i) {
       this.initialActive.selected = i;
       await this.refreshVisibleBuckets();
+    },
+
+    // pastikan initial category yang sedang aktif masih ada di categoriesInitial;
+    // kalau tidak (mis. dihapus/diubah lewat Event Settings), pindah ke yang pertama tersedia
+    _ensureValidInitialSelection() {
+      const list = this.events.categoriesInitial || [];
+      if (!list.length) return;
+      const current = (
+        (this.initialActive.selected && this.initialActive.selected.name) ||
+        ""
+      ).toUpperCase();
+      const stillValid = list.some(
+        (i) => String(i.name).toUpperCase() === current
+      );
+      if (!stillValid) {
+        this.initialActive.selected = list[0];
+      }
     },
 
     /* =========================================================
@@ -1034,6 +1069,9 @@ export default {
             detail: (res && res.error) || "Gagal menghapus team di database.",
             message: "Failed",
           });
+          // rollback: DB gagal hapus tapi state lokal sudah terlanjur
+          // dihilangkan → resync panel ini dari DB supaya UI tidak "bohong"
+          this.loadTeamsRegistered(div, race);
         }
       });
     },
@@ -1155,11 +1193,14 @@ export default {
         identity.raceName,
         Date.now(),
       ].join("|");
-      this.lastToken = token;
+      const panelKey = div + "_" + race;
+      this.lastTokenByPanel[panelKey] = token;
+      this.$set(this.loadingByPanel, panelKey, true);
 
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
-          if (this.lastToken !== token) return resolve(); // abaikan balasan usang
+          if (this.lastTokenByPanel[panelKey] !== token) return resolve(); // abaikan balasan usang
+          this.$set(this.loadingByPanel, panelKey, false);
           if (bucket && Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
             resolve({ div, race, ok: true });
@@ -1175,6 +1216,10 @@ export default {
         // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
           ipcRenderer.off("get-teams-registered-reply", onReply);
+          // hanya matikan loading kalau tidak ada request lebih baru untuk panel ini
+          if (this.lastTokenByPanel[panelKey] === token) {
+            this.$set(this.loadingByPanel, panelKey, false);
+          }
           resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });
@@ -1252,14 +1297,11 @@ export default {
               bibTeam: (t && t.bibTeam) || "",
             }));
 
-            if (!this.availableTeams.length) {
-              this.availableTeams = this.dummyTeams.slice();
-            }
             resolve();
           });
         });
       } catch {
-        this.availableTeams = this.dummyTeams.slice();
+        this.availableTeams = [];
       }
     },
 
@@ -1646,13 +1688,13 @@ export default {
       this.dataTeams = this.dataTeams.slice(); // trigger reactive update
       this.$set(this.draftMap, k, null);
       this.persistParticipants();
-      this.syncBucketToDB(bucket); // sinkron ke DB
+      this.syncBucketToDB(bucket, div, race); // sinkron ke DB
     },
 
     /* =========================================================
      * PERSISTENCE (DB & local state)
      * =======================================================*/
-    syncBucketToDB(bucket) {
+    syncBucketToDB(bucket, div, race) {
       ipcRenderer.send("upsert-teams-registered", bucket);
       ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
         if (!res || !res.ok) {
@@ -1663,6 +1705,9 @@ export default {
               (res && res.error) ||
               "Gagal menyimpan perubahan tim ke database.",
           });
+          // rollback: DB gagal simpan tapi state lokal sudah terlanjur
+          // menambahkan tim → resync panel ini dari DB supaya UI tidak "bohong"
+          if (div && race) this.loadTeamsRegistered(div, race);
         }
       });
     },

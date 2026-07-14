@@ -41,7 +41,12 @@
       </b-row>
     </div>
 
-    <div class="panel-body">
+    <div class="panel-body" :class="{ 'is-loading': loading }">
+      <div v-if="loading" class="panel-loading-overlay">
+        <b-spinner small variant="primary" class="mr-2" />
+        <span>Memuat data tim…</span>
+      </div>
+
       <table class="team-table">
         <thead>
           <tr>
@@ -153,6 +158,7 @@ export default {
     rows: { type: Array, default: () => [] },
     teamsAvailable: { type: Array, default: () => [] },
     draft: { type: Object, default: null },
+    loading: { type: Boolean, default: false },
   },
   computed: {
     selectOptions() {
@@ -262,6 +268,27 @@ export default {
 /* konsisten padding panel */
 .panel-body {
   padding: 10px 16px 6px 16px;
+  position: relative;
+}
+.panel-body.is-loading .team-table {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: blur(0.5px);
+  transition: opacity 0.15s ease;
+}
+.panel-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #325a8f;
+  font-weight: 600;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
 }
 .panel-footer {
   padding: 8px 16px 14px 16px;

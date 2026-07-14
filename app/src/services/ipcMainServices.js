@@ -108,6 +108,10 @@ const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
+const {
+  insertChatMessage,
+  listChatMessagesByEvent,
+} = require("../controllers/INSERT/insertChatMessage");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -163,6 +167,42 @@ function setupIPCMainHandlers() {
         ok: false,
         error: err.message,
       });
+    }
+  });
+
+  // Chat: send a message (event-scoped group chat)
+  ipcMain.on("chat:send", async (event, payload) => {
+    try {
+      const message = await insertChatMessage(payload);
+      event.reply("chat:send:reply", { ok: true, message });
+    } catch (err) {
+      event.reply("chat:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: list history for an event + category (Race Category room)
+  ipcMain.on("chat:listByEvent", async (event, payload) => {
+    try {
+      const eventId = payload && payload.eventId ? payload.eventId : payload;
+      const category = payload && payload.category ? payload.category : "";
+      const messages = await listChatMessagesByEvent(eventId, category);
+      event.reply("chat:listByEvent:reply", { ok: true, messages });
+    } catch (err) {
+      event.reply("chat:listByEvent:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: dedicated event-info fetch (own reply channel — the widget is
+  // mounted persistently across every event page, so it must NOT share a
+  // reply channel with page components like Details/index.vue that also
+  // call get-events-byid, or removeAllListeners on either side can wipe out
+  // the other's pending listener)
+  ipcMain.on("chat:get-event", async (event, eventId) => {
+    try {
+      const data = await getEventById(eventId);
+      event.reply("chat:get-event-reply", data);
+    } catch (err) {
+      event.reply("chat:get-event-reply", null);
     }
   });
 

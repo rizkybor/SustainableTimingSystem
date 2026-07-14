@@ -1,11 +1,13 @@
 {
   "name": "app",
   "author": {
-    "name": "Rizky Ajie Kurniawan"
+    "name": "PT. Jendela Cakra Digital",
+    "email": "contact@jcdigital.co.id",
+    "url": "https://jcdigital.co.id"
   },
   "description": "STiming System 424 | Professional Timing - Indonesia @2025",
   "productName": "STiming System 424",
-  "version": "2.0.0",
+  "version": "3.0.1",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {

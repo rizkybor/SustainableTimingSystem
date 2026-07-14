@@ -749,23 +749,23 @@ export default {
     loadOptions: function () {
       var self = this;
       ipcRenderer.send("option-level");
-      ipcRenderer.on("option-level-reply", function (_e, data) {
+      ipcRenderer.once("option-level-reply", function (_e, data) {
         self.optionLevels = data || [];
       });
       ipcRenderer.send("option-categories-event");
-      ipcRenderer.on("option-categories-event-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-event-reply", function (_e, data) {
         self.optionCategories = data || [];
       });
       ipcRenderer.send("option-categories-division");
-      ipcRenderer.on("option-categories-division-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-division-reply", function (_e, data) {
         self.optionDivisions = data || [];
       });
       ipcRenderer.send("option-categories-initial");
-      ipcRenderer.on("option-categories-initial-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-initial-reply", function (_e, data) {
         self.optionInitials = data || [];
       });
       ipcRenderer.send("option-categories-race");
-      ipcRenderer.on("option-categories-race-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-race-reply", function (_e, data) {
         self.optionRaces = data || [];
       });
     },

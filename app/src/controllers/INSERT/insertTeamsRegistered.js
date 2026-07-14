@@ -121,6 +121,9 @@ async function findRegisteredEntriesByTeamName(nameTeam) {
     matched.forEach((t) => {
       out.push({
         eventId: String(doc.eventId || ""),
+        initialId: String(doc.initialId || ""),
+        raceId: String(doc.raceId || ""),
+        divisionId: String(doc.divisionId || ""),
         // NB: field ini bernama "eventName" di teamsRegisteredCollection,
         // tapi isinya sebenarnya RACE CATEGORY/discipline (SPRINT/HEAD2HEAD/
         // SLALOM/DRR/RX) — bukan judul event. Judul event asli ada di

@@ -16,6 +16,21 @@ let client;
 let db;
 let connecting;
 
+// Index yang harus ada, dibuat sekali per koneksi (createIndex idempotent —
+// aman dipanggil berkali-kali kalau index sudah ada).
+async function ensureIndexes(database) {
+  try {
+    // Cegah duplikat tim di master roster: satu nama+bib hanya boleh sekali.
+    await database
+      .collection("teamsCollection")
+      .createIndex({ nameTeam: 1, bibTeam: 1 }, { unique: true });
+  } catch (err) {
+    // Kalau data lama sudah mengandung duplikat nameTeam+bibTeam, MongoDB
+    // menolak membuat unique index — jangan sampai itu menggagalkan seluruh
+    // koneksi DB, cukup lanjut tanpa constraint ini untuk sementara.
+  }
+}
+
 async function getDb() {
   if (db) return db;
 
@@ -33,8 +48,9 @@ async function getDb() {
   if (!connecting) {
     connecting = client
       .connect()
-      .then(() => {
+      .then(async () => {
         db = client.db("sustainabledb_atlas");
+        await ensureIndexes(db);
         return db;
       })
       .catch((err) => {

@@ -60,4 +60,46 @@ async function getSlalomResult(identity = {}) {
 }
 
 
-module.exports = { getSprintResult, getDrrResult, getSlalomResult };
+// --- cari hasil MENTAH (per-run) satu tim, untuk Sprint/Slalom/DRR saja ---
+// H2H & RX belum ada endpoint baca per-tim dari koleksi hasilnya
+// (h2h_results/rx_results) — dikembalikan null (tidak didukung) untuk itu.
+function findTeamInArray(docs, fieldName, nameUpper) {
+  for (let i = 0; i < (docs || []).length; i++) {
+    const doc = docs[i] || {};
+    const arr = Array.isArray(doc[fieldName]) ? doc[fieldName] : [];
+    for (let j = 0; j < arr.length; j++) {
+      const t = arr[j];
+      if (t && String(t.nameTeam || "").trim().toUpperCase() === nameUpper) {
+        return t;
+      }
+    }
+  }
+  return null;
+}
+
+async function getRaceCategoryResultForTeam(identity = {}) {
+  const cat = String(identity.raceCategory || "").trim().toUpperCase();
+  const nameUpper = String(identity.nameTeam || "").trim().toUpperCase();
+  if (!nameUpper) return null;
+
+  if (cat === "SPRINT") {
+    const docs = await getSprintResult(identity);
+    return findTeamInArray(docs, "result", nameUpper);
+  }
+  if (cat === "SLALOM") {
+    const docs = await getSlalomResult(identity);
+    return findTeamInArray(docs, "teams", nameUpper);
+  }
+  if (cat === "DRR") {
+    const docs = await getDrrResult(identity);
+    return findTeamInArray(docs, "result", nameUpper);
+  }
+  return null;
+}
+
+module.exports = {
+  getSprintResult,
+  getDrrResult,
+  getSlalomResult,
+  getRaceCategoryResultForTeam,
+};

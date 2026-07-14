@@ -161,6 +161,32 @@
                 <div v-else class="text-muted small mt-2">
                   {{ loadingResults ? "Memuat hasil…" : "Belum ada hasil." }}
                 </div>
+
+                <!-- Timing detail mentah (Sprint/Slalom/DRR saja) -->
+                <template v-if="cat.supportsRawResult">
+                  <div v-if="cat.rawRuns.length" class="timing-detail mt-2">
+                    <div
+                      v-for="(run, rIdx) in cat.rawRuns"
+                      :key="rIdx"
+                      class="timing-run"
+                    >
+                      <div class="timing-run-label">{{ run.label }}</div>
+                      <div v-if="run.fields.length" class="result-grid">
+                        <div
+                          class="td-field"
+                          v-for="f in run.fields"
+                          :key="f.label"
+                        >
+                          <div class="td-label">{{ f.label }}</div>
+                          <div class="td-value">{{ f.value }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="text-muted small mt-2">
+                    {{ loadingRawResults ? "Memuat timing detail…" : "Belum ada timing detail." }}
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -174,6 +200,7 @@
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { RESULT_FIELD_LABELS, collectFields } from "@/utils/formatRaceResult";
 
 // teamsRegisteredCollection & temporaryOverallEventResults kadang memakai
 // key discipline yang beda ejaan untuk kategori yang sama (mis. Head to Head
@@ -184,6 +211,32 @@ var CATEGORY_KEY_ALIASES = { HEAD2HEAD: "HEADTOHEAD" };
 function normalizeCategoryKey(raceCategory) {
   var up = String(raceCategory || "").toUpperCase();
   return CATEGORY_KEY_ALIASES[up] || up;
+}
+
+// Timing detail mentah per-run baru ada endpoint bacanya untuk 3 kategori
+// ini (lihat getRaceCategoryResultForTeam di controllers/GET/getResult.js).
+// H2H & RX belum punya endpoint baca-per-tim dari koleksi hasilnya.
+var RAW_RESULT_CATEGORIES = ["SPRINT", "SLALOM", "DRR"];
+
+function registrationIdentityKey(r) {
+  return [r.eventId, r.initialId, r.raceId, r.divisionId].join("|");
+}
+
+// Normalisasi field "result" milik satu tim jadi daftar run yang siap
+// dirender — bentuknya beda per kategori: Sprint/DRR = objek tunggal,
+// Slalom = array per-run (biasanya 2 run).
+function normalizeRawRuns(rawResult) {
+  if (!rawResult || rawResult.result === undefined) return [];
+  var result = rawResult.result;
+  if (Array.isArray(result)) {
+    return result.map(function (r, idx) {
+      return {
+        label: result.length > 1 ? "Run " + (idx + 1) : "Result",
+        fields: collectFields(r, RESULT_FIELD_LABELS),
+      };
+    });
+  }
+  return [{ label: "Result", fields: collectFields(result, RESULT_FIELD_LABELS) }];
 }
 
 export default {
@@ -205,6 +258,10 @@ export default {
       // urutan pengiriman request — supaya aman kalau balasan datang tidak
       // berurutan karena beberapa event di-query sekaligus)
       resultDocsByEventId: {},
+      // hasil timing MENTAH per-run (Sprint/Slalom/DRR saja — H2H/RX belum
+      // ada endpoint baca per-tim), diindeks per identity key registrasi
+      rawResultByKey: {},
+      loadingRawResults: false,
       masterFields: [
         { key: "nameTeam", label: "Team Name" },
         { key: "typeTeam", label: "Type" },
@@ -285,6 +342,12 @@ export default {
             ) || null;
         }
 
+        const supportsRawResult =
+          RAW_RESULT_CATEGORIES.indexOf(String(r.raceCategory || "").toUpperCase()) !== -1;
+        const rawResult = supportsRawResult
+          ? this.rawResultByKey[registrationIdentityKey(r)] || null
+          : null;
+
         map[key].categories.push({
           raceCategory: r.raceCategory,
           raceName: r.raceName,
@@ -292,6 +355,8 @@ export default {
           initialName: r.initialName,
           bibTeam: r.bibTeam,
           result: resultEntry,
+          supportsRawResult: supportsRawResult,
+          rawRuns: supportsRawResult ? normalizeRawRuns(rawResult) : [],
         });
       });
 
@@ -337,6 +402,7 @@ export default {
         this.registrations = res && res.ok && Array.isArray(res.items) ? res.items : [];
         this.loadResultsForEvents();
         this.loadEventNames();
+        this.loadRawResults();
         done();
       });
     },
@@ -396,6 +462,41 @@ export default {
         this.$set(this.eventInfoById, eventId, data || {});
         this.$delete(this.pendingEventInfoIds, eventId);
       }
+    },
+
+    // Timing detail mentah per-run (Sprint/Slalom/DRR saja). Sekuensial,
+    // satu per satu, karena "team-result-detail:get-reply" adalah channel
+    // sendiri untuk fitur ini tapi tetap lebih aman dipanggil berurutan
+    // daripada banyak request bersamaan yang balasannya cuma dibedakan
+    // lewat urutan .once() pendaftaran.
+    async loadRawResults() {
+      const targets = this.registrations.filter(
+        (r) => RAW_RESULT_CATEGORIES.indexOf(String(r.raceCategory || "").toUpperCase()) !== -1
+      );
+      if (!targets.length) return;
+
+      this.loadingRawResults = true;
+      for (let i = 0; i < targets.length; i++) {
+        const r = targets[i];
+        const key = registrationIdentityKey(r);
+        if (this.rawResultByKey[key] !== undefined) continue;
+
+        // eslint-disable-next-line no-await-in-loop
+        const res = await new Promise((resolve) => {
+          ipcRenderer.send("team-result-detail:get", {
+            eventId: r.eventId,
+            initialId: r.initialId,
+            raceId: r.raceId,
+            divisionId: r.divisionId,
+            raceCategory: r.raceCategory,
+            nameTeam: this.teamName,
+          });
+          ipcRenderer.once("team-result-detail:get-reply", (_e, data) => resolve(data));
+        });
+
+        this.$set(this.rawResultByKey, key, (res && res.ok && res.team) || null);
+      }
+      this.loadingRawResults = false;
     },
   },
 };
@@ -544,5 +645,19 @@ export default {
   font-weight: 600;
   font-size: 13px;
   color: #1f2937;
+}
+
+.timing-detail {
+  border-top: 1px dashed #e6ebf4;
+  padding-top: 10px;
+}
+.timing-run + .timing-run { margin-top: 10px; }
+.timing-run-label {
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #1c4c7a;
+  margin-bottom: 6px;
 }
 </style>

@@ -130,9 +130,13 @@ the judge/operator accounts used throughout the settings above.
   currently being reviewed for correctness across formats (see project
   history for specifics) — Sprint, Slalom, and DRR result pages should be
   spot-checked against the database when in doubt about a displayed number.
-- Head-to-Head and Down River Race result pages don't yet expose the
-  "View Overall" button that Sprint, Slalom, and Rafting Cross have, even
-  though their scores are recorded correctly in the background.
+- ~~Head-to-Head and Down River Race result pages don't yet expose the
+  "View Overall" button that Sprint, Slalom, and Rafting Cross have.~~
+  **Stale note, corrected.** Checked both `HeadToHeadResult.vue` and
+  `DrrResult.vue` directly — the button, the `PrintOverallModal` wiring,
+  `fetchEventResultsAggregate()`, and `buildAggregateFromDoc()` are all
+  already present and structurally identical to `SprintResult.vue`. All
+  five result pages expose "View Overall" the same way.
 
 ## Known issues to fix
 
@@ -157,33 +161,41 @@ Found during a code-review pass; not yet fixed unless noted otherwise.
   now-unused `buildResultDocs()` helper. `saveAllRoundsLocal()` (local-only
   save) and `exportAllRoundsJSON()` were left untouched — they're
   self-contained and don't depend on any dead channel.
-- **`getOptionTeamTypes()`'s error-fallback list doesn't match its normal
-  list.** In `ipcMainServices.js`, if the DB-backed team-type query throws,
-  the fallback offers `{value:"country"}` instead of the real
-  `wilayah`/`negara` values used everywhere else (including the
-  Level→allowed-type scope map in `Details/index.vue`). If that fallback
-  ever fires, the Team Type dropdown would offer a value nothing else in the
-  app recognizes.
-- **Duplicate teams aren't actually prevented.** `insertTeams.js` has
-  duplicate-key error handling for a unique `nameTeam + bibTeam` index, but
-  the index creation itself is commented out ("optional, create at DB
-  init"). In practice, nothing stops the same team name from being created
-  more than once in the master roster.
-- **`EventSettings.vue` (and possibly `JudgesSettings.vue`) still leak IPC
-  listeners on repeated use.** Their `loadOptions()` registers persistent
-  `ipcRenderer.on(...)` listeners for the shared `option-level`/
-  `option-categories-*` channels with no cleanup. This is the exact same bug
-  already found and fixed in `CreateEvent.vue` (switched to `.once()`) — the
-  fix just hasn't been applied to these two yet.
-- **Team Details page (`/team`) only shows Ranked/Score, not full timing
-  detail.** The per-category "Result" section is sourced from
-  `temporaryOverallEventResults` (a cross-category rank/score rollup), not
-  the raw per-run start/finish/penalty data — that lives in 5 differently-
-  shaped collections (`temporarySprintResult`, `temporarySlalomResult`,
-  `temporaryDrrResult`, `h2h_results`, `rx_results`), each with its own
-  round/heat-based query logic. Deliberately deferred rather than risking 5
-  bespoke, hard-to-verify integrations; worth revisiting if full per-run
-  detail is needed on that page.
+- ~~`getOptionTeamTypes()`'s error-fallback list doesn't match its normal
+  list.~~ **Fixed.** In `ipcMainServices.js`, the fallback used when the
+  DB-backed team-type query throws offered `{value:"country"}` instead of
+  the real `wilayah`/`negara` values used everywhere else (including the
+  Level→allowed-type scope map in `Details/index.vue`). Fallback now mirrors
+  `getOptionTeamTypes()` in `insertTeams.js` exactly (club/pengcab/pengprov/
+  wilayah/negara).
+- ~~Duplicate teams aren't actually prevented.~~ **Fixed.** `insertTeams.js`
+  had duplicate-key error handling for a unique `nameTeam + bibTeam` index,
+  but the index creation itself was commented out ("optional, create at DB
+  init"). The index is now actually created — once per DB connection, via
+  a new `ensureIndexes()` in `controllers/index.js` (not on every insert,
+  and wrapped in try/catch so pre-existing duplicate data can't break the
+  whole DB connection). `updateTeamById` (the Edit-team path) now also
+  surfaces a clear "already exists" error instead of a raw Mongo error if an
+  edit would create a duplicate.
+- ~~`EventSettings.vue` (and possibly `JudgesSettings.vue`) still leak IPC
+  listeners on repeated use.~~ **Fixed** for `EventSettings.vue` (switched
+  `loadOptions()`'s 5 `ipcRenderer.on(...)` to `.once()`, same fix as
+  `CreateEvent.vue`). Re-checked `JudgesSettings.vue` specifically — it
+  already used `.once()` everywhere; the earlier note was overcautious.
+- **Team Details page (`/team`) — Sprint/Slalom/DRR now show full per-run
+  timing detail; H2H/RX still show only Ranked/Score.** Added
+  `getRaceCategoryResultForTeam()` (`controllers/GET/getResult.js`) + IPC
+  channel `team-result-detail:get`, which looks up one team's raw row in
+  `temporarySprintResult` / `temporarySlalomResult` / `temporaryDrrResult`
+  by exact bucket identity (eventId/initialId/raceId/divisionId) and team
+  name. Rendering logic (`RESULT_FIELD_LABELS`/`collectFields`) was
+  extracted from `TeamDetailsModal.vue` into a shared
+  `src/utils/formatRaceResult.js` so both places stay in sync. H2H and RX
+  were deliberately left out of this: neither exposes a "read one team's
+  result" query from `h2h_results`/`rx_results` today (only
+  bracket/overall-shaped reads), so supporting them means designing and
+  adding new backend queries against schemas that haven't been read/tested
+  yet — a separate, riskier piece of work.
 - **Signature images don't print on every result PDF yet.** Technical
   Delegate & Race Director signature *images* (the new Comitte upload
   feature) currently render on the Sprint, Rafting Cross (all 3 variants),
@@ -201,6 +213,7 @@ insert-h2h-result dari HeadToHead.vue tidak ada penerimanya — jalur simpan has
 Fallback getOptionTeamTypes() tidak konsisten — kalau query DB gagal, opsi fallback pakai "country" bukan "wilayah"/"negara" seperti yang dipakai di tempat lain.
 
 Duplikat tim tidak benar-benar dicegah — index unik nameTeam+bibTeam di insertTeams.js sengaja dikomentari ("opsional").
+
 EventSettings.vue/JudgesSettings.vue masih bocor listener IPC — pola bug yang sama persis dengan yang sudah diperbaiki di CreateEvent.vue, belum diterapkan ke dua file ini.
 
 Halaman Team Details baru menampilkan Ranked/Score, belum detail timing mentah per-run — datanya tersebar di 5 koleksi berbeda struktur (sengaja ditunda, bukan bug).
@@ -208,5 +221,3 @@ Halaman Team Details baru menampilkan Ranked/Score, belum detail timing mentah p
 Signature Comitte belum tampil di semua PDF — baru render di Sprint/Rafting Cross/Overall; Slalom, DRR, H2H memang cuma punya slot Chief Judge dari sononya.
 
 Item lama yang belum tersentuh: edge case Sprint/Slalom/DRR result masih perlu di-review, dan H2H/DRR belum punya tombol "View Overall".
-
-Semua sudah tertulis rapi di Featured.md bagian "Known issues to fix" (baru) plus deskripsi fitur-fitur baru sesi ini (Comitte signature, View Details, Team Details page, Live Chat) ditambahkan ke bagian alur utamanya.

@@ -95,6 +95,7 @@ const {
   getSprintResult,
   getDrrResult,
   getSlalomResult,
+  getRaceCategoryResultForTeam,
 } = require("../controllers/GET/getResult.js");
 
 const {
@@ -487,6 +488,21 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // Timing detail mentah per-tim (Sprint/Slalom/DRR saja — H2H/RX belum ada
+  // endpoint baca per-tim dari koleksi hasilnya)
+  ipcMain.on("team-result-detail:get", async (event, identity) => {
+    try {
+      const team = await getRaceCategoryResultForTeam(identity || {});
+      event.reply("team-result-detail:get-reply", { ok: true, team });
+    } catch (error) {
+      event.reply("team-result-detail:get-reply", {
+        ok: false,
+        team: null,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
   // ========================================================================
   // File picker & Cloudinary (TIDAK ADA optional chaining)
   // ========================================================================
@@ -575,7 +591,8 @@ function setupIPCMainHandlers() {
         { value: "club", name: "Club" },
         { value: "pengcab", name: "Pengcab" },
         { value: "pengprov", name: "Pengprov" },
-        { value: "country", name: "Country" },
+        { value: "wilayah", name: "Wilayah" },
+        { value: "negara", name: "Negara" },
       ]);
     }
   });

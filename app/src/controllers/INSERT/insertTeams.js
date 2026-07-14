@@ -45,9 +45,9 @@ async function insertNewTeam(payload = {}) {
   if (!doc.typeTeam) throw new Error("typeTeam is required");
   if (!doc.nameTeam) throw new Error("nameTeam is required");
 
-  // Opsional: index unik kombinasi (buat di init DB):
-  // await coll.createIndex({ nameTeam: 1, bibTeam: 1 }, { unique: true });
-
+  // Unique index (nameTeam + bibTeam) dibuat sekali per koneksi DB lewat
+  // ensureIndexes() di controllers/index.js — E11000 di bawah ini adalah
+  // hasil pelanggaran index itu.
   try {
     const result = await coll.insertOne(doc);
     return { insertedId: result.insertedId };
@@ -114,10 +114,17 @@ async function collUpdateOneSafe(oid, setDoc) {
   const db = await getDb();
   const coll = db.collection("teamsCollection");
 
-  // Kalau cuma updatedAt saja, tetap jalankan — tidak dianggap error
-  const r = await coll.updateOne({ _id: oid }, { $set: setDoc });
-  // matchedCount > 0 dianggap sukses walaupun modifiedCount bisa 0 (data sama)
-  return r.matchedCount > 0;
+  try {
+    // Kalau cuma updatedAt saja, tetap jalankan — tidak dianggap error
+    const r = await coll.updateOne({ _id: oid }, { $set: setDoc });
+    // matchedCount > 0 dianggap sukses walaupun modifiedCount bisa 0 (data sama)
+    return r.matchedCount > 0;
+  } catch (e) {
+    if (e && e.code === 11000) {
+      throw new Error("Team with the same name & bib already exists");
+    }
+    throw e;
+  }
 }
 
 module.exports = {

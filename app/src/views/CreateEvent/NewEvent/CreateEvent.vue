@@ -38,7 +38,7 @@
                 <b-row>
                   <!-- KIRI: field level, event name, river name -->
                   <b-col md="8">
-                    <b-form-group label="Event Level">
+                    <b-form-group label="Event Level (Tingkat Event)">
                       <b-input-group size="sm">
                         <!-- Dropdown Event Level -->
                         <b-form-select
@@ -127,7 +127,7 @@
                     </b-modal>
 
                     <!-- EVENT NAME  -->
-                    <b-form-group label="Event Name">
+                    <b-form-group label="Event Name (Nama Event)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.eventName"
@@ -137,7 +137,7 @@
                     </b-form-group>
 
                     <!-- RIVER NAME  -->
-                    <b-form-group label="River Name">
+                    <b-form-group label="River Name (Nama Sungai)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.riverName"
@@ -149,7 +149,7 @@
 
                   <!-- KANAN: upload (Event Poster) -->
                   <b-col md="4">
-                    <b-form-group label="Event Poster">
+                    <b-form-group label="Event Poster (Poster Event)">
                       <div class="d-flex flex-column align-items-stretch">
                         <div class="mb-2">
                           <img
@@ -216,7 +216,7 @@
                 </p>
 
                 <!-- DISTRICT  -->
-                <b-form-group label="District">
+                <b-form-group label="District (Daerah)">
                   <b-form-input
                     size="sm"
                     v-model="formEvent.addressDistrict"
@@ -230,7 +230,7 @@
                 <b-row>
                   <!-- SUBDISTRICT  -->
                   <b-col cols="6">
-                    <b-form-group label="Sub District">
+                    <b-form-group label="Sub District (Kecamatan)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressSubDistrict"
@@ -244,7 +244,7 @@
 
                   <!-- VILLAGE  -->
                   <b-col cols="6">
-                    <b-form-group label="Village">
+                    <b-form-group label="Village (Desa)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressVillage"
@@ -260,7 +260,7 @@
                 <b-row>
                   <!-- CITY  -->
                   <b-col cols="6">
-                    <b-form-group label="City">
+                    <b-form-group label="City (Kota)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressCity"
@@ -274,7 +274,7 @@
 
                   <!-- PROVINCE  -->
                   <b-col cols="6">
-                    <b-form-group label="Province">
+                    <b-form-group label="Province (Provinsi)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressProvince"
@@ -290,7 +290,7 @@
                 <b-row>
                   <!-- ZIP CODE  -->
                   <b-col cols="6">
-                    <b-form-group label="ZIP Code">
+                    <b-form-group label="ZIP Code (Kode Pos)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressZipCode"
@@ -304,7 +304,7 @@
 
                   <b-col>
                     <!-- STATE -->
-                    <b-form-group label="State">
+                    <b-form-group label="State (Negara)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.addressState"
@@ -320,7 +320,7 @@
                 <b-row>
                   <b-col cols="6">
                     <!-- START DATE -->
-                    <b-form-group label="Start Date">
+                    <b-form-group label="Start Date (Tanggal Mulai)">
                       <b-form-datepicker
                         size="sm"
                         v-model="formEvent.startDateEvent"
@@ -334,7 +334,7 @@
                   </b-col>
                   <b-col cols="6">
                     <!-- END DATE -->
-                    <b-form-group label="End Date">
+                    <b-form-group label="End Date (Tanggal Berakhir)">
                       <b-form-datepicker
                         :disabled="formEvent.startDateEvent === ''"
                         size="sm"
@@ -355,7 +355,7 @@
                 </p>
 
                 <!-- EVENT CATEGORIES -->
-                <b-form-group label="Event Categories" label-cols="3">
+                <b-form-group label="Event Categories (Kategori Event)" label-cols="3">
                   <multiselect
                     v-model="formEvent.categoriesEvent"
                     :options="optionCategories"
@@ -367,7 +367,7 @@
                 </b-form-group>
 
                 <!-- DIVISION CATEGORIES -->
-                <b-form-group label="Division Categories" label-cols="3">
+                <b-form-group label="Division Categories (Kategori Divisi)" label-cols="3">
                   <multiselect
                     v-model="formEvent.categoriesDivision"
                     :options="optionDivisions"
@@ -379,7 +379,7 @@
                 </b-form-group>
 
                 <!-- RACE CATEGORIES -->
-                <b-form-group label="Race Categories" label-cols="3">
+                <b-form-group label="Race Categories (Kategori Lomba)" label-cols="3">
                   <multiselect
                     v-model="formEvent.categoriesRace"
                     :options="optionRaces"
@@ -391,7 +391,7 @@
                 </b-form-group>
 
                 <!-- INITIAL CATEGORIES -->
-                <b-form-group label="Initial Categories" label-cols="3">
+                <b-form-group label="Initial Categories (Kategori Inisial)" label-cols="3">
                   <multiselect
                     v-model="formEvent.categoriesInitial"
                     :options="optionInitials"
@@ -408,7 +408,7 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <b-form-group label="Technical Delegate">
+                    <b-form-group label="Technical Delegate (Delegasi Teknis)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.technicalDelegate"
@@ -452,7 +452,7 @@
                     </div>
                   </b-col>
                   <b-col>
-                    <b-form-group label="Race Director">
+                    <b-form-group label="Race Director (Direktur Lomba)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.raceDirector"
@@ -499,7 +499,7 @@
 
                 <b-row>
                   <b-col cols="6">
-                    <b-form-group label="Chief Judge">
+                    <b-form-group label="Chief Judge (Ketua Juri)">
                       <b-form-input
                         size="sm"
                         v-model="formEvent.chiefJudge"

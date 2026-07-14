@@ -1,6 +1,7 @@
-// ===== Cloudinary config (dipakai bareng oleh CreateEvent & EventSettings) =====
+// ===== Cloudinary config (dipakai bareng oleh CreateEvent, EventSettings & Chat) =====
 var CLOUD_NAME = "kikiaka";
 var UPLOAD_PRESET = "stiming-preset";
+export var MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB, dipakai juga oleh chat widget
 
 export function toCloudMeta(json) {
   return {
@@ -24,13 +25,26 @@ export function toCloudMeta(json) {
   };
 }
 
-export async function uploadOne(fileObj, folder) {
+// resourceType: "image" (default) | "video" (dipakai juga utk audio, sesuai
+// konvensi Cloudinary yang memperlakukan file audio sebagai resource "video")
+export async function uploadOne(fileObj, folder, resourceType) {
   if (!fileObj) return { ok: false, error: "no-file" };
+
+  var kind = resourceType || "image";
+
+  var size =
+    typeof fileObj.size === "number" ? fileObj.size : null;
+  if (size != null && size > MAX_UPLOAD_BYTES) {
+    return { ok: false, error: "file-too-large" };
+  }
 
   // A) lewat bridge Electron kalau ada
   if (window.cloud && typeof window.cloud.uploadFile === "function") {
     try {
-      var up = await window.cloud.uploadFile(fileObj, { folder: folder });
+      var up = await window.cloud.uploadFile(fileObj, {
+        folder: folder,
+        resourceType: kind,
+      });
       if (up && up.ok === true && up.result) {
         return { ok: true, result: toCloudMeta(up.result) };
       }
@@ -50,7 +64,8 @@ export async function uploadOne(fileObj, folder) {
     fd.append("upload_preset", UPLOAD_PRESET);
     if (folder) fd.append("folder", folder);
 
-    var url = "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/image/upload";
+    var url =
+      "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/" + kind + "/upload";
     var res = await fetch(url, { method: "POST", body: fd });
     var json = null;
     try {

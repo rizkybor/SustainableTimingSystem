@@ -114,6 +114,7 @@ const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
 const {
   insertChatMessage,
   listChatMessagesByEvent,
+  deleteChatMessage,
 } = require("../controllers/INSERT/insertChatMessage");
 
 cloudinary.config({
@@ -170,6 +171,18 @@ function setupIPCMainHandlers() {
         ok: false,
         error: err.message,
       });
+    }
+  });
+
+  // Chat: hapus (soft-delete) pesan milik sendiri
+  ipcMain.on("chat:delete", async (event, payload) => {
+    try {
+      const id = payload && payload.id;
+      const senderEmail = payload && payload.senderEmail;
+      const result = await deleteChatMessage(id, senderEmail);
+      event.reply("chat:delete:reply", result);
+    } catch (err) {
+      event.reply("chat:delete:reply", { ok: false, error: err.message });
     }
   });
 

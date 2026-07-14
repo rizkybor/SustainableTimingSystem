@@ -1,5 +1,6 @@
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
+const { notifyResultsUpdated } = require("../socketBroadcast");
 
 async function insertSprintResult(payload) {
   try {
@@ -213,6 +214,14 @@ async function insertSprintResult(payload) {
 
       const res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
+
+      notifyResultsUpdated({
+        eventId: meta.eventId,
+        category: "SPRINT",
+        initialId: meta.initialId,
+        divisionId: meta.divisionId,
+        raceId: meta.raceId,
+      });
     }
 
     return { ok: true, upsertedCount };
@@ -834,6 +843,14 @@ async function insertSlalomResult(payload) {
       const res = await col.updateOne(filter, update, { upsert: true });
       if (res && res.upsertedCount) upsertedCount += res.upsertedCount;
 
+      notifyResultsUpdated({
+        eventId: meta.eventId,
+        category: "SLALOM",
+        initialId: meta.initialId,
+        divisionId: meta.divisionId,
+        raceId: meta.raceId,
+      });
+
       step = ge.next();
     }
 
@@ -1096,6 +1113,14 @@ async function insertDrrResult(payload) {
 
       const res = await col.updateOne(filter, update, { upsert: true });
       if (res.upsertedCount) upsertedCount += res.upsertedCount;
+
+      notifyResultsUpdated({
+        eventId: meta.eventId,
+        category: "DRR",
+        initialId: meta.initialId,
+        divisionId: meta.divisionId,
+        raceId: meta.raceId,
+      });
     }
 
     return { ok: true, upsertedCount: upsertedCount };

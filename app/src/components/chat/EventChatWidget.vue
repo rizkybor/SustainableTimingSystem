@@ -148,13 +148,67 @@
                       <span class="chat-message-name">{{ m.senderName }}</span>
                       <span class="chat-message-time">{{ formatTime(m.createdAt) }}</span>
                     </div>
-                    <div class="chat-message-bubble">
-                      <span
-                        v-for="(tok, ti) in renderMessageTokens(m.text)"
-                        :key="ti"
-                        :class="{ 'chat-mention': tok.mention }"
-                        >{{ tok.text }}</span
+
+                    <div class="chat-message-row">
+                      <div class="chat-message-bubble" :class="{ 'chat-message-bubble--deleted': m.deleted }">
+                        <p v-if="m.deleted" class="chat-deleted-text">
+                          <Icon icon="mdi:trash-can-outline" width="13" height="13" />
+                          Pesan telah dihapus
+                        </p>
+                        <template v-else>
+                          <button
+                            v-if="m.attachment && m.attachment.type === 'image'"
+                            type="button"
+                            class="chat-attachment-image-btn"
+                            @click="openImagePreview(m.attachment.url)"
+                          >
+                            <img :src="m.attachment.url" alt="Gambar" class="chat-attachment-image" />
+                          </button>
+                          <VoiceMessageBubble
+                            v-else-if="m.attachment && m.attachment.type === 'audio'"
+                            :url="m.attachment.url"
+                            :duration="m.attachment.duration"
+                            :is-own="m.senderEmail === ADMIN_EMAIL"
+                          />
+                          <template v-if="m.text">
+                            <span
+                              v-for="(tok, ti) in renderMessageTokens(m.text)"
+                              :key="ti"
+                              :class="{ 'chat-mention': tok.mention }"
+                              >{{ tok.text }}</span
+                            >
+                          </template>
+                        </template>
+                      </div>
+
+                      <button
+                        v-if="m.senderEmail === ADMIN_EMAIL && !m.deleted"
+                        type="button"
+                        class="chat-delete-trigger"
+                        aria-label="Hapus pesan"
+                        @click="toggleDeleteConfirm(m._id)"
                       >
+                        <Icon icon="mdi:trash-can-outline" width="14" height="14" />
+                      </button>
+                    </div>
+
+                    <div v-if="confirmDeleteId === m._id" class="chat-delete-confirm">
+                      <span>Hapus pesan ini?</span>
+                      <button
+                        type="button"
+                        class="chat-delete-confirm-yes"
+                        :disabled="deletingId === m._id"
+                        @click="confirmDeleteMessage(m._id)"
+                      >
+                        {{ deletingId === m._id ? "…" : "Ya" }}
+                      </button>
+                      <button
+                        type="button"
+                        class="chat-delete-confirm-no"
+                        @click="confirmDeleteId = null"
+                      >
+                        Batal
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -184,14 +238,56 @@
                   </button>
                 </div>
 
-                <form class="chat-composer" @submit.prevent="sendMessage">
+                <div v-if="uploadError" class="chat-upload-error">
+                  {{ uploadError }}
+                </div>
+                <div v-if="recording" class="chat-recording-indicator">
+                  <span class="chat-recording-dot"></span>
+                  Merekam… {{ recordTimeLabel }}
+                </div>
+
+                <form class="chat-composer" @submit.prevent="sendMessage()">
+                  <input
+                    ref="imageInput"
+                    type="file"
+                    accept="image/*"
+                    class="chat-hidden-input"
+                    @change="onImageSelected"
+                  />
+                  <button
+                    type="button"
+                    class="chat-tool-btn"
+                    title="Kirim gambar"
+                    :disabled="sending || uploading || recording"
+                    @click="triggerImagePicker"
+                  >
+                    <Icon icon="mdi:image-outline" width="18" height="18" />
+                  </button>
+                  <button
+                    type="button"
+                    class="chat-tool-btn"
+                    :class="{ 'chat-tool-btn--recording': recording }"
+                    :title="recording ? 'Berhenti rekam' : 'Rekam pesan suara'"
+                    :disabled="sending || uploading"
+                    @click="recording ? stopRecording() : startRecording()"
+                  >
+                    <Icon
+                      :icon="recording ? 'mdi:stop' : 'mdi:microphone-outline'"
+                      width="18"
+                      height="18"
+                    />
+                  </button>
                   <input
                     ref="composerInput"
                     v-model="draft"
                     type="text"
                     class="chat-composer-input"
-                    :placeholder="`Kirim ke judge ${activeCategoryLabel}... (ketik @ untuk sebut nama)`"
-                    :disabled="sending"
+                    :placeholder="
+                      uploading
+                        ? 'Mengunggah...'
+                        : `Kirim ke judge ${activeCategoryLabel}... (ketik @ untuk sebut nama)`
+                    "
+                    :disabled="sending || uploading || recording"
                     @input="onDraftInput"
                     @keydown="onComposerKeydown"
                     @blur="onComposerBlur"
@@ -199,7 +295,7 @@
                   <button
                     type="submit"
                     class="chat-send-btn"
-                    :disabled="sending || !draft.trim()"
+                    :disabled="sending || uploading || recording || !draft.trim()"
                     title="Kirim"
                   >
                     <Icon v-if="!sending" icon="mdi:send" width="17" height="17" />
@@ -212,6 +308,20 @@
         </template>
       </div>
     </transition>
+
+    <!-- LIGHTBOX PREVIEW GAMBAR -->
+    <transition name="chat-lightbox-fade">
+      <div
+        v-if="previewImage"
+        class="chat-lightbox"
+        @click="closeImagePreview"
+      >
+        <img :src="previewImage" alt="Pratinjau" class="chat-lightbox-img" @click.stop />
+        <button type="button" class="chat-lightbox-close" @click="closeImagePreview">
+          <Icon icon="mdi:close" width="20" height="20" />
+        </button>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -220,10 +330,37 @@ import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import tone from "@/assets/tone/tone_message.mp3";
+import { uploadOne, MAX_UPLOAD_BYTES } from "@/utils/cloudinaryUpload";
+import VoiceMessageBubble from "@/components/chat/VoiceMessageBubble.vue";
 
 const ADMIN_EMAIL = "timing-system@internal";
 const ADMIN_NAME = "Timing System";
 const EXPANDED_STORAGE_KEY = "chatWidgetExpanded";
+const MAX_RECORD_SECONDS = 120; // jaring pengaman ukuran file
+
+const AUDIO_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+];
+
+function pickSupportedAudioMime() {
+  if (typeof MediaRecorder === "undefined") return null;
+  return (
+    AUDIO_MIME_CANDIDATES.find(
+      (m) =>
+        typeof MediaRecorder.isTypeSupported === "function" &&
+        MediaRecorder.isTypeSupported(m)
+    ) || null
+  );
+}
+
+function formatDuration(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 const CATEGORY_DEFS = [
   { key: "sprint", eventName: "SPRINT", label: "Sprint" },
@@ -269,7 +406,7 @@ function categoryRoleLabel(entry, key) {
 
 export default {
   name: "EventChatWidget",
-  components: { Icon },
+  components: { Icon, VoiceMessageBubble },
   props: {
     eventId: { type: String, default: "" },
   },
@@ -289,6 +426,14 @@ export default {
       unreadByCategory: {},
       selfSocketId: null,
       initSocket: null,
+      pollTimer: null,
+      uploading: false,
+      uploadError: null,
+      recording: false,
+      recordSeconds: 0,
+      previewImage: null,
+      confirmDeleteId: null,
+      deletingId: null,
       // @mention autocomplete
       showMentionList: false,
       mentionQuery: "",
@@ -347,6 +492,9 @@ export default {
         0
       );
     },
+    recordTimeLabel() {
+      return formatDuration(this.recordSeconds);
+    },
   },
   watch: {
     eventId() {
@@ -354,14 +502,35 @@ export default {
       if (this.eventId) this.loadEventContext();
     },
   },
+  created() {
+    // Objek imperatif (MediaRecorder/stream/chunks) sengaja bukan di data()
+    // supaya tidak ikut di-reactive-kan Vue.
+    this._mediaRecorder = null;
+    this._mediaStream = null;
+    this._recordedChunks = [];
+    this._recordTimer = null;
+  },
   mounted() {
     if (this.eventId) this.loadEventContext();
     this.initRealtime();
+    // Jaring pengaman kalau socket sempat putus/gagal reconnect — poll
+    // ringan kategori yang sedang dibuka supaya pesan tetap masuk tanpa
+    // harus refresh aplikasi.
+    this.pollTimer = setInterval(() => this.pollActiveCategory(), 7000);
   },
   beforeDestroy() {
     if (this.initSocket) {
       this.initSocket.off("connect", this._onSocketConnect);
       this.initSocket.off("custom:event", this._onSocketMessage);
+    }
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+    if (this._recordTimer) clearInterval(this._recordTimer);
+    if (this._mediaStream) {
+      this._mediaStream.getTracks().forEach((t) => t.stop());
+      this._mediaStream = null;
     }
   },
   methods: {
@@ -460,10 +629,226 @@ export default {
       });
     },
 
-    sendMessage() {
+    // Poll diam-diam kategori yang sedang dibuka (tidak menampilkan spinner,
+    // tidak menimpa state — cuma menambahkan pesan baru yang belum ada).
+    // Dipakai sebagai fallback selama socket realtime belum/tidak connect.
+    pollActiveCategory() {
+      if (
+        typeof ipcRenderer === "undefined" ||
+        !this.isOpen ||
+        !this.eventId ||
+        !this.activeCategoryKey
+      )
+        return;
+
+      const category = this.activeCategoryKey;
+      ipcRenderer.removeAllListeners("chat:listByEvent:reply");
+      ipcRenderer.send("chat:listByEvent", { eventId: this.eventId, category });
+      ipcRenderer.once("chat:listByEvent:reply", (_e, res) => {
+        if (!res || !res.ok || !Array.isArray(res.messages)) return;
+        // pastikan kategori aktif belum berpindah selagi menunggu balasan
+        if (category !== this.activeCategoryKey) return;
+
+        const list = this.messagesByCategory[category] || [];
+        const known = new Set(list.map((m) => m._id));
+        const additions = res.messages.filter((m) => !known.has(m._id));
+        if (!additions.length) return;
+
+        this.$set(this.messagesByCategory, category, [...list, ...additions]);
+        this.$nextTick(() => this.scrollToBottom());
+
+        const hasIncoming = additions.some((m) => m.senderEmail !== ADMIN_EMAIL);
+        if (hasIncoming) {
+          try {
+            new Audio(tone).play();
+          } catch (err) {
+            // gagal play audio bukan fatal
+          }
+        }
+      });
+    },
+
+    openImagePreview(url) {
+      this.previewImage = url;
+    },
+    closeImagePreview() {
+      this.previewImage = null;
+    },
+
+    toggleDeleteConfirm(id) {
+      this.confirmDeleteId = this.confirmDeleteId === id ? null : id;
+    },
+
+    confirmDeleteMessage(id) {
+      if (this.deletingId || typeof ipcRenderer === "undefined") return;
+      const category = this.activeCategoryKey;
+
+      this.deletingId = id;
+      ipcRenderer.removeAllListeners("chat:delete:reply");
+      ipcRenderer.send("chat:delete", { id, senderEmail: ADMIN_EMAIL });
+      ipcRenderer.once("chat:delete:reply", (_e, res) => {
+        this.deletingId = null;
+        this.confirmDeleteId = null;
+
+        if (!res || !res.ok) {
+          this.showUploadError((res && res.error) || "Gagal menghapus pesan");
+          return;
+        }
+
+        const list = this.messagesByCategory[category] || [];
+        this.$set(
+          this.messagesByCategory,
+          category,
+          list.map((m) =>
+            m._id === id ? { ...m, deleted: true, text: "", attachment: null } : m
+          )
+        );
+
+        try {
+          const socket = getSocket();
+          socket.emit("custom:event", {
+            type: "chat:deleted",
+            eventId: this.eventId,
+            category,
+            senderId: socket.id,
+            _id: id,
+          });
+        } catch (err) {
+          // gagal broadcast realtime bukan fatal — sudah tersimpan
+        }
+      });
+    },
+
+    showUploadError(msg) {
+      this.uploadError = msg;
+      setTimeout(() => {
+        this.uploadError = null;
+      }, 4000);
+    },
+
+    triggerImagePicker() {
+      if (this.$refs.imageInput) this.$refs.imageInput.click();
+    },
+
+    async onImageSelected(e) {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      if (file.size > MAX_UPLOAD_BYTES) {
+        this.showUploadError("Ukuran gambar maksimal 5MB");
+        return;
+      }
+
+      this.uploading = true;
+      try {
+        const up = await uploadOne(file, "sustainable-js/chat", "image");
+        if (up && up.ok && up.result) {
+          this.sendMessage({
+            type: "image",
+            url: up.result.secure_url,
+            publicId: up.result.public_id,
+            format: up.result.format,
+            bytes: up.result.bytes,
+            duration: null,
+          });
+        } else {
+          this.showUploadError((up && up.error) || "Gagal upload gambar");
+        }
+      } finally {
+        this.uploading = false;
+      }
+    },
+
+    async startRecording() {
+      if (this.recording || this.uploading) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this._mediaStream = stream;
+
+        const mimeType = pickSupportedAudioMime();
+        const recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+
+        this._recordedChunks = [];
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) this._recordedChunks.push(ev.data);
+        };
+        recorder.onstop = () => {
+          if (this._mediaStream) {
+            this._mediaStream.getTracks().forEach((t) => t.stop());
+            this._mediaStream = null;
+          }
+        };
+
+        this._mediaRecorder = recorder;
+        recorder.start();
+        this.recording = true;
+        this.recordSeconds = 0;
+
+        this._recordTimer = setInterval(() => {
+          this.recordSeconds += 1;
+          if (this.recordSeconds >= MAX_RECORD_SECONDS) this.stopRecording();
+        }, 1000);
+      } catch (err) {
+        this.showUploadError("Tidak bisa mengakses mikrofon");
+      }
+    },
+
+    stopRecording() {
+      const recorder = this._mediaRecorder;
+      if (!recorder || recorder.state === "inactive") return;
+
+      clearInterval(this._recordTimer);
+      const durationSec = this.recordSeconds;
+
+      recorder.addEventListener(
+        "stop",
+        async () => {
+          this.recording = false;
+
+          const blob = new Blob(this._recordedChunks, {
+            type: recorder.mimeType || "audio/webm",
+          });
+          this._recordedChunks = [];
+
+          if (!blob.size) return;
+          if (blob.size > MAX_UPLOAD_BYTES) {
+            this.showUploadError("Rekaman terlalu besar (maks 5MB), coba lebih pendek");
+            return;
+          }
+
+          this.uploading = true;
+          try {
+            const up = await uploadOne(blob, "sustainable-js/chat", "video");
+            if (up && up.ok && up.result) {
+              this.sendMessage({
+                type: "audio",
+                url: up.result.secure_url,
+                publicId: up.result.public_id,
+                format: up.result.format,
+                bytes: up.result.bytes,
+                duration: durationSec,
+              });
+            } else {
+              this.showUploadError((up && up.error) || "Gagal upload suara");
+            }
+          } finally {
+            this.uploading = false;
+          }
+        },
+        { once: true }
+      );
+
+      recorder.stop();
+    },
+
+    sendMessage(attachment) {
       const text = this.draft.trim();
       const category = this.activeCategoryKey;
-      if (!text || !category || typeof ipcRenderer === "undefined") return;
+      const att = attachment || null;
+      if ((!text && !att) || !category || typeof ipcRenderer === "undefined")
+        return;
 
       this.sending = true;
       const payload = {
@@ -472,6 +857,7 @@ export default {
         senderEmail: ADMIN_EMAIL,
         senderName: ADMIN_NAME,
         text,
+        attachment: att,
       };
 
       ipcRenderer.removeAllListeners("chat:send:reply");
@@ -495,12 +881,15 @@ export default {
               senderEmail: res.message.senderEmail,
               senderName: res.message.senderName,
               text: res.message.text,
+              attachment: res.message.attachment || null,
               _id: res.message._id,
               createdAt: res.message.createdAt,
             });
           } catch (err) {
             // gagal broadcast realtime bukan fatal — pesan sudah tersimpan
           }
+        } else if (res && !res.ok) {
+          this.showUploadError(res.error || "Gagal mengirim pesan");
         }
       });
     },
@@ -611,6 +1000,23 @@ export default {
 
         this._onSocketMessage = (raw) => {
           const msg = raw || {};
+          if (String(msg.eventId || "") !== String(this.eventId || "")) return;
+
+          if (msg.type === "chat:deleted") {
+            const category = String(msg.category || "");
+            const list = this.messagesByCategory[category] || [];
+            this.$set(
+              this.messagesByCategory,
+              category,
+              list.map((m) =>
+                m._id === msg._id
+                  ? { ...m, deleted: true, text: "", attachment: null }
+                  : m
+              )
+            );
+            return;
+          }
+
           if (msg.type !== "chat") return;
           if (
             msg.senderId &&
@@ -618,7 +1024,6 @@ export default {
             msg.senderId === this.selfSocketId
           )
             return;
-          if (String(msg.eventId || "") !== String(this.eventId || "")) return;
 
           const category = String(msg.category || "");
           if (!category) return;
@@ -631,8 +1036,9 @@ export default {
             {
               _id: msg._id,
               senderEmail: msg.senderEmail,
-              senderName: msg.senderName,
+              senderName: msg.senderName || "Judge",
               text: msg.text,
+              attachment: msg.attachment || null,
               createdAt: msg.createdAt,
             },
           ]);
@@ -1126,6 +1532,96 @@ export default {
   border: none;
   border-radius: 14px 14px 4px 14px;
 }
+.chat-message-bubble--deleted {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+  border: 1px dashed #e5e7eb !important;
+  box-shadow: none;
+}
+.chat-deleted-text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-style: italic;
+  font-size: 12px;
+  margin: 0;
+}
+
+.chat-message-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-row--own .chat-message-row {
+  flex-direction: row-reverse;
+}
+.chat-delete-trigger {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #c4cad3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.chat-row:hover .chat-delete-trigger {
+  opacity: 1;
+}
+.chat-delete-trigger:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+.chat-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid #eef1f5;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 30, 45, 0.08);
+  font-size: 11px;
+  color: #4b5563;
+  width: fit-content;
+}
+.chat-row--own .chat-delete-confirm {
+  margin-left: auto;
+}
+.chat-delete-confirm-yes {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-delete-confirm-yes:hover {
+  background: #dc2626;
+}
+.chat-delete-confirm-yes:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.chat-delete-confirm-no {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: none;
+  background: #f1f5f9;
+  color: #4b5563;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-delete-confirm-no:hover {
+  background: #e2e8f0;
+}
 
 /* ===== COMPOSER ===== */
 .chat-composer-wrap {
@@ -1225,5 +1721,130 @@ export default {
 .chat-send-btn:disabled {
   background: #cbd5e1;
   cursor: not-allowed;
+}
+
+.chat-hidden-input {
+  display: none;
+}
+.chat-tool-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #f8fafc;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chat-tool-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #1874a5;
+}
+.chat-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.chat-tool-btn--recording {
+  background: #ef4444;
+  color: #fff;
+}
+.chat-tool-btn--recording:hover:not(:disabled) {
+  background: #dc2626;
+}
+.chat-upload-error {
+  padding: 6px 14px;
+  font-size: 11.5px;
+  color: #dc2626;
+  background: #fef2f2;
+  border-top: 1px solid #fee2e2;
+}
+.chat-recording-indicator {
+  padding: 6px 14px;
+  font-size: 11.5px;
+  color: #dc2626;
+  background: #fef2f2;
+  border-top: 1px solid #fee2e2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: chat-recording-pulse 1.2s ease-in-out infinite;
+}
+@keyframes chat-recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.chat-attachment-image-btn {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.chat-attachment-image {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  transition: opacity 0.15s ease;
+}
+.chat-attachment-image-btn:hover .chat-attachment-image {
+  opacity: 0.9;
+}
+
+.chat-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(10, 14, 20, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.chat-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.chat-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.chat-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.chat-lightbox-fade-enter-active,
+.chat-lightbox-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.chat-lightbox-fade-enter,
+.chat-lightbox-fade-leave-to {
+  opacity: 0;
 }
 </style>

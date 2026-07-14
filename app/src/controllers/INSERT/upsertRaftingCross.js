@@ -1,5 +1,6 @@
 // ../Controllers/insert/upsertRaftingCross.js
 const { getDb } = require("../index");
+const { notifyResultsUpdated } = require("../socketBroadcast");
 
 // --- Nama koleksi
 const COL_BRACKETS = "rx_brackets";
@@ -236,6 +237,15 @@ async function upsertOverall(bucket, overallPkg = {}) {
     { $set: doc },
     { upsert: true }
   );
+
+  notifyResultsUpdated({
+    eventId: doc.bucket.eventId,
+    category: "RX",
+    initialId: doc.bucket.initialId,
+    divisionId: doc.bucket.divisionId,
+    raceId: doc.bucket.raceId,
+  });
+
   return { ok: true };
 }
 

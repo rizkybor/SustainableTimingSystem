@@ -230,6 +230,17 @@
                   size="sm"
                   variant="outline-secondary"
                   class="btn-icon mr-2"
+                  title="View Details"
+                  @click="viewTeamDetails(row.item)"
+                >
+                  <Icon icon="mdi:eye-outline" width="16" height="16" />
+                </b-button>
+
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  class="btn-icon mr-2"
+                  title="Edit"
                   @click="openEdit(row.item)"
                 >
                   <Icon icon="mdi:pencil" width="16" height="16" />
@@ -239,6 +250,7 @@
                   size="sm"
                   variant="outline-danger"
                   class="btn-icon"
+                  title="Delete"
                   @click="deleteTeam(row.item)"
                 >
                   <Icon icon="mdi:delete" width="16" height="16" />
@@ -563,6 +575,10 @@ export default {
       return String(v);
     },
 
+    viewTeamDetails(item) {
+      this.$router.push("/team?name=" + encodeURIComponent(item.nameTeam || ""));
+    },
+
     openEdit(item) {
       this.editForm = {
         _id: this._toStringId(item._id),
@@ -619,7 +635,28 @@ export default {
       });
     },
 
-    deleteTeam(team) {
+    async deleteTeam(team) {
+      let ok = true;
+      if (this.$bvModal && this.$bvModal.msgBoxConfirm) {
+        ok = await this.$bvModal
+          .msgBoxConfirm(
+            `Hapus tim "${team.nameTeam || "-"}" dari daftar tim?`,
+            {
+              title: "Confirm Delete",
+              okTitle: "Delete",
+              okVariant: "danger",
+              cancelTitle: "Cancel",
+              centered: true,
+              noCloseOnEsc: true,
+              noCloseOnBackdrop: true,
+            }
+          )
+          .catch(() => false);
+      } else {
+        ok = window.confirm(`Hapus tim "${team.nameTeam || "-"}" dari daftar tim?`);
+      }
+      if (!ok) return;
+
       ipcRenderer.send("teams:delete", { _id: this._toStringId(team._id) });
       ipcRenderer.once("teams:delete-reply", (_e, res) => {
         if (res && res.ok) this.loadTeams();

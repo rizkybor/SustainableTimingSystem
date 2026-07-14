@@ -1,5 +1,6 @@
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
+const { notifyResultsUpdated } = require("../socketBroadcast");
 
 async function upsertEventResultsDoc(payload) {
   const db = await getDb();
@@ -30,6 +31,15 @@ async function upsertEventResultsDoc(payload) {
 
   const options = { upsert: true };
   const result = await col.updateOne(filter, updateDoc, options);
+
+  notifyResultsUpdated({
+    eventId: payload.eventId,
+    category: "OVERALL",
+    initialId: payload.initialId,
+    divisionId: payload.divisionId,
+    raceId: payload.raceId,
+  });
+
   return result;
 }
 

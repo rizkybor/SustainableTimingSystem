@@ -141,6 +141,12 @@
     <div class="pdf-footer">
       <div class="col">
         <div class="label">Chief Judge</div>
+        <img
+          v-if="dataEvent.chiefJudgeSignature && dataEvent.chiefJudgeSignature.secure_url"
+          :src="dataEvent.chiefJudgeSignature.secure_url"
+          class="sign-img"
+          alt="Chief Judge signature"
+        />
         <div class="signature">{{ safe(dataEvent.chiefJudge) }}</div>
       </div>
       <div class="col text-right">
@@ -461,9 +467,20 @@ export default {
   align-items: flex-start;
   margin-top: 10px;
 }
+.pdf-footer .col {
+  position: relative;
+}
 .pdf-footer .label {
   font-weight: 600;
   margin-bottom: 38px;
+}
+.pdf-footer .sign-img {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  height: 30px;
+  max-width: 160px;
+  object-fit: contain;
 }
 .pdf-footer .signature {
   font-weight: 800;

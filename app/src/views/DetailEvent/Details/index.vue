@@ -143,86 +143,29 @@
 
       <!-- PANELS -->
       <team-panel
-        v-if="showPanel('R4', 'MEN')"
-        class="mt-2"
-        title="Team R4 Men's"
-        :division="'R4'"
-        :race="'MEN'"
+        v-for="(combo, comboIdx) in visibleDivisionRaceCombos"
+        :key="combo.panelKey"
+        :class="comboIdx === 0 ? 'mt-2' : 'mt-4'"
+        :title="combo.title"
+        :division="combo.division"
+        :race="combo.race"
         :event-name="raceActive.selected.name"
         :initial-name="initialActive.selected.name"
-        :rows="teamsMenR4"
-        :teams-available="availableFor('R4', 'MEN')"
-        :draft="draftMap['R4_MEN']"
-        @add-draft="addDraft('R4', 'MEN')"
-        @draft-change="onDraftChange('R4', 'MEN', $event)"
-        @draft-save="saveDraft('R4', 'MEN')"
-        @draft-cancel="cancelDraft('R4', 'MEN')"
-        @delete-row="deleteRow('R4', 'MEN', $event)"
+        :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
+        :teams-available="availableFor(combo.division, combo.race)"
+        :draft="draftMap[combo.panelKey]"
+        :loading="loadingByPanel[combo.panelKey]"
+        @add-draft="addDraft(combo.division, combo.race)"
+        @draft-change="onDraftChange(combo.division, combo.race, $event)"
+        @draft-save="saveDraft(combo.division, combo.race)"
+        @draft-cancel="cancelDraft(combo.division, combo.race)"
+        @delete-row="deleteRow(combo.division, combo.race, $event)"
         @start-race="handleStartRace"
-        @show-result="showResult('R4', 'MEN')"
+        @show-result="showResult(combo.division, combo.race)"
+        @view-details="openTeamDetails(combo.division, combo.race, $event)"
       />
 
-      <team-panel
-        v-if="showPanel('R4', 'WOMEN')"
-        class="mt-4"
-        title="Team R4 Women’s"
-        :division="'R4'"
-        :race="'WOMEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsWomenR4"
-        :teams-available="availableFor('R4', 'WOMEN')"
-        :draft="draftMap['R4_WOMEN']"
-        @add-draft="addDraft('R4', 'WOMEN')"
-        @draft-change="onDraftChange('R4', 'WOMEN', $event)"
-        @draft-save="saveDraft('R4', 'WOMEN')"
-        @draft-cancel="cancelDraft('R4', 'WOMEN')"
-        @delete-row="deleteRow('R4', 'WOMEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R4', 'WOMEN')"
-      />
-
-      <team-panel
-        v-if="showPanel('R6', 'MEN')"
-        class="mt-4"
-        title="Team R6 Men's"
-        :division="'R6'"
-        :race="'MEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsMenR6"
-        :teams-available="availableFor('R6', 'MEN')"
-        :draft="draftMap['R6_MEN']"
-        @add-draft="addDraft('R6', 'MEN')"
-        @draft-change="onDraftChange('R6', 'MEN', $event)"
-        @draft-save="saveDraft('R6', 'MEN')"
-        @draft-cancel="cancelDraft('R6', 'MEN')"
-        @delete-row="deleteRow('R6', 'MEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R6', 'MEN')"
-      />
-
-      <team-panel
-        v-if="showPanel('R6', 'WOMEN')"
-        class="mt-4"
-        title="Team R6 Women’s"
-        :division="'R6'"
-        :race="'WOMEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsWomenR6"
-        :teams-available="availableFor('R6', 'WOMEN')"
-        :draft="draftMap['R6_WOMEN']"
-        @add-draft="addDraft('R6', 'WOMEN')"
-        @draft-change="onDraftChange('R6', 'WOMEN', $event)"
-        @draft-save="saveDraft('R6', 'WOMEN')"
-        @draft-cancel="cancelDraft('R6', 'WOMEN')"
-        @delete-row="deleteRow('R6', 'WOMEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R6', 'WOMEN')"
-      />
-
-      <div v-if="!anyPanelShown" class="text-center text-muted py-5">
+      <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
         Belum ada konfigurasi divisi/race untuk event ini.
       </div>
 
@@ -264,6 +207,16 @@
       :event-name="safeEventName"
       @update-settings="handleUpdateSettings"
     />
+
+    <team-details-modal
+      v-model="showTeamDetails"
+      :team="selectedTeamForDetails"
+      :race-name="raceActive.selected.name"
+      :division-name="selectedTeamDivision"
+      :race-category-name="selectedTeamRace"
+      :initial-name="initialActive.selected.name"
+      :teams-available="availableTeams"
+    />
   </div>
 </template>
 
@@ -281,115 +234,22 @@ const LEVEL_SCOPE_MAP = {
 };
 
 // ===== Cloudinary config (ISI sesuai punyamu) =====
-var CLOUD_NAME = "kikiaka";
-var UPLOAD_PRESET = "stiming-preset"; 
 var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
 var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
+var FOLDER_COMMITTEE_SIGNATURE = "sustainable-js/committee-signature";
 
-function _toCloudMeta(json) {
-  return {
-    public_id: json && json.public_id ? String(json.public_id) : "",
-    secure_url:
-      json && (json.secure_url || json.url)
-        ? String(json.secure_url || json.url)
-        : "",
-    url:
-      json && (json.secure_url || json.url)
-        ? String(json.secure_url || json.url)
-        : "",
-    width: typeof (json && json.width) === "number" ? json.width : null,
-    height: typeof (json && json.height) === "number" ? json.height : null,
-    format: json && json.format ? String(json.format) : "",
-    bytes: typeof (json && json.bytes) === "number" ? json.bytes : 0,
-    resource_type:
-      json && json.resource_type ? String(json.resource_type) : "image",
-    original_filename:
-      json && json.original_filename ? String(json.original_filename) : "",
-  };
-}
-
-async function _uploadOne(fileObj, folder) {
-  if (!fileObj) return { ok: false, error: "no-file" };
-
-  // A) lewat bridge Electron kalau ada
-  if (window.cloud && typeof window.cloud.uploadFile === "function") {
-    try {
-      var up = await window.cloud.uploadFile(fileObj, { folder: folder });
-      if (up && up.ok === true && up.result) {
-        return { ok: true, result: _toCloudMeta(up.result) };
-      }
-      return {
-        ok: false,
-        error: up && up.error ? String(up.error) : "upload-failed",
-      };
-    } catch (e) {
-      return { ok: false, error: e && e.message ? e.message : String(e) };
-    }
-  }
-
-  // B) fallback unsigned upload
-  try {
-    var fd = new FormData();
-    fd.append("file", fileObj);
-    fd.append("upload_preset", UPLOAD_PRESET);
-    if (folder) fd.append("folder", folder);
-
-    var url = "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/image/upload";
-    var res = await fetch(url, { method: "POST", body: fd });
-    var json = null;
-    try {
-      json = await res.json();
-    } catch (_e) {
-      json = null;
-    }
-
-    if (!res.ok || !json || !(json.secure_url || json.url)) {
-      var det =
-        json && json.error && json.error.message
-          ? json.error.message
-          : "upload-failed";
-      return { ok: false, error: det, raw: json };
-    }
-    return { ok: true, result: _toCloudMeta(json) };
-  } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
-  }
-}
-
-async function _uploadMany(list, folder) {
-  var out = [];
-  if (!list || typeof list.length !== "number") return out;
-
-  for (var i = 0; i < list.length; i++) {
-    var f = list[i];
-
-    // kalau yang datang path string (drag&drop), minta bridge bikin File-like
-    if (
-      typeof f === "string" &&
-      window.cloud &&
-      typeof window.cloud.pathToFile === "function"
-    ) {
-      try {
-        var created = await window.cloud.pathToFile(f);
-        if (created) f = created;
-      } catch (_e) {}
-    }
-
-    var up = await _uploadOne(f, folder);
-    if (up && up.ok && up.result) out.push(up.result);
-  }
-  return out;
-}
-
+import { uploadOne as _uploadOne, uploadMany as _uploadMany } from "@/utils/cloudinaryUpload";
 import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
+import rxPng from "@/assets/images/Rectangle-5.png";
 import { ipcRenderer } from "electron";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import EventSettingsModal from "@/components/race/EventSettings.vue";
+import TeamDetailsModal from "@/components/race/TeamDetailsModal.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
@@ -401,6 +261,7 @@ export default {
     RaceSettingsModal,
     JudgeSettingsModal,
     EventSettingsModal,
+    TeamDetailsModal,
   },
   data() {
     return {
@@ -412,9 +273,21 @@ export default {
         R6_MEN: false,
         R6_WOMEN: false,
       },
-      lastToken: "",
+      // per-panel (div_race) token, bukan satu field bersama — supaya refresh
+      // beberapa panel yang berjalan bersamaan tidak saling menimpa token guard
+      lastTokenByPanel: {},
+      loadingByPanel: {
+        R4_MEN: false,
+        R4_WOMEN: false,
+        R6_MEN: false,
+        R6_WOMEN: false,
+      },
       showRaceSettings: false,
       showEventSettings: false,
+      showTeamDetails: false,
+      selectedTeamForDetails: null,
+      selectedTeamDivision: "",
+      selectedTeamRace: "",
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -442,42 +315,71 @@ export default {
         },
       },
       // kategori UI
+      // Satu-satunya sumber kebenaran utk tiap Race Category: key (dipakai
+      // sbg identity, cocok dgn nilai yg tersimpan di DB), plus rute race
+      // (live-timing) & result-nya masing-masing. Menambah kategori baru
+      // cukup menambah satu entry di sini — tidak perlu sentuh pathMap lain.
       raceCategories: [
         {
           key: "SPRINT",
           title: "Sprint",
           icon: sprintPng,
           desc: "Short-distance race against the clock  on grade II-III rapids",
+          racePath: "sprint-race",
+          resultPath: "sprint-result",
         },
         {
           key: "HEAD2HEAD",
           title: "Head to Head",
           icon: h2hPng,
           desc: "Direct competition between two teams  on parallel courses",
+          racePath: "head2head-race",
+          resultPath: "headtohead-result",
         },
         {
           key: "SLALOM",
           title: "Slalom",
           icon: slalomPng,
           desc: "Technical course navigation through  gates on whitewater",
+          racePath: "slalom-race",
+          resultPath: "slalom-result",
         },
         {
           key: "DRR",
           title: "Down River",
           icon: drrPng,
           desc: "Long-distance endurance race through  varied river conditions",
+          racePath: "drr-race",
+          resultPath: "drr-result",
         },
         {
           key: "RX",
           title: "Rafting Cross",
-          icon: h2hPng,
+          icon: rxPng,
           desc: "Multi-team knockout heats racing side-by-side  through gates to qualify",
+          racePath: "rx-race",
+          resultPath: "rx-result",
         },
+      ],
+
+      // Satu-satunya sumber kebenaran utk kombinasi Division x Race yang
+      // tersedia (dulu 4 blok <team-panel> di template masing-masing
+      // hardcode 'R4'/'MEN' dkk berulang di ~8 tempat — menambah kombinasi
+      // baru berarti copy-paste seluruh blok). panelKey harus tetap format
+      // "DIVISI_RACE" karena dipakai sbg key di draftMap/loadingByPanel.
+      DIVISION_RACE_COMBOS: [
+        { panelKey: "R4_MEN", division: "R4", race: "MEN", title: "Team R4 Men's" },
+        { panelKey: "R4_WOMEN", division: "R4", race: "WOMEN", title: "Team R4 Women's" },
+        { panelKey: "R6_MEN", division: "R6", race: "MEN", title: "Team R6 Men's" },
+        { panelKey: "R6_WOMEN", division: "R6", race: "WOMEN", title: "Team R6 Women's" },
       ],
 
       // state
       raceActive: { selected: { name: "SPRINT" } },
-      initialActive: { selected: { name: "Silakan Pilih Initial" } },
+      // name kosong (bukan placeholder) supaya guard "belum ada yang dipilih"
+      // di created() (!initialActive.selected.name) benar-benar bisa true dan
+      // auto-select initial category pertama berjalan seperti seharusnya.
+      initialActive: { selected: { name: "" } },
 
       // data
       events: {}, // { categoriesDivision, categoriesRace, categoriesInitial, participant: [...] }
@@ -511,26 +413,13 @@ export default {
       if (!enabledKeys.size) return this.raceCategories;
       return this.raceCategories.filter((c) => enabledKeys.has(c.key));
     },
-    // ambil rows berdasar kombinasi & initial aktif
-    teamsMenR4() {
-      return this.getTeamsBy("R4", "MEN", this.raceActive.selected.name);
-    },
-    teamsWomenR4() {
-      return this.getTeamsBy("R4", "WOMEN", this.raceActive.selected.name);
-    },
-    teamsMenR6() {
-      return this.getTeamsBy("R6", "MEN", this.raceActive.selected.name);
-    },
-    teamsWomenR6() {
-      return this.getTeamsBy("R6", "WOMEN", this.raceActive.selected.name);
-    },
-
-    anyPanelShown() {
-      return (
-        this.showPanel("R4", "MEN") ||
-        this.showPanel("R4", "WOMEN") ||
-        this.showPanel("R6", "MEN") ||
-        this.showPanel("R6", "WOMEN")
+    // Kombinasi Division/Race yang aktif utk event ini (dari
+    // DIVISION_RACE_COMBOS, difilter oleh showPanel) — satu-satunya sumber
+    // dipakai template utk me-render panel tim secara dinamis (v-for),
+    // menggantikan 4 blok <team-panel> yang dulu di-hardcode manual.
+    visibleDivisionRaceCombos() {
+      return this.DIVISION_RACE_COMBOS.filter((c) =>
+        this.showPanel(c.division, c.race)
       );
     },
     hasEventLogo() {
@@ -673,10 +562,18 @@ export default {
           payload && Array.isArray(payload.categoriesInitial)
             ? payload.categoriesInitial
             : [],
+        technicalDelegate:
+          payload && payload.technicalDelegate
+            ? String(payload.technicalDelegate)
+            : "",
+        chiefJudge:
+          payload && payload.chiefJudge ? String(payload.chiefJudge) : "",
+        raceDirector:
+          payload && payload.raceDirector ? String(payload.raceDirector) : "",
       };
 
       // preview sederhana ke console
-      console.log(
+      logger.info(
         "READY PAYLOAD:\n" +
           JSON.stringify(
             {
@@ -723,6 +620,9 @@ export default {
           categoriesDivision: safePayload.categoriesDivision,
           categoriesRace: safePayload.categoriesRace,
           categoriesInitial: safePayload.categoriesInitial,
+          technicalDelegate: safePayload.technicalDelegate,
+          chiefJudge: safePayload.chiefJudge,
+          raceDirector: safePayload.raceDirector,
         };
         ipcRenderer.send("services:update:event-basic", basicDoc);
 
@@ -810,6 +710,27 @@ export default {
           new Set([...keepSponsorUrls, ...newSponsorUrls])
         );
 
+        // ===== 3.5) UPLOAD SIGNATURE COMITTE (opsional, PNG tunggal per role) =====
+        this._setLoading(true, "Mengunggah signature komite…", 80);
+        const newTdSignature = payload.technicalDelegateSignatureFile
+          ? await _uploadOne(
+              payload.technicalDelegateSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+        const newCjSignature = payload.chiefJudgeSignatureFile
+          ? await _uploadOne(
+              payload.chiefJudgeSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+        const newRdSignature = payload.raceDirectorSignatureFile
+          ? await _uploadOne(
+              payload.raceDirectorSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+
         // ===== 4) UPDATE DB ASSETS (URL saja) =====
         this._setLoading(true, "Memperbarui aset di database…", 85);
         const assetsDoc = {
@@ -817,6 +738,26 @@ export default {
           eventFiles: finalEventUrls,
           sponsorFiles: finalSponsorUrls,
         };
+
+        // signature baru diupload → pakai itu; kalau tidak, dan user minta
+        // hapus signature lama → set null; kalau tidak dua-duanya, jangan
+        // dikirim sama sekali supaya nilai lama di DB tidak tersentuh
+        if (newTdSignature && newTdSignature.ok) {
+          assetsDoc.technicalDelegateSignature = newTdSignature.result;
+        } else if (payload.removeTechnicalDelegateSignature) {
+          assetsDoc.technicalDelegateSignature = null;
+        }
+        if (newCjSignature && newCjSignature.ok) {
+          assetsDoc.chiefJudgeSignature = newCjSignature.result;
+        } else if (payload.removeChiefJudgeSignature) {
+          assetsDoc.chiefJudgeSignature = null;
+        }
+        if (newRdSignature && newRdSignature.ok) {
+          assetsDoc.raceDirectorSignature = newRdSignature.result;
+        } else if (payload.removeRaceDirectorSignature) {
+          assetsDoc.raceDirectorSignature = null;
+        }
+
         ipcRenderer.send("services:update:event-assets", assetsDoc);
 
         var step2 = await new Promise(function (resolve) {
@@ -844,6 +785,7 @@ export default {
         this._setLoading(true, "Memuat ulang data event…", 95);
         await this.loadEvent(eventId);
         this._ensureValidRaceSelection();
+        this._ensureValidInitialSelection();
 
         this._setLoading(true, "Selesai ✔", 100);
         ipcRenderer.send("get-alert-saved", {
@@ -880,25 +822,11 @@ export default {
     },
 
     onUpdateRaceSettings(payload) {
+      // RaceSettingsModal sudah menyimpan (upsert) sendiri dan baru meng-emit
+      // event ini SETELAH balasan sukses diterima — jadi di sini cukup
+      // sinkronkan state lokal, tidak perlu kirim ulang race-settings:upsert
+      // (kalau dikirim lagi, jadinya double-write ke DB untuk data yang sama).
       if (payload && payload.settings) this.raceSettings = payload.settings;
-
-      if (typeof window !== "undefined" && window.ipcRenderer) {
-        window.ipcRenderer.send("race-settings:upsert", payload);
-
-        // sekali saja, tunggu reply lalu lepas listener
-        const handler = (_event, res) => {
-          if (res && res.ok) {
-            logger.info("✅ Race settings updated in DB:", res);
-          } else {
-            logger.warn("❌ Failed to update race settings:", res && res.error);
-          }
-          window.ipcRenderer.removeListener(
-            "race-settings:upsert-reply",
-            handler
-          );
-        };
-        window.ipcRenderer.on("race-settings:upsert-reply", handler);
-      }
     },
 
     onUpdateJudgeSettings(payload) {
@@ -925,6 +853,23 @@ export default {
     async selectInitial(i) {
       this.initialActive.selected = i;
       await this.refreshVisibleBuckets();
+    },
+
+    // pastikan initial category yang sedang aktif masih ada di categoriesInitial;
+    // kalau tidak (mis. dihapus/diubah lewat Event Settings), pindah ke yang pertama tersedia
+    _ensureValidInitialSelection() {
+      const list = this.events.categoriesInitial || [];
+      if (!list.length) return;
+      const current = (
+        (this.initialActive.selected && this.initialActive.selected.name) ||
+        ""
+      ).toUpperCase();
+      const stillValid = list.some(
+        (i) => String(i.name).toUpperCase() === current
+      );
+      if (!stillValid) {
+        this.initialActive.selected = list[0];
+      }
     },
 
     /* =========================================================
@@ -959,14 +904,18 @@ export default {
       return String(v || "").toUpperCase();
     },
 
-    _mapRaceToPath(evName) {
-      const e = this._toUpperSafe(evName);
-      if (e === "SPRINT") return "sprint-race";
-      if (e === "SLALOM") return "slalom-race";
-      if (e === "DRR") return "drr-race";
-      if (e === "HEAD2HEAD") return "head2head-race";
-      if (e === "RX") return "rx-race";
-      return e.toLowerCase(); // fallback
+    // Cari definisi Race Category by key (SPRINT/HEAD2HEAD/SLALOM/DRR/RX).
+    // NB: field ini di banyak tempat lain (identity, DB) disebut "eventName"
+    // — penamaan lama yang sebenarnya berarti Race Category, bukan judul
+    // event. Di sini sengaja dipakai nama yang jelas (raceCategoryKey).
+    _findRaceCategory(raceCategoryKey) {
+      const k = this._toUpperSafe(raceCategoryKey);
+      return this.raceCategories.find((c) => c.key === k) || null;
+    },
+
+    _mapRaceToPath(raceCategoryKey) {
+      const cat = this._findRaceCategory(raceCategoryKey);
+      return cat ? cat.racePath : this._toUpperSafe(raceCategoryKey).toLowerCase();
     },
 
     /* =========================================================
@@ -1005,7 +954,6 @@ export default {
             String(row.nameTeam).trim().toUpperCase()
       );
       this.dataTeams = this.dataTeams.slice();
-      this.persistParticipants();
 
       // 2) Hapus di DB
       ipcRenderer.send("delete-team-in-bucket", {
@@ -1034,6 +982,9 @@ export default {
             detail: (res && res.error) || "Gagal menghapus team di database.",
             message: "Failed",
           });
+          // rollback: DB gagal hapus tapi state lokal sudah terlanjur
+          // dihilangkan → resync panel ini dari DB supaya UI tidak "bohong"
+          this.loadTeamsRegistered(div, race);
         }
       });
     },
@@ -1044,6 +995,12 @@ export default {
       );
     },
 
+    // Handler "Show Result" — dinamis berdasar 3 parameter yg lagi aktif:
+    // Race Category (raceActive), Initials Category (initialActive), dan
+    // Division/Race dari tabel yang diklik (div, race datang dari panel
+    // yang memicu event ini). Kombinasi ketiganya di-resolve jadi satu
+    // identity (_buildIdentity) lalu diarahkan ke halaman Result yang
+    // sesuai utk Race Category tsb (raceCategories[].resultPath).
     showResult(div, race) {
       const idt = this._buildIdentity(div, race);
       if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
@@ -1055,17 +1012,20 @@ export default {
         return;
       }
 
-      const pathMap = {
-        SPRINT: "sprint-result",
-        DRR: "drr-result",
-        SLALOM: "slalom-result",
-        HEAD2HEAD: "headtohead-result",
-        RX: "rx-result",
-      };
-      const path = pathMap[idt.eventName] || "";
+      const cat = this._findRaceCategory(idt.eventName);
+      if (!cat || !cat.resultPath) {
+        // dulu ini diam-diam nyasar ke path kosong (halaman event) — sekarang
+        // ditolak eksplisit dgn pesan yg jelas
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Race Category tidak dikenali",
+          detail: `Belum ada halaman Result untuk kategori "${idt.eventName}".`,
+        });
+        return;
+      }
 
       this.$router.push({
-        path: `/event-detail/${this.$route.params.id}/${path}`,
+        path: `/event-detail/${this.$route.params.id}/${cat.resultPath}`,
         query: {
           eventId: idt.eventId,
           initialId: idt.initialId,
@@ -1077,6 +1037,13 @@ export default {
           divisionName: idt.divisionName,
         },
       });
+    },
+
+    openTeamDetails(div, race, row) {
+      this.selectedTeamForDetails = row;
+      this.selectedTeamDivision = div;
+      this.selectedTeamRace = race;
+      this.showTeamDetails = true;
     },
 
     /* =========================================================
@@ -1155,11 +1122,14 @@ export default {
         identity.raceName,
         Date.now(),
       ].join("|");
-      this.lastToken = token;
+      const panelKey = div + "_" + race;
+      this.lastTokenByPanel[panelKey] = token;
+      this.$set(this.loadingByPanel, panelKey, true);
 
       return await new Promise((resolve) => {
         const onReply = (_e, bucket) => {
-          if (this.lastToken !== token) return resolve(); // abaikan balasan usang
+          if (this.lastTokenByPanel[panelKey] !== token) return resolve(); // abaikan balasan usang
+          this.$set(this.loadingByPanel, panelKey, false);
           if (bucket && Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
             resolve({ div, race, ok: true });
@@ -1175,6 +1145,10 @@ export default {
         // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
           ipcRenderer.off("get-teams-registered-reply", onReply);
+          // hanya matikan loading kalau tidak ada request lebih baru untuk panel ini
+          if (this.lastTokenByPanel[panelKey] === token) {
+            this.$set(this.loadingByPanel, panelKey, false);
+          }
           resolve({ div, race, ok: false, reason: "timeout" });
         }, 3000);
       });
@@ -1250,16 +1224,15 @@ export default {
                   : String((t && t._id) || ""),
               nameTeam: t && t.nameTeam ? t.nameTeam : "",
               bibTeam: (t && t.bibTeam) || "",
+              typeTeam: (t && t.typeTeam) || "",
+              countryCode: (t && t.countryCode) || "",
             }));
 
-            if (!this.availableTeams.length) {
-              this.availableTeams = this.dummyTeams.slice();
-            }
             resolve();
           });
         });
       } catch {
-        this.availableTeams = this.dummyTeams.slice();
+        this.availableTeams = [];
       }
     },
 
@@ -1645,14 +1618,13 @@ export default {
       );
       this.dataTeams = this.dataTeams.slice(); // trigger reactive update
       this.$set(this.draftMap, k, null);
-      this.persistParticipants();
-      this.syncBucketToDB(bucket); // sinkron ke DB
+      this.syncBucketToDB(bucket, div, race); // sinkron ke DB
     },
 
     /* =========================================================
      * PERSISTENCE (DB & local state)
      * =======================================================*/
-    syncBucketToDB(bucket) {
+    syncBucketToDB(bucket, div, race) {
       ipcRenderer.send("upsert-teams-registered", bucket);
       ipcRenderer.once("upsert-teams-registered-reply", (_e, res) => {
         if (!res || !res.ok) {
@@ -1663,6 +1635,9 @@ export default {
               (res && res.error) ||
               "Gagal menyimpan perubahan tim ke database.",
           });
+          // rollback: DB gagal simpan tapi state lokal sudah terlanjur
+          // menambahkan tim → resync panel ini dari DB supaya UI tidak "bohong"
+          if (div && race) this.loadTeamsRegistered(div, race);
         }
       });
     },
@@ -1675,26 +1650,18 @@ export default {
             const ev = data || {};
             ev._id = this._idToString(ev._id); // normalisasi id → string
             this.events = ev;
-            this.dataTeams = Array.isArray(ev.participant)
-              ? ev.participant
-              : [];
+            // dataTeams (bucket per divisi/race/initial) selalu di-refresh
+            // dari teamsRegisteredCollection lewat refreshVisibleBuckets(),
+            // jadi mulai dari kosong di sini — eventsCollection tidak
+            // pernah menyimpan salinan registrasi tim (lihat catatan di
+            // Featured.md soal eventsCollection.participant yang mati).
+            this.dataTeams = [];
             resolve();
           });
         });
       } catch {
         this.events = {};
         this.dataTeams = [];
-      }
-    },
-
-    persistParticipants() {
-      try {
-        ipcRenderer.send("events-update-participant", {
-          eventId: this.$route.params.id,
-          participant: this.dataTeams,
-        });
-      } catch {
-        // no-op; state lokal tetap dipakai
       }
     },
 

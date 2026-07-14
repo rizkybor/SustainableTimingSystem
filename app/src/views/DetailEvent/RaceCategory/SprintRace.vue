@@ -411,7 +411,6 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
@@ -427,6 +426,7 @@ import {
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -598,7 +598,7 @@ function loadRaceStartPayloadForSprint() {
 export default {
   name: "SustainableTimingSystemSprintRace",
   components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       isLoading: false,
@@ -607,22 +607,11 @@ export default {
       sprintBucketMap: Object.create(null),
       selectedSprintKey: "",
       selfSocketId: null,
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
       endGame: false,
       isScrolled: false,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
       penTeam: "",
       dataPenalties: [],
       dataScore: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
-      currentPort: "",
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -755,53 +744,66 @@ export default {
 
   async mounted() {
     var audio = new Audio(tone);
-    const socket = getSocket();
 
-    const onConnect = () => {
-      this.selfSocketId = socket.id || null;
-    };
-    socket.on("connect", onConnect);
+    try {
+      const socket = getSocket();
 
-    const onMessage = async (msg = {}) => {
-      // abaikan echo dari diri sendiri
-      if (
-        msg &&
-        msg.senderId &&
-        this.selfSocketId &&
-        msg.senderId === this.selfSocketId
-      )
-        return;
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
 
-      // tampilkan toast (opsional)
-      if (this.$bvToast) {
-        audio.play();
-        this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
-          title: "Pesan Realtime",
-          variant: "success",
-          solid: true,
-        });
-      }
+      const onConnect = () => {
+        this.selfSocketId = socket.id || null;
+      };
+      socket.on("connect", onConnect);
 
-      // === mapping pesan Judges Dashboard ===
-      // type: 'Start' | 'Finish', teamId: string, value: number
-      if (
-        msg &&
-        msg.teamId &&
-        (msg.type === "Start" || msg.type === "Finish")
-      ) {
-        await this.applyPenaltyFromSocket(msg);
-        return;
-      }
+      const onMessage = async (msg = {}) => {
+        // abaikan echo dari diri sendiri
+        if (
+          msg &&
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
 
-      // fallback lain (abaikan / logic lainmu)
-    };
+        if (!isSameEvent(msg)) return;
 
-    socket.on("custom:event", onMessage);
+        // tampilkan toast (opsional)
+        if (this.$bvToast && msg.text) {
+          audio.play();
+          this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text}`, {
+            title: "Pesan Realtime",
+            variant: "success",
+            solid: true,
+          });
+        }
 
-    this.$once("hook:beforeDestroy", () => {
-      socket.off("connect", onConnect);
-      socket.off("custom:event", onMessage);
-    });
+        // === mapping pesan Judges Dashboard ===
+        // type: 'Start' | 'Finish', teamId/bibTeam/nameTeam, value: number
+        if (
+          msg &&
+          (msg.teamId || msg.bibTeam || msg.nameTeam) &&
+          (msg.type === "Start" || msg.type === "Finish")
+        ) {
+          await this.applyPenaltyFromSocket(msg);
+          return;
+        }
+
+        // fallback lain (abaikan / logic lainmu)
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        socket.off("connect", onConnect);
+        socket.off("custom:event", onMessage);
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
 
     try {
       const events = localStorage.getItem("eventDetails");
@@ -839,126 +841,27 @@ export default {
   },
 
   methods: {
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
-    // === NOTIFY ===
-    notify(type, detail, message = "Info") {
-      if (this.$ipc || (window && window.ipcRenderer)) {
-        const ir = this.$ipc || window.ipcRenderer;
-        ir.send && ir.send("get-alert", { type, detail, message });
-      }
-      // bisa juga set state:
-      this.lastErrorMessage = `${message}: ${detail}`;
-    },
-
-    notifyError(err, message = "Error") {
-      const detail =
-        (err && (err.message || err.toString())) || "Unknown error";
-      this.notify("error", detail, message);
-    },
-    // ======
-
     /* =========================================================
-     * SOCKET / IPC (opsional)
+     * SOCKET / IPC
      * =======================================================*/
-    // sendRealtimeMessage() {
-    //   const socket = getSocket();
-    //   socket.emit(
-    //     "custom:event",
-    //     {
-    //       senderId: socket.id,
-    //       from: "Sustainable Timing System",
-    //       text: "Terima kasih, udah gue teerima beks nilai penaltynya",
-    //       ts: new Date().toISOString(),
-    //     },
-    //     (ok) => {
-    //       if (!ok) {
-    //         ipcRenderer.send("get-alert", {
-    //           type: "error",
-    //           message: "Gagal mengirim pesan realtime",
-    //           detail: "Silakan cek koneksi broker/socket.",
-    //         });
-    //       }
-    //     }
-    //   );
-    // },
-
     async applyPenaltyFromSocket(payload = {}) {
-      const teamId = String(payload.teamId || "");
-      if (!teamId) return;
-
-      // cari tim lokal
+      // cari tim lokal: teamId -> bibTeam -> nameTeam (case-insensitive)
       const items = this.participantArr;
-      const idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      let idx = -1;
+      if (payload.teamId) {
+        const teamId = String(payload.teamId);
+        idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      }
+      if (idx === -1 && payload.bibTeam) {
+        const bib = String(payload.bibTeam);
+        idx = items.findIndex((t) => String(t.bibTeam || "") === bib);
+      }
+      if (idx === -1 && payload.nameTeam) {
+        const nameLC = String(payload.nameTeam).toLowerCase();
+        idx = items.findIndex(
+          (t) => String(t.nameTeam || "").toLowerCase() === nameLC
+        );
+      }
       if (idx === -1) return;
 
       const local = items[idx];
@@ -974,11 +877,13 @@ export default {
 
       if (!field) return;
 
-      // normalisasi angka
+      // normalisasi & validasi angka terhadap opsi penalty yang benar-benar dimuat
       const numVal =
         payload.value === "" || payload.value == null
           ? 0
           : Number(payload.value);
+      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      if (!allowed.includes(numVal)) return;
 
       // set nilai penalty → ini otomatis mengikat dengan v-model.number di <b-select>
       this.$set(local.result, field, numVal);
@@ -1113,6 +1018,13 @@ export default {
 
     // === ON SELECT LOAD PAYLOAD ===
     async onSelectSprintBucket(key) {
+      // Flush any pending edits for the bucket we're switching AWAY from
+      // before overwriting `this.participant` with the new bucket's data —
+      // otherwise an edit made in the last 250ms (debounce window of the
+      // `participant` watcher below) is lost when switching back later.
+      if (this.selectedSprintKey) {
+        saveLocalResults(this.selectedSprintKey, this.participantArr);
+      }
       await this.fetchSprintBucketTeamsByKey(key);
     },
 
@@ -1381,6 +1293,10 @@ export default {
         );
 
         await this.recalcPenalties(row);
+      }
+
+      if (this.selectedSprintKey) {
+        saveLocalResults(this.selectedSprintKey, this.participantArr);
       }
     },
 

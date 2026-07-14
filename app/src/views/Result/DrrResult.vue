@@ -526,6 +526,7 @@ export default {
         "addressZipCode",
         "raceDirector",
         "chiefJudge",
+        "chiefJudgeSignature",
         "event_logo",
       ];
       let i = 0;

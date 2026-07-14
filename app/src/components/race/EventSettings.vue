@@ -335,9 +335,154 @@
           </div>
         </section>
 
+        <!-- ===================== Comitte ===================== -->
+        <section class="uploader-section mt-4">
+          <div class="section-title">Comitte</div>
+
+          <b-row>
+            <b-col md="6">
+              <b-form-group label="Technical Delegate">
+                <b-form-input
+                  size="sm"
+                  v-model="form.technicalDelegate"
+                  placeholder="Enter technical delegate name"
+                  class="br-15"
+                />
+              </b-form-group>
+
+              <div class="sig-upload">
+                <div class="sig-upload-label">Signature (optional, PNG)</div>
+                <div class="sig-upload-row">
+                  <img
+                    v-if="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
+                    :src="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
+                    class="sig-thumb"
+                    alt="Technical Delegate signature"
+                  />
+                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                  <div class="sig-upload-actions">
+                    <input
+                      ref="tdSignatureInput"
+                      type="file"
+                      accept="image/png"
+                      class="d-none"
+                      @change="onTechnicalDelegateSignatureChange"
+                    />
+                    <b-button size="sm" variant="outline-primary" @click="$refs.tdSignatureInput.click()">
+                      Choose PNG
+                    </b-button>
+                    <b-button
+                      v-if="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
+                      size="sm"
+                      variant="outline-danger"
+                      @click="removeTechnicalDelegateSignatureFile"
+                    >
+                      Remove
+                    </b-button>
+                  </div>
+                </div>
+              </div>
+            </b-col>
+            <b-col md="6">
+              <b-form-group label="Race Director">
+                <b-form-input
+                  size="sm"
+                  v-model="form.raceDirector"
+                  placeholder="Enter race director name"
+                  class="br-15"
+                />
+              </b-form-group>
+
+              <div class="sig-upload">
+                <div class="sig-upload-label">Signature (optional, PNG)</div>
+                <div class="sig-upload-row">
+                  <img
+                    v-if="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
+                    :src="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
+                    class="sig-thumb"
+                    alt="Race Director signature"
+                  />
+                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                  <div class="sig-upload-actions">
+                    <input
+                      ref="rdSignatureInput"
+                      type="file"
+                      accept="image/png"
+                      class="d-none"
+                      @change="onRaceDirectorSignatureChange"
+                    />
+                    <b-button size="sm" variant="outline-primary" @click="$refs.rdSignatureInput.click()">
+                      Choose PNG
+                    </b-button>
+                    <b-button
+                      v-if="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
+                      size="sm"
+                      variant="outline-danger"
+                      @click="removeRaceDirectorSignatureFile"
+                    >
+                      Remove
+                    </b-button>
+                  </div>
+                </div>
+              </div>
+            </b-col>
+          </b-row>
+          <b-row>
+            <b-col md="6">
+              <b-form-group label="Chief Judge">
+                <b-form-input
+                  size="sm"
+                  v-model="form.chiefJudge"
+                  placeholder="Enter chief judge name"
+                  class="br-15"
+                />
+              </b-form-group>
+
+              <div class="sig-upload">
+                <div class="sig-upload-label">Signature (optional, PNG)</div>
+                <div class="sig-upload-row">
+                  <img
+                    v-if="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
+                    :src="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
+                    class="sig-thumb"
+                    alt="Chief Judge signature"
+                  />
+                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                  <div class="sig-upload-actions">
+                    <input
+                      ref="cjSignatureInput"
+                      type="file"
+                      accept="image/png"
+                      class="d-none"
+                      @change="onChiefJudgeSignatureChange"
+                    />
+                    <b-button size="sm" variant="outline-primary" @click="$refs.cjSignatureInput.click()">
+                      Choose PNG
+                    </b-button>
+                    <b-button
+                      v-if="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
+                      size="sm"
+                      variant="outline-danger"
+                      @click="removeChiefJudgeSignatureFile"
+                    >
+                      Remove
+                    </b-button>
+                  </div>
+                </div>
+              </div>
+            </b-col>
+          </b-row>
+        </section>
+
         <!-- ===================== Signature Result ===================== -->
         <section class="signature mt-4">
           <div class="section-title">Signature Result</div>
+          <div class="text-muted small mb-2">
+            Pilih tanda tangan mana yang ikut ditampilkan di hasil cetak (PDF).
+          </div>
           <div class="sig-list">
             <label class="sig-item">
               <input type="checkbox" v-model="signatureTechnicalDelegate" />
@@ -369,6 +514,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import Multiselect from "vue-multiselect";
+import { logger } from "@/utils/logger";
 
 export default {
   name: "EventSettingsModal",
@@ -401,6 +547,10 @@ export default {
         categoriesDivision: [],
         categoriesRace: [],
         categoriesInitial: [],
+        // Comitte
+        technicalDelegate: "",
+        chiefJudge: "",
+        raceDirector: "",
       },
       optionLevels: [],
       optionCategories: [],
@@ -427,6 +577,24 @@ export default {
       signatureChiefJudge: false,
       signatureRaceDirector: false,
 
+      // ===== Comitte signature (opsional, PNG tunggal per role) =====
+      // File yang dipilih tapi belum diupload (diupload saat Update ditekan)
+      technicalDelegateSignatureFile: null,
+      chiefJudgeSignatureFile: null,
+      raceDirectorSignatureFile: null,
+      // URL signature yang sudah tersimpan di DB (untuk preview)
+      technicalDelegateSignatureUrl: "",
+      chiefJudgeSignatureUrl: "",
+      raceDirectorSignatureUrl: "",
+      // preview lokal (object URL) untuk file yang baru dipilih
+      technicalDelegateSignaturePreview: "",
+      chiefJudgeSignaturePreview: "",
+      raceDirectorSignaturePreview: "",
+      // ditandai true kalau user menghapus signature yang sudah ada
+      removeTechnicalDelegateSignature: false,
+      removeChiefJudgeSignature: false,
+      removeRaceDirectorSignature: false,
+
       isUpdating: false,
     };
   },
@@ -449,10 +617,24 @@ export default {
     this.loadOptions();
   },
 
+  beforeDestroy() {
+    this._clearEventDataListener();
+    if (this.technicalDelegateSignaturePreview) URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
+    if (this.chiefJudgeSignaturePreview) URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
+    if (this.raceDirectorSignaturePreview) URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+  },
+
   watch: {
     show: {
       immediate: true,
       handler: function (v) {
+        // selalu bersihkan listener/timeout dari pembukaan sebelumnya lebih
+        // dulu — sebelumnya kalau modal ditutup sebelum balasan datang,
+        // listener "get-events-byid-reply" dibiarkan menggantung (hanya
+        // dibersihkan oleh timeout 3 detik), sehingga buka-tutup modal
+        // dengan cepat bisa menumpuk beberapa listener sekaligus di channel
+        // bersama ini
+        this._clearEventDataListener();
         if (!v || !this.eventId) return;
 
         // reset state setiap modal dibuka
@@ -463,9 +645,19 @@ export default {
         this.keepEventUrls = [];
         this.keepSponsorUrls = [];
 
+        this.technicalDelegateSignatureFile = null;
+        this.chiefJudgeSignatureFile = null;
+        this.raceDirectorSignatureFile = null;
+        this.technicalDelegateSignaturePreview = "";
+        this.chiefJudgeSignaturePreview = "";
+        this.raceDirectorSignaturePreview = "";
+        this.removeTechnicalDelegateSignature = false;
+        this.removeChiefJudgeSignature = false;
+        this.removeRaceDirectorSignature = false;
+
         var self = this;
         function onReply(_e, ev) {
-          if (!self.show) return;
+          self._clearEventDataListener();
 
           var sig = ev && ev.signature ? ev.signature : {};
           self.signatureTechnicalDelegate = !!sig.technicalDelegate;
@@ -489,50 +681,91 @@ export default {
             categoriesDivision: ev && Array.isArray(ev.categoriesDivision) ? ev.categoriesDivision.slice() : [],
             categoriesRace: ev && Array.isArray(ev.categoriesRace) ? ev.categoriesRace.slice() : [],
             categoriesInitial: ev && Array.isArray(ev.categoriesInitial) ? ev.categoriesInitial.slice() : [],
+            technicalDelegate: ev && ev.technicalDelegate ? String(ev.technicalDelegate) : "",
+            chiefJudge: ev && ev.chiefJudge ? String(ev.chiefJudge) : "",
+            raceDirector: ev && ev.raceDirector ? String(ev.raceDirector) : "",
           };
+
+          self.technicalDelegateSignatureUrl =
+            ev && ev.technicalDelegateSignature && ev.technicalDelegateSignature.secure_url
+              ? String(ev.technicalDelegateSignature.secure_url)
+              : "";
+          self.chiefJudgeSignatureUrl =
+            ev && ev.chiefJudgeSignature && ev.chiefJudgeSignature.secure_url
+              ? String(ev.chiefJudgeSignature.secure_url)
+              : "";
+          self.raceDirectorSignatureUrl =
+            ev && ev.raceDirectorSignature && ev.raceDirectorSignature.secure_url
+              ? String(ev.raceDirectorSignature.secure_url)
+              : "";
 
           self.existingEventUrls   = ev && ev.eventFiles && Array.isArray(ev.eventFiles) ? ev.eventFiles.slice() : [];
           self.existingSponsorUrls = ev && ev.sponsorFiles && Array.isArray(ev.sponsorFiles) ? ev.sponsorFiles.slice() : [];
 
           self.keepEventUrls = self.existingEventUrls.slice();
           self.keepSponsorUrls = self.existingSponsorUrls.slice();
-
-          ipcRenderer.removeListener("get-events-byid-reply", onReply);
         }
 
+        this._eventDataReplyHandler = onReply;
         ipcRenderer.on("get-events-byid-reply", onReply);
         ipcRenderer.send("get-events-byid", this.eventId);
 
         // guard timeout supaya listener tidak menggantung
-        setTimeout(function () {
-          ipcRenderer.removeListener("get-events-byid-reply", onReply);
+        this._eventDataReplyTimeout = setTimeout(function () {
+          self._clearEventDataListener();
         }, 3000);
       },
+    },
+    "form.startDateEvent": function (newStart) {
+      // kalau start date digeser jadi setelah end date yang sudah dipilih,
+      // end date lama jadi tidak valid (range terbalik) — kosongkan supaya
+      // user memilih ulang, daripada diam-diam tersimpan dengan range salah
+      if (
+        newStart &&
+        this.form.endDateEvent &&
+        this.form.endDateEvent < newStart
+      ) {
+        this.form.endDateEvent = "";
+      }
     },
   },
 
   methods: {
+    _clearEventDataListener: function () {
+      if (this._eventDataReplyHandler) {
+        ipcRenderer.removeListener(
+          "get-events-byid-reply",
+          this._eventDataReplyHandler
+        );
+        this._eventDataReplyHandler = null;
+      }
+      if (this._eventDataReplyTimeout) {
+        clearTimeout(this._eventDataReplyTimeout);
+        this._eventDataReplyTimeout = null;
+      }
+    },
+
     /* ---------------- Options (Event Information) ---------------- */
     loadOptions: function () {
       var self = this;
       ipcRenderer.send("option-level");
-      ipcRenderer.on("option-level-reply", function (_e, data) {
+      ipcRenderer.once("option-level-reply", function (_e, data) {
         self.optionLevels = data || [];
       });
       ipcRenderer.send("option-categories-event");
-      ipcRenderer.on("option-categories-event-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-event-reply", function (_e, data) {
         self.optionCategories = data || [];
       });
       ipcRenderer.send("option-categories-division");
-      ipcRenderer.on("option-categories-division-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-division-reply", function (_e, data) {
         self.optionDivisions = data || [];
       });
       ipcRenderer.send("option-categories-initial");
-      ipcRenderer.on("option-categories-initial-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-initial-reply", function (_e, data) {
         self.optionInitials = data || [];
       });
       ipcRenderer.send("option-categories-race");
-      ipcRenderer.on("option-categories-race-reply", function (_e, data) {
+      ipcRenderer.once("option-categories-race-reply", function (_e, data) {
         self.optionRaces = data || [];
       });
     },
@@ -583,7 +816,7 @@ export default {
           await window.cloud.deleteByPublicId(publicId);
         }
       } catch (e) {
-        console.warn("Cloudinary delete failed:", e);
+        logger.warn("Cloudinary delete failed:", e);
       }
 
       try {
@@ -595,7 +828,9 @@ export default {
             public_id: publicId,
           });
         }
-      } catch (_e) {}
+      } catch (_e) {
+        logger.warn("Gagal mengirim remove-one asset ke backend:", _e);
+      }
 
       list.splice(idx, 1);
       if (zone === "event") this.keepEventUrls = list.slice();
@@ -713,6 +948,97 @@ export default {
       return n.toFixed(fixed) + " " + units[i];
     },
 
+    /* ---------------- Comitte signature (opsional, PNG) ---------------- */
+    _pickPngFile: function (e) {
+      var file = e && e.target && e.target.files ? e.target.files[0] : null;
+      if (e && e.target) e.target.value = "";
+      if (!file) return null;
+
+      var isPng = /image\/png/i.test(file.type || "") || /\.png$/i.test(file.name || "");
+      if (!isPng) {
+        var msg1 = "Signature harus berformat PNG";
+        if (this.$bvToast) this.$bvToast.toast(msg1, { title: "Format tidak didukung", variant: "warning", solid: true });
+        else alert(msg1);
+        return null;
+      }
+
+      var sizeOk = file.size <= this.maxSizeMB * 1024 * 1024;
+      if (!sizeOk) {
+        var msg2 = "Ukuran signature maksimum " + this.maxSizeMB + "MB";
+        if (this.$bvToast) this.$bvToast.toast(msg2, { title: "Ukuran terlalu besar", variant: "warning", solid: true });
+        else alert(msg2);
+        return null;
+      }
+
+      return file;
+    },
+
+    onTechnicalDelegateSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.technicalDelegateSignaturePreview) {
+        URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
+      }
+      this.technicalDelegateSignatureFile = file;
+      this.technicalDelegateSignaturePreview = URL.createObjectURL(file);
+      this.removeTechnicalDelegateSignature = false;
+    },
+    removeTechnicalDelegateSignatureFile: function () {
+      if (this.technicalDelegateSignaturePreview) {
+        URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
+      }
+      this.technicalDelegateSignatureFile = null;
+      this.technicalDelegateSignaturePreview = "";
+      if (this.technicalDelegateSignatureUrl) {
+        this.removeTechnicalDelegateSignature = true;
+        this.technicalDelegateSignatureUrl = "";
+      }
+    },
+
+    onChiefJudgeSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.chiefJudgeSignaturePreview) {
+        URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
+      }
+      this.chiefJudgeSignatureFile = file;
+      this.chiefJudgeSignaturePreview = URL.createObjectURL(file);
+      this.removeChiefJudgeSignature = false;
+    },
+    removeChiefJudgeSignatureFile: function () {
+      if (this.chiefJudgeSignaturePreview) {
+        URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
+      }
+      this.chiefJudgeSignatureFile = null;
+      this.chiefJudgeSignaturePreview = "";
+      if (this.chiefJudgeSignatureUrl) {
+        this.removeChiefJudgeSignature = true;
+        this.chiefJudgeSignatureUrl = "";
+      }
+    },
+
+    onRaceDirectorSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.raceDirectorSignaturePreview) {
+        URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+      }
+      this.raceDirectorSignatureFile = file;
+      this.raceDirectorSignaturePreview = URL.createObjectURL(file);
+      this.removeRaceDirectorSignature = false;
+    },
+    removeRaceDirectorSignatureFile: function () {
+      if (this.raceDirectorSignaturePreview) {
+        URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+      }
+      this.raceDirectorSignatureFile = null;
+      this.raceDirectorSignaturePreview = "";
+      if (this.raceDirectorSignatureUrl) {
+        this.removeRaceDirectorSignature = true;
+        this.raceDirectorSignatureUrl = "";
+      }
+    },
+
     onUpdate: function () {
       this.isUpdating = true;
 
@@ -745,6 +1071,19 @@ export default {
         categoriesDivision: this.form.categoriesDivision,
         categoriesRace: this.form.categoriesRace,
         categoriesInitial: this.form.categoriesInitial,
+
+        // ===== Comitte =====
+        technicalDelegate: this.form.technicalDelegate,
+        chiefJudge: this.form.chiefJudge,
+        raceDirector: this.form.raceDirector,
+
+        // ===== Comitte signature (File baru, opsional) =====
+        technicalDelegateSignatureFile: this.technicalDelegateSignatureFile,
+        chiefJudgeSignatureFile: this.chiefJudgeSignatureFile,
+        raceDirectorSignatureFile: this.raceDirectorSignatureFile,
+        removeTechnicalDelegateSignature: this.removeTechnicalDelegateSignature,
+        removeChiefJudgeSignature: this.removeChiefJudgeSignature,
+        removeRaceDirectorSignature: this.removeRaceDirectorSignature,
       };
 
       this.$emit("update-settings", payload);
@@ -849,6 +1188,30 @@ export default {
 }
 .sig-item { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .sig-item input[type="checkbox"] { transform: scale(1.1); }
+
+/* Comitte signature upload */
+.sig-upload { margin: -8px 0 16px; }
+.sig-upload-label { font-size: 12px; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+.sig-upload-row { display: flex; align-items: center; gap: 12px; }
+.sig-thumb {
+  width: 90px;
+  height: 50px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #e6ebf4;
+  border-radius: 8px;
+  padding: 4px;
+}
+.sig-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 11px;
+  background: #fafafa;
+  border: 1px dashed #cbd5e1;
+}
+.sig-upload-actions { display: flex; align-items: center; gap: 8px; }
 
 /* Footer */
 .footer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }

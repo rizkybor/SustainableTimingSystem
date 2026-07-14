@@ -697,7 +697,6 @@
 <script>
 import SlalomSession1PdfResult from "../ResultComponent/slalom-pdfResult.vue";
 import { ipcRenderer } from "electron";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
@@ -708,6 +707,10 @@ import { getSocket } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
+import { createBucketCache } from "@/utils/localBucketCache";
+
+const slalomBucketCache = createBucketCache("slalomLocal");
 
 /** ===== constants/helpers (sama dengan Sprint) ===== */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -925,7 +928,7 @@ export default {
     Icon,
     CountryFlag,
   },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
 
   data() {
     return {
@@ -939,20 +942,10 @@ export default {
       slalomBucketOptions: [],
       slalomBucketMap: Object.create(null),
       selectedSlalomKey: "",
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
       endGame: false,
       activeRun: 0,
       sortBest: { enabled: false, desc: false },
       SLALOM_GATES: buildGates(DEFAULT_S16),
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
       dataEvent: {},
       titleCategories: "",
       teams: [],
@@ -1445,10 +1438,12 @@ export default {
             ? msg.value
             : 0;
 
-        // IZINKAN 0/5/10/50
-        const ALLOWED = new Set([0, 5, 10, 50]);
+        // izinkan hanya nilai yang benar-benar ditawarkan UI untuk konteks ini
+        const allowedList = this.filteredPenalties(
+          kind === "gate" ? "Gate" : "SF"
+        ).map((p) => Number(p.value));
         const np = Number(raw);
-        const value = ALLOWED.has(np) ? np : 0;
+        const value = allowedList.includes(np) ? np : 0;
 
         let changed = false;
 
@@ -1660,51 +1655,6 @@ export default {
         sessionIdx = Number.isFinite(chosen) ? chosen : this.activeRun || 0;
       }
       return { team: team, teamIdx: teamIdx, sessionIdx: sessionIdx };
-    },
-
-    async applyPenaltyFromSocket(msg) {
-      var runIdx = Number.isFinite(msg && msg.run)
-        ? Number(msg.run)
-        : undefined;
-      await this.refreshPenaltiesFromRegistered({
-        teamId: msg && msg.teamId,
-        bib: msg && msg.bib,
-        runIdx: runIdx,
-      });
-    },
-
-    async applyRaceFromSocket(msg) {
-      try {
-        const f = this._findTeamAndSessionIndex(msg.teamId || msg.bib);
-        if (!f.team) return;
-
-        const s =
-          f.team.sessions && f.team.sessions[f.sessionIdx]
-            ? f.team.sessions[f.sessionIdx]
-            : null;
-        if (!s) return;
-
-        // msg.time harus string "HH:MM:SS.mmm"
-        const val = String(msg.time || "");
-        if (!val) return;
-
-        if (msg.type === "RaceStart") {
-          s.startTime = val;
-        } else if (msg.type === "RaceFinish") {
-          s.finishTime = val;
-          if (s.startTime && s.finishTime) {
-            const diff = Math.max(
-              0,
-              hmsToMs(s.finishTime) - hmsToMs(s.startTime)
-            );
-            s.raceTime = msToHMSms(diff);
-          }
-        }
-        this.recalcSession(s);
-        this.checkEndGameStatus();
-      } catch (err) {
-        logger && logger.warn && logger.warn("applyRaceFromSocket error:", err);
-      }
     },
 
     // ================= EXISTING LOGIC =================
@@ -2019,6 +1969,9 @@ export default {
       this.slalomBucketMap = map;
     },
     async onSelectSlalomBucket(key) {
+      if (this.selectedSlalomKey) {
+        slalomBucketCache.save(this.selectedSlalomKey, this.teams);
+      }
       await this.fetchSlalomTeamsByKey(key);
     },
     async fetchSlalomTeamsByKey(key) {
@@ -2079,11 +2032,12 @@ export default {
       var b = this.slalomBucketMap[key];
       if (!b) return;
 
-      this.teams = Array.isArray(b.teams)
+      var freshTeams = Array.isArray(b.teams)
         ? b.teams.map(function (t) {
             return Object.assign({}, t);
           })
         : [];
+      this.teams = slalomBucketCache.merge(freshTeams, slalomBucketCache.load(key));
       this.titleCategories = this._slalomBucketLabel(b);
       localStorage.setItem("currentSlalomBucketKey", key);
 
@@ -2119,77 +2073,6 @@ export default {
         i = i + 1;
       }
     },
-
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            "Preferred port not found: " + PREFERRED_PATH,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port;
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
 
     checkEndGameStatus() {
       const allFinished =
@@ -2439,6 +2322,9 @@ export default {
         }
       }
       this.checkEndGameStatus();
+      if (this.selectedSlalomKey) {
+        slalomBucketCache.save(this.selectedSlalomKey, this.teams);
+      }
     },
 
     /** === Navigasi sederhana === */

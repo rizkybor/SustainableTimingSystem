@@ -74,6 +74,8 @@ const {
   getTeamsRegistered,
   deleteTeamInBucket,
   upsertTeamsRegistered,
+  findRegisteredEntriesByTeamName,
+  findRegisteredBucketsByEventId,
 } = require("../controllers/INSERT/insertTeamsRegistered.js");
 
 const {
@@ -94,6 +96,7 @@ const {
   getSprintResult,
   getDrrResult,
   getSlalomResult,
+  getRaceCategoryResultForTeam,
 } = require("../controllers/GET/getResult.js");
 
 const {
@@ -108,6 +111,11 @@ const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
+const {
+  insertChatMessage,
+  listChatMessagesByEvent,
+  deleteChatMessage,
+} = require("../controllers/INSERT/insertChatMessage");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -163,6 +171,54 @@ function setupIPCMainHandlers() {
         ok: false,
         error: err.message,
       });
+    }
+  });
+
+  // Chat: hapus (soft-delete) pesan milik sendiri
+  ipcMain.on("chat:delete", async (event, payload) => {
+    try {
+      const id = payload && payload.id;
+      const senderEmail = payload && payload.senderEmail;
+      const result = await deleteChatMessage(id, senderEmail);
+      event.reply("chat:delete:reply", result);
+    } catch (err) {
+      event.reply("chat:delete:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: send a message (event-scoped group chat)
+  ipcMain.on("chat:send", async (event, payload) => {
+    try {
+      const message = await insertChatMessage(payload);
+      event.reply("chat:send:reply", { ok: true, message });
+    } catch (err) {
+      event.reply("chat:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: list history for an event + category (Race Category room)
+  ipcMain.on("chat:listByEvent", async (event, payload) => {
+    try {
+      const eventId = payload && payload.eventId ? payload.eventId : payload;
+      const category = payload && payload.category ? payload.category : "";
+      const messages = await listChatMessagesByEvent(eventId, category);
+      event.reply("chat:listByEvent:reply", { ok: true, messages });
+    } catch (err) {
+      event.reply("chat:listByEvent:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: dedicated event-info fetch (own reply channel — the widget is
+  // mounted persistently across every event page, so it must NOT share a
+  // reply channel with page components like Details/index.vue that also
+  // call get-events-byid, or removeAllListeners on either side can wipe out
+  // the other's pending listener)
+  ipcMain.on("chat:get-event", async (event, eventId) => {
+    try {
+      const data = await getEventById(eventId);
+      event.reply("chat:get-event-reply", data);
+    } catch (err) {
+      event.reply("chat:get-event-reply", null);
     }
   });
 
@@ -446,6 +502,21 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // Timing detail mentah per-tim (Sprint/Slalom/DRR saja — H2H/RX belum ada
+  // endpoint baca per-tim dari koleksi hasilnya)
+  ipcMain.on("team-result-detail:get", async (event, identity) => {
+    try {
+      const team = await getRaceCategoryResultForTeam(identity || {});
+      event.reply("team-result-detail:get-reply", { ok: true, team });
+    } catch (error) {
+      event.reply("team-result-detail:get-reply", {
+        ok: false,
+        team: null,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
   // ========================================================================
   // File picker & Cloudinary (TIDAK ADA optional chaining)
   // ========================================================================
@@ -534,7 +605,8 @@ function setupIPCMainHandlers() {
         { value: "club", name: "Club" },
         { value: "pengcab", name: "Pengcab" },
         { value: "pengprov", name: "Pengprov" },
-        { value: "country", name: "Country" },
+        { value: "wilayah", name: "Wilayah" },
+        { value: "negara", name: "Negara" },
       ]);
     }
   });
@@ -630,6 +702,35 @@ function setupIPCMainHandlers() {
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
+      });
+    }
+  });
+
+  // Cari semua event/race dimana sebuah tim (by nameTeam) terdaftar
+  ipcMain.on("teams-registered:find-by-name", async (event, nameTeam) => {
+    try {
+      const items = await findRegisteredEntriesByTeamName(nameTeam);
+      event.reply("teams-registered:find-by-name-reply", { ok: true, items });
+    } catch (error) {
+      event.reply("teams-registered:find-by-name-reply", {
+        ok: false,
+        items: [],
+        error: String((error && error.message) || error),
+      });
+    }
+  });
+
+  // Semua bucket registrasi (lintas race category) utk satu event — dipakai
+  // Event Overall Result utk cross-check skor lama vs registrasi terkini
+  ipcMain.on("teams-registered:find-by-event", async (event, eventId) => {
+    try {
+      const items = await findRegisteredBucketsByEventId(eventId);
+      event.reply("teams-registered:find-by-event-reply", { ok: true, items });
+    } catch (error) {
+      event.reply("teams-registered:find-by-event-reply", {
+        ok: false,
+        items: [],
+        error: String((error && error.message) || error),
       });
     }
   });

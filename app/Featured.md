@@ -34,15 +34,35 @@ critically — which **race categories** this event will run
 which divisions, races (men/women), and "initial" categories (age/skill
 tiers) are offered. All of this becomes one document in `eventsCollection`.
 
+It also collects the **Comitte** — Technical Delegate, Chief Judge, and Race
+Director names — each with an *optional* PNG signature upload (Cloudinary,
+`sustainable-js/committee-signature`). Once uploaded, the signature image
+prints directly on official result PDFs in place of a blank sign-here line.
+
 Once created, `Event Settings` lets the organizer edit any of these fields
-later, including adding/removing race categories and re-uploading logos —
-without needing to recreate the event.
+later — including Comitte names/signatures and re-uploading logos — without
+needing to recreate the event.
 
 ### 3. Register Teams
 Teams (name, BIB number, roster info) are created once in a master roster
 (`Create Team`) and then **registered** into a specific event + division +
 race + initial + format combination from the event's detail page. A team can
 be registered into multiple formats/categories within the same event.
+
+From the event detail page's "Registered Teams" table, a **View Details**
+button opens a per-registration modal (team info, BIB, status, and — once
+timing/results exist — the recorded times/penalties/rank for that specific
+race). Separately, every team card (Home page and the "List All Teams" table
+in `Create Team`) has its own **View Details** button leading to a global
+**Team Details** page (`/team?name=...`) that lists every Event the team has
+ever registered into, and — nested under each Event — every Race Category
+registration with its Ranked/Score result once available.
+
+A floating **Live Chat** widget is available on every page under an event
+(all race screens, settings, results). It's a per-Race-Category group chat
+(not 1:1) between the Timing System operator and whichever judges are
+assigned to that category via Judges Settings — supports @mention of
+assigned judges and plays a sound on incoming messages.
 
 ### 4. Configure the race (per event)
 Two settings modals apply once per event, shared across every category:
@@ -110,6 +130,94 @@ the judge/operator accounts used throughout the settings above.
   currently being reviewed for correctness across formats (see project
   history for specifics) — Sprint, Slalom, and DRR result pages should be
   spot-checked against the database when in doubt about a displayed number.
-- Head-to-Head and Down River Race result pages don't yet expose the
-  "View Overall" button that Sprint, Slalom, and Rafting Cross have, even
-  though their scores are recorded correctly in the background.
+- ~~Head-to-Head and Down River Race result pages don't yet expose the
+  "View Overall" button that Sprint, Slalom, and Rafting Cross have.~~
+  **Stale note, corrected.** Checked both `HeadToHeadResult.vue` and
+  `DrrResult.vue` directly — the button, the `PrintOverallModal` wiring,
+  `fetchEventResultsAggregate()`, and `buildAggregateFromDoc()` are all
+  already present and structurally identical to `SprintResult.vue`. All
+  five result pages expose "View Overall" the same way.
+
+## Known issues to fix
+
+Found during a code-review pass; not yet fixed unless noted otherwise.
+
+- ~~`eventsCollection.participant` is dead/stale data.~~ **Fixed.**
+  `Details/index.vue`'s `persistParticipants()` sent an
+  `events-update-participant` IPC message with no backend handler anywhere —
+  a silent no-op. Removed it (both call sites, in `deleteRow` and
+  `saveDraft`) along with the now-pointless `ev.participant` read in
+  `loadEvent()`, since `dataTeams` is always immediately repopulated from
+  `teamsRegisteredCollection` via `refreshVisibleBuckets()` regardless. The
+  real, live-synced source of "who's registered" remains
+  `teamsRegisteredCollection` (`upsert-teams-registered` /
+  `get-teams-registered` / `delete-team-in-bucket`) — nothing in the app
+  reads or writes `eventsCollection.participant` anymore.
+- ~~`HeadToHead.vue` sends `insert-h2h-result` to nowhere.~~ **Fixed.** That
+  channel had no backend handler; the real H2H result save path is
+  `h2h:round:save` / `h2h:rounds:saveMany`. Removed the dead
+  `saveAllRoundsToDB()` method (its only trigger button was already
+  commented out in the template, so it wasn't reachable) along with its
+  now-unused `buildResultDocs()` helper. `saveAllRoundsLocal()` (local-only
+  save) and `exportAllRoundsJSON()` were left untouched — they're
+  self-contained and don't depend on any dead channel.
+- ~~`getOptionTeamTypes()`'s error-fallback list doesn't match its normal
+  list.~~ **Fixed.** In `ipcMainServices.js`, the fallback used when the
+  DB-backed team-type query throws offered `{value:"country"}` instead of
+  the real `wilayah`/`negara` values used everywhere else (including the
+  Level→allowed-type scope map in `Details/index.vue`). Fallback now mirrors
+  `getOptionTeamTypes()` in `insertTeams.js` exactly (club/pengcab/pengprov/
+  wilayah/negara).
+- ~~Duplicate teams aren't actually prevented.~~ **Fixed.** `insertTeams.js`
+  had duplicate-key error handling for a unique `nameTeam + bibTeam` index,
+  but the index creation itself was commented out ("optional, create at DB
+  init"). The index is now actually created — once per DB connection, via
+  a new `ensureIndexes()` in `controllers/index.js` (not on every insert,
+  and wrapped in try/catch so pre-existing duplicate data can't break the
+  whole DB connection). `updateTeamById` (the Edit-team path) now also
+  surfaces a clear "already exists" error instead of a raw Mongo error if an
+  edit would create a duplicate.
+- ~~`EventSettings.vue` (and possibly `JudgesSettings.vue`) still leak IPC
+  listeners on repeated use.~~ **Fixed** for `EventSettings.vue` (switched
+  `loadOptions()`'s 5 `ipcRenderer.on(...)` to `.once()`, same fix as
+  `CreateEvent.vue`). Re-checked `JudgesSettings.vue` specifically — it
+  already used `.once()` everywhere; the earlier note was overcautious.
+- **Team Details page (`/team`) — Sprint/Slalom/DRR now show full per-run
+  timing detail; H2H/RX still show only Ranked/Score.** Added
+  `getRaceCategoryResultForTeam()` (`controllers/GET/getResult.js`) + IPC
+  channel `team-result-detail:get`, which looks up one team's raw row in
+  `temporarySprintResult` / `temporarySlalomResult` / `temporaryDrrResult`
+  by exact bucket identity (eventId/initialId/raceId/divisionId) and team
+  name. Rendering logic (`RESULT_FIELD_LABELS`/`collectFields`) was
+  extracted from `TeamDetailsModal.vue` into a shared
+  `src/utils/formatRaceResult.js` so both places stay in sync. H2H and RX
+  were deliberately left out of this: neither exposes a "read one team's
+  result" query from `h2h_results`/`rx_results` today (only
+  bracket/overall-shaped reads), so supporting them means designing and
+  adding new backend queries against schemas that haven't been read/tested
+  yet — a separate, riskier piece of work.
+- **Signature images don't print on every result PDF yet.** Technical
+  Delegate & Race Director signature *images* (the new Comitte upload
+  feature) currently render on the Sprint, Rafting Cross (all 3 variants),
+  and Overall-alltime PDF templates. Slalom, DRR, and Head-to-Head result
+  PDFs only ever had a Chief Judge signature slot to begin with (pre-existing
+  layout, not something this session broke) — so Technical Delegate/Race
+  Director signatures have nowhere to render on those three yet.
+
+
+Catatan fitur yang perlu diperbaiki
+eventsCollection.participant mati/basi — persistParticipants() mengirim IPC ke channel yang tidak ada handler-nya sama sekali. Data registrasi yang benar-benar dipakai ada di teamsRegisteredCollection.
+
+insert-h2h-result dari HeadToHead.vue tidak ada penerimanya — jalur simpan hasil H2H yang asli lewat h2h:round:save/h2h:rounds:saveMany. Kode mati, tapi tidak berbahaya.
+
+Fallback getOptionTeamTypes() tidak konsisten — kalau query DB gagal, opsi fallback pakai "country" bukan "wilayah"/"negara" seperti yang dipakai di tempat lain.
+
+Duplikat tim tidak benar-benar dicegah — index unik nameTeam+bibTeam di insertTeams.js sengaja dikomentari ("opsional").
+
+EventSettings.vue/JudgesSettings.vue masih bocor listener IPC — pola bug yang sama persis dengan yang sudah diperbaiki di CreateEvent.vue, belum diterapkan ke dua file ini.
+
+Halaman Team Details baru menampilkan Ranked/Score, belum detail timing mentah per-run — datanya tersebar di 5 koleksi berbeda struktur (sengaja ditunda, bukan bug).
+
+Signature Comitte belum tampil di semua PDF — baru render di Sprint/Rafting Cross/Overall; Slalom, DRR, H2H memang cuma punya slot Chief Judge dari sononya.
+
+Item lama yang belum tersentuh: edge case Sprint/Slalom/DRR result masih perlu di-review, dan H2H/DRR belum punya tombol "View Overall".

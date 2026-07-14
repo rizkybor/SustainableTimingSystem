@@ -1,6 +1,7 @@
 // ../Controllers/insert/upsertHeadToHead.js
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
+const { notifyResultsUpdated } = require("../socketBroadcast");
 
 // --- Nama koleksi (silakan samain dengan konvensi kamu)
 const COL_BRACKETS = "h2h_brackets";
@@ -229,6 +230,15 @@ async function upsertOverall(bucket, overallPkg = {}) {
     { $set: doc },
     { upsert: true }
   );
+
+  notifyResultsUpdated({
+    eventId: doc.bucket.eventId,
+    category: "H2H",
+    initialId: doc.bucket.initialId,
+    divisionId: doc.bucket.divisionId,
+    raceId: doc.bucket.raceId,
+  });
+
   return { ok: true };
 }
 

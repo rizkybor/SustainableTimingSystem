@@ -527,7 +527,6 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
@@ -537,6 +536,10 @@ import { getSocket } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
+import { createBucketCache } from "@/utils/localBucketCache";
+
+const drrBucketCache = createBucketCache("drrLocal");
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 function getBucket() {
@@ -747,21 +750,13 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       initSocket: null,
       selfSocketId: null,
       isLoading: false,
       defaultImg,
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
       selectedDrrKey: "",
@@ -770,8 +765,6 @@ export default {
       editResult: false,
       dataPenalties: [],
       dataScore: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -959,13 +952,11 @@ export default {
             }
           );
         }
-        console.log(msg.type, "<<");
         // Normalisasi tipe lama → baru (opsional)
         if (msg.type === "PenaltiesUpdated") {
           const gt = String(msg.gate || "")
             .trim()
             .toLowerCase();
-          console.log(gt, "<<< cek");
           if (gt === "start" || gt === "s" || gt === "st")
             msg.type = "PenaltyStart";
           else if (gt === "finish" || gt === "f" || gt === "fin")
@@ -1003,7 +994,7 @@ export default {
 
         // Terapkan semua update dulu…
         for (const u of updates) {
-          console.log("HAHA", u), await this.applyPenaltyFromSocketDirect(u);
+          await this.applyPenaltyFromSocketDirect(u);
         }
 
         // …baru re-rank sekali (hemat render)
@@ -1138,11 +1129,16 @@ export default {
           }
         }
 
-        // --- numeric value ---
+        // --- numeric value (izinkan hanya nilai yang benar-benar ditawarkan UI) ---
         var rawVal = 0;
         if (msg && msg.penalty != null) rawVal = msg.penalty;
         else if (msg && msg.value != null) rawVal = msg.value;
-        var ALLOWED = [0, 5, 10, 50];
+        var ALLOWED = (kind === "section"
+          ? this.penaltiesSection
+          : this.penaltiesStartFinish
+        ).map(function (p) {
+          return Number(p.value);
+        });
         var numericValue =
           ALLOWED.indexOf(Number(rawVal)) >= 0 ? Number(rawVal) : 0;
 
@@ -1349,18 +1345,19 @@ export default {
         );
         this.$set(sObj, "totalTime", team.result.totalTime || sObj.totalTime);
 
-        // --- akhir: set edit flag + re-rank ---
+        // --- akhir: set edit flag ---
+        // (ranking di-handle sekali oleh pemanggil di onMessage setelah semua
+        // update dalam batch diterapkan — lihat assignRanks di socket handler)
         this.editResult = true;
-        if (typeof this.assignRanks === "function") {
-          await this.assignRanks(this.participant);
-        }
         if (typeof this.checkEndGameStatus === "function")
           this.checkEndGameStatus();
         if (typeof this.$forceUpdate === "function") this.$forceUpdate();
 
         return true;
       } catch (err) {
-        console.warn("applyPenaltyFromSocketDirect DRR error:", err);
+        if (logger && logger.warn) {
+          logger.warn("applyPenaltyFromSocketDirect DRR error:", err);
+        }
         return false;
       }
     },
@@ -1463,75 +1460,6 @@ export default {
         pad(hr, 2) + ":" + pad(min, 2) + ":" + pad(sec, 2) + "." + pad(ms, 3);
       return neg ? "-" + s : s;
     },
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
     // === NOTIFY ===
     notify(type, detail, message = "Info") {
       if (this.$ipc || (window && window.ipcRenderer)) {
@@ -1781,7 +1709,8 @@ export default {
       if (!b) return;
 
       // set participant & judul
-      this.participant = (b.teams || []).map((t) => ({ ...t }));
+      const freshParticipant = (b.teams || []).map((t) => ({ ...t }));
+      this.participant = drrBucketCache.merge(freshParticipant, drrBucketCache.load(key));
       this.titleCategories = b._isAggregate
         ? "ALL DIVISION/RACE – ALL INITIAL (DRR)"
         : this._bucketLabel(b);
@@ -1820,6 +1749,9 @@ export default {
     },
 
     async onSelectDrrBucket(key) {
+      if (this.selectedDrrKey) {
+        drrBucketCache.save(this.selectedDrrKey, this.participant);
+      }
       await this.fetchBucketTeamsByKey(key);
     },
 
@@ -2176,6 +2108,10 @@ export default {
 
       this.editResult = true;
       await this.assignRanks(this.participant);
+
+      if (this.selectedDrrKey) {
+        drrBucketCache.save(this.selectedDrrKey, this.participant);
+      }
     },
 
     getScoreByRanked(ranked) {
@@ -2208,6 +2144,10 @@ export default {
             this.participant[id].result.finishTime
           );
         }
+      }
+
+      if (this.selectedDrrKey) {
+        drrBucketCache.save(this.selectedDrrKey, this.participant);
       }
     },
 

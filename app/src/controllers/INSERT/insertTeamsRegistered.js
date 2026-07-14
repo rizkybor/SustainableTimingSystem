@@ -103,8 +103,74 @@ async function deleteTeamInBucket({ identity, team }) {
   return { ok: result.modifiedCount > 0 };
 }
 
+// --- FIND all bucket entries (across every event/race) for a given team name ---
+async function findRegisteredEntriesByTeamName(nameTeam) {
+  const nm = String(nameTeam || "").trim().toUpperCase();
+  if (!nm) return [];
+
+  const db = await getDb();
+  const coll = db.collection("teamsRegisteredCollection");
+
+  const docs = await coll.find({ "teams.nameTeam": nm }).toArray();
+
+  const out = [];
+  docs.forEach((doc) => {
+    const matched = Array.isArray(doc.teams)
+      ? doc.teams.filter((t) => String(t && t.nameTeam || "").toUpperCase() === nm)
+      : [];
+    matched.forEach((t) => {
+      out.push({
+        eventId: String(doc.eventId || ""),
+        initialId: String(doc.initialId || ""),
+        raceId: String(doc.raceId || ""),
+        divisionId: String(doc.divisionId || ""),
+        // NB: field ini bernama "eventName" di teamsRegisteredCollection,
+        // tapi isinya sebenarnya RACE CATEGORY/discipline (SPRINT/HEAD2HEAD/
+        // SLALOM/DRR/RX) — bukan judul event. Judul event asli ada di
+        // eventsCollection, di-lookup terpisah lewat eventId.
+        raceCategory: String(doc.eventName || ""),
+        initialName: String(doc.initialName || ""),
+        raceName: String(doc.raceName || ""),
+        divisionName: String(doc.divisionName || ""),
+        bibTeam: String((t && t.bibTeam) || ""),
+      });
+    });
+  });
+  return out;
+}
+
+// --- FIND semua bucket registrasi utk satu event, lintas race category
+// (dipakai utk cross-check "apakah tim ini masih benar-benar terdaftar di
+// discipline X" saat menampilkan rekap Overall — hasil lama yang tersimpan
+// di temporaryOverallEventResults bisa jadi basi kalau registrasinya sudah
+// diubah/dihapus setelah race dijalankan) ---
+async function findRegisteredBucketsByEventId(eventId) {
+  const id = String(eventId || "");
+  if (!id) return [];
+
+  const db = await getDb();
+  const coll = db.collection("teamsRegisteredCollection");
+
+  const docs = await coll.find({ eventId: id }).toArray();
+  return docs.map((doc) => ({
+    // NB: sama seperti findRegisteredEntriesByTeamName — "eventName" di
+    // collection ini sebenarnya berarti RACE CATEGORY/discipline.
+    raceCategory: String(doc.eventName || ""),
+    initialName: String(doc.initialName || ""),
+    raceName: String(doc.raceName || ""),
+    divisionName: String(doc.divisionName || ""),
+    teamNames: Array.isArray(doc.teams)
+      ? doc.teams
+          .map((t) => String((t && t.nameTeam) || "").trim().toUpperCase())
+          .filter(Boolean)
+      : [],
+  }));
+}
+
 module.exports = {
   getTeamsRegistered,
   upsertTeamsRegistered,
+  findRegisteredBucketsByEventId,
   deleteTeamInBucket,
+  findRegisteredEntriesByTeamName,
 };

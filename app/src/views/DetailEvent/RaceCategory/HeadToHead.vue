@@ -470,12 +470,6 @@
               <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
             </button>
             <button
-              class="btn-action btn-outline-primary"
-              @click="saveAllRoundsToDB"
-            >
-              <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
-            </button>
-            <button
               class="btn-action btn-outline-dark"
               @click="exportAllRoundsJSON"
             >
@@ -1008,7 +1002,6 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
@@ -1016,8 +1009,11 @@ import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
+import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1086,66 +1082,6 @@ function getBucket() {
       divisionName: "",
     };
   }
-}
-
-/** builder dokumen yang akan disimpan (pola Sprint) */
-function buildResultDocs(participantArr, bucket) {
-  const now = new Date();
-  return participantArr.map((t) => {
-    const team = {
-      nameTeam: String(t.nameTeam || ""),
-      bibTeam: String(t.bibTeam || ""),
-      startOrder: String(t.startOrder || ""),
-      praStart: String(t.praStart || ""),
-      intervalRace: String(t.intervalRace || ""),
-      statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
-    };
-    const result = { ...(t.result || {}) };
-    const otr = { ...(t.otr || {}) };
-
-    // normalisasi
-    result.startTime = String(result.startTime || "");
-    result.finishTime = String(result.finishTime || "");
-    result.raceTime = String(result.raceTime || "");
-    result.penalty = Number.isFinite(result.penalty)
-      ? result.penalty
-      : result.penalty
-      ? Number(result.penalty)
-      : 0;
-    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
-    result.totalTime = String(result.totalTime || result.raceTime || "");
-    result.ranked = Number.isFinite(result.ranked)
-      ? result.ranked
-      : result.ranked
-      ? Number(result.ranked)
-      : 0;
-    result.score = Number.isFinite(result.score)
-      ? result.score
-      : result.score
-      ? Number(result.score)
-      : 0;
-
-    return {
-      // kunci relasi (HARUS sama dgn Teams Registered)
-      eventId: bucket.eventId,
-      initialId: bucket.initialId,
-      raceId: bucket.raceId,
-      divisionId: bucket.divisionId,
-      eventName: bucket.eventName,
-      initialName: bucket.initialName,
-      raceName: bucket.raceName,
-      divisionName: bucket.divisionName,
-
-      // data tim + hasil
-      ...team,
-      result,
-      otr,
-
-      // meta optional
-      createdAt: now,
-      updatedAt: now,
-    };
-  });
 }
 
 function normalizeTeamForH2H(t = {}) {
@@ -1219,7 +1155,7 @@ export default {
     Icon,
     CountryFlag,
   },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       pdfMode: "round",
@@ -1231,10 +1167,7 @@ export default {
       isLoadingBracket: false,
       isLoadingTableList: false,
       selfSocketId: null,
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
+      initSocket: null,
       endGame: false,
       isScrolled: false,
       showBracket: true,
@@ -1259,14 +1192,8 @@ export default {
       showBronze: true,
       editForm: "",
       editResult: false,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
       dataPenalties: [],
       dataScore: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
       isRankedDescending: false,
 
       /** penting: tipe konsisten */
@@ -1629,6 +1556,64 @@ export default {
     this.computeWinLoseByHeat();
 
     this.fetchBooyanActiveFromSettings();
+
+    // ====== SOCKET INIT & LISTENERS (Judges Dashboard realtime) ======
+    try {
+      const socket = getSocket();
+      this.initSocket = socket;
+
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
+
+      const onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
+
+      const onMessage = async (raw) => {
+        const msg = raw || {};
+
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
+
+        if (this.$bvToast && msg.text) {
+          try {
+            new Audio(tone).play();
+          } catch {
+            // abaikan gagal play audio
+          }
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
+        }
+
+        await this.applyPenaltyFromSocketH2H(msg);
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
   },
 
   methods: {
@@ -2807,77 +2792,6 @@ export default {
         }
       });
     },
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
     resetByRow(item) {
       if (!item || !item.result) return;
 
@@ -3743,6 +3657,54 @@ export default {
       if (!any) return "classic";
       if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2";
       return "4";
+    },
+
+    /* =========================================================
+     * SOCKET / IPC (Judges Dashboard realtime)
+     * =======================================================*/
+    async applyPenaltyFromSocketH2H(msg = {}) {
+      // resolve tim: teamId/bib/nama -> index di this.participant
+      // (pola sama seperti updateTime: cocokkan lewat participantArr lalu
+      // ambil objek nyata dari this.participant, bukan visibleParticipants)
+      const nameLC = String(msg.teamName || msg.nameTeam || "").toLowerCase();
+      const bib = String(msg.bibTeam || msg.bib || "");
+      const teamId = msg.teamId != null ? String(msg.teamId) : "";
+
+      const targetIndex = this.participantArr.findIndex((p) => {
+        if (teamId && String(p.teamId || "") === teamId) return true;
+        const pNameLC = String(p.nameTeam || p.teamName || "").toLowerCase();
+        const nameMatch = nameLC && pNameLC === nameLC;
+        const bibMatch = bib && String(p.bibTeam || "") === bib;
+        if (nameLC) return nameMatch && (!bib ? true : bibMatch);
+        return false;
+      });
+      if (targetIndex === -1) return;
+
+      const target = this.participant[targetIndex];
+      if (!target || !target.result) return;
+
+      this.ensurePenaltiesObject(target.result);
+      const p = target.result.penalties;
+
+      const kind = String(msg.type || "");
+      if (kind === "PenaltyStart") {
+        this.$set(p, "s", Number(msg.value) || 0);
+      } else if (kind === "PenaltyFinish") {
+        this.$set(p, "f", Number(msg.value) || 0);
+      } else if (kind === "PenaltyOther") {
+        this.$set(p, "o", Number(msg.value) || 0);
+      } else if (kind === "BooyanCorner") {
+        const corner = String(msg.corner || "").toLowerCase();
+        if (corner === "r1" || corner === "r2" || corner === "l1" || corner === "l2") {
+          this.$set(p, corner, msg.touched ? "Y" : "N");
+        } else {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      await this.onPenaltyChange(target);
     },
 
     ensurePenaltiesObject(result) {
@@ -4637,71 +4599,6 @@ export default {
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
 
-    /** SAVE RESULT (channel khusus H2H) */
-    // ...existing
-    saveAllRoundsToDB() {
-      const bucket = getBucket();
-      const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
-      if (missing.length) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: `Bucket fields missing: ${missing.join(", ")}`,
-          message: "Failed",
-        });
-        return;
-      }
-
-      const docs = [];
-      (this.rounds || []).forEach((r) => {
-        // ambil hasil tersimpan; kalau belum ada, bangun dari memory saat ini
-        const roundKey = String(r.id);
-        const all = readAllRoundResults(this.roundResultsRootKey) || {};
-        const arr = Array.isArray(all[roundKey])
-          ? all[roundKey]
-          : this.participantsForRound(r).map((t) => ({
-              nameTeam: t.nameTeam,
-              bibTeam: t.bibTeam,
-              result: t.result,
-            }));
-
-        arr.forEach((row) => {
-          const base = buildResultDocs([row], bucket)[0];
-          base.result = {
-            ...(base.result || {}),
-            _roundId: roundKey,
-            _roundName: r.bronze ? "Final B" : r.name,
-          };
-          docs.push(base);
-        });
-      });
-
-      if (!docs.length) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data yang bisa disimpan.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-
-      ipcRenderer.send("insert-h2h-result", docs);
-      ipcRenderer.once("insert-h2h-result-reply", (_e, res) => {
-        if (res && res.ok) {
-          ipcRenderer.send("get-alert-saved", {
-            type: "question",
-            detail: "Semua hasil per-babak berhasil disimpan.",
-            message: "Successfully",
-          });
-        } else {
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            detail: (res && res.error) || "Save failed",
-            message: "Failed",
-          });
-        }
-      });
-    },
 
     goTo() {
       localStorage.removeItem("raceStartPayload");

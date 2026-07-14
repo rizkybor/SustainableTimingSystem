@@ -442,24 +442,30 @@ import { Icon } from "@iconify/vue2";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
+import { createBucketCache } from "@/utils/localBucketCache";
+
+const rxBucketCache = createBucketCache("rxLocal");
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
-const PREFERRED_PATH = "/dev/tty.usbserial-120";
 
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
   components: { Icon, EmptyCard, OperationTimePanel, CountryFlag },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       isLoading: false,
       defaultImg,
       dataEvent: {},
       titleCategories: "",
+      selfSocketId: null,
+      initSocket: null,
 
       rxBucketOptions: [],
       rxBucketMap: Object.create(null),
@@ -474,19 +480,6 @@ export default {
       },
       dataPenalties: [],
       dataScore: [],
-
-      // ===== Serial timing device =====
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
-      currentPort: "",
 
       rounds: [],
       currentRoundIndex: -1,
@@ -625,6 +618,64 @@ export default {
       await this.fetchRxBucketTeamsByKey(this.selectedRxKey);
       await this.loadBracket();
     }
+
+    // ====== SOCKET INIT & LISTENERS (Judges Dashboard realtime) ======
+    try {
+      const socket = getSocket();
+      this.initSocket = socket;
+
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
+
+      const onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
+
+      const onMessage = async (raw) => {
+        const msg = raw || {};
+
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
+
+        if (this.$bvToast && msg.text) {
+          try {
+            new Audio(tone).play();
+          } catch {
+            // abaikan gagal play audio
+          }
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
+        }
+
+        await this.applyPenaltyFromSocketRX(msg);
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
   },
 
   beforeRouteLeave(to, from, next) {
@@ -736,6 +787,9 @@ export default {
       this.rxBucketMap = map;
     },
     async onSelectRxBucket(key) {
+      if (this.selectedRxKey) {
+        rxBucketCache.save(this.selectedRxKey, this.rounds);
+      }
       await this.fetchRxBucketTeamsByKey(key);
       await this.loadBracket();
     },
@@ -871,6 +925,59 @@ export default {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
       return m ? m.score : 0;
     },
+    /* =========================================================
+     * SOCKET / IPC (Judges Dashboard realtime)
+     * =======================================================*/
+    async applyPenaltyFromSocketRX(msg = {}) {
+      // resolve tim: teamId/bib/nama -> (heat, slotIdx) via roundParticipants
+      // (pola sama seperti updateTime, ~890-897)
+      const nameLC = String(msg.name || msg.nameTeam || "").toLowerCase();
+      const bib = String(msg.bibTeam || msg.bib || "");
+      const teamId = msg.teamId != null ? String(msg.teamId) : "";
+
+      const visItem = this.roundParticipants.find((t) => {
+        if (teamId && String(t.id || "") === teamId) return true;
+        const tNameLC = String(t.name || "").toLowerCase();
+        const nameMatch = nameLC && tNameLC === nameLC;
+        const bibMatch = bib && String(t.bibTeam || "") === bib;
+        if (nameLC) return nameMatch && (!bib ? true : bibMatch);
+        return false;
+      });
+      if (!visItem) return;
+
+      const heat = this.currentRound.heats.find(
+        (h) => h.id === visItem._heatId
+      );
+      if (!heat) return;
+      const res = heat.results[visItem._slotIdx];
+      if (!res) return;
+
+      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      const kind = String(msg.type || "");
+
+      if (kind === "RaceTime") {
+        res.raceTime = String(msg.value || "");
+      } else if (kind === "PenaltyGate1" || String(msg.gate || "") === "1" || msg.gate === "gate1") {
+        const v = Number(msg.value);
+        if (!allowed.includes(v)) return;
+        res.penalties.gate1 = v;
+      } else if (kind === "PenaltyGate2" || String(msg.gate || "") === "2" || msg.gate === "gate2") {
+        const v = Number(msg.value);
+        if (!allowed.includes(v)) return;
+        res.penalties.gate2 = v;
+      } else {
+        return;
+      }
+
+      this.recalcTeamResult(heat, visItem._slotIdx);
+      // per keputusan: update dari socket langsung auto-rank heat-nya
+      this.rankHeat(heat);
+
+      if (this.selectedRxKey) {
+        rxBucketCache.save(this.selectedRxKey, this.rounds);
+      }
+    },
+
     recalcTeamResult(heat, idx) {
       const res = heat.results[idx];
       if (!res) return;
@@ -904,86 +1011,10 @@ export default {
           this.recalcTeamResult(heat, visItem._slotIdx);
         }
       }
-    },
 
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          if (this.$bvToast) {
-            this.$bvToast.toast(`Preferred port not found: ${PREFERRED_PATH}`, {
-              title: "Device",
-              variant: "warning",
-              solid: true,
-            });
-          }
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) => {
-            if (this.$bvToast) {
-              this.$bvToast.toast(detail, {
-                title: message || "Device",
-                variant: type,
-                solid: true,
-              });
-            }
-          },
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port;
-        } else {
-          this.isPortConnected = false;
-          if (this.$bvToast) {
-            this.$bvToast.toast("No valid serial port found / failed to open.", {
-              title: "Device",
-              variant: "danger",
-              solid: true,
-            });
-          }
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
+      if (this.selectedRxKey) {
+        rxBucketCache.save(this.selectedRxKey, this.rounds);
       }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = "";
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
     },
 
     /* ============ BRACKET BUILD ============ */
@@ -1481,13 +1512,12 @@ export default {
       }
       await new Promise((resolve) => {
         ipcRenderer.once("rx:bracket:get-reply", (_e, res) => {
-          if (res && res.ok && res.item && Array.isArray(res.item.rounds) && res.item.rounds.length) {
-            this.rounds = res.item.rounds;
-            this.currentRoundIndex = 0;
-          } else {
-            this.rounds = [];
-            this.currentRoundIndex = -1;
-          }
+          const fresh =
+            res && res.ok && res.item && Array.isArray(res.item.rounds) && res.item.rounds.length
+              ? res.item.rounds
+              : [];
+          this.rounds = rxBucketCache.merge(fresh, rxBucketCache.load(this.selectedRxKey));
+          this.currentRoundIndex = this.rounds.length ? 0 : -1;
           resolve();
         });
         ipcRenderer.send("rx:bracket:get", bucket);

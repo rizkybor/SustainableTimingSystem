@@ -525,6 +525,10 @@ export default {
     value: function (v) {
       this.localShow = v;
       if (v) {
+        // setiap kali modal dibuka ulang, mulai dari kondisi bersih supaya
+        // prefill dari backend (race-settings & assignments) tidak pernah
+        // terus-menerus terblokir oleh edit lokal dari sesi sebelumnya
+        this.hasLocalEdits = false;
         this.loading = true;
         this.fetchSettingsIPC();
         this.fetchUsers();
@@ -1347,6 +1351,10 @@ export default {
             this.draft.h2h.juryStart = incoming.h2h.juryStart || "";
           if (!this.isFilled(this.draft.h2h.juryFinish))
             this.draft.h2h.juryFinish = incoming.h2h.juryFinish || "";
+          // sinkronkan flag bouyan mana yang aktif dari Race Settings
+          // event ini (bukan dari default statis di parent), supaya
+          // dropdown Bouyan yang tampil selalu sesuai konfigurasi terkini
+          if (incoming.h2hFlags) this.draft.h2hFlags = incoming.h2hFlags;
           if (!this.draft.h2hValues) this.draft.h2hValues = {};
           var keys = ["R1", "R2", "L1", "L2"];
           for (var i = 0; i < keys.length; i++) {
@@ -1410,6 +1418,8 @@ export default {
 
           // RX
           if (!this.draft.rx) this.draft.rx = { juryStart: "", juryFinish: "" };
+          // sinkronkan flag gate mana yang aktif dari Race Settings event ini
+          if (incoming.rxFlags) this.draft.rxFlags = incoming.rxFlags;
           if (!this.isFilled(this.draft.rx.juryStart))
             this.draft.rx.juryStart = incoming.rx.juryStart || "";
           if (!this.isFilled(this.draft.rx.juryFinish))

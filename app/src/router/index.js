@@ -10,6 +10,7 @@ import DownRiverRace from "../views/DetailEvent/RaceCategory/DownRiverRace.vue";
 import HeadToHead from "../views/DetailEvent/RaceCategory/HeadToHead.vue";
 import RaftingCross from "../views/DetailEvent/RaceCategory/RaftingCross.vue";
 import CreateTeam from "@/views/CreateTeam/index.vue";
+import TeamDetail from "@/views/TeamDetail/index.vue";
 import SprintResult from "@/views/Result/SprintResult.vue";
 import HeadToHeadResult from "@/views/Result/HeadToHeadResult.vue";
 import SlalomResult from "@/views/Result/SlalomResult.vue";
@@ -35,6 +36,7 @@ const routes = [
   { path: "/events", name: "events", component: AllEvent },
   { path: "/create-new", name: "create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
+  { path: "/team", name: "team-detail", component: TeamDetail },
 
   {
     path: "/event-detail/:id",

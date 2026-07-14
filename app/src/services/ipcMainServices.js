@@ -74,6 +74,7 @@ const {
   getTeamsRegistered,
   deleteTeamInBucket,
   upsertTeamsRegistered,
+  findRegisteredEntriesByTeamName,
 } = require("../controllers/INSERT/insertTeamsRegistered.js");
 
 const {
@@ -670,6 +671,20 @@ function setupIPCMainHandlers() {
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
+      });
+    }
+  });
+
+  // Cari semua event/race dimana sebuah tim (by nameTeam) terdaftar
+  ipcMain.on("teams-registered:find-by-name", async (event, nameTeam) => {
+    try {
+      const items = await findRegisteredEntriesByTeamName(nameTeam);
+      event.reply("teams-registered:find-by-name-reply", { ok: true, items });
+    } catch (error) {
+      event.reply("teams-registered:find-by-name-reply", {
+        ok: false,
+        items: [],
+        error: String((error && error.message) || error),
       });
     }
   });

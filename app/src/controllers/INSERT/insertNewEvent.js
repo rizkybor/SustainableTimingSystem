@@ -188,6 +188,14 @@ async function updateBasic(payload) {
     updatedAt: new Date(),
   };
 
+  // Comitte (nama, bukan flag tampil/tidaknya di hasil cetak)
+  if (payload && payload.technicalDelegate != null)
+    set.technicalDelegate = String(payload.technicalDelegate);
+  if (payload && payload.chiefJudge != null)
+    set.chiefJudge = String(payload.chiefJudge);
+  if (payload && payload.raceDirector != null)
+    set.raceDirector = String(payload.raceDirector);
+
   if (payload && payload.levelName != null)
     set.levelName = String(payload.levelName);
   if (payload && payload.riverName != null)
@@ -240,13 +248,26 @@ async function updateAssets(payload) {
   const sp =
     payload && Array.isArray(payload.sponsorFiles) ? payload.sponsorFiles : [];
 
-  const update = {
-    $set: {
-      eventFiles: ev,
-      sponsorFiles: sp,
-      updatedAt: new Date(),
-    },
+  const set = {
+    eventFiles: ev,
+    sponsorFiles: sp,
+    updatedAt: new Date(),
   };
+
+  // Signature Comitte (opsional, PNG tunggal per role). Kalau field-nya
+  // dikirim eksplisit (termasuk null utk hapus), baru di-set; kalau tidak
+  // dikirim sama sekali, nilai lama di DB dibiarkan apa adanya.
+  if (payload && Object.prototype.hasOwnProperty.call(payload, "technicalDelegateSignature")) {
+    set.technicalDelegateSignature = payload.technicalDelegateSignature || null;
+  }
+  if (payload && Object.prototype.hasOwnProperty.call(payload, "chiefJudgeSignature")) {
+    set.chiefJudgeSignature = payload.chiefJudgeSignature || null;
+  }
+  if (payload && Object.prototype.hasOwnProperty.call(payload, "raceDirectorSignature")) {
+    set.raceDirectorSignature = payload.raceDirectorSignature || null;
+  }
+
+  const update = { $set: set };
 
   var db = await getDb();
   const coll = db.collection("eventsCollection");

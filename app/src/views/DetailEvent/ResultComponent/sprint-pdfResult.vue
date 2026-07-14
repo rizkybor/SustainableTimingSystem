@@ -149,19 +149,37 @@
   <div class="sign-left">
     <div class="sig-card" v-if="data.signature && data.signature.technicalDelegate">
       <div class="sign-title">Technical Delegate</div>
-      <div class="sign-line"></div>
+      <img
+        v-if="data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
+        :src="data.technicalDelegateSignature.secure_url"
+        class="sign-img"
+        alt="Technical Delegate signature"
+      />
+      <div v-else class="sign-line"></div>
       <div class="sign-name">{{ data.technicalDelegate || "—" }}</div>
     </div>
 
     <div class="sig-card" v-if="data.signature && data.signature.chiefJudge">
       <div class="sign-title">Chief Judge</div>
-      <div class="sign-line"></div>
+      <img
+        v-if="data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
+        :src="data.chiefJudgeSignature.secure_url"
+        class="sign-img"
+        alt="Chief Judge signature"
+      />
+      <div v-else class="sign-line"></div>
       <div class="sign-name">{{ data.chiefJudge || "—" }}</div>
     </div>
 
     <div class="sig-card" v-if="data.signature && data.signature.raceDirector">
       <div class="sign-title">Race Director</div>
-      <div class="sign-line"></div>
+      <img
+        v-if="data.raceDirectorSignature && data.raceDirectorSignature.secure_url"
+        :src="data.raceDirectorSignature.secure_url"
+        class="sign-img"
+        alt="Race Director signature"
+      />
+      <div v-else class="sign-line"></div>
       <div class="sign-name">{{ data.raceDirector || "—" }}</div>
     </div>
   </div>
@@ -355,6 +373,12 @@ export default {
   width: 100%;
   margin: 14mm 0 2mm;
   border-radius: 2px;
+}
+.sign-img {
+  height: 14mm;
+  max-width: 60%;
+  object-fit: contain;
+  margin: 2mm 0 2mm;
 }
 .sign-name {
   font-weight: 700;

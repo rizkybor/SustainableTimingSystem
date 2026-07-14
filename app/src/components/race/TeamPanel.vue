@@ -113,7 +113,15 @@
             <td class="text-right">
               <button
                 type="button"
-                class="btn-ghost danger"
+                class="btn-ghost"
+                @click="$emit('view-details', r)"
+                title="View Details"
+              >
+                <Icon icon="mdi:eye-outline" width="18" height="18" />
+              </button>
+              <button
+                type="button"
+                class="btn-ghost danger ml-2"
                 @click="onDelete(r)"
                 title="Delete"
               >

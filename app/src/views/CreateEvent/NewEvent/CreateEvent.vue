@@ -416,6 +416,40 @@
                         class="br-15"
                       />
                     </b-form-group>
+
+                    <div class="sig-upload">
+                      <div class="sig-upload-label">Signature (optional, PNG)</div>
+                      <div class="sig-upload-row">
+                        <img
+                          v-if="technicalDelegateSignaturePreview"
+                          :src="technicalDelegateSignaturePreview"
+                          class="sig-thumb"
+                          alt="Technical Delegate signature"
+                        />
+                        <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                        <div class="sig-upload-actions">
+                          <input
+                            ref="tdSignatureInput"
+                            type="file"
+                            accept="image/png"
+                            class="d-none"
+                            @change="onTechnicalDelegateSignatureChange"
+                          />
+                          <b-button size="sm" variant="outline-primary" @click="$refs.tdSignatureInput.click()">
+                            Choose PNG
+                          </b-button>
+                          <b-button
+                            v-if="technicalDelegateSignaturePreview"
+                            size="sm"
+                            variant="outline-danger"
+                            @click="removeTechnicalDelegateSignatureFile"
+                          >
+                            Remove
+                          </b-button>
+                        </div>
+                      </div>
+                    </div>
                   </b-col>
                   <b-col>
                     <b-form-group label="Race Director">
@@ -426,6 +460,40 @@
                         class="br-15"
                       />
                     </b-form-group>
+
+                    <div class="sig-upload">
+                      <div class="sig-upload-label">Signature (optional, PNG)</div>
+                      <div class="sig-upload-row">
+                        <img
+                          v-if="raceDirectorSignaturePreview"
+                          :src="raceDirectorSignaturePreview"
+                          class="sig-thumb"
+                          alt="Race Director signature"
+                        />
+                        <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                        <div class="sig-upload-actions">
+                          <input
+                            ref="rdSignatureInput"
+                            type="file"
+                            accept="image/png"
+                            class="d-none"
+                            @change="onRaceDirectorSignatureChange"
+                          />
+                          <b-button size="sm" variant="outline-primary" @click="$refs.rdSignatureInput.click()">
+                            Choose PNG
+                          </b-button>
+                          <b-button
+                            v-if="raceDirectorSignaturePreview"
+                            size="sm"
+                            variant="outline-danger"
+                            @click="removeRaceDirectorSignatureFile"
+                          >
+                            Remove
+                          </b-button>
+                        </div>
+                      </div>
+                    </div>
                   </b-col>
                 </b-row>
 
@@ -439,6 +507,40 @@
                         class="br-15"
                       />
                     </b-form-group>
+
+                    <div class="sig-upload">
+                      <div class="sig-upload-label">Signature (optional, PNG)</div>
+                      <div class="sig-upload-row">
+                        <img
+                          v-if="chiefJudgeSignaturePreview"
+                          :src="chiefJudgeSignaturePreview"
+                          class="sig-thumb"
+                          alt="Chief Judge signature"
+                        />
+                        <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
+
+                        <div class="sig-upload-actions">
+                          <input
+                            ref="cjSignatureInput"
+                            type="file"
+                            accept="image/png"
+                            class="d-none"
+                            @change="onChiefJudgeSignatureChange"
+                          />
+                          <b-button size="sm" variant="outline-primary" @click="$refs.cjSignatureInput.click()">
+                            Choose PNG
+                          </b-button>
+                          <b-button
+                            v-if="chiefJudgeSignaturePreview"
+                            size="sm"
+                            variant="outline-danger"
+                            @click="removeChiefJudgeSignatureFile"
+                          >
+                            Remove
+                          </b-button>
+                        </div>
+                      </div>
+                    </div>
                   </b-col>
                   <b-col> </b-col>
                 </b-row>
@@ -470,6 +572,9 @@
 import Multiselect from "vue-multiselect";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import { uploadOne } from "@/utils/cloudinaryUpload";
+
+var FOLDER_COMMITTEE_SIGNATURE = "sustainable-js/committee-signature";
 
 export default {
   name: "SustainableTimingSystemCreateEvent",
@@ -483,6 +588,14 @@ export default {
       posterTempPath: null,
       text: "",
       name: "",
+
+      // Comitte signature (opsional, PNG) — file lokal, diupload setelah event tersimpan
+      technicalDelegateSignatureFile: null,
+      chiefJudgeSignatureFile: null,
+      raceDirectorSignatureFile: null,
+      technicalDelegateSignaturePreview: "",
+      chiefJudgeSignaturePreview: "",
+      raceDirectorSignaturePreview: "",
       formEvent: {
         levelName: null,
         eventName: "",
@@ -519,6 +632,21 @@ export default {
   async mounted() {
     await this.loadOptions();
     await this.checkValueStorage();
+  },
+
+  watch: {
+    "formEvent.startDateEvent": function (newStart) {
+      // kalau start date digeser jadi setelah end date yang sudah dipilih,
+      // end date lama jadi tidak valid (range terbalik) — kosongkan supaya
+      // user memilih ulang, daripada diam-diam tersimpan dengan range salah
+      if (
+        newStart &&
+        this.formEvent.endDateEvent &&
+        this.formEvent.endDateEvent < newStart
+      ) {
+        this.formEvent.endDateEvent = "";
+      }
+    },
   },
 
   computed: {
@@ -585,7 +713,13 @@ export default {
     },
     async checkValueStorage() {
       const dataStorage = localStorage.getItem("formNewEvent");
-      const datas = dataStorage ? JSON.parse(dataStorage) : null;
+      let datas = null;
+      try {
+        datas = dataStorage ? JSON.parse(dataStorage) : null;
+      } catch (_e) {
+        // draft rusak/tidak valid → abaikan, jangan sampai mounted() gagal total
+        localStorage.removeItem("formNewEvent");
+      }
       if (datas) {
         this.formEvent = datas;
         if (datas.poster && datas.poster.secure_url) {
@@ -604,31 +738,31 @@ export default {
 
     async setOptionLevel() {
       ipcRenderer.send("option-level");
-      ipcRenderer.on("option-level-reply", (_e, data) => {
+      ipcRenderer.once("option-level-reply", (_e, data) => {
         this.optionLevels = data || [];
       });
     },
     async setOptionCategoriesEvent() {
       ipcRenderer.send("option-categories-event");
-      ipcRenderer.on("option-categories-event-reply", (_e, data) => {
+      ipcRenderer.once("option-categories-event-reply", (_e, data) => {
         this.optionCategories = data || [];
       });
     },
     async setOptionCategoriesDivision() {
       ipcRenderer.send("option-categories-division");
-      ipcRenderer.on("option-categories-division-reply", (_e, data) => {
+      ipcRenderer.once("option-categories-division-reply", (_e, data) => {
         this.optionDivisions = data || [];
       });
     },
     async setOptionCategoriesInitial() {
       ipcRenderer.send("option-categories-initial");
-      ipcRenderer.on("option-categories-initial-reply", (_e, data) => {
+      ipcRenderer.once("option-categories-initial-reply", (_e, data) => {
         this.optionInitials = data || [];
       });
     },
     async setOptionCategoriesRace() {
       ipcRenderer.send("option-categories-race");
-      ipcRenderer.on("option-categories-race-reply", (_e, data) => {
+      ipcRenderer.once("option-categories-race-reply", (_e, data) => {
         this.optionRaces = data || [];
       });
     },
@@ -664,6 +798,109 @@ export default {
         return false;
       }
       return true;
+    },
+
+    /* ---------------- Comitte signature (opsional, PNG) ---------------- */
+    _pickPngFile: function (e) {
+      var file = e && e.target && e.target.files ? e.target.files[0] : null;
+      if (e && e.target) e.target.value = "";
+      if (!file) return null;
+
+      var isPng = /image\/png/i.test(file.type || "") || /\.png$/i.test(file.name || "");
+      if (!isPng) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Format tidak didukung",
+          detail: "Signature harus berformat PNG",
+        });
+        return null;
+      }
+
+      var sizeOk = file.size <= 10 * 1024 * 1024;
+      if (!sizeOk) {
+        ipcRenderer.send("get-alert", {
+          type: "warning",
+          message: "Ukuran terlalu besar",
+          detail: "Ukuran signature maksimum 10MB",
+        });
+        return null;
+      }
+
+      return file;
+    },
+    onTechnicalDelegateSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.technicalDelegateSignaturePreview) URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
+      this.technicalDelegateSignatureFile = file;
+      this.technicalDelegateSignaturePreview = URL.createObjectURL(file);
+    },
+    removeTechnicalDelegateSignatureFile: function () {
+      if (this.technicalDelegateSignaturePreview) URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
+      this.technicalDelegateSignatureFile = null;
+      this.technicalDelegateSignaturePreview = "";
+    },
+    onChiefJudgeSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.chiefJudgeSignaturePreview) URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
+      this.chiefJudgeSignatureFile = file;
+      this.chiefJudgeSignaturePreview = URL.createObjectURL(file);
+    },
+    removeChiefJudgeSignatureFile: function () {
+      if (this.chiefJudgeSignaturePreview) URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
+      this.chiefJudgeSignatureFile = null;
+      this.chiefJudgeSignaturePreview = "";
+    },
+    onRaceDirectorSignatureChange: function (e) {
+      var file = this._pickPngFile(e);
+      if (!file) return;
+      if (this.raceDirectorSignaturePreview) URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+      this.raceDirectorSignatureFile = file;
+      this.raceDirectorSignaturePreview = URL.createObjectURL(file);
+    },
+    removeRaceDirectorSignatureFile: function () {
+      if (this.raceDirectorSignaturePreview) URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+      this.raceDirectorSignatureFile = null;
+      this.raceDirectorSignaturePreview = "";
+    },
+
+    // upload signature (kalau ada yang dipilih) & simpan ke event yang baru dibuat
+    async uploadSignaturesIfAny(insertedId) {
+      var hasAny =
+        this.technicalDelegateSignatureFile ||
+        this.chiefJudgeSignatureFile ||
+        this.raceDirectorSignatureFile;
+      if (!hasAny) return;
+
+      var assetsDoc = { _id: insertedId, eventFiles: [], sponsorFiles: [] };
+
+      if (this.technicalDelegateSignatureFile) {
+        var upTd = await uploadOne(this.technicalDelegateSignatureFile, FOLDER_COMMITTEE_SIGNATURE);
+        if (upTd && upTd.ok) assetsDoc.technicalDelegateSignature = upTd.result;
+      }
+      if (this.chiefJudgeSignatureFile) {
+        var upCj = await uploadOne(this.chiefJudgeSignatureFile, FOLDER_COMMITTEE_SIGNATURE);
+        if (upCj && upCj.ok) assetsDoc.chiefJudgeSignature = upCj.result;
+      }
+      if (this.raceDirectorSignatureFile) {
+        var upRd = await uploadOne(this.raceDirectorSignatureFile, FOLDER_COMMITTEE_SIGNATURE);
+        if (upRd && upRd.ok) assetsDoc.raceDirectorSignature = upRd.result;
+      }
+
+      ipcRenderer.send("services:update:event-assets", assetsDoc);
+      await new Promise(function (resolve) {
+        ipcRenderer.once("services:update:event-assets:reply", function (_e, resp) {
+          if (!resp || resp.ok !== true) {
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              message: "Saved without some signatures",
+              detail: "Event tersimpan, tapi update signature komite gagal.",
+            });
+          }
+          resolve();
+        });
+      });
     },
 
     async clearPoster() {
@@ -832,45 +1069,36 @@ export default {
             sponsorFiles: [],
           };
           ipcRenderer.send("update-event-poster", updatePayload);
-          ipcRenderer.once(
-            "update-event-poster-reply",
-            function (_e2, resp) {
-              var ok = false;
-              if (resp !== null && resp !== undefined) {
-                if (resp.ok === true) ok = true;
-              }
-              if (!ok) {
-                var detail = "Unknown error";
-                if (resp !== null && resp !== undefined) {
-                  if (typeof resp.error === "string") detail = resp.error;
-                }
-                ipcRenderer.send("get-alert", {
-                  type: "error",
-                  message: "Update poster gagal",
-                  detail: detail,
-                });
-                return;
-              }
+          const resp = await new Promise(function (resolve) {
+            ipcRenderer.once("update-event-poster-reply", function (_e2, r) {
+              resolve(r);
+            });
+          });
 
-              var matched = 0;
-              if (resp !== null && resp !== undefined) {
-                if (typeof resp.matchedCount === "number")
-                  matched = resp.matchedCount;
-              }
-              if (matched === 0) {
-                ipcRenderer.send("get-alert", {
-                  type: "error",
-                  message: "Update poster gagal",
-                  detail: "Document tidak ditemukan (matchedCount=0)",
-                });
-                return;
-              }
-
-              // sukses
-              this.finishSave();
-            }.bind(this)
-          );
-          return;
+          var ok = resp !== null && resp !== undefined && resp.ok === true;
+          if (!ok) {
+            var detail =
+              resp !== null && resp !== undefined && typeof resp.error === "string"
+                ? resp.error
+                : "Unknown error";
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Update poster gagal",
+              detail: detail,
+            });
+          } else {
+            var matched =
+              resp !== null && resp !== undefined && typeof resp.matchedCount === "number"
+                ? resp.matchedCount
+                : 0;
+            if (matched === 0) {
+              ipcRenderer.send("get-alert", {
+                type: "error",
+                message: "Update poster gagal",
+                detail: "Document tidak ditemukan (matchedCount=0)",
+              });
+            }
+          }
         } else {
           // Upload gagal tapi event sudah tersimpan
           ipcRenderer.send("get-alert", {
@@ -878,12 +1106,12 @@ export default {
             message: "Saved without poster",
             detail: "Event tersimpan. Upload poster gagal.",
           });
-          this.finishSave();
-          return;
         }
       }
 
-      // Tidak ada poster lokal → selesai
+      // 4) Upload signature Comitte kalau ada yang dipilih (opsional)
+      await this.uploadSignaturesIfAny(insertedId);
+
       this.finishSave();
     },
 
@@ -930,4 +1158,28 @@ hr {
   width: 100%;
   margin-bottom: 30px;
 }
+
+/* Comitte signature upload */
+.sig-upload { margin: -8px 0 16px; }
+.sig-upload-label { font-size: 12px; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+.sig-upload-row { display: flex; align-items: center; gap: 12px; }
+.sig-thumb {
+  width: 90px;
+  height: 50px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #e6ebf4;
+  border-radius: 8px;
+  padding: 4px;
+}
+.sig-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 11px;
+  background: #fafafa;
+  border: 1px dashed #cbd5e1;
+}
+.sig-upload-actions { display: flex; align-items: center; gap: 8px; }
 </style>

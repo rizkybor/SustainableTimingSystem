@@ -189,7 +189,13 @@
       <footer class="sign">
         <div class="sign-col">
           <div class="sign-title">Chief Judge</div>
-          <div class="sign-line"></div>
+          <img
+            v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
+            :src="eventData.chiefJudgeSignature.secure_url"
+            class="sign-img"
+            alt="Chief Judge signature"
+          />
+          <div v-else class="sign-line"></div>
           <div class="sign-name">
             {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
           </div>
@@ -375,7 +381,13 @@
         <footer class="sign">
           <div class="sign-col">
             <div class="sign-title">Chief Judge</div>
-            <div class="sign-line"></div>
+            <img
+              v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
+              :src="eventData.chiefJudgeSignature.secure_url"
+              class="sign-img"
+              alt="Chief Judge signature"
+            />
+            <div v-else class="sign-line"></div>
             <div class="sign-name">
               {{
                 eventData && eventData.chiefJudge ? eventData.chiefJudge : "—"
@@ -617,6 +629,13 @@ export default {
   width: 75%;
   margin: 20px auto 6px;
   border-radius: 2px;
+}
+.sign-img {
+  height: 50px;
+  max-width: 75%;
+  object-fit: contain;
+  margin: 10px auto 6px;
+  display: block;
 }
 .sign-name {
   font-weight: 800;

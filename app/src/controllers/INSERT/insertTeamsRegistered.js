@@ -103,8 +103,42 @@ async function deleteTeamInBucket({ identity, team }) {
   return { ok: result.modifiedCount > 0 };
 }
 
+// --- FIND all bucket entries (across every event/race) for a given team name ---
+async function findRegisteredEntriesByTeamName(nameTeam) {
+  const nm = String(nameTeam || "").trim().toUpperCase();
+  if (!nm) return [];
+
+  const db = await getDb();
+  const coll = db.collection("teamsRegisteredCollection");
+
+  const docs = await coll.find({ "teams.nameTeam": nm }).toArray();
+
+  const out = [];
+  docs.forEach((doc) => {
+    const matched = Array.isArray(doc.teams)
+      ? doc.teams.filter((t) => String(t && t.nameTeam || "").toUpperCase() === nm)
+      : [];
+    matched.forEach((t) => {
+      out.push({
+        eventId: String(doc.eventId || ""),
+        // NB: field ini bernama "eventName" di teamsRegisteredCollection,
+        // tapi isinya sebenarnya RACE CATEGORY/discipline (SPRINT/HEAD2HEAD/
+        // SLALOM/DRR/RX) — bukan judul event. Judul event asli ada di
+        // eventsCollection, di-lookup terpisah lewat eventId.
+        raceCategory: String(doc.eventName || ""),
+        initialName: String(doc.initialName || ""),
+        raceName: String(doc.raceName || ""),
+        divisionName: String(doc.divisionName || ""),
+        bibTeam: String((t && t.bibTeam) || ""),
+      });
+    });
+  });
+  return out;
+}
+
 module.exports = {
   getTeamsRegistered,
   upsertTeamsRegistered,
   deleteTeamInBucket,
+  findRegisteredEntriesByTeamName,
 };

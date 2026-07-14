@@ -223,6 +223,15 @@ export default {
         }
       },
     },
+    "draft.rx.teamsPerHeat"(v) {
+      // qualifiers per heat harus selalu < teams per heat; clamp langsung
+      // (bukan cuma pas confirm()) supaya tampilan spinbutton tidak pernah
+      // menunjukkan nilai yang sudah melebihi batas max-nya sendiri.
+      const max = Number(v) - 1;
+      if (this.draft.rx.qualifiersPerHeat > max) {
+        this.draft.rx.qualifiersPerHeat = Math.max(1, max);
+      }
+    },
   },
   mounted() {
     if (this.eventId) this.fetchSettingsIPC();

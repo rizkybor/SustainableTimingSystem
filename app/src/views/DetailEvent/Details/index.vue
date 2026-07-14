@@ -161,6 +161,7 @@
         @delete-row="deleteRow('R4', 'MEN', $event)"
         @start-race="handleStartRace"
         @show-result="showResult('R4', 'MEN')"
+        @view-details="openTeamDetails('R4', 'MEN', $event)"
       />
 
       <team-panel
@@ -182,6 +183,7 @@
         @delete-row="deleteRow('R4', 'WOMEN', $event)"
         @start-race="handleStartRace"
         @show-result="showResult('R4', 'WOMEN')"
+        @view-details="openTeamDetails('R4', 'WOMEN', $event)"
       />
 
       <team-panel
@@ -203,6 +205,7 @@
         @delete-row="deleteRow('R6', 'MEN', $event)"
         @start-race="handleStartRace"
         @show-result="showResult('R6', 'MEN')"
+        @view-details="openTeamDetails('R6', 'MEN', $event)"
       />
 
       <team-panel
@@ -224,6 +227,7 @@
         @delete-row="deleteRow('R6', 'WOMEN', $event)"
         @start-race="handleStartRace"
         @show-result="showResult('R6', 'WOMEN')"
+        @view-details="openTeamDetails('R6', 'WOMEN', $event)"
       />
 
       <div v-if="!anyPanelShown" class="text-center text-muted py-5">
@@ -268,6 +272,16 @@
       :event-name="safeEventName"
       @update-settings="handleUpdateSettings"
     />
+
+    <team-details-modal
+      v-model="showTeamDetails"
+      :team="selectedTeamForDetails"
+      :race-name="raceActive.selected.name"
+      :division-name="selectedTeamDivision"
+      :race-category-name="selectedTeamRace"
+      :initial-name="initialActive.selected.name"
+      :teams-available="availableTeams"
+    />
   </div>
 </template>
 
@@ -285,108 +299,11 @@ const LEVEL_SCOPE_MAP = {
 };
 
 // ===== Cloudinary config (ISI sesuai punyamu) =====
-var CLOUD_NAME = "kikiaka";
-var UPLOAD_PRESET = "stiming-preset"; 
 var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
 var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
+var FOLDER_COMMITTEE_SIGNATURE = "sustainable-js/committee-signature";
 
-function _toCloudMeta(json) {
-  return {
-    public_id: json && json.public_id ? String(json.public_id) : "",
-    secure_url:
-      json && (json.secure_url || json.url)
-        ? String(json.secure_url || json.url)
-        : "",
-    url:
-      json && (json.secure_url || json.url)
-        ? String(json.secure_url || json.url)
-        : "",
-    width: typeof (json && json.width) === "number" ? json.width : null,
-    height: typeof (json && json.height) === "number" ? json.height : null,
-    format: json && json.format ? String(json.format) : "",
-    bytes: typeof (json && json.bytes) === "number" ? json.bytes : 0,
-    resource_type:
-      json && json.resource_type ? String(json.resource_type) : "image",
-    original_filename:
-      json && json.original_filename ? String(json.original_filename) : "",
-  };
-}
-
-async function _uploadOne(fileObj, folder) {
-  if (!fileObj) return { ok: false, error: "no-file" };
-
-  // A) lewat bridge Electron kalau ada
-  if (window.cloud && typeof window.cloud.uploadFile === "function") {
-    try {
-      var up = await window.cloud.uploadFile(fileObj, { folder: folder });
-      if (up && up.ok === true && up.result) {
-        return { ok: true, result: _toCloudMeta(up.result) };
-      }
-      return {
-        ok: false,
-        error: up && up.error ? String(up.error) : "upload-failed",
-      };
-    } catch (e) {
-      return { ok: false, error: e && e.message ? e.message : String(e) };
-    }
-  }
-
-  // B) fallback unsigned upload
-  try {
-    var fd = new FormData();
-    fd.append("file", fileObj);
-    fd.append("upload_preset", UPLOAD_PRESET);
-    if (folder) fd.append("folder", folder);
-
-    var url = "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/image/upload";
-    var res = await fetch(url, { method: "POST", body: fd });
-    var json = null;
-    try {
-      json = await res.json();
-    } catch (_e) {
-      json = null;
-    }
-
-    if (!res.ok || !json || !(json.secure_url || json.url)) {
-      var det =
-        json && json.error && json.error.message
-          ? json.error.message
-          : "upload-failed";
-      return { ok: false, error: det, raw: json };
-    }
-    return { ok: true, result: _toCloudMeta(json) };
-  } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
-  }
-}
-
-async function _uploadMany(list, folder) {
-  var out = [];
-  if (!list || typeof list.length !== "number") return out;
-
-  for (var i = 0; i < list.length; i++) {
-    var f = list[i];
-
-    // kalau yang datang path string (drag&drop), minta bridge bikin File-like
-    if (
-      typeof f === "string" &&
-      window.cloud &&
-      typeof window.cloud.pathToFile === "function"
-    ) {
-      try {
-        var created = await window.cloud.pathToFile(f);
-        if (created) f = created;
-      } catch (_e) {
-        logger.warn("pathToFile gagal, pakai nilai asli:", _e);
-      }
-    }
-
-    var up = await _uploadOne(f, folder);
-    if (up && up.ok && up.result) out.push(up.result);
-  }
-  return out;
-}
-
+import { uploadOne as _uploadOne, uploadMany as _uploadMany } from "@/utils/cloudinaryUpload";
 import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
@@ -396,6 +313,7 @@ import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import EventSettingsModal from "@/components/race/EventSettings.vue";
+import TeamDetailsModal from "@/components/race/TeamDetailsModal.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
@@ -407,6 +325,7 @@ export default {
     RaceSettingsModal,
     JudgeSettingsModal,
     EventSettingsModal,
+    TeamDetailsModal,
   },
   data() {
     return {
@@ -429,6 +348,10 @@ export default {
       },
       showRaceSettings: false,
       showEventSettings: false,
+      showTeamDetails: false,
+      selectedTeamForDetails: null,
+      selectedTeamDivision: "",
+      selectedTeamRace: "",
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -690,6 +613,14 @@ export default {
           payload && Array.isArray(payload.categoriesInitial)
             ? payload.categoriesInitial
             : [],
+        technicalDelegate:
+          payload && payload.technicalDelegate
+            ? String(payload.technicalDelegate)
+            : "",
+        chiefJudge:
+          payload && payload.chiefJudge ? String(payload.chiefJudge) : "",
+        raceDirector:
+          payload && payload.raceDirector ? String(payload.raceDirector) : "",
       };
 
       // preview sederhana ke console
@@ -740,6 +671,9 @@ export default {
           categoriesDivision: safePayload.categoriesDivision,
           categoriesRace: safePayload.categoriesRace,
           categoriesInitial: safePayload.categoriesInitial,
+          technicalDelegate: safePayload.technicalDelegate,
+          chiefJudge: safePayload.chiefJudge,
+          raceDirector: safePayload.raceDirector,
         };
         ipcRenderer.send("services:update:event-basic", basicDoc);
 
@@ -827,6 +761,27 @@ export default {
           new Set([...keepSponsorUrls, ...newSponsorUrls])
         );
 
+        // ===== 3.5) UPLOAD SIGNATURE COMITTE (opsional, PNG tunggal per role) =====
+        this._setLoading(true, "Mengunggah signature komite…", 80);
+        const newTdSignature = payload.technicalDelegateSignatureFile
+          ? await _uploadOne(
+              payload.technicalDelegateSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+        const newCjSignature = payload.chiefJudgeSignatureFile
+          ? await _uploadOne(
+              payload.chiefJudgeSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+        const newRdSignature = payload.raceDirectorSignatureFile
+          ? await _uploadOne(
+              payload.raceDirectorSignatureFile,
+              FOLDER_COMMITTEE_SIGNATURE
+            )
+          : null;
+
         // ===== 4) UPDATE DB ASSETS (URL saja) =====
         this._setLoading(true, "Memperbarui aset di database…", 85);
         const assetsDoc = {
@@ -834,6 +789,26 @@ export default {
           eventFiles: finalEventUrls,
           sponsorFiles: finalSponsorUrls,
         };
+
+        // signature baru diupload → pakai itu; kalau tidak, dan user minta
+        // hapus signature lama → set null; kalau tidak dua-duanya, jangan
+        // dikirim sama sekali supaya nilai lama di DB tidak tersentuh
+        if (newTdSignature && newTdSignature.ok) {
+          assetsDoc.technicalDelegateSignature = newTdSignature.result;
+        } else if (payload.removeTechnicalDelegateSignature) {
+          assetsDoc.technicalDelegateSignature = null;
+        }
+        if (newCjSignature && newCjSignature.ok) {
+          assetsDoc.chiefJudgeSignature = newCjSignature.result;
+        } else if (payload.removeChiefJudgeSignature) {
+          assetsDoc.chiefJudgeSignature = null;
+        }
+        if (newRdSignature && newRdSignature.ok) {
+          assetsDoc.raceDirectorSignature = newRdSignature.result;
+        } else if (payload.removeRaceDirectorSignature) {
+          assetsDoc.raceDirectorSignature = null;
+        }
+
         ipcRenderer.send("services:update:event-assets", assetsDoc);
 
         var step2 = await new Promise(function (resolve) {
@@ -898,25 +873,11 @@ export default {
     },
 
     onUpdateRaceSettings(payload) {
+      // RaceSettingsModal sudah menyimpan (upsert) sendiri dan baru meng-emit
+      // event ini SETELAH balasan sukses diterima — jadi di sini cukup
+      // sinkronkan state lokal, tidak perlu kirim ulang race-settings:upsert
+      // (kalau dikirim lagi, jadinya double-write ke DB untuk data yang sama).
       if (payload && payload.settings) this.raceSettings = payload.settings;
-
-      if (typeof window !== "undefined" && window.ipcRenderer) {
-        window.ipcRenderer.send("race-settings:upsert", payload);
-
-        // sekali saja, tunggu reply lalu lepas listener
-        const handler = (_event, res) => {
-          if (res && res.ok) {
-            logger.info("✅ Race settings updated in DB:", res);
-          } else {
-            logger.warn("❌ Failed to update race settings:", res && res.error);
-          }
-          window.ipcRenderer.removeListener(
-            "race-settings:upsert-reply",
-            handler
-          );
-        };
-        window.ipcRenderer.on("race-settings:upsert-reply", handler);
-      }
     },
 
     onUpdateJudgeSettings(payload) {
@@ -1117,6 +1078,13 @@ export default {
       });
     },
 
+    openTeamDetails(div, race, row) {
+      this.selectedTeamForDetails = row;
+      this.selectedTeamDivision = div;
+      this.selectedTeamRace = race;
+      this.showTeamDetails = true;
+    },
+
     /* =========================================================
      * BUCKET READ/WRITE (dataTeams) + VISIBILITY
      * =======================================================*/
@@ -1295,6 +1263,8 @@ export default {
                   : String((t && t._id) || ""),
               nameTeam: t && t.nameTeam ? t.nameTeam : "",
               bibTeam: (t && t.bibTeam) || "",
+              typeTeam: (t && t.typeTeam) || "",
+              countryCode: (t && t.countryCode) || "",
             }));
 
             resolve();

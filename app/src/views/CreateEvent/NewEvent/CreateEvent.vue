@@ -1,7 +1,7 @@
 <template>
   <div>
     <b-row>
-      <b-col cols="10" offset="1" class="mb-5">
+      <b-col cols="12" class="mb-5 px-4 px-lg-5">
         <div style="margin-top: 48px">
           <div class="card-wrapper p-3 mb-2">
             <!-- TOP BAR (breadcrumb + datetime) -->
@@ -39,7 +39,7 @@
                   <!-- KIRI: field level, event name, river name -->
                   <b-col md="8">
                     <b-form-group label="Event Level (Tingkat Event)">
-                      <b-input-group size="sm">
+                      <b-input-group>
                         <!-- Dropdown Event Level -->
                         <b-form-select
                           v-model="formEvent.levelName"
@@ -54,7 +54,6 @@
                             v-b-tooltip.hover
                             title="Keterangan level event"
                             variant="outline-info"
-                            size="sm"
                             class="br-15"
                             @click="showListModal = true"
                           >
@@ -129,7 +128,6 @@
                     <!-- EVENT NAME  -->
                     <b-form-group label="Event Name (Nama Event)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.eventName"
                         placeholder="Enter your event name"
                         class="br-15"
@@ -139,7 +137,6 @@
                     <!-- RIVER NAME  -->
                     <b-form-group label="River Name (Nama Sungai)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.riverName"
                         placeholder="Enter river name"
                         class="br-15"
@@ -218,7 +215,6 @@
                 <!-- DISTRICT  -->
                 <b-form-group label="District (Daerah)">
                   <b-form-input
-                    size="sm"
                     v-model="formEvent.addressDistrict"
                     placeholder="Enter District"
                     class="br-15"
@@ -232,7 +228,6 @@
                   <b-col cols="6">
                     <b-form-group label="Sub District (Kecamatan)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressSubDistrict"
                         placeholder="Enter Sub District"
                         class="br-15"
@@ -246,7 +241,6 @@
                   <b-col cols="6">
                     <b-form-group label="Village (Desa)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressVillage"
                         placeholder="Enter Village"
                         class="br-15"
@@ -262,7 +256,6 @@
                   <b-col cols="6">
                     <b-form-group label="City (Kota)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressCity"
                         placeholder="Enter City"
                         class="br-15"
@@ -276,7 +269,6 @@
                   <b-col cols="6">
                     <b-form-group label="Province (Provinsi)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressProvince"
                         placeholder="Enter Province"
                         class="br-15"
@@ -292,7 +284,6 @@
                   <b-col cols="6">
                     <b-form-group label="ZIP Code (Kode Pos)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressZipCode"
                         placeholder="Enter ZIP Code"
                         class="br-15"
@@ -306,7 +297,6 @@
                     <!-- STATE -->
                     <b-form-group label="State (Negara)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.addressState"
                         placeholder="Enter State"
                         class="br-15"
@@ -322,7 +312,6 @@
                     <!-- START DATE -->
                     <b-form-group label="Start Date (Tanggal Mulai)">
                       <b-form-datepicker
-                        size="sm"
                         v-model="formEvent.startDateEvent"
                         placeholder="Select start date"
                         class="mb-2 br-15"
@@ -337,7 +326,6 @@
                     <b-form-group label="End Date (Tanggal Berakhir)">
                       <b-form-datepicker
                         :disabled="formEvent.startDateEvent === ''"
-                        size="sm"
                         v-model="formEvent.endDateEvent"
                         placeholder="Select end date"
                         class="mb-2 br-15"
@@ -410,7 +398,6 @@
                   <b-col cols="6">
                     <b-form-group label="Technical Delegate (Delegasi Teknis)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.technicalDelegate"
                         placeholder="Enter technical delegate name"
                         class="br-15"
@@ -454,7 +441,6 @@
                   <b-col>
                     <b-form-group label="Race Director (Direktur Lomba)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.raceDirector"
                         placeholder="Enter race director name"
                         class="br-15"
@@ -501,7 +487,6 @@
                   <b-col cols="6">
                     <b-form-group label="Chief Judge (Ketua Juri)">
                       <b-form-input
-                        size="sm"
                         v-model="formEvent.chiefJudge"
                         placeholder="Enter chief judge name"
                         class="br-15"

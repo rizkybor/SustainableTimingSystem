@@ -26,6 +26,7 @@ export function createSerialReader(options) {
   var onStart = options.onStart;
   var onFinish = options.onFinish;
   var onNotify = options.onNotify;
+  var onClose = options.onClose;
 
   var port = null;
   var buffer = "";
@@ -79,11 +80,34 @@ export function createSerialReader(options) {
         return { ok: false };
       }
 
-      port = new SerialPort({ path: picked.path, baudRate: baudRate });
+      var opened = await new Promise(function (resolve) {
+        var candidate = new SerialPort({ path: picked.path, baudRate: baudRate }, function (err) {
+          if (err) {
+            resolve({ ok: false, error: err });
+            return;
+          }
+          resolve({ ok: true });
+        });
+        port = candidate;
+      });
+
+      if (!opened.ok) {
+        var openMsg = (opened.error && opened.error.message) ? opened.error.message : String(opened.error);
+        notify("error", openMsg, "Serial setup failed");
+        port = null;
+        return { ok: false, error: opened.error };
+      }
+
       port.on("data", handleData);
       port.on("error", function (err) {
         var msg = (err && err.message) ? err.message : String(err);
         notify("error", msg, "Serial error");
+      });
+      port.on("close", function () {
+        var wasPort = port;
+        port = null;
+        buffer = "";
+        if (typeof onClose === "function") onClose(wasPort);
       });
 
       return { ok: true, portInfo: picked };
@@ -96,6 +120,9 @@ export function createSerialReader(options) {
 
   async function disconnect() {
     if (port && port.isOpen) {
+      // Drop the 'close' listener first so an intentional disconnect doesn't
+      // also trigger onClose's "unexpected disconnection" handling.
+      port.removeAllListeners("close");
       await new Promise(function (resolve) { port.close(resolve); });
     }
     port = null;

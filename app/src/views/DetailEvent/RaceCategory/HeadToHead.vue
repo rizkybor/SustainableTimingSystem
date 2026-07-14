@@ -1002,7 +1002,6 @@
 
 <script>
 import { ipcRenderer } from "electron";
-import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
@@ -1014,6 +1013,7 @@ import { getSocket } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import serialPortMixin from "@/mixins/serialPortMixin";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
@@ -1155,7 +1155,7 @@ export default {
     Icon,
     CountryFlag,
   },
-  mixins: [teamFlagMixin],
+  mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       pdfMode: "round",
@@ -1168,10 +1168,6 @@ export default {
       isLoadingTableList: false,
       selfSocketId: null,
       initSocket: null,
-      selectPath: "",
-      baudRate: 9600,
-      baudOptions: [1200, 2400, 9600],
-      serialCtrl: null,
       endGame: false,
       isScrolled: false,
       showBracket: true,
@@ -1196,14 +1192,8 @@ export default {
       showBronze: true,
       editForm: "",
       editResult: false,
-      port: null,
-      isPortConnected: false,
-      digitId: [],
-      digitTime: [],
       dataPenalties: [],
       dataScore: [],
-      digitTimeStart: null,
-      digitTimeFinish: null,
       isRankedDescending: false,
 
       /** penting: tipe konsisten */
@@ -2802,77 +2792,6 @@ export default {
         }
       });
     },
-    // === SERIAL CONNECTION ===
-    async connectPort() {
-      if (!this.isPortConnected) {
-        const PREFERRED_PATH = "/dev/tty.usbserial-120";
-        const ports = await listPorts();
-        this.currentPort = ports;
-        const portIndex = ports.findIndex(
-          (p) => String(p.path) === PREFERRED_PATH
-        );
-
-        if (portIndex === -1) {
-          this.notify(
-            "warning",
-            `Preferred port not found: ${PREFERRED_PATH}`,
-            "Device"
-          );
-          alert("Preferred port not found");
-          return;
-        }
-
-        this.selectPath = ports[portIndex].path;
-
-        this.serialCtrl = createSerialReader({
-          baudRate: this.baudRate,
-          portIndex: portIndex,
-          onNotify: (type, detail, message) =>
-            this.notify(type, detail, message),
-          onData: (a, b) => {
-            this.digitId.unshift(a);
-            this.digitTime.unshift(b);
-          },
-          onStart: (formatted /*, a, b*/) => {
-            this.digitTimeStart = formatted;
-          },
-          onFinish: (formatted /*, a, b*/) => {
-            this.digitTimeFinish = formatted;
-          },
-        });
-
-        const res = await this.serialCtrl.connect();
-        if (res.ok) {
-          this.isPortConnected = true;
-          this.port = this.serialCtrl.port; // kalau perlu akses instance
-          alert("Connected");
-        } else {
-          this.isPortConnected = false;
-          alert("No valid serial port found / failed to open.");
-        }
-      } else {
-        await this.disconnected();
-        this.isPortConnected = false;
-        alert("Disconnected");
-      }
-    },
-
-    async disconnected() {
-      try {
-        if (this.serialCtrl) await this.serialCtrl.disconnect();
-      } finally {
-        this.port = null;
-        this.serialCtrl = null;
-        this.isPortConnected = false;
-        this.selectPath = null;
-      }
-    },
-
-    setBaud(br) {
-      this.baudRate = br;
-    },
-    // === END CONNECTION ===
-
     resetByRow(item) {
       if (!item || !item.result) return;
 

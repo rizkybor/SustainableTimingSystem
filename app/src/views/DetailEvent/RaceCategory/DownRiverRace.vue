@@ -959,13 +959,11 @@ export default {
             }
           );
         }
-        console.log(msg.type, "<<");
         // Normalisasi tipe lama → baru (opsional)
         if (msg.type === "PenaltiesUpdated") {
           const gt = String(msg.gate || "")
             .trim()
             .toLowerCase();
-          console.log(gt, "<<< cek");
           if (gt === "start" || gt === "s" || gt === "st")
             msg.type = "PenaltyStart";
           else if (gt === "finish" || gt === "f" || gt === "fin")
@@ -1003,7 +1001,7 @@ export default {
 
         // Terapkan semua update dulu…
         for (const u of updates) {
-          console.log("HAHA", u), await this.applyPenaltyFromSocketDirect(u);
+          await this.applyPenaltyFromSocketDirect(u);
         }
 
         // …baru re-rank sekali (hemat render)
@@ -1138,11 +1136,16 @@ export default {
           }
         }
 
-        // --- numeric value ---
+        // --- numeric value (izinkan hanya nilai yang benar-benar ditawarkan UI) ---
         var rawVal = 0;
         if (msg && msg.penalty != null) rawVal = msg.penalty;
         else if (msg && msg.value != null) rawVal = msg.value;
-        var ALLOWED = [0, 5, 10, 50];
+        var ALLOWED = (kind === "section"
+          ? this.penaltiesSection
+          : this.penaltiesStartFinish
+        ).map(function (p) {
+          return Number(p.value);
+        });
         var numericValue =
           ALLOWED.indexOf(Number(rawVal)) >= 0 ? Number(rawVal) : 0;
 
@@ -1349,18 +1352,19 @@ export default {
         );
         this.$set(sObj, "totalTime", team.result.totalTime || sObj.totalTime);
 
-        // --- akhir: set edit flag + re-rank ---
+        // --- akhir: set edit flag ---
+        // (ranking di-handle sekali oleh pemanggil di onMessage setelah semua
+        // update dalam batch diterapkan — lihat assignRanks di socket handler)
         this.editResult = true;
-        if (typeof this.assignRanks === "function") {
-          await this.assignRanks(this.participant);
-        }
         if (typeof this.checkEndGameStatus === "function")
           this.checkEndGameStatus();
         if (typeof this.$forceUpdate === "function") this.$forceUpdate();
 
         return true;
       } catch (err) {
-        console.warn("applyPenaltyFromSocketDirect DRR error:", err);
+        if (logger && logger.warn) {
+          logger.warn("applyPenaltyFromSocketDirect DRR error:", err);
+        }
         return false;
       }
     },

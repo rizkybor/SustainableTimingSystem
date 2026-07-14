@@ -1016,6 +1016,8 @@ import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
+import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 
@@ -1231,6 +1233,7 @@ export default {
       isLoadingBracket: false,
       isLoadingTableList: false,
       selfSocketId: null,
+      initSocket: null,
       selectPath: "",
       baudRate: 9600,
       baudOptions: [1200, 2400, 9600],
@@ -1629,6 +1632,64 @@ export default {
     this.computeWinLoseByHeat();
 
     this.fetchBooyanActiveFromSettings();
+
+    // ====== SOCKET INIT & LISTENERS (Judges Dashboard realtime) ======
+    try {
+      const socket = getSocket();
+      this.initSocket = socket;
+
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
+
+      const onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
+
+      const onMessage = async (raw) => {
+        const msg = raw || {};
+
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
+
+        if (this.$bvToast && msg.text) {
+          try {
+            new Audio(tone).play();
+          } catch {
+            // abaikan gagal play audio
+          }
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
+        }
+
+        await this.applyPenaltyFromSocketH2H(msg);
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
   },
 
   methods: {
@@ -3743,6 +3804,54 @@ export default {
       if (!any) return "classic";
       if (a.r1 && a.l1 && !a.r2 && !a.l2) return "2";
       return "4";
+    },
+
+    /* =========================================================
+     * SOCKET / IPC (Judges Dashboard realtime)
+     * =======================================================*/
+    async applyPenaltyFromSocketH2H(msg = {}) {
+      // resolve tim: teamId/bib/nama -> index di this.participant
+      // (pola sama seperti updateTime: cocokkan lewat participantArr lalu
+      // ambil objek nyata dari this.participant, bukan visibleParticipants)
+      const nameLC = String(msg.teamName || msg.nameTeam || "").toLowerCase();
+      const bib = String(msg.bibTeam || msg.bib || "");
+      const teamId = msg.teamId != null ? String(msg.teamId) : "";
+
+      const targetIndex = this.participantArr.findIndex((p) => {
+        if (teamId && String(p.teamId || "") === teamId) return true;
+        const pNameLC = String(p.nameTeam || p.teamName || "").toLowerCase();
+        const nameMatch = nameLC && pNameLC === nameLC;
+        const bibMatch = bib && String(p.bibTeam || "") === bib;
+        if (nameLC) return nameMatch && (!bib ? true : bibMatch);
+        return false;
+      });
+      if (targetIndex === -1) return;
+
+      const target = this.participant[targetIndex];
+      if (!target || !target.result) return;
+
+      this.ensurePenaltiesObject(target.result);
+      const p = target.result.penalties;
+
+      const kind = String(msg.type || "");
+      if (kind === "PenaltyStart") {
+        this.$set(p, "s", Number(msg.value) || 0);
+      } else if (kind === "PenaltyFinish") {
+        this.$set(p, "f", Number(msg.value) || 0);
+      } else if (kind === "PenaltyOther") {
+        this.$set(p, "o", Number(msg.value) || 0);
+      } else if (kind === "BooyanCorner") {
+        const corner = String(msg.corner || "").toLowerCase();
+        if (corner === "r1" || corner === "r2" || corner === "l1" || corner === "l2") {
+          this.$set(p, corner, msg.touched ? "Y" : "N");
+        } else {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      await this.onPenaltyChange(target);
     },
 
     ensurePenaltiesObject(result) {

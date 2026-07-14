@@ -444,6 +444,8 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
 import { createSerialReader, listPorts } from "@/utils/serialConnection.js";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import { getSocket } from "@/services/socket";
+import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 
@@ -460,6 +462,8 @@ export default {
       defaultImg,
       dataEvent: {},
       titleCategories: "",
+      selfSocketId: null,
+      initSocket: null,
 
       rxBucketOptions: [],
       rxBucketMap: Object.create(null),
@@ -624,6 +628,64 @@ export default {
           : this.rxBucketOptions[0].value;
       await this.fetchRxBucketTeamsByKey(this.selectedRxKey);
       await this.loadBracket();
+    }
+
+    // ====== SOCKET INIT & LISTENERS (Judges Dashboard realtime) ======
+    try {
+      const socket = getSocket();
+      this.initSocket = socket;
+
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
+
+      const onConnect = () => {
+        this.selfSocketId = socket && socket.id ? socket.id : null;
+      };
+      socket.on("connect", onConnect);
+
+      const onMessage = async (raw) => {
+        const msg = raw || {};
+
+        if (
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
+        if (!isSameEvent(msg)) return;
+
+        if (this.$bvToast && msg.text) {
+          try {
+            new Audio(tone).play();
+          } catch {
+            // abaikan gagal play audio
+          }
+          this.$bvToast.toast(
+            (msg.from ? msg.from : "Realtime") + ": " + msg.text,
+            {
+              title: "Pesan Realtime",
+              variant: "success",
+              solid: true,
+            }
+          );
+        }
+
+        await this.applyPenaltyFromSocketRX(msg);
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        if (this.initSocket) {
+          this.initSocket.off("connect", onConnect);
+          this.initSocket.off("custom:event", onMessage);
+        }
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
     }
   },
 
@@ -871,6 +933,55 @@ export default {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
       return m ? m.score : 0;
     },
+    /* =========================================================
+     * SOCKET / IPC (Judges Dashboard realtime)
+     * =======================================================*/
+    async applyPenaltyFromSocketRX(msg = {}) {
+      // resolve tim: teamId/bib/nama -> (heat, slotIdx) via roundParticipants
+      // (pola sama seperti updateTime, ~890-897)
+      const nameLC = String(msg.name || msg.nameTeam || "").toLowerCase();
+      const bib = String(msg.bibTeam || msg.bib || "");
+      const teamId = msg.teamId != null ? String(msg.teamId) : "";
+
+      const visItem = this.roundParticipants.find((t) => {
+        if (teamId && String(t.id || "") === teamId) return true;
+        const tNameLC = String(t.name || "").toLowerCase();
+        const nameMatch = nameLC && tNameLC === nameLC;
+        const bibMatch = bib && String(t.bibTeam || "") === bib;
+        if (nameLC) return nameMatch && (!bib ? true : bibMatch);
+        return false;
+      });
+      if (!visItem) return;
+
+      const heat = this.currentRound.heats.find(
+        (h) => h.id === visItem._heatId
+      );
+      if (!heat) return;
+      const res = heat.results[visItem._slotIdx];
+      if (!res) return;
+
+      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      const kind = String(msg.type || "");
+
+      if (kind === "RaceTime") {
+        res.raceTime = String(msg.value || "");
+      } else if (kind === "PenaltyGate1" || String(msg.gate || "") === "1" || msg.gate === "gate1") {
+        const v = Number(msg.value);
+        if (!allowed.includes(v)) return;
+        res.penalties.gate1 = v;
+      } else if (kind === "PenaltyGate2" || String(msg.gate || "") === "2" || msg.gate === "gate2") {
+        const v = Number(msg.value);
+        if (!allowed.includes(v)) return;
+        res.penalties.gate2 = v;
+      } else {
+        return;
+      }
+
+      this.recalcTeamResult(heat, visItem._slotIdx);
+      // per keputusan: update dari socket langsung auto-rank heat-nya
+      this.rankHeat(heat);
+    },
+
     recalcTeamResult(heat, idx) {
       const res = heat.results[idx];
       if (!res) return;

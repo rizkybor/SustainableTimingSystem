@@ -755,53 +755,66 @@ export default {
 
   async mounted() {
     var audio = new Audio(tone);
-    const socket = getSocket();
 
-    const onConnect = () => {
-      this.selfSocketId = socket.id || null;
-    };
-    socket.on("connect", onConnect);
+    try {
+      const socket = getSocket();
 
-    const onMessage = async (msg = {}) => {
-      // abaikan echo dari diri sendiri
-      if (
-        msg &&
-        msg.senderId &&
-        this.selfSocketId &&
-        msg.senderId === this.selfSocketId
-      )
-        return;
+      const isSameEvent = (m) => {
+        const cur = this.currentEventId ? String(this.currentEventId) : "";
+        const ev = m && m.eventId ? String(m.eventId) : "";
+        return !cur || !ev ? true : cur === ev;
+      };
 
-      // tampilkan toast (opsional)
-      if (this.$bvToast) {
-        audio.play();
-        this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text || ""}`, {
-          title: "Pesan Realtime",
-          variant: "success",
-          solid: true,
-        });
-      }
+      const onConnect = () => {
+        this.selfSocketId = socket.id || null;
+      };
+      socket.on("connect", onConnect);
 
-      // === mapping pesan Judges Dashboard ===
-      // type: 'Start' | 'Finish', teamId: string, value: number
-      if (
-        msg &&
-        msg.teamId &&
-        (msg.type === "Start" || msg.type === "Finish")
-      ) {
-        await this.applyPenaltyFromSocket(msg);
-        return;
-      }
+      const onMessage = async (msg = {}) => {
+        // abaikan echo dari diri sendiri
+        if (
+          msg &&
+          msg.senderId &&
+          this.selfSocketId &&
+          msg.senderId === this.selfSocketId
+        )
+          return;
 
-      // fallback lain (abaikan / logic lainmu)
-    };
+        if (!isSameEvent(msg)) return;
 
-    socket.on("custom:event", onMessage);
+        // tampilkan toast (opsional)
+        if (this.$bvToast && msg.text) {
+          audio.play();
+          this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text}`, {
+            title: "Pesan Realtime",
+            variant: "success",
+            solid: true,
+          });
+        }
 
-    this.$once("hook:beforeDestroy", () => {
-      socket.off("connect", onConnect);
-      socket.off("custom:event", onMessage);
-    });
+        // === mapping pesan Judges Dashboard ===
+        // type: 'Start' | 'Finish', teamId/bibTeam/nameTeam, value: number
+        if (
+          msg &&
+          (msg.teamId || msg.bibTeam || msg.nameTeam) &&
+          (msg.type === "Start" || msg.type === "Finish")
+        ) {
+          await this.applyPenaltyFromSocket(msg);
+          return;
+        }
+
+        // fallback lain (abaikan / logic lainmu)
+      };
+
+      socket.on("custom:event", onMessage);
+
+      this.$once("hook:beforeDestroy", () => {
+        socket.off("connect", onConnect);
+        socket.off("custom:event", onMessage);
+      });
+    } catch (err) {
+      if (logger && logger.warn) logger.warn("socket init failed:", err);
+    }
 
     try {
       const events = localStorage.getItem("eventDetails");
@@ -928,37 +941,26 @@ export default {
     // ======
 
     /* =========================================================
-     * SOCKET / IPC (opsional)
+     * SOCKET / IPC
      * =======================================================*/
-    // sendRealtimeMessage() {
-    //   const socket = getSocket();
-    //   socket.emit(
-    //     "custom:event",
-    //     {
-    //       senderId: socket.id,
-    //       from: "Sustainable Timing System",
-    //       text: "Terima kasih, udah gue teerima beks nilai penaltynya",
-    //       ts: new Date().toISOString(),
-    //     },
-    //     (ok) => {
-    //       if (!ok) {
-    //         ipcRenderer.send("get-alert", {
-    //           type: "error",
-    //           message: "Gagal mengirim pesan realtime",
-    //           detail: "Silakan cek koneksi broker/socket.",
-    //         });
-    //       }
-    //     }
-    //   );
-    // },
-
     async applyPenaltyFromSocket(payload = {}) {
-      const teamId = String(payload.teamId || "");
-      if (!teamId) return;
-
-      // cari tim lokal
+      // cari tim lokal: teamId -> bibTeam -> nameTeam (case-insensitive)
       const items = this.participantArr;
-      const idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      let idx = -1;
+      if (payload.teamId) {
+        const teamId = String(payload.teamId);
+        idx = items.findIndex((t) => String(t.teamId || "") === teamId);
+      }
+      if (idx === -1 && payload.bibTeam) {
+        const bib = String(payload.bibTeam);
+        idx = items.findIndex((t) => String(t.bibTeam || "") === bib);
+      }
+      if (idx === -1 && payload.nameTeam) {
+        const nameLC = String(payload.nameTeam).toLowerCase();
+        idx = items.findIndex(
+          (t) => String(t.nameTeam || "").toLowerCase() === nameLC
+        );
+      }
       if (idx === -1) return;
 
       const local = items[idx];
@@ -974,11 +976,13 @@ export default {
 
       if (!field) return;
 
-      // normalisasi angka
+      // normalisasi & validasi angka terhadap opsi penalty yang benar-benar dimuat
       const numVal =
         payload.value === "" || payload.value == null
           ? 0
           : Number(payload.value);
+      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      if (!allowed.includes(numVal)) return;
 
       // set nilai penalty → ini otomatis mengikat dengan v-model.number di <b-select>
       this.$set(local.result, field, numVal);

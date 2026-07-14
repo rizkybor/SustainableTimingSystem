@@ -1445,10 +1445,12 @@ export default {
             ? msg.value
             : 0;
 
-        // IZINKAN 0/5/10/50
-        const ALLOWED = new Set([0, 5, 10, 50]);
+        // izinkan hanya nilai yang benar-benar ditawarkan UI untuk konteks ini
+        const allowedList = this.filteredPenalties(
+          kind === "gate" ? "Gate" : "SF"
+        ).map((p) => Number(p.value));
         const np = Number(raw);
-        const value = ALLOWED.has(np) ? np : 0;
+        const value = allowedList.includes(np) ? np : 0;
 
         let changed = false;
 
@@ -1660,51 +1662,6 @@ export default {
         sessionIdx = Number.isFinite(chosen) ? chosen : this.activeRun || 0;
       }
       return { team: team, teamIdx: teamIdx, sessionIdx: sessionIdx };
-    },
-
-    async applyPenaltyFromSocket(msg) {
-      var runIdx = Number.isFinite(msg && msg.run)
-        ? Number(msg.run)
-        : undefined;
-      await this.refreshPenaltiesFromRegistered({
-        teamId: msg && msg.teamId,
-        bib: msg && msg.bib,
-        runIdx: runIdx,
-      });
-    },
-
-    async applyRaceFromSocket(msg) {
-      try {
-        const f = this._findTeamAndSessionIndex(msg.teamId || msg.bib);
-        if (!f.team) return;
-
-        const s =
-          f.team.sessions && f.team.sessions[f.sessionIdx]
-            ? f.team.sessions[f.sessionIdx]
-            : null;
-        if (!s) return;
-
-        // msg.time harus string "HH:MM:SS.mmm"
-        const val = String(msg.time || "");
-        if (!val) return;
-
-        if (msg.type === "RaceStart") {
-          s.startTime = val;
-        } else if (msg.type === "RaceFinish") {
-          s.finishTime = val;
-          if (s.startTime && s.finishTime) {
-            const diff = Math.max(
-              0,
-              hmsToMs(s.finishTime) - hmsToMs(s.startTime)
-            );
-            s.raceTime = msToHMSms(diff);
-          }
-        }
-        this.recalcSession(s);
-        this.checkEndGameStatus();
-      } catch (err) {
-        logger && logger.warn && logger.warn("applyRaceFromSocket error:", err);
-      }
     },
 
     // ================= EXISTING LOGIC =================

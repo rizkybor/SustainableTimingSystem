@@ -230,6 +230,15 @@ import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 
+// "categories[].name" di temporaryOverallEventResults kadang beda ejaan
+// dgn discipline key yg dipakai teamsRegisteredCollection utk Head to Head
+// (HEAD2HEAD saat registrasi, HEADTOHEAD saat hasil di-merge ke rekap).
+var DISCIPLINE_KEY_ALIASES = { HEAD2HEAD: "HEADTOHEAD" };
+function normalizeDisciplineKey(key) {
+  var up = String(key || "").toUpperCase();
+  return DISCIPLINE_KEY_ALIASES[up] || up;
+}
+
 export default {
   name: "EventOverallResult",
   components: {
@@ -249,6 +258,10 @@ export default {
       eventInfo: {},
       buckets: [],
       showPdf: false,
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check skor lama vs status registrasi saat ini —
+      // lihat buildBucketRows()/isTeamRegisteredFor()
+      registeredBuckets: [],
     };
   },
   computed: {
@@ -286,12 +299,55 @@ export default {
     var eventId = String(this.$route.params.id || "");
     if (eventId) {
       await this.loadEventById(eventId);
+      await this.loadRegisteredBuckets(eventId);
       await this.loadAllBuckets(eventId);
     }
   },
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
+    },
+
+    // Ambil semua bucket registrasi (lintas race category) event ini, utk
+    // cross-check di buildBucketRows(): kalau gagal, biarkan
+    // registeredBuckets kosong — isTeamRegisteredFor() akan fail-open (tidak
+    // menyaring apa pun) daripada diam-diam menyembunyikan skor yang valid.
+    async loadRegisteredBuckets(eventId) {
+      if (typeof ipcRenderer === "undefined") return;
+      await new Promise((resolve) => {
+        const timeoutId = setTimeout(resolve, 5000);
+        ipcRenderer.send("teams-registered:find-by-event", eventId);
+        ipcRenderer.once("teams-registered:find-by-event-reply", (_e, res) => {
+          clearTimeout(timeoutId);
+          this.registeredBuckets =
+            res && res.ok && Array.isArray(res.items) ? res.items : [];
+          resolve();
+        });
+      });
+    },
+
+    // Apakah `teamName` benar-benar terdaftar di `disciplineKey` (SPRINT/
+    // HEAD2HEAD/SLALOM/DRR/RX) utk kombinasi initial/race/division ini?
+    // Fail-open (true) kalau registeredBuckets belum berhasil dimuat sama
+    // sekali, supaya kegagalan fetch tidak menyembunyikan skor yang valid.
+    isTeamRegisteredFor(disciplineKey, initialName, raceName, divisionName, teamName) {
+      if (!this.registeredBuckets.length) return true;
+
+      const wantedKey = normalizeDisciplineKey(disciplineKey);
+      const nameUpper = String(teamName || "").trim().toUpperCase();
+      const ini = String(initialName || "").toUpperCase();
+      const rac = String(raceName || "").toUpperCase();
+      const div = String(divisionName || "").toUpperCase();
+
+      return this.registeredBuckets.some(
+        (b) =>
+          normalizeDisciplineKey(b.raceCategory) === wantedKey &&
+          String(b.initialName || "").toUpperCase() === ini &&
+          String(b.raceName || "").toUpperCase() === rac &&
+          String(b.divisionName || "").toUpperCase() === div &&
+          Array.isArray(b.teamNames) &&
+          b.teamNames.indexOf(nameUpper) !== -1
+      );
     },
 
     async loadEventById(eventId) {
@@ -346,6 +402,10 @@ export default {
     buildBucketRows(doc) {
       var rows = [];
       var arr = doc && Array.isArray(doc.eventResult) ? doc.eventResult : [];
+      var initialName = doc && doc.initialName;
+      var raceName = doc && doc.raceName;
+      var divisionName = doc && doc.divisionName;
+
       for (var i = 0; i < arr.length; i++) {
         var t = arr[i] || {};
         var cats = t && Array.isArray(t.categories) ? t.categories : [];
@@ -385,10 +445,44 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore =
-          t && t.totalScore != null
-            ? Number(t.totalScore) || 0
-            : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb utk bucket ini sekarang —
+        // hasil lama yang tersimpan tidak otomatis hilang saat registrasi
+        // diubah/dihapus, jadi tanpa cross-check ini skor basi bisa tetap
+        // muncul di rekap Overall walau tim sudah tidak ikut kategori itu.
+        if (!this.isTeamRegisteredFor("SPRINT", initialName, raceName, divisionName, t.teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
+        }
+        if (!this.isTeamRegisteredFor("HEAD2HEAD", initialName, raceName, divisionName, t.teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!this.isTeamRegisteredFor("SLALOM", initialName, raceName, divisionName, t.teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!this.isTeamRegisteredFor("DRR", initialName, raceName, divisionName, t.teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!this.isTeamRegisteredFor("RX", initialName, raceName, divisionName, t.teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        // Total dihitung ulang dari discipline yang sudah tervalidasi di
+        // atas — jangan percaya t.totalScore mentah-mentah karena bisa
+        // sudah termasuk kontribusi discipline yang barusan disaring.
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+
+        // Kalau SEMUA discipline-nya gugur (tim ini sudah tidak terdaftar
+        // di kategori apa pun utk bucket ini), seluruh barisnya basi —
+        // jangan ditampilkan sama sekali, bukan cuma skornya di-nol-kan.
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
 
         rows.push({
           teamName: t.teamName || "",

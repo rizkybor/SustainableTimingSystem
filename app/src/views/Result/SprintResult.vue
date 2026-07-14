@@ -145,7 +145,6 @@
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
               <th class="text-center">Score</th>
-              <th class="text-center" v-if="!isOfficial">Action</th>
             </tr>
           </thead>
 
@@ -160,10 +159,38 @@
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
               <td class="text-center" style="color: red">
-                {{ r.penaltyTime || "00:00:000" }}
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.penaltyTime"
+                  @change="onEditTimeField(r, 'penaltyTime', $event.target.value)"
+                />
+                <span v-else>{{ r.penaltyTime || "00:00:000" }}</span>
               </td>
-              <td class="text-center">{{ r.startTime || "00:00:000" }}</td>
-              <td class="text-center">{{ r.finishTime || "00:00:000" }}</td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.startTime"
+                  @change="onEditTimeField(r, 'startTime', $event.target.value)"
+                />
+                <span v-else>{{ r.startTime || "00:00:000" }}</span>
+              </td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.finishTime"
+                  @change="onEditTimeField(r, 'finishTime', $event.target.value)"
+                />
+                <span v-else>{{ r.finishTime || "00:00:000" }}</span>
+              </td>
               <td class="bold text-center">{{ r.raceTime || "00:00:000" }}</td>
               <td class="bold text-center" style="color: green">
                 {{ r.resultTime || "00:00:000" }}
@@ -175,16 +202,6 @@
                     ? r.score
                     : getScoreByRanked(r.ranked) || 0
                 }}
-              </td>
-              <td class="text-center" v-if="!isOfficial">
-                <b-button
-                  size="sm"
-                  variant="warning"
-                  class="icon-btn"
-                  @click="openEdit(r)"
-                >
-                  <Icon icon="mdi:pencil" />
-                </b-button>
               </td>
             </tr>
           </tbody>
@@ -720,9 +737,6 @@ export default {
       });
     },
 
-    openEdit(row) {
-      this.$emit("edit-row", row);
-    },
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
       return m ? m.score : 0;
@@ -835,6 +849,158 @@ export default {
       return rows;
     },
 
+    /** "HH:MM:SS.mmm" -> ms, aman untuk kosong/format salah (bukan Infinity) */
+    timeToMsSafe(str) {
+      if (!str) return 0;
+      const [hh = "0", mm = "0", ssms = "0"] = String(str).split(":");
+      const [ss = "0", ms = "0"] = String(ssms).split(".");
+      const h = parseInt(hh, 10) || 0;
+      const m = parseInt(mm, 10) || 0;
+      const s = parseInt(ss, 10) || 0;
+      const mil = parseInt(ms, 10) || 0;
+      return h * 3600000 + m * 60000 + s * 1000 + mil;
+    },
+
+    /** ms -> "HH:MM:SS.mmm" */
+    msToTime(ms) {
+      const total = Math.max(0, Math.round(ms));
+      const h = Math.floor(total / 3600000);
+      const rem1 = total % 3600000;
+      const m = Math.floor(rem1 / 60000);
+      const rem2 = rem1 % 60000;
+      const s = Math.floor(rem2 / 1000);
+      const mil = rem2 % 1000;
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(mil, 3)}`;
+    },
+
+    /** Race Time = Finish Time - Start Time */
+    hitungSelisihWaktu(waktuAwal, waktuAkhir) {
+      if (!waktuAwal || !waktuAkhir) return "";
+      const msA = this.timeToMsSafe(waktuAwal);
+      const msB = this.timeToMsSafe(waktuAkhir);
+      return this.msToTime(msB - msA);
+    },
+
+    /** Result Time = Race Time + Penalty Time */
+    tambahWaktu(waktuA, waktuB) {
+      return this.msToTime(
+        this.timeToMsSafe(waktuA) + this.timeToMsSafe(waktuB)
+      );
+    },
+
+    /** Dipanggil saat Penalty/Start/Finish Time diedit langsung di tabel:
+     * hitung ulang Race Time & Result Time baris ini, lalu re-rank/re-score
+     * SEMUA baris (waktu satu tim berubah bisa menggeser ranking tim lain),
+     * dan simpan hasilnya ke database. */
+    onEditTimeField(row, field, rawValue) {
+      this.$set(row, field, String(rawValue == null ? "" : rawValue).trim());
+
+      row.raceTime =
+        row.startTime && row.finishTime
+          ? this.hitungSelisihWaktu(row.startTime, row.finishTime)
+          : "";
+      row.totalTime = row.raceTime
+        ? this.tambahWaktu(row.raceTime, row.penaltyTime || "00:00:00.000")
+        : "";
+      row.resultTime = row.totalTime;
+
+      this.results = this.computeRanksAndScores(this.results);
+      this.saveResultsToDb();
+    },
+
+    /** Simpan seluruh baris hasil (dgn ranking/score terbaru) ke DB */
+    saveResultsToDb() {
+      const q = this.$route.query || {};
+      if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) return;
+
+      const docs = this.results.map((r) => ({
+        eventId: String(q.eventId),
+        initialId: String(q.initialId),
+        raceId: String(q.raceId),
+        divisionId: String(q.divisionId),
+        eventName: "SPRINT",
+        initialName: String(q.initialName || this.sprintCats.initial || ""),
+        raceName: String(q.raceName || this.sprintCats.race || ""),
+        divisionName: String(q.divisionName || this.sprintCats.division || ""),
+        nameTeam: r.nameTeam,
+        bibTeam: r.bibTeam,
+        startOrder: r.startOrder || "",
+        praStart: r.praStart || "",
+        intervalRace: r.intervalRace || "",
+        statusId: r.statusId || 0,
+        result: {
+          startTime: r.startTime || "",
+          finishTime: r.finishTime || "",
+          raceTime: r.raceTime || "",
+          startPenalty: r.startPenalty || 0,
+          finishPenalty: r.finishPenalty || 0,
+          penalty: r.totalPenalty || 0,
+          totalPenalty: r.totalPenalty || 0,
+          startPenaltyTime: "00:00:00.000",
+          finishPenaltyTime: "00:00:00.000",
+          totalPenaltyTime: r.penaltyTime || "00:00:00.000",
+          penaltyTime: r.penaltyTime || "00:00:00.000",
+          totalTime: r.totalTime || r.resultTime || "",
+          ranked: Number(r.ranked) || 0,
+          score: Number(r.score) || 0,
+          judgesBy: r.judgesBy || "",
+          judgesTime: r.judgesTime || "",
+        },
+      }));
+
+      ipcRenderer.send("insert-sprint-result", docs);
+      ipcRenderer.once("insert-sprint-result-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Gagal menyimpan",
+            detail:
+              (res && res.error) || "Perubahan tidak tersimpan ke database.",
+          });
+        }
+      });
+    },
+
+    // Tim yang BENAR-BENAR terdaftar SPRINT utk kombinasi initial/race/
+    // division ini saat ini (bukan histori). Dipakai buat menyaring hasil
+    // yang mungkin sudah usang: kalau dulu pernah tersimpan hasil race utk
+    // tim tsb tapi registrasinya sekarang sudah dihapus/dipindah ke race
+    // category lain, hasil lama itu harusnya tidak ikut tampil di sini lagi.
+    // Return null kalau gagal mengecek (bukan "tidak ada yang terdaftar")
+    // supaya baris hasil tidak diam-diam disembunyikan gara-gara error IPC.
+    fetchRegisteredSprintTeamNames(q) {
+      return new Promise((resolve) => {
+        const identity = {
+          eventId: String(q.eventId || ""),
+          initialId: String(q.initialId || ""),
+          raceId: String(q.raceId || ""),
+          divisionId: String(q.divisionId || ""),
+          eventName: "SPRINT",
+          initialName: String(q.initialName || ""),
+          raceName: String(q.raceName || ""),
+          divisionName: String(q.divisionName || ""),
+        };
+
+        const timeoutId = setTimeout(() => resolve(null), 5000);
+
+        ipcRenderer.send("get-teams-registered", identity);
+        ipcRenderer.once("get-teams-registered-reply", (_e, bucket) => {
+          clearTimeout(timeoutId);
+          if (!bucket || !Array.isArray(bucket.teams)) {
+            resolve(null);
+            return;
+          }
+          const names = new Set();
+          bucket.teams.forEach((t) => {
+            const n = String((t && t.nameTeam) || "").trim().toUpperCase();
+            if (n) names.add(n);
+          });
+          resolve(names);
+        });
+      });
+    },
+
     async loadSprintResult() {
       const q = this.$route.query || {};
       if (!q.eventId || !q.initialId || !q.raceId || !q.divisionId) {
@@ -844,6 +1010,8 @@ export default {
 
       this.loading = true;
       this.error = "";
+
+      const registeredNames = await this.fetchRegisteredSprintTeamNames(q);
 
       // kirim permintaan
       ipcRenderer.send("get-sprint-result", q);
@@ -869,6 +1037,14 @@ export default {
                   ? doc.result
                   : [doc.result || {}];
                 arr.forEach((r) => {
+                  const nameUpper = String(r.nameTeam || doc.nameTeam || "")
+                    .trim()
+                    .toUpperCase();
+                  // tim sudah tidak terdaftar Sprint utk kombinasi ini →
+                  // hasil lama ini usang, jangan ditampilkan
+                  if (registeredNames && !registeredNames.has(nameUpper)) {
+                    return;
+                  }
                   const R = this.normalizeResult(r);
                   rows.push({
                     nameTeam: r.nameTeam || doc.nameTeam || "",
@@ -890,6 +1066,17 @@ export default {
                       R.score !== ""
                         ? Number(R.score)
                         : 0,
+                    // dipertahankan supaya tidak hilang saat menyimpan ulang
+                    // (results di halaman ini tidak menampilkannya, tapi
+                    // dokumen di DB punya field-field ini per tim)
+                    startOrder: r.startOrder || "",
+                    praStart: r.praStart || "",
+                    intervalRace: r.intervalRace || "",
+                    statusId: Number.isFinite(r.statusId) ? r.statusId : 0,
+                    startPenalty: Number(R.startPenalty) || 0,
+                    finishPenalty: Number(R.finishPenalty) || 0,
+                    judgesBy: (r.result && r.result.judgesBy) || "",
+                    judgesTime: (r.result && r.result.judgesTime) || "",
                   });
                 });
               });
@@ -1039,6 +1226,24 @@ export default {
 }
 .bold {
   font-weight: 800;
+}
+.cell-input {
+  width: 100%;
+  min-width: 100px;
+  max-width: 130px;
+  text-align: center;
+  border: 1px solid #e0e3e8;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  background: #fafbfc;
+}
+.cell-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: #9ec5ff;
+  box-shadow: 0 0 0 3px rgba(42, 104, 196, 0.15);
 }
 .text-center {
   text-align: center;

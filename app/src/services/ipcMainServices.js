@@ -75,6 +75,7 @@ const {
   deleteTeamInBucket,
   upsertTeamsRegistered,
   findRegisteredEntriesByTeamName,
+  findRegisteredBucketsByEventId,
 } = require("../controllers/INSERT/insertTeamsRegistered.js");
 
 const {
@@ -699,6 +700,21 @@ function setupIPCMainHandlers() {
       event.reply("teams-registered:find-by-name-reply", { ok: true, items });
     } catch (error) {
       event.reply("teams-registered:find-by-name-reply", {
+        ok: false,
+        items: [],
+        error: String((error && error.message) || error),
+      });
+    }
+  });
+
+  // Semua bucket registrasi (lintas race category) utk satu event — dipakai
+  // Event Overall Result utk cross-check skor lama vs registrasi terkini
+  ipcMain.on("teams-registered:find-by-event", async (event, eventId) => {
+    try {
+      const items = await findRegisteredBucketsByEventId(eventId);
+      event.reply("teams-registered:find-by-event-reply", { ok: true, items });
+    } catch (error) {
+      event.reply("teams-registered:find-by-event-reply", {
         ok: false,
         items: [],
         error: String((error && error.message) || error),

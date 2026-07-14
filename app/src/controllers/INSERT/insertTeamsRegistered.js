@@ -139,9 +139,38 @@ async function findRegisteredEntriesByTeamName(nameTeam) {
   return out;
 }
 
+// --- FIND semua bucket registrasi utk satu event, lintas race category
+// (dipakai utk cross-check "apakah tim ini masih benar-benar terdaftar di
+// discipline X" saat menampilkan rekap Overall — hasil lama yang tersimpan
+// di temporaryOverallEventResults bisa jadi basi kalau registrasinya sudah
+// diubah/dihapus setelah race dijalankan) ---
+async function findRegisteredBucketsByEventId(eventId) {
+  const id = String(eventId || "");
+  if (!id) return [];
+
+  const db = await getDb();
+  const coll = db.collection("teamsRegisteredCollection");
+
+  const docs = await coll.find({ eventId: id }).toArray();
+  return docs.map((doc) => ({
+    // NB: sama seperti findRegisteredEntriesByTeamName — "eventName" di
+    // collection ini sebenarnya berarti RACE CATEGORY/discipline.
+    raceCategory: String(doc.eventName || ""),
+    initialName: String(doc.initialName || ""),
+    raceName: String(doc.raceName || ""),
+    divisionName: String(doc.divisionName || ""),
+    teamNames: Array.isArray(doc.teams)
+      ? doc.teams
+          .map((t) => String((t && t.nameTeam) || "").trim().toUpperCase())
+          .filter(Boolean)
+      : [],
+  }));
+}
+
 module.exports = {
   getTeamsRegistered,
   upsertTeamsRegistered,
+  findRegisteredBucketsByEventId,
   deleteTeamInBucket,
   findRegisteredEntriesByTeamName,
 };

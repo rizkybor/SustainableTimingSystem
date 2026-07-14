@@ -143,94 +143,29 @@
 
       <!-- PANELS -->
       <team-panel
-        v-if="showPanel('R4', 'MEN')"
-        class="mt-2"
-        title="Team R4 Men's"
-        :division="'R4'"
-        :race="'MEN'"
+        v-for="(combo, comboIdx) in visibleDivisionRaceCombos"
+        :key="combo.panelKey"
+        :class="comboIdx === 0 ? 'mt-2' : 'mt-4'"
+        :title="combo.title"
+        :division="combo.division"
+        :race="combo.race"
         :event-name="raceActive.selected.name"
         :initial-name="initialActive.selected.name"
-        :rows="teamsMenR4"
-        :teams-available="availableFor('R4', 'MEN')"
-        :draft="draftMap['R4_MEN']"
-        :loading="loadingByPanel['R4_MEN']"
-        @add-draft="addDraft('R4', 'MEN')"
-        @draft-change="onDraftChange('R4', 'MEN', $event)"
-        @draft-save="saveDraft('R4', 'MEN')"
-        @draft-cancel="cancelDraft('R4', 'MEN')"
-        @delete-row="deleteRow('R4', 'MEN', $event)"
+        :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
+        :teams-available="availableFor(combo.division, combo.race)"
+        :draft="draftMap[combo.panelKey]"
+        :loading="loadingByPanel[combo.panelKey]"
+        @add-draft="addDraft(combo.division, combo.race)"
+        @draft-change="onDraftChange(combo.division, combo.race, $event)"
+        @draft-save="saveDraft(combo.division, combo.race)"
+        @draft-cancel="cancelDraft(combo.division, combo.race)"
+        @delete-row="deleteRow(combo.division, combo.race, $event)"
         @start-race="handleStartRace"
-        @show-result="showResult('R4', 'MEN')"
-        @view-details="openTeamDetails('R4', 'MEN', $event)"
+        @show-result="showResult(combo.division, combo.race)"
+        @view-details="openTeamDetails(combo.division, combo.race, $event)"
       />
 
-      <team-panel
-        v-if="showPanel('R4', 'WOMEN')"
-        class="mt-4"
-        title="Team R4 Women’s"
-        :division="'R4'"
-        :race="'WOMEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsWomenR4"
-        :teams-available="availableFor('R4', 'WOMEN')"
-        :draft="draftMap['R4_WOMEN']"
-        :loading="loadingByPanel['R4_WOMEN']"
-        @add-draft="addDraft('R4', 'WOMEN')"
-        @draft-change="onDraftChange('R4', 'WOMEN', $event)"
-        @draft-save="saveDraft('R4', 'WOMEN')"
-        @draft-cancel="cancelDraft('R4', 'WOMEN')"
-        @delete-row="deleteRow('R4', 'WOMEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R4', 'WOMEN')"
-        @view-details="openTeamDetails('R4', 'WOMEN', $event)"
-      />
-
-      <team-panel
-        v-if="showPanel('R6', 'MEN')"
-        class="mt-4"
-        title="Team R6 Men's"
-        :division="'R6'"
-        :race="'MEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsMenR6"
-        :teams-available="availableFor('R6', 'MEN')"
-        :draft="draftMap['R6_MEN']"
-        :loading="loadingByPanel['R6_MEN']"
-        @add-draft="addDraft('R6', 'MEN')"
-        @draft-change="onDraftChange('R6', 'MEN', $event)"
-        @draft-save="saveDraft('R6', 'MEN')"
-        @draft-cancel="cancelDraft('R6', 'MEN')"
-        @delete-row="deleteRow('R6', 'MEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R6', 'MEN')"
-        @view-details="openTeamDetails('R6', 'MEN', $event)"
-      />
-
-      <team-panel
-        v-if="showPanel('R6', 'WOMEN')"
-        class="mt-4"
-        title="Team R6 Women’s"
-        :division="'R6'"
-        :race="'WOMEN'"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :rows="teamsWomenR6"
-        :teams-available="availableFor('R6', 'WOMEN')"
-        :draft="draftMap['R6_WOMEN']"
-        :loading="loadingByPanel['R6_WOMEN']"
-        @add-draft="addDraft('R6', 'WOMEN')"
-        @draft-change="onDraftChange('R6', 'WOMEN', $event)"
-        @draft-save="saveDraft('R6', 'WOMEN')"
-        @draft-cancel="cancelDraft('R6', 'WOMEN')"
-        @delete-row="deleteRow('R6', 'WOMEN', $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult('R6', 'WOMEN')"
-        @view-details="openTeamDetails('R6', 'WOMEN', $event)"
-      />
-
-      <div v-if="!anyPanelShown" class="text-center text-muted py-5">
+      <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
         Belum ada konfigurasi divisi/race untuk event ini.
       </div>
 
@@ -308,6 +243,7 @@ import sprintPng from "@/assets/images/Rectangle-3.png";
 import slalomPng from "@/assets/images/Rectangle-4-1.png";
 import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
+import rxPng from "@/assets/images/Rectangle-5.png";
 import { ipcRenderer } from "electron";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
@@ -379,37 +315,63 @@ export default {
         },
       },
       // kategori UI
+      // Satu-satunya sumber kebenaran utk tiap Race Category: key (dipakai
+      // sbg identity, cocok dgn nilai yg tersimpan di DB), plus rute race
+      // (live-timing) & result-nya masing-masing. Menambah kategori baru
+      // cukup menambah satu entry di sini — tidak perlu sentuh pathMap lain.
       raceCategories: [
         {
           key: "SPRINT",
           title: "Sprint",
           icon: sprintPng,
           desc: "Short-distance race against the clock  on grade II-III rapids",
+          racePath: "sprint-race",
+          resultPath: "sprint-result",
         },
         {
           key: "HEAD2HEAD",
           title: "Head to Head",
           icon: h2hPng,
           desc: "Direct competition between two teams  on parallel courses",
+          racePath: "head2head-race",
+          resultPath: "headtohead-result",
         },
         {
           key: "SLALOM",
           title: "Slalom",
           icon: slalomPng,
           desc: "Technical course navigation through  gates on whitewater",
+          racePath: "slalom-race",
+          resultPath: "slalom-result",
         },
         {
           key: "DRR",
           title: "Down River",
           icon: drrPng,
           desc: "Long-distance endurance race through  varied river conditions",
+          racePath: "drr-race",
+          resultPath: "drr-result",
         },
         {
           key: "RX",
           title: "Rafting Cross",
-          icon: h2hPng,
+          icon: rxPng,
           desc: "Multi-team knockout heats racing side-by-side  through gates to qualify",
+          racePath: "rx-race",
+          resultPath: "rx-result",
         },
+      ],
+
+      // Satu-satunya sumber kebenaran utk kombinasi Division x Race yang
+      // tersedia (dulu 4 blok <team-panel> di template masing-masing
+      // hardcode 'R4'/'MEN' dkk berulang di ~8 tempat — menambah kombinasi
+      // baru berarti copy-paste seluruh blok). panelKey harus tetap format
+      // "DIVISI_RACE" karena dipakai sbg key di draftMap/loadingByPanel.
+      DIVISION_RACE_COMBOS: [
+        { panelKey: "R4_MEN", division: "R4", race: "MEN", title: "Team R4 Men's" },
+        { panelKey: "R4_WOMEN", division: "R4", race: "WOMEN", title: "Team R4 Women's" },
+        { panelKey: "R6_MEN", division: "R6", race: "MEN", title: "Team R6 Men's" },
+        { panelKey: "R6_WOMEN", division: "R6", race: "WOMEN", title: "Team R6 Women's" },
       ],
 
       // state
@@ -451,26 +413,13 @@ export default {
       if (!enabledKeys.size) return this.raceCategories;
       return this.raceCategories.filter((c) => enabledKeys.has(c.key));
     },
-    // ambil rows berdasar kombinasi & initial aktif
-    teamsMenR4() {
-      return this.getTeamsBy("R4", "MEN", this.raceActive.selected.name);
-    },
-    teamsWomenR4() {
-      return this.getTeamsBy("R4", "WOMEN", this.raceActive.selected.name);
-    },
-    teamsMenR6() {
-      return this.getTeamsBy("R6", "MEN", this.raceActive.selected.name);
-    },
-    teamsWomenR6() {
-      return this.getTeamsBy("R6", "WOMEN", this.raceActive.selected.name);
-    },
-
-    anyPanelShown() {
-      return (
-        this.showPanel("R4", "MEN") ||
-        this.showPanel("R4", "WOMEN") ||
-        this.showPanel("R6", "MEN") ||
-        this.showPanel("R6", "WOMEN")
+    // Kombinasi Division/Race yang aktif utk event ini (dari
+    // DIVISION_RACE_COMBOS, difilter oleh showPanel) — satu-satunya sumber
+    // dipakai template utk me-render panel tim secara dinamis (v-for),
+    // menggantikan 4 blok <team-panel> yang dulu di-hardcode manual.
+    visibleDivisionRaceCombos() {
+      return this.DIVISION_RACE_COMBOS.filter((c) =>
+        this.showPanel(c.division, c.race)
       );
     },
     hasEventLogo() {
@@ -955,14 +904,18 @@ export default {
       return String(v || "").toUpperCase();
     },
 
-    _mapRaceToPath(evName) {
-      const e = this._toUpperSafe(evName);
-      if (e === "SPRINT") return "sprint-race";
-      if (e === "SLALOM") return "slalom-race";
-      if (e === "DRR") return "drr-race";
-      if (e === "HEAD2HEAD") return "head2head-race";
-      if (e === "RX") return "rx-race";
-      return e.toLowerCase(); // fallback
+    // Cari definisi Race Category by key (SPRINT/HEAD2HEAD/SLALOM/DRR/RX).
+    // NB: field ini di banyak tempat lain (identity, DB) disebut "eventName"
+    // — penamaan lama yang sebenarnya berarti Race Category, bukan judul
+    // event. Di sini sengaja dipakai nama yang jelas (raceCategoryKey).
+    _findRaceCategory(raceCategoryKey) {
+      const k = this._toUpperSafe(raceCategoryKey);
+      return this.raceCategories.find((c) => c.key === k) || null;
+    },
+
+    _mapRaceToPath(raceCategoryKey) {
+      const cat = this._findRaceCategory(raceCategoryKey);
+      return cat ? cat.racePath : this._toUpperSafe(raceCategoryKey).toLowerCase();
     },
 
     /* =========================================================
@@ -1042,6 +995,12 @@ export default {
       );
     },
 
+    // Handler "Show Result" — dinamis berdasar 3 parameter yg lagi aktif:
+    // Race Category (raceActive), Initials Category (initialActive), dan
+    // Division/Race dari tabel yang diklik (div, race datang dari panel
+    // yang memicu event ini). Kombinasi ketiganya di-resolve jadi satu
+    // identity (_buildIdentity) lalu diarahkan ke halaman Result yang
+    // sesuai utk Race Category tsb (raceCategories[].resultPath).
     showResult(div, race) {
       const idt = this._buildIdentity(div, race);
       if (!idt.eventId || !idt.initialId || !idt.raceId || !idt.divisionId) {
@@ -1053,17 +1012,20 @@ export default {
         return;
       }
 
-      const pathMap = {
-        SPRINT: "sprint-result",
-        DRR: "drr-result",
-        SLALOM: "slalom-result",
-        HEAD2HEAD: "headtohead-result",
-        RX: "rx-result",
-      };
-      const path = pathMap[idt.eventName] || "";
+      const cat = this._findRaceCategory(idt.eventName);
+      if (!cat || !cat.resultPath) {
+        // dulu ini diam-diam nyasar ke path kosong (halaman event) — sekarang
+        // ditolak eksplisit dgn pesan yg jelas
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Race Category tidak dikenali",
+          detail: `Belum ada halaman Result untuk kategori "${idt.eventName}".`,
+        });
+        return;
+      }
 
       this.$router.push({
-        path: `/event-detail/${this.$route.params.id}/${path}`,
+        path: `/event-detail/${this.$route.params.id}/${cat.resultPath}`,
         query: {
           eventId: idt.eventId,
           initialId: idt.initialId,

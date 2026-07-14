@@ -1001,7 +1001,6 @@ export default {
             String(row.nameTeam).trim().toUpperCase()
       );
       this.dataTeams = this.dataTeams.slice();
-      this.persistParticipants();
 
       // 2) Hapus di DB
       ipcRenderer.send("delete-team-in-bucket", {
@@ -1657,7 +1656,6 @@ export default {
       );
       this.dataTeams = this.dataTeams.slice(); // trigger reactive update
       this.$set(this.draftMap, k, null);
-      this.persistParticipants();
       this.syncBucketToDB(bucket, div, race); // sinkron ke DB
     },
 
@@ -1690,26 +1688,18 @@ export default {
             const ev = data || {};
             ev._id = this._idToString(ev._id); // normalisasi id → string
             this.events = ev;
-            this.dataTeams = Array.isArray(ev.participant)
-              ? ev.participant
-              : [];
+            // dataTeams (bucket per divisi/race/initial) selalu di-refresh
+            // dari teamsRegisteredCollection lewat refreshVisibleBuckets(),
+            // jadi mulai dari kosong di sini — eventsCollection tidak
+            // pernah menyimpan salinan registrasi tim (lihat catatan di
+            // Featured.md soal eventsCollection.participant yang mati).
+            this.dataTeams = [];
             resolve();
           });
         });
       } catch {
         this.events = {};
         this.dataTeams = [];
-      }
-    },
-
-    persistParticipants() {
-      try {
-        ipcRenderer.send("events-update-participant", {
-          eventId: this.$route.params.id,
-          participant: this.dataTeams,
-        });
-      } catch {
-        // no-op; state lokal tetap dipakai
       }
     },
 

@@ -138,19 +138,25 @@ the judge/operator accounts used throughout the settings above.
 
 Found during a code-review pass; not yet fixed unless noted otherwise.
 
-- **`eventsCollection.participant` is dead/stale data.** `Details/index.vue`'s
-  `persistParticipants()` sends an `events-update-participant` IPC message,
-  but no `ipcMain.on` handler for that channel exists anywhere in the app —
-  it's a silent no-op. The real, live-synced source of "who's registered" is
+- ~~`eventsCollection.participant` is dead/stale data.~~ **Fixed.**
+  `Details/index.vue`'s `persistParticipants()` sent an
+  `events-update-participant` IPC message with no backend handler anywhere —
+  a silent no-op. Removed it (both call sites, in `deleteRow` and
+  `saveDraft`) along with the now-pointless `ev.participant` read in
+  `loadEvent()`, since `dataTeams` is always immediately repopulated from
+  `teamsRegisteredCollection` via `refreshVisibleBuckets()` regardless. The
+  real, live-synced source of "who's registered" remains
   `teamsRegisteredCollection` (`upsert-teams-registered` /
-  `get-teams-registered`). Anything that still reads `event.participant`
-  directly is reading stale/empty data and should be pointed at
-  `teamsRegisteredCollection` instead.
-- **`HeadToHead.vue` sends `insert-h2h-result` to nowhere.** There's no
-  backend handler for that channel; the real H2H result save path is
-  `h2h:round:save` / `h2h:rounds:saveMany`. The dead send doesn't break
-  anything (fire-and-forget, no listener), but it's confusing leftover code
-  worth removing.
+  `get-teams-registered` / `delete-team-in-bucket`) — nothing in the app
+  reads or writes `eventsCollection.participant` anymore.
+- ~~`HeadToHead.vue` sends `insert-h2h-result` to nowhere.~~ **Fixed.** That
+  channel had no backend handler; the real H2H result save path is
+  `h2h:round:save` / `h2h:rounds:saveMany`. Removed the dead
+  `saveAllRoundsToDB()` method (its only trigger button was already
+  commented out in the template, so it wasn't reachable) along with its
+  now-unused `buildResultDocs()` helper. `saveAllRoundsLocal()` (local-only
+  save) and `exportAllRoundsJSON()` were left untouched — they're
+  self-contained and don't depend on any dead channel.
 - **`getOptionTeamTypes()`'s error-fallback list doesn't match its normal
   list.** In `ipcMainServices.js`, if the DB-backed team-type query throws,
   the fallback offers `{value:"country"}` instead of the real
@@ -185,3 +191,22 @@ Found during a code-review pass; not yet fixed unless noted otherwise.
   PDFs only ever had a Chief Judge signature slot to begin with (pre-existing
   layout, not something this session broke) — so Technical Delegate/Race
   Director signatures have nowhere to render on those three yet.
+
+
+Catatan fitur yang perlu diperbaiki
+eventsCollection.participant mati/basi — persistParticipants() mengirim IPC ke channel yang tidak ada handler-nya sama sekali. Data registrasi yang benar-benar dipakai ada di teamsRegisteredCollection.
+
+insert-h2h-result dari HeadToHead.vue tidak ada penerimanya — jalur simpan hasil H2H yang asli lewat h2h:round:save/h2h:rounds:saveMany. Kode mati, tapi tidak berbahaya.
+
+Fallback getOptionTeamTypes() tidak konsisten — kalau query DB gagal, opsi fallback pakai "country" bukan "wilayah"/"negara" seperti yang dipakai di tempat lain.
+
+Duplikat tim tidak benar-benar dicegah — index unik nameTeam+bibTeam di insertTeams.js sengaja dikomentari ("opsional").
+EventSettings.vue/JudgesSettings.vue masih bocor listener IPC — pola bug yang sama persis dengan yang sudah diperbaiki di CreateEvent.vue, belum diterapkan ke dua file ini.
+
+Halaman Team Details baru menampilkan Ranked/Score, belum detail timing mentah per-run — datanya tersebar di 5 koleksi berbeda struktur (sengaja ditunda, bukan bug).
+
+Signature Comitte belum tampil di semua PDF — baru render di Sprint/Rafting Cross/Overall; Slalom, DRR, H2H memang cuma punya slot Chief Judge dari sononya.
+
+Item lama yang belum tersentuh: edge case Sprint/Slalom/DRR result masih perlu di-review, dan H2H/DRR belum punya tombol "View Overall".
+
+Semua sudah tertulis rapi di Featured.md bagian "Known issues to fix" (baru) plus deskripsi fitur-fitur baru sesi ini (Comitte signature, View Details, Team Details page, Live Chat) ditambahkan ke bagian alur utamanya.

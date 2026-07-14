@@ -470,12 +470,6 @@
               <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
             </button>
             <button
-              class="btn-action btn-outline-primary"
-              @click="saveAllRoundsToDB"
-            >
-              <Icon icon="mdi:database-arrow-up-outline" /> Save All (DB)
-            </button>
-            <button
               class="btn-action btn-outline-dark"
               @click="exportAllRoundsJSON"
             >
@@ -1088,66 +1082,6 @@ function getBucket() {
       divisionName: "",
     };
   }
-}
-
-/** builder dokumen yang akan disimpan (pola Sprint) */
-function buildResultDocs(participantArr, bucket) {
-  const now = new Date();
-  return participantArr.map((t) => {
-    const team = {
-      nameTeam: String(t.nameTeam || ""),
-      bibTeam: String(t.bibTeam || ""),
-      startOrder: String(t.startOrder || ""),
-      praStart: String(t.praStart || ""),
-      intervalRace: String(t.intervalRace || ""),
-      statusId: Number.isFinite(t.statusId) ? Number(t.statusId) : 0,
-    };
-    const result = { ...(t.result || {}) };
-    const otr = { ...(t.otr || {}) };
-
-    // normalisasi
-    result.startTime = String(result.startTime || "");
-    result.finishTime = String(result.finishTime || "");
-    result.raceTime = String(result.raceTime || "");
-    result.penalty = Number.isFinite(result.penalty)
-      ? result.penalty
-      : result.penalty
-      ? Number(result.penalty)
-      : 0;
-    result.penaltyTime = String(result.penaltyTime || "00:00:00.000");
-    result.totalTime = String(result.totalTime || result.raceTime || "");
-    result.ranked = Number.isFinite(result.ranked)
-      ? result.ranked
-      : result.ranked
-      ? Number(result.ranked)
-      : 0;
-    result.score = Number.isFinite(result.score)
-      ? result.score
-      : result.score
-      ? Number(result.score)
-      : 0;
-
-    return {
-      // kunci relasi (HARUS sama dgn Teams Registered)
-      eventId: bucket.eventId,
-      initialId: bucket.initialId,
-      raceId: bucket.raceId,
-      divisionId: bucket.divisionId,
-      eventName: bucket.eventName,
-      initialName: bucket.initialName,
-      raceName: bucket.raceName,
-      divisionName: bucket.divisionName,
-
-      // data tim + hasil
-      ...team,
-      result,
-      otr,
-
-      // meta optional
-      createdAt: now,
-      updatedAt: now,
-    };
-  });
 }
 
 function normalizeTeamForH2H(t = {}) {
@@ -4746,71 +4680,6 @@ export default {
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
 
-    /** SAVE RESULT (channel khusus H2H) */
-    // ...existing
-    saveAllRoundsToDB() {
-      const bucket = getBucket();
-      const must = ["eventId", "initialId", "raceId", "divisionId"];
-      const missing = must.filter((k) => !bucket[k]);
-      if (missing.length) {
-        ipcRenderer.send("get-alert", {
-          type: "error",
-          detail: `Bucket fields missing: ${missing.join(", ")}`,
-          message: "Failed",
-        });
-        return;
-      }
-
-      const docs = [];
-      (this.rounds || []).forEach((r) => {
-        // ambil hasil tersimpan; kalau belum ada, bangun dari memory saat ini
-        const roundKey = String(r.id);
-        const all = readAllRoundResults(this.roundResultsRootKey) || {};
-        const arr = Array.isArray(all[roundKey])
-          ? all[roundKey]
-          : this.participantsForRound(r).map((t) => ({
-              nameTeam: t.nameTeam,
-              bibTeam: t.bibTeam,
-              result: t.result,
-            }));
-
-        arr.forEach((row) => {
-          const base = buildResultDocs([row], bucket)[0];
-          base.result = {
-            ...(base.result || {}),
-            _roundId: roundKey,
-            _roundName: r.bronze ? "Final B" : r.name,
-          };
-          docs.push(base);
-        });
-      });
-
-      if (!docs.length) {
-        ipcRenderer.send("get-alert", {
-          type: "warning",
-          detail: "Belum ada data yang bisa disimpan.",
-          message: "Ups Sorry",
-        });
-        return;
-      }
-
-      ipcRenderer.send("insert-h2h-result", docs);
-      ipcRenderer.once("insert-h2h-result-reply", (_e, res) => {
-        if (res && res.ok) {
-          ipcRenderer.send("get-alert-saved", {
-            type: "question",
-            detail: "Semua hasil per-babak berhasil disimpan.",
-            message: "Successfully",
-          });
-        } else {
-          ipcRenderer.send("get-alert", {
-            type: "error",
-            detail: (res && res.error) || "Save failed",
-            message: "Failed",
-          });
-        }
-      });
-    },
 
     goTo() {
       localStorage.removeItem("raceStartPayload");

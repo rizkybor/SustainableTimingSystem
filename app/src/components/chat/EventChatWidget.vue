@@ -15,6 +15,12 @@
       <span v-if="!isOpen && totalUnread > 0" class="chat-fab-badge">{{
         totalUnread > 99 ? "99+" : totalUnread
       }}</span>
+      <span
+        v-if="!isOpen && totalMentionUnread"
+        class="chat-fab-mention-badge"
+        title="Anda disebut (mention)"
+        >@</span
+      >
     </button>
 
     <!-- PANEL -->
@@ -79,7 +85,8 @@
             @click="selectCategory(c.key)"
           >
             {{ c.label }}
-            <span v-if="unreadByCategory[c.key]" class="chat-tab-dot"></span>
+            <span v-if="mentionUnreadByCategory[c.key]" class="chat-tab-mention" title="Anda disebut (mention)">@</span>
+            <span v-else-if="unreadByCategory[c.key]" class="chat-tab-dot"></span>
           </button>
         </div>
 
@@ -118,7 +125,7 @@
 
             <!-- MESSAGE STREAM -->
             <div v-else key="messages" class="chat-body">
-              <div ref="messageList" class="chat-messages">
+              <div ref="messageList" class="chat-messages" @scroll="onMessagesScroll">
                 <div v-if="loadingMessages" class="chat-placeholder chat-placeholder--compact">
                   <b-spinner small />
                   <p>Memuat pesan...</p>
@@ -131,11 +138,31 @@
                   <p>Belum ada pesan di ruang {{ activeCategoryLabel }}.<br />Mulai obrolan dengan judge.</p>
                 </div>
 
+                <div v-else-if="hasMoreOlderByCategory[activeCategoryKey]" class="chat-load-older">
+                  <div v-if="loadingOlderByCategory[activeCategoryKey]" class="chat-load-older-spinner">
+                    <b-spinner small />
+                    Memuat pesan lama…
+                  </div>
+                  <button v-else type="button" class="chat-load-older-btn" @click="loadOlderMessages">
+                    Muat pesan sebelumnya
+                  </button>
+                </div>
+                <p
+                  v-else-if="activeMessages.length && hasMoreOlderByCategory[activeCategoryKey] === false"
+                  class="chat-load-older-end"
+                >
+                  — Awal percakapan —
+                </p>
+
                 <div
                   v-for="(m, idx) in activeMessages"
                   :key="m._id || idx"
+                  :data-msg-id="m._id"
                   class="chat-row"
-                  :class="{ 'chat-row--own': m.senderEmail === ADMIN_EMAIL }"
+                  :class="{
+                    'chat-row--own': m.senderEmail === ADMIN_EMAIL,
+                    'chat-row--highlight': highlightId === m._id,
+                  }"
                 >
                   <div
                     class="chat-avatar chat-avatar--sm"
@@ -145,8 +172,13 @@
                   </div>
                   <div class="chat-message">
                     <div class="chat-message-meta">
-                      <span class="chat-message-name">{{ m.senderName }}</span>
-                      <span class="chat-message-time">{{ formatTime(m.createdAt) }}</span>
+                      <span class="chat-message-name" :style="{ color: avatarColor(m.senderName) }">{{ m.senderName }}</span>
+                      <span
+                        v-if="!m.deleted && hasMentionToken(m.text)"
+                        class="chat-mention-badge"
+                        title="Pesan ini mengandung mention"
+                        >@</span
+                      >
                     </div>
 
                     <div class="chat-message-row">
@@ -157,12 +189,25 @@
                         </p>
                         <template v-else>
                           <button
+                            v-if="m.replyTo"
+                            type="button"
+                            class="chat-reply-quote"
+                            @click="jumpToMessage(m.replyTo._id)"
+                          >
+                            <span
+                              class="chat-reply-quote-name"
+                              :style="{ color: avatarColor(m.replyTo.senderName) }"
+                              >{{ m.replyTo.senderEmail === ADMIN_EMAIL ? "Saya" : m.replyTo.senderName }}</span
+                            >
+                            <span class="chat-reply-quote-text">{{ quotePreviewText(m.replyTo) }}</span>
+                          </button>
+                          <button
                             v-if="m.attachment && m.attachment.type === 'image'"
                             type="button"
                             class="chat-attachment-image-btn"
                             @click="openImagePreview(m.attachment.url)"
                           >
-                            <img :src="m.attachment.url" alt="Gambar" class="chat-attachment-image" />
+                            <img :src="m.attachment.url" alt="Gambar" class="chat-attachment-image" @load="scrollToBottom" />
                           </button>
                           <VoiceMessageBubble
                             v-else-if="m.attachment && m.attachment.type === 'audio'"
@@ -179,7 +224,18 @@
                             >
                           </template>
                         </template>
+                        <span class="chat-message-bubble-time">{{ formatTime(m.createdAt) }}</span>
                       </div>
+
+                      <button
+                        v-if="!m.deleted"
+                        type="button"
+                        class="chat-reply-trigger"
+                        aria-label="Balas pesan"
+                        @click="replyingTo = m"
+                      >
+                        <Icon icon="mdi:reply-outline" width="14" height="14" />
+                      </button>
 
                       <button
                         v-if="m.senderEmail === ADMIN_EMAIL && !m.deleted"
@@ -244,6 +300,32 @@
                 <div v-if="recording" class="chat-recording-indicator">
                   <span class="chat-recording-dot"></span>
                   Merekam… {{ recordTimeLabel }}
+                </div>
+
+                <div v-if="replyingTo" class="chat-reply-preview">
+                  <div class="chat-reply-preview-bar" />
+                  <div class="chat-reply-preview-body">
+                    <p
+                      class="chat-reply-preview-name"
+                      :style="{
+                        color:
+                          replyingTo.senderEmail === ADMIN_EMAIL
+                            ? '#1874a5'
+                            : avatarColor(replyingTo.senderName),
+                      }"
+                    >
+                      Membalas {{ replyingTo.senderEmail === ADMIN_EMAIL ? "Saya" : replyingTo.senderName }}
+                    </p>
+                    <p class="chat-reply-preview-text">{{ quotePreviewText(replyingTo) }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="chat-reply-preview-close"
+                    aria-label="Batal balas"
+                    @click="replyingTo = null"
+                  >
+                    <Icon icon="mdi:close" width="14" height="14" />
+                  </button>
                 </div>
 
                 <form class="chat-composer" @submit.prevent="sendMessage()">
@@ -329,13 +411,14 @@
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
-import tone from "@/assets/tone/tone_message.mp3";
+import tone from "@/assets/tone/message_notify.mp3";
 import { uploadOne, MAX_UPLOAD_BYTES } from "@/utils/cloudinaryUpload";
 import VoiceMessageBubble from "@/components/chat/VoiceMessageBubble.vue";
 
 const ADMIN_EMAIL = "timing-system@internal";
 const ADMIN_NAME = "Timing System";
 const EXPANDED_STORAGE_KEY = "chatWidgetExpanded";
+const CHAT_PAGE_SIZE = 25; // jumlah pesan per batch (initial load & load pesan lama)
 const MAX_RECORD_SECONDS = 120; // jaring pengaman ukuran file
 
 const AUDIO_MIME_CANDIDATES = [
@@ -424,6 +507,9 @@ export default {
       draft: "",
       sending: false,
       unreadByCategory: {},
+      mentionUnreadByCategory: {},
+      hasMoreOlderByCategory: {},
+      loadingOlderByCategory: {},
       selfSocketId: null,
       initSocket: null,
       pollTimer: null,
@@ -434,6 +520,8 @@ export default {
       previewImage: null,
       confirmDeleteId: null,
       deletingId: null,
+      replyingTo: null,
+      highlightId: null,
       // @mention autocomplete
       showMentionList: false,
       mentionQuery: "",
@@ -459,22 +547,7 @@ export default {
       return c ? c.label : "";
     },
     members() {
-      if (!this.activeCategoryKey) return [];
-      const key = this.activeCategoryKey;
-      const out = [];
-      this.judgeAssignments.forEach((doc) => {
-        const entry =
-          doc && doc.judges && doc.judges.length ? doc.judges[0] : null;
-        const role = categoryRoleLabel(entry, key);
-        if (role) {
-          out.push({
-            email: doc.email,
-            username: doc.username,
-            role,
-          });
-        }
-      });
-      return out;
+      return this.membersForCategory(this.activeCategoryKey);
     },
     activeMessages() {
       return this.messagesByCategory[this.activeCategoryKey] || [];
@@ -491,6 +564,9 @@ export default {
         (a, b) => a + (b || 0),
         0
       );
+    },
+    totalMentionUnread() {
+      return Object.values(this.mentionUnreadByCategory).some(Boolean);
     },
     recordTimeLabel() {
       return formatDuration(this.recordSeconds);
@@ -540,6 +616,9 @@ export default {
       this.activeCategoryKey = "";
       this.messagesByCategory = {};
       this.unreadByCategory = {};
+      this.mentionUnreadByCategory = {};
+      this.hasMoreOlderByCategory = {};
+      this.loadingOlderByCategory = {};
       this.showMembers = false;
       this.showMentionList = false;
     },
@@ -586,6 +665,10 @@ export default {
             ...this.unreadByCategory,
             [this.activeCategoryKey]: 0,
           };
+          this.mentionUnreadByCategory = {
+            ...this.mentionUnreadByCategory,
+            [this.activeCategoryKey]: false,
+          };
           if (!this.messagesByCategory[this.activeCategoryKey]) {
             this.loadMessagesForActiveCategory();
           } else {
@@ -606,6 +689,7 @@ export default {
       this.showMembers = false;
       this.showMentionList = false;
       this.unreadByCategory = { ...this.unreadByCategory, [key]: 0 };
+      this.mentionUnreadByCategory = { ...this.mentionUnreadByCategory, [key]: false };
       if (!this.messagesByCategory[key]) {
         this.loadMessagesForActiveCategory();
       } else {
@@ -619,14 +703,70 @@ export default {
       const category = this.activeCategoryKey;
       this.loadingMessages = true;
       ipcRenderer.removeAllListeners("chat:listByEvent:reply");
-      ipcRenderer.send("chat:listByEvent", { eventId: this.eventId, category });
+      ipcRenderer.send("chat:listByEvent", {
+        eventId: this.eventId,
+        category,
+        limit: CHAT_PAGE_SIZE,
+      });
       ipcRenderer.once("chat:listByEvent:reply", (_e, res) => {
         this.loadingMessages = false;
         if (res && res.ok && Array.isArray(res.messages)) {
           this.$set(this.messagesByCategory, category, res.messages);
+          this.$set(this.hasMoreOlderByCategory, category, !!res.hasMore);
           this.$nextTick(() => this.scrollToBottom());
         }
       });
+    },
+
+    // Load pesan LEBIH LAMA saat user scroll ke atas — batch di-prepend ke
+    // awal daftar, posisi scroll dipertahankan (tidak lompat ke bawah) dengan
+    // menyimpan scrollHeight sebelum & sesudah render lalu menghitung selisihnya.
+    loadOlderMessages() {
+      const category = this.activeCategoryKey;
+      if (typeof ipcRenderer === "undefined" || !this.eventId || !category) return;
+      if (this.loadingOlderByCategory[category]) return;
+      if (this.hasMoreOlderByCategory[category] === false) return;
+
+      const list = this.messagesByCategory[category] || [];
+      if (!list.length) return;
+      const oldest = list[0];
+
+      const el = this.$refs.messageList;
+      const prevScrollHeight = el ? el.scrollHeight : 0;
+      const prevScrollTop = el ? el.scrollTop : 0;
+
+      this.$set(this.loadingOlderByCategory, category, true);
+      ipcRenderer.removeAllListeners("chat:listOlder:reply");
+      ipcRenderer.send("chat:listOlder", {
+        eventId: this.eventId,
+        category,
+        before: oldest._id,
+        limit: CHAT_PAGE_SIZE,
+      });
+      ipcRenderer.once("chat:listOlder:reply", (_e, res) => {
+        this.$set(this.loadingOlderByCategory, category, false);
+        if (!res || !res.ok || !Array.isArray(res.messages)) return;
+        // kategori aktif sudah berpindah selagi menunggu balasan — abaikan
+        if (category !== this.activeCategoryKey) return;
+
+        this.$set(this.hasMoreOlderByCategory, category, !!res.hasMore);
+        if (!res.messages.length) return;
+
+        const current = this.messagesByCategory[category] || [];
+        this.$set(this.messagesByCategory, category, [...res.messages, ...current]);
+
+        this.$nextTick(() => {
+          const elAfter = this.$refs.messageList;
+          if (elAfter) {
+            elAfter.scrollTop = elAfter.scrollHeight - prevScrollHeight + prevScrollTop;
+          }
+        });
+      });
+    },
+
+    onMessagesScroll(e) {
+      const el = e.target;
+      if (el.scrollTop < 60) this.loadOlderMessages();
     },
 
     // Poll diam-diam kategori yang sedang dibuka (tidak menampilkan spinner,
@@ -643,7 +783,11 @@ export default {
 
       const category = this.activeCategoryKey;
       ipcRenderer.removeAllListeners("chat:listByEvent:reply");
-      ipcRenderer.send("chat:listByEvent", { eventId: this.eventId, category });
+      ipcRenderer.send("chat:listByEvent", {
+        eventId: this.eventId,
+        category,
+        limit: CHAT_PAGE_SIZE,
+      });
       ipcRenderer.once("chat:listByEvent:reply", (_e, res) => {
         if (!res || !res.ok || !Array.isArray(res.messages)) return;
         // pastikan kategori aktif belum berpindah selagi menunggu balasan
@@ -850,6 +994,16 @@ export default {
       if ((!text && !att) || !category || typeof ipcRenderer === "undefined")
         return;
 
+      const replyTo = this.replyingTo
+        ? {
+            _id: this.replyingTo._id,
+            senderEmail: this.replyingTo.senderEmail,
+            senderName: this.replyingTo.senderName,
+            text: this.replyingTo.text || "",
+            attachmentType: (this.replyingTo.attachment && this.replyingTo.attachment.type) || null,
+          }
+        : null;
+
       this.sending = true;
       const payload = {
         eventId: this.eventId,
@@ -858,6 +1012,7 @@ export default {
         senderName: ADMIN_NAME,
         text,
         attachment: att,
+        replyTo,
       };
 
       ipcRenderer.removeAllListeners("chat:send:reply");
@@ -869,6 +1024,7 @@ export default {
           this.$set(this.messagesByCategory, category, [...list, res.message]);
           this.draft = "";
           this.showMentionList = false;
+          this.replyingTo = null;
           this.$nextTick(() => this.scrollToBottom());
 
           try {
@@ -882,6 +1038,7 @@ export default {
               senderName: res.message.senderName,
               text: res.message.text,
               attachment: res.message.attachment || null,
+              replyTo: res.message.replyTo || null,
               _id: res.message._id,
               createdAt: res.message.createdAt,
             });
@@ -892,6 +1049,27 @@ export default {
           this.showUploadError(res.error || "Gagal mengirim pesan");
         }
       });
+    },
+
+    quotePreviewText(m) {
+      if (!m) return "";
+      if (m.text) return m.text;
+      const type = m.attachmentType || (m.attachment && m.attachment.type);
+      if (type === "image") return "📷 Gambar";
+      if (type === "audio") return "🎤 Pesan suara";
+      return "";
+    },
+
+    jumpToMessage(id) {
+      const el = this.$refs.messageList
+        ? this.$refs.messageList.querySelector(`[data-msg-id="${id}"]`)
+        : null;
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      this.highlightId = id;
+      setTimeout(() => {
+        if (this.highlightId === id) this.highlightId = null;
+      }, 1200);
     },
 
     /* =========================================================
@@ -958,12 +1136,47 @@ export default {
       });
     },
 
-    renderMessageTokens(text) {
-      const str = String(text || "");
-      const names = this.members
+    membersForCategory(key) {
+      if (!key) return [];
+      const out = [];
+      this.judgeAssignments.forEach((doc) => {
+        const entry =
+          doc && doc.judges && doc.judges.length ? doc.judges[0] : null;
+        const role = categoryRoleLabel(entry, key);
+        if (role) {
+          out.push({
+            email: doc.email,
+            username: doc.username,
+            role,
+          });
+        }
+      });
+      return out;
+    },
+
+    mentionableNames(categoryKey) {
+      const members = categoryKey ? this.membersForCategory(categoryKey) : this.members;
+      return members
         .map((m) => m.username || m.email)
         .filter(Boolean)
         .sort((a, b) => b.length - a.length);
+    },
+
+    // Pesan dianggap "Mentioned" kalau mengandung token "@<username judge terdaftar>"
+    // — dipakai buat tanda notifikasi '@' merah (bukan sekadar teks "@" bebas ala email dsb).
+    hasMentionToken(text, categoryKey) {
+      const str = String(text || "");
+      if (!str) return false;
+      const names = this.mentionableNames(categoryKey);
+      if (!names.length) return false;
+      const escaped = names.map((n) => String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      const re = new RegExp("(^|\\s)@(" + escaped.join("|") + ")(?=\\s|$)", "i");
+      return re.test(str);
+    },
+
+    renderMessageTokens(text) {
+      const str = String(text || "");
+      const names = this.mentionableNames();
 
       if (!names.length) return [{ mention: false, text: str }];
 
@@ -1039,6 +1252,7 @@ export default {
               senderName: msg.senderName || "Judge",
               text: msg.text,
               attachment: msg.attachment || null,
+              replyTo: msg.replyTo || null,
               createdAt: msg.createdAt,
             },
           ]);
@@ -1053,6 +1267,12 @@ export default {
               ...this.unreadByCategory,
               [category]: (this.unreadByCategory[category] || 0) + 1,
             };
+            if (this.hasMentionToken(msg.text, category)) {
+              this.mentionUnreadByCategory = {
+                ...this.mentionUnreadByCategory,
+                [category]: true,
+              };
+            }
           }
 
           try {
@@ -1087,9 +1307,14 @@ export default {
       if (!dt) return "";
       const d = new Date(dt);
       if (isNaN(d.getTime())) return "";
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${hh}:${mm}`;
+      // Selalu tampilkan Waktu Indonesia Barat (WIB), lepas dari timezone
+      // sistem operasi perangkat yang menjalankan app ini.
+      return d.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      });
     },
 
     initials(name) {
@@ -1164,6 +1389,24 @@ export default {
   min-width: 20px;
   text-align: center;
   box-shadow: 0 2px 6px rgba(229, 72, 77, 0.5);
+}
+.chat-fab-mention-badge {
+  position: absolute;
+  bottom: -3px;
+  left: -3px;
+  width: 20px;
+  height: 20px;
+  background: #e5484d;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(229, 72, 77, 0.5);
+  animation: chat-recording-pulse 1.4s ease-in-out infinite;
 }
 .chat-fab-icon-enter-active,
 .chat-fab-icon-leave-active {
@@ -1350,6 +1593,33 @@ export default {
   margin-left: 5px;
   vertical-align: middle;
 }
+.chat-tab-mention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.chat-mention-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  margin-left: 4px;
+}
 .chat-tab--active .chat-tab-dot {
   background: #fff;
 }
@@ -1467,7 +1737,10 @@ export default {
   overflow-y: auto;
   padding: 14px;
   min-height: 260px;
-  background: #fbfcfd;
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle, rgba(24, 116, 165, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, #f1f5f9, #f8fafc);
+  background-size: 18px 18px, 100% 100%;
   display: flex;
   flex-direction: column;
 }
@@ -1477,6 +1750,40 @@ export default {
 .chat-messages::-webkit-scrollbar-thumb {
   background: rgba(15, 30, 45, 0.15);
   border-radius: 999px;
+}
+
+.chat-load-older {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 12px;
+}
+.chat-load-older-spinner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.chat-load-older-btn {
+  border: none;
+  background: rgba(24, 116, 165, 0.08);
+  color: #1874a5;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.chat-load-older-btn:hover {
+  background: rgba(24, 116, 165, 0.16);
+}
+.chat-load-older-end {
+  text-align: center;
+  font-size: 11px;
+  color: #cbd5e1;
+  padding: 4px 0 12px;
+  margin: 0;
 }
 
 .chat-row {
@@ -1532,6 +1839,17 @@ export default {
   border: none;
   border-radius: 14px 14px 4px 14px;
 }
+.chat-message-bubble-time {
+  display: block;
+  text-align: right;
+  font-size: 10px;
+  margin-top: 3px;
+  color: #9aa3af;
+  opacity: 0.85;
+}
+.chat-row--own .chat-message-bubble .chat-message-bubble-time {
+  color: rgba(255, 255, 255, 0.75);
+}
 .chat-message-bubble--deleted {
   background: #f3f4f6 !important;
   color: #9ca3af !important;
@@ -1555,7 +1873,8 @@ export default {
 .chat-row--own .chat-message-row {
   flex-direction: row-reverse;
 }
-.chat-delete-trigger {
+.chat-delete-trigger,
+.chat-reply-trigger {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -1570,12 +1889,59 @@ export default {
   opacity: 0;
   transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.chat-row:hover .chat-delete-trigger {
+.chat-row:hover .chat-delete-trigger,
+.chat-row:hover .chat-reply-trigger {
   opacity: 1;
 }
 .chat-delete-trigger:hover {
   background: #fef2f2;
   color: #ef4444;
+}
+.chat-reply-trigger:hover {
+  background: #eff6ff;
+  color: #1874a5;
+}
+
+.chat-reply-quote {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-left: 3px solid #1874a5;
+  border-radius: 6px;
+  background: rgba(24, 116, 165, 0.06);
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.chat-row--own .chat-message-bubble .chat-reply-quote {
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: rgba(255, 255, 255, 0.7);
+}
+.chat-reply-quote-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-row--own .chat-message-bubble .chat-reply-quote-name {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.chat-reply-quote-text {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-row--own .chat-message-bubble .chat-reply-quote-text {
+  color: rgba(255, 255, 255, 0.75);
+}
+.chat-row--highlight .chat-message-bubble {
+  box-shadow: 0 0 0 2px #1874a5;
 }
 .chat-delete-confirm {
   display: flex;
@@ -1782,6 +2148,54 @@ export default {
 @keyframes chat-recording-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+.chat-reply-preview {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 7px 10px;
+  background: #eff6ff;
+  border-top: 1px solid #dbeafe;
+}
+.chat-reply-preview-bar {
+  width: 3px;
+  border-radius: 999px;
+  background: #1874a5;
+  flex-shrink: 0;
+}
+.chat-reply-preview-body {
+  flex: 1;
+  min-width: 0;
+}
+.chat-reply-preview-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin: 0;
+}
+.chat-reply-preview-text {
+  font-size: 11.5px;
+  color: #6b7280;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-reply-preview-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.chat-reply-preview-close:hover {
+  background: #dbeafe;
+  color: #1874a5;
 }
 .chat-attachment-image-btn {
   display: block;

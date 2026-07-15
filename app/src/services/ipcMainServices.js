@@ -196,15 +196,36 @@ function setupIPCMainHandlers() {
     }
   });
 
-  // Chat: list history for an event + category (Race Category room)
+  // Chat: list history for an event + category (Race Category room) —
+  // dipakai untuk initial load & poll ringan (selalu ambil batch TERBARU).
   ipcMain.on("chat:listByEvent", async (event, payload) => {
     try {
       const eventId = payload && payload.eventId ? payload.eventId : payload;
       const category = payload && payload.category ? payload.category : "";
-      const messages = await listChatMessagesByEvent(eventId, category);
-      event.reply("chat:listByEvent:reply", { ok: true, messages });
+      const limit = payload && payload.limit;
+      const { items, hasMore } = await listChatMessagesByEvent(eventId, category, { limit });
+      event.reply("chat:listByEvent:reply", { ok: true, messages: items, hasMore });
     } catch (err) {
       event.reply("chat:listByEvent:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // Chat: load pesan LEBIH LAMA (infinite-scroll ke atas) — channel balasan
+  // sengaja terpisah dari "chat:listByEvent:reply" supaya tidak rebutan
+  // listener dengan initial-load/poll yang bisa jalan bersamaan.
+  ipcMain.on("chat:listOlder", async (event, payload) => {
+    try {
+      const eventId = payload && payload.eventId;
+      const category = payload && payload.category;
+      const before = payload && payload.before;
+      const limit = payload && payload.limit;
+      const { items, hasMore } = await listChatMessagesByEvent(eventId, category, {
+        before,
+        limit,
+      });
+      event.reply("chat:listOlder:reply", { ok: true, messages: items, hasMore });
+    } catch (err) {
+      event.reply("chat:listOlder:reply", { ok: false, error: err.message });
     }
   });
 

@@ -29,6 +29,16 @@ async function ensureIndexes(database) {
     // menolak membuat unique index — jangan sampai itu menggagalkan seluruh
     // koneksi DB, cukup lanjut tanpa constraint ini untuk sementara.
   }
+
+  try {
+    // Dipakai buat cursor pagination live chat (load pesan lama saat scroll
+    // ke atas) — filter by eventId+category lalu urut/filter by _id.
+    await database
+      .collection("chatMessages")
+      .createIndex({ eventId: 1, category: 1, _id: -1 });
+  } catch (err) {
+    // non-fatal
+  }
 }
 
 async function getDb() {

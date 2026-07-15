@@ -21,6 +21,18 @@ function normalizeAttachment(a) {
   };
 }
 
+function normalizeReplyTo(r) {
+  if (!r || typeof r !== "object" || !r._id) return null;
+  var attachmentType = r.attachmentType ? String(r.attachmentType) : "";
+  return {
+    _id: String(r._id),
+    senderEmail: r.senderEmail ? String(r.senderEmail) : "",
+    senderName: r.senderName ? String(r.senderName) : "",
+    text: r.text ? String(r.text) : "",
+    attachmentType: VALID_ATTACHMENT_TYPES.indexOf(attachmentType) === -1 ? null : attachmentType,
+  };
+}
+
 // INSERT: satu pesan chat untuk sebuah event + kategori (Race Category)
 async function insertChatMessage(payload) {
   var p = payload || {};
@@ -30,6 +42,7 @@ async function insertChatMessage(payload) {
   var senderName = p.senderName ? String(p.senderName) : senderEmail;
   var text = p.text ? String(p.text).trim() : "";
   var attachment = normalizeAttachment(p.attachment);
+  var replyTo = normalizeReplyTo(p.replyTo);
 
   if (!eventId) throw new Error("eventId is required");
   if (VALID_CATEGORIES.indexOf(category) === -1) {
@@ -48,6 +61,7 @@ async function insertChatMessage(payload) {
     senderName: senderName,
     text: text,
     attachment: attachment,
+    replyTo: replyTo,
     deleted: false,
     createdAt: new Date(),
   };
@@ -59,10 +73,16 @@ async function insertChatMessage(payload) {
   };
 }
 
-// LIST: riwayat chat untuk satu event + kategori, urut lama -> baru
+// LIST: riwayat chat untuk satu event + kategori, urut lama -> baru.
+// Cursor pagination pakai _id (bukan createdAt) — ObjectId sudah monoton
+// per waktu insert dan unik, jadi aman dipakai sebagai cursor tanpa perlu
+// tie-breaker tambahan untuk pesan yang createdAt-nya kebetulan sama persis.
+// opts.before: _id pesan paling lama yang sudah termuat di client (opsional,
+// kosongkan untuk ambil batch pesan TERBARU / initial load).
 async function listChatMessagesByEvent(eventId, category, opts) {
   var options = opts || {};
-  var limit = Number.isFinite(options.limit) ? options.limit : 200;
+  var limit = Number.isFinite(options.limit) ? options.limit : 25;
+  limit = Math.min(Math.max(limit, 1), 100);
 
   var db = await getDb();
   var col = db.collection("chatMessages");
@@ -70,17 +90,27 @@ async function listChatMessagesByEvent(eventId, category, opts) {
   var query = { eventId: String(eventId || "") };
   if (category) query.category = String(category).toLowerCase();
 
-  var items = await col
+  if (options.before) {
+    try {
+      query._id = { $lt: new ObjectId(String(options.before)) };
+    } catch (e) {
+      // cursor tidak valid — abaikan, perlakukan seperti tanpa cursor
+    }
+  }
+
+  var page = await col
     .find(query)
-    .sort({ createdAt: -1 })
+    .sort({ _id: -1 })
     .limit(limit)
     .toArray();
 
-  items.reverse(); // jadi urut lama -> baru
-  items.forEach(function (it) {
+  var hasMore = page.length === limit;
+
+  page.reverse(); // jadi urut lama -> baru
+  page.forEach(function (it) {
     it._id = String(it._id);
   });
-  return items;
+  return { items: page, hasMore: hasMore };
 }
 
 // DELETE (soft): hapus/tarik pesan milik sendiri ala WhatsApp — dokumen

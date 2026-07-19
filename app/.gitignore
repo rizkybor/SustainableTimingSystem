@@ -27,3 +27,6 @@ yarn-error.log*
 
 # generated installer key (contains the real secret, see scripts/generate-installer-key.js)
 /nsis/installer-key.nsh
+
+# internal dev notes (SI card reader decode logic recap)
+src/utils/sportIdentReader.md

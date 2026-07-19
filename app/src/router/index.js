@@ -20,6 +20,7 @@ import EventOverallResult from "@/views/Result/EventOverallResult.vue";
 import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
 import AllEvent from "../views/Event/AllEvent.vue";
 import Unlock from "@/views/Unlock.vue";
+import SiCardTest from "@/views/SiCardTest/index.vue";
 import { isUnlocked } from "@/utils/auth";
 
 Vue.use(VueRouter);
@@ -37,6 +38,7 @@ const routes = [
   { path: "/create-new", name: "create-new", component: CreateEvent },
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/team", name: "team-detail", component: TeamDetail },
+  { path: "/si-test", name: "si-card-test", component: SiCardTest },
 
   {
     path: "/event-detail/:id",

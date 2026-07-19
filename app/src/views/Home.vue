@@ -145,6 +145,32 @@
             </div>
           </b-card>
         </b-col>
+
+        <b-col cols="12" md="4" class="mb-4">
+          <b-card class="action-card">
+            <div class="d-flex flex-column align-items-center text-center p-2">
+              <div
+                class="mb-2 d-flex align-items-center justify-content-center"
+              >
+                <Icon icon="mdi:card-account-details-outline" width="48" height="48" />
+              </div>
+              <h5 class="mb-1 mt-3 font-weight-bold">
+                SI Card Reader Test
+                <b-badge variant="warning" class="ml-1">temp</b-badge>
+              </h5>
+              <small class="text-muted d-block mb-3">
+                Halaman percobaan integrasi SPORTident card reader (dev only).
+              </small>
+              <b-button
+                variant="secondary"
+                class="btn-action btn-outline-info w-100"
+                @click="goTo('si-test')"
+              >
+                Open SI Test
+              </b-button>
+            </div>
+          </b-card>
+        </b-col>
       </b-row>
 
       <!-- 4) EVENTS LIST (SLIDER) -->

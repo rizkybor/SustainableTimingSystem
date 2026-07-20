@@ -21,6 +21,7 @@ import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
 import AllEvent from "../views/Event/AllEvent.vue";
 import Unlock from "@/views/Unlock.vue";
 import SiCardTest from "@/views/SiCardTest/index.vue";
+import MicroGateTest from "@/views/MicroGateTest/index.vue";
 import { isUnlocked } from "@/utils/auth";
 
 Vue.use(VueRouter);
@@ -39,6 +40,7 @@ const routes = [
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/team", name: "team-detail", component: TeamDetail },
   { path: "/si-test", name: "si-card-test", component: SiCardTest },
+  { path: "/microgate-test", name: "microgate-test", component: MicroGateTest },
 
   {
     path: "/event-detail/:id",

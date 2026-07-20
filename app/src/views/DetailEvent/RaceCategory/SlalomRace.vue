@@ -145,11 +145,19 @@
                   'btn-danger': isPortConnected,
                   'btn-success': !isPortConnected,
                 }"
-                class="btn-action mb-2"
+                class="btn-action btn-connect mb-2"
+                :disabled="isConnectingPort"
                 @click="connectPort"
               >
-                <Icon icon="ic:baseline-sync" />
-                {{ isPortConnected ? "Disconnect" : "Connect Racetime" }}
+                <b-spinner small v-if="isConnectingPort" class="mr-1" />
+                <Icon v-else icon="ic:baseline-sync" />
+                {{
+                  isConnectingPort
+                    ? "Connecting..."
+                    : isPortConnected
+                    ? "Disconnect"
+                    : "Connect Racetime"
+                }}
               </button>
 
               <span
@@ -3257,6 +3265,44 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* Connect/Disconnect: .btn-action's white background above (and its :hover
+   rule) win by default over Bootstrap's .btn-success/.btn-danger (equal
+   specificity, .btn-action declared later) — these overrides use an extra
+   class to win instead. */
+.btn-connect {
+  min-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+.btn-connect.btn-success {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.btn-connect.btn-success:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+}
+.btn-connect.btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.btn-connect.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.btn-connect:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* ===== HERO / BANNER ===== */

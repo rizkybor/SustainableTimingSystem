@@ -323,8 +323,19 @@ export default {
       selectedEventId: "",
       eventDict: {},
       eventOptions: [],
+      // SVG inline (bukan URL layanan eksternal) — sebelumnya memuat dari
+      // ui-avatars.com, yang jadi gambar rusak (broken image) kalau jaringan
+      // tidak bisa akses domain eksternal itu (mis. offline/firewall).
+      // Placeholder lokal ini selalu tampil tanpa bergantung pada internet.
       fallbackAvatar:
-        "https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&bold=true",
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+            '<rect width="64" height="64" fill="#E5E7EB"/>' +
+            '<circle cx="32" cy="24" r="12" fill="#9CA3AF"/>' +
+            '<path d="M8 58c0-13.3 10.7-22 24-22s24 8.7 24 22" fill="#9CA3AF"/>' +
+            "</svg>"
+        ),
     };
   },
   computed: {
@@ -601,14 +612,19 @@ export default {
           return;
         }
 
-        // normalisasi mainEvents + tambahkan selectedEventId (unik)
+        // normalisasi mainEvents. JANGAN ikut-ikutan menambahkan
+        // `selectedEventId` di sini — itu cuma nilai dropdown "+ Add
+        // Event" yang sedang dipilih (bisa saja belum diklik Add-nya).
+        // Kalau ikut disertakan, event yang cuma sedang dilihat/dipilih
+        // di dropdown (tanpa klik + Add Event) akan diam-diam ikut
+        // tersimpan ke mainEvents user saat tombol Save utama diklik.
+        // Penambahan event yang sah sudah ditangani sepenuhnya oleh
+        // addMainEvent() yang push langsung ke editForm.mainEvents.
         const set = new Set(
           (Array.isArray(form.mainEvents) ? form.mainEvents : [])
             .map(this._toStringId)
             .filter(Boolean)
         );
-        const selectedId = this._toStringId(this.selectedEventId || "");
-        if (selectedId) set.add(selectedId);
 
         // ⚠️ KIRIM CUMA INI
         const payload = {

@@ -110,7 +110,9 @@
             </td>
             <td class="text-center">
               {{
-                row && row.result && row.result.penalty ? row.result.penalty : 0
+                row && row.result && row.result.totalPenalty
+                  ? row.result.totalPenalty
+                  : 0
               }}
             </td>
             <td class="mono">

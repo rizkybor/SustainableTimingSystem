@@ -95,19 +95,35 @@
               </div>
 
               <div class="meta-row">
-                <!-- Select category -->
-                <b-form-group
-                  label="Switch Sprint Category:"
-                  label-for="sprintBucketSelect"
-                  class="mb-0 sprint-actionbar__select"
-                >
-                  <b-form-select
-                    id="sprintBucketSelect"
-                    :options="sprintBucketOptions"
-                    v-model="selectedSprintKey"
-                    @change="onSelectSprintBucket"
-                  />
-                </b-form-group>
+                <!-- Select category: pilih Initial dulu, baru Divisi/Race -->
+                <div class="sprint-actionbar__select">
+                  <div class="switch-label mb-1">Switch Sprint Category:</div>
+
+                  <div class="init-tabs mb-2" v-if="initials.length">
+                    <button
+                      v-for="i in initials"
+                      :key="i.id"
+                      type="button"
+                      class="init-tab"
+                      :class="{ active: selectedInitialName === i.name }"
+                      @click="selectInitialTab(i)"
+                    >
+                      {{ i.name }}
+                    </button>
+                  </div>
+
+                  <b-form-group
+                    label-for="sprintBucketSelect"
+                    class="mb-0"
+                  >
+                    <b-form-select
+                      id="sprintBucketSelect"
+                      :options="sprintOptionsForSelectedInitial"
+                      v-model="selectedSprintKey"
+                      @change="onSelectSprintBucket"
+                    />
+                  </b-form-group>
+                </div>
               </div>
             </div>
           </b-col>
@@ -302,7 +318,17 @@
 
                   <!-- START TIME  -->
                   <td class="text-center text-monospace">
-                    {{ item.result.startTime }}
+                    <b-form-input
+                      :value="item.result.startTime"
+                      placeholder="00:00:00.000"
+                      style="
+                        min-width: 130px;
+                        text-align: center;
+                        border-radius: 8px;
+                      "
+                      class="text-monospace"
+                      @change="updateTime($event, index, 'start')"
+                    />
                   </td>
 
                   <!-- PENALTY START -->
@@ -315,7 +341,7 @@
                       class="small-select"
                     >
                       <option
-                        v-for="p in dataPenalties"
+                        v-for="p in dataPenaltiesStart"
                         :key="'sp' + p.value"
                         :value="p.value"
                       >
@@ -334,11 +360,11 @@
                       class="small-select"
                     >
                       <option
-                        v-for="p in dataPenalties"
+                        v-for="p in dataPenaltiesFinish"
                         :key="'fp' + p.value"
                         :value="p.value"
                       >
-                        {{ p.value }}
+                        {{ p.label }}
                       </option>
                     </b-select>
                   </td>
@@ -493,8 +519,6 @@ function buildResultDocs(participantArr, bucket) {
       ? Number(result.finishPenalty)
       : 0;
 
-    result.penalty = 0;
-
     result.totalPenalty = Number.isFinite(result.totalPenalty)
       ? Number(result.totalPenalty)
       : result.startPenalty + result.finishPenalty;
@@ -560,8 +584,6 @@ function normalizeTeamForSprint(t = {}) {
     startPenalty: 0,
     finishPenalty: 0,
 
-    penalty: 0,
-
     startPenaltyTime: "00:00:00.000",
     finishPenaltyTime: "00:00:00.000",
     totalPenalty: 0,
@@ -614,11 +636,22 @@ export default {
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
       selectedSprintKey: "",
+      // Initial (Youth/Junior/Open dll) yang sedang dipilih di tab "Switch
+      // Sprint Category" — dropdown di bawahnya cuma menampilkan kombinasi
+      // Divisi/Race milik Initial ini, mengikuti pola halaman Details.
+      selectedInitialName: "",
       selfSocketId: null,
       endGame: false,
       isScrolled: false,
       penTeam: "",
+      // key bucket yang SEDANG ditampilkan — dipakai (bukan selectedSprintKey)
+      // untuk flush cache saat pindah kategori, karena v-model pada
+      // b-form-select sudah menimpa selectedSprintKey ke nilai baru sebelum
+      // handler @change sempat jalan.
+      lastSprintKey: "",
       dataPenalties: [],
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
       dataScore: [],
       isRankedDescending: false,
       participant: [],
@@ -714,6 +747,26 @@ export default {
       return Array.isArray(this.participant)
         ? this.participant
         : Object.values(this.participant || {});
+    },
+    // Kombinasi Divisi/Race (mis. "R4 MEN") milik Initial yang sedang aktif
+    // saja — labelnya tidak perlu lagi menyertakan nama Initial karena sudah
+    // dipilih lewat tab di atasnya.
+    sprintOptionsForSelectedInitial() {
+      const opts = this.sprintBucketOptions || [];
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.sprintBucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.sprintBucketMap[o.value];
+          return {
+            value: o.value,
+            text: `${b.divisionName} ${b.raceName}`,
+          };
+        });
     },
     dataEventSafe() {
       return this.dataEvent && typeof this.dataEvent === "object"
@@ -822,6 +875,7 @@ export default {
 
     await this.loadDataScore("SPRINT");
     await this.loadDataPenalties("SPRINT");
+    await this.loadRaceSettings();
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
@@ -890,7 +944,9 @@ export default {
         payload.value === "" || payload.value == null
           ? 0
           : Number(payload.value);
-      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      const sourceList =
+        kind === "start" ? this.dataPenaltiesStart : this.dataPenaltiesFinish;
+      const allowed = (sourceList || []).map((p) => Number(p.value));
       if (!allowed.includes(numVal)) return;
 
       // set nilai penalty → ini otomatis mengikat dengan v-model.number di <b-select>
@@ -973,14 +1029,64 @@ export default {
       try {
         ipcRenderer.send("option-penalties", type);
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          if (payload) {
-            this.dataPenalties = payload[0].data;
-          } else {
-            this.dataPenalties = [];
-          }
+          const data =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
+          this.dataPenalties = data;
+          // dipakai sebagai fallback sebelum race-settings per-event dimuat
+          this.dataPenaltiesStart = data;
+          this.dataPenaltiesFinish = data;
         });
       } catch (error) {
         this.dataPenalties = [];
+        this.dataPenaltiesStart = [];
+        this.dataPenaltiesFinish = [];
+      }
+    },
+
+    // sekunder → string "HH:MM:SS.000" biar konsisten dg format timePen lainnya
+    secondsToTimeString(totalSec) {
+      const t = Math.max(0, Number(totalSec) || 0);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+
+    // PS (Pen. Start) dan PF (Pen. Finish) punya daftar pilihan penalty yang
+    // independen, dikustomisasi per-event lewat modal Race Settings (default
+    // FAJI: start 0/5/10..., finish 0/10/50 — lihat Pasal 37 & 43). Kalau
+    // event ini belum pernah diatur, dataPenalties dari optionPenalties
+    // (global) tetap dipakai untuk keduanya.
+    async loadRaceSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const sprintSettings = res && res.ok && res.settings && res.settings.sprint;
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: this.secondsToTimeString(Number(p.value) || 0),
+                  }))
+                : null;
+
+            const startList = sprintSettings && toList(sprintSettings.startPenalties);
+            const finishList = sprintSettings && toList(sprintSettings.finishPenalties);
+
+            if (startList) this.dataPenaltiesStart = startList;
+            if (finishList) this.dataPenaltiesFinish = finishList;
+
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", this.currentEventId);
+        });
+      } catch (error) {
+        // biarkan dataPenaltiesStart/Finish dari sumber global jika gagal memuat override
       }
     },
 
@@ -1030,10 +1136,31 @@ export default {
       // before overwriting `this.participant` with the new bucket's data —
       // otherwise an edit made in the last 250ms (debounce window of the
       // `participant` watcher below) is lost when switching back later.
-      if (this.selectedSprintKey) {
-        saveLocalResults(this.selectedSprintKey, this.participantArr);
+      //
+      // PENTING: pakai `lastSprintKey`, BUKAN `selectedSprintKey` — karena
+      // b-form-select memakai event "change" untuk v-model-nya, jadi
+      // `selectedSprintKey` SUDAH ter-update ke `key` (bucket baru) sebelum
+      // handler @change ini sempat jalan. Kalau pakai `selectedSprintKey` di
+      // sini, data bucket lama malah kesimpan ke slot cache bucket baru.
+      if (this.lastSprintKey && this.lastSprintKey !== key) {
+        saveLocalResults(this.lastSprintKey, this.participantArr);
       }
       await this.fetchSprintBucketTeamsByKey(key);
+    },
+
+    // === Klik tab Initial (Youth/Junior/Open dll) ===
+    async selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+
+      const target = String(i.name).toUpperCase();
+      const match = (this.sprintBucketOptions || []).find((o) => {
+        const b = this.sprintBucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+
+      if (match) {
+        await this.onSelectSprintBucket(match.value);
+      }
     },
 
     // --- fetch teams via IPC (khusus Sprint) ---
@@ -1107,6 +1234,9 @@ export default {
     _useSprintBucket(key) {
       const b = this.sprintBucketMap[key];
       if (!b) return;
+      // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat —
+      // mencakup semua jalur (klik tab, restore dari localStorage, refresh)
+      this.selectedInitialName = b.initialName || this.selectedInitialName;
       this.participant = (b.teams || []).map((t) => ({ ...t }));
 
       const cached = loadLocalResults(key);
@@ -1132,6 +1262,7 @@ export default {
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
+      this.lastSprintKey = key;
       this.assignRanks(this.participantArr);
     },
 
@@ -1217,8 +1348,8 @@ export default {
     },
 
     async recalcPenalties(item) {
-      const sp = this.findPenalty(item.result.startPenalty);
-      const fp = this.findPenalty(item.result.finishPenalty);
+      const sp = this.findPenalty(item.result.startPenalty, this.dataPenaltiesStart);
+      const fp = this.findPenalty(item.result.finishPenalty, this.dataPenaltiesFinish);
 
       item.result.startPenaltyTime = sp.timePen;
       item.result.finishPenaltyTime = fp.timePen;
@@ -1240,9 +1371,11 @@ export default {
       await this.assignRanks(this.participant);
     },
 
-    findPenalty(val) {
+    findPenalty(val, list) {
       return (
-        this.dataPenalties.find((p) => Number(p.value) === Number(val)) || {
+        (list || this.dataPenalties).find(
+          (p) => Number(p.value) === Number(val)
+        ) || {
           value: 0,
           timePen: "00:00:00.000",
         }
@@ -1674,6 +1807,45 @@ export default {
   border-color: rgb(0, 180, 255);
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
+
+.switch-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b3445;
+}
+
+/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn halaman Details */
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+}
+
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
 /* ---- End styling utk Switch DRR Category select ---- */
 
 /* ---- Styling utk penalty section select ---- */
@@ -1683,6 +1855,7 @@ export default {
   cursor: pointer;
   transition: all 0.25s ease;
   margin-bottom: 6px;
+  width: 90px;
 }
 
 .small-select:hover {

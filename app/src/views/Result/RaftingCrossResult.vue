@@ -298,6 +298,7 @@
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
       :raceCats="rxCats"
+      :categories="visibleCategories"
       @close="showOverallModal = false"
     />
   </div>
@@ -316,6 +317,12 @@ import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -346,6 +353,13 @@ export default {
       isOfficial: false,
       loading: false,
       error: "",
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check di buildAggregateFromDoc() (modal Print Result
+      // Overall) — lihat src/utils/registeredTeamsFilter.js
+      registeredBuckets: [],
+      // Race Category yang benar-benar dipilih utk event ini — null =
+      // fail-open (tampilkan semua kolom kategori)
+      enabledCategoryKeys: null,
       rows: [],
       podium: [],
       showPdf: false,
@@ -359,6 +373,9 @@ export default {
     };
   },
   computed: {
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
     hasEventLogo() {
       var logos = this.eventInfo.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
@@ -455,6 +472,8 @@ export default {
     const q = this.$route.query || {};
     if (q.eventId) {
       await this.loadEventById(q.eventId);
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
     }
     await this.loadRxResult();
   },
@@ -659,13 +678,43 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore =
-          t && t.totalScore != null
-            ? Number(t.totalScore) || 0
-            : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb saat ini — mencegah skor
+        // basi (tim sudah dihapus/dipindah dari Registered Teams) tetap
+        // muncul di Print Result Overall.
+        var initialName = doc && doc.initialName;
+        var raceName = doc && doc.raceName;
+        var divisionName = doc && doc.divisionName;
+        var teamName = t.teamName || "";
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SPRINT", initialName, raceName, divisionName, teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "HEAD2HEAD", initialName, raceName, divisionName, teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SLALOM", initialName, raceName, divisionName, teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "DRR", initialName, raceName, divisionName, teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "RX", initialName, raceName, divisionName, teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
+
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         rows.push({
           no: i + 1,
-          teamName: t.teamName || "",
+          teamName: teamName,
           bib: t.bib || "",
           countryCode: this.flagFor(t.teamName),
           sprintScore: sprintScore,

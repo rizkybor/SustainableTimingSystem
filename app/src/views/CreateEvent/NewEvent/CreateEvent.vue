@@ -538,11 +538,12 @@
               <b-button
                 class="btn-action"
                 style="border-radius: 10px"
+                :disabled="isSaving"
                 @click="save()"
                 type="input"
                 variant="primary"
               >
-                Submit
+                {{ isSaving ? "Saving…" : "Submit" }}
                 <Icon icon="ic:baseline-check-circle" />
               </b-button>
             </div>
@@ -570,6 +571,12 @@ export default {
       showListModal: false,
       posterPreview: "",
       isUploadingPoster: false,
+      // true selama save() -> handleAfterInsert() -> finishSave() berjalan
+      // (insert DB, upload poster & signature ke Cloudinary, update DB
+      // lagi — bisa beberapa detik). Dipakai utk menonaktifkan tombol
+      // Submit supaya tidak bisa diklik dua kali sampai membuat event
+      // duplikat di database (sebelumnya tidak ada pengaman sama sekali).
+      isSaving: false,
       posterTempPath: null,
       text: "",
       name: "",
@@ -977,6 +984,7 @@ export default {
 
     // ===== SAVE: insert → (upload) → (update) → finish =====
     save() {
+      if (this.isSaving) return; // cegah submit dobel selagi masih memproses
       const formValid = this.validateForm();
       if (!formValid) {
         ipcRenderer.send("get-alert", {
@@ -986,6 +994,8 @@ export default {
         });
         return;
       }
+
+      this.isSaving = true;
 
       // Jangan paksa null; biarkan seperti di form.
       const payload = JSON.parse(JSON.stringify(this.formEvent));
@@ -1033,6 +1043,7 @@ export default {
     async handleAfterInsert(data) {
       var insertedId = this._asIdString(data);
       if (!insertedId) {
+        this.isSaving = false;
         ipcRenderer.send("get-alert", {
           type: "error",
           message: "DB Save Failed",

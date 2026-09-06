@@ -6,7 +6,8 @@
     centered
     size="xl"
     body-class="p-0"
-    content-class="rounded-20 overflow-hidden"
+    content-class="rounded-20 overflow-hidden rs-modal"
+    scrollable
   >
     <!-- Header -->
     <template #modal-header>
@@ -503,8 +504,8 @@
       <!-- Footer -->
       <div class="footer-actions">
         <button type="button" class="btn-outline" @click="show = false">Cancel</button>
-        <button type="button" class="btn-primary" :disabled="isUpdating" @click="onUpdate">
-          {{ isUpdating ? "Updating…" : "Update" }}
+        <button type="button" class="btn-primary" :disabled="saving" @click="onUpdate">
+          {{ saving ? "Updating…" : "Update" }}
         </button>
       </div>
     </div>
@@ -526,6 +527,11 @@ export default {
     eventName: { type: String, default: "" },
     maxFiles: { type: Number, default: 10 },
     maxSizeMB: { type: Number, default: 100 },
+    // true selama parent (Details/index.vue) masih memproses simpan (upload
+    // file ke Cloudinary, update DB, dll — bisa beberapa detik). Dipakai
+    // utk menahan modal tetap terbuka sampai proses itu benar-benar
+    // selesai, bukan langsung tertutup begitu tombol Update diklik.
+    saving: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -595,7 +601,10 @@ export default {
       removeChiefJudgeSignature: false,
       removeRaceDirectorSignature: false,
 
-      isUpdating: false,
+      // true sesaat setelah tombol Update diklik, sampai prop `saving`
+      // (dikendalikan parent) kembali ke false — dipakai watcher `saving`
+      // di bawah utk tahu kapan boleh menutup modal.
+      waitingForSave: false,
     };
   },
 
@@ -726,6 +735,16 @@ export default {
         this.form.endDateEvent < newStart
       ) {
         this.form.endDateEvent = "";
+      }
+    },
+    // Tutup modal HANYA setelah parent benar-benar selesai memproses simpan
+    // (saving balik ke false) — sebelumnya modal ditutup seketika begitu
+    // tombol Update diklik, padahal upload file & update DB di parent masih
+    // berjalan di background tanpa terlihat sedang berlangsung di modal ini.
+    saving: function (v) {
+      if (!v && this.waitingForSave) {
+        this.waitingForSave = false;
+        this.show = false;
       }
     },
   },
@@ -1040,7 +1059,7 @@ export default {
     },
 
     onUpdate: function () {
-      this.isUpdating = true;
+      this.waitingForSave = true;
 
       var payload = {
         eventId: this.eventId,
@@ -1087,12 +1106,44 @@ export default {
       };
 
       this.$emit("update-settings", payload);
-      this.show = false;
-      this.isUpdating = false;
+      // JANGAN tutup modal di sini — upload file & update DB di parent
+      // (handleUpdateSettings) masih async dan bisa makan waktu beberapa
+      // detik. Modal ditutup otomatis oleh watcher `saving` di atas begitu
+      // parent selesai (baik sukses maupun gagal — parent sudah punya
+      // notifikasi get-alert/get-alert-saved sendiri utk itu).
     },
   },
 };
 </script>
+
+<!-- unscoped: .modal-header/.modal-body dirender BootstrapVue di luar root
+     komponen ini, jadi <style scoped> di bawah tidak bisa menjangkaunya -->
+<style>
+/* Batasi tinggi modal & jadikan layout fleksibel supaya bisa discroll saat
+   konten melebihi tinggi layar — sama dgn Race Settings & Judges Configuration.
+   PENTING: pakai !important — BootstrapVue's `centered` + `scrollable`
+   sekaligus menghasilkan class `.modal-dialog-centered.modal-dialog-
+   scrollable .modal-content { max-height: none }` yang spesifisitasnya
+   (3 class) lebih tinggi dari .rs-modal (1 class). */
+.rs-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 65vh !important;
+  overflow: hidden;
+}
+
+.rs-modal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+}
+
+.rs-modal .modal-body {
+  overflow: auto;
+}
+</style>
 
 <style scoped>
 .modal-inner { background: #f5f7fb; }

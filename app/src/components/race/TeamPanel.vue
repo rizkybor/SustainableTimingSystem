@@ -11,11 +11,17 @@
 
         <!-- Right: Actions -->
         <b-col cols="12" md="6" class="d-flex justify-content-md-end gap-2">
-          <!-- 👇 BARU: tampil hanya jika ada result -->
+          <!-- Disabled kalau belum ada tim terdaftar, atau belum ada satu pun
+               tim yang punya hasil tersimpan di kategori ini -->
           <b-button
             class="btn-add"
+            :disabled="!canShowResult"
             @click="$emit('show-result')"
-            title="Show saved results for this category"
+            :title="
+              canShowResult
+                ? 'Show saved results for this category'
+                : 'Belum ada hasil tersimpan utk kombinasi ini'
+            "
           >
             <Icon icon="mdi:podium" class="mr-1" /> Show Result
           </b-button>
@@ -53,6 +59,7 @@
             <th style="width: 64px">No</th>
             <th>Team Name</th>
             <th style="width: 180px">BIB Number</th>
+            <th style="width: 160px">Status</th>
             <th style="width: 120px" class="text-right">Action</th>
           </tr>
         </thead>
@@ -82,6 +89,7 @@
                 @input="onBibChange"
               />
             </td>
+            <td></td>
             <td class="text-right">
               <button
                 type="button"
@@ -110,6 +118,20 @@
               <CountryFlag :code="flagFor(r.nameTeam)" />
             </td>
             <td>{{ r.bibTeam }}</td>
+            <td>
+              <span
+                v-if="hasCompeted(r)"
+                class="status-badge status-competed"
+                title="Tim ini sudah punya hasil tersimpan di kategori ini"
+              >
+                <Icon icon="mdi:check-circle" width="14" height="14" />
+                Sudah Bertanding
+              </span>
+              <span v-else class="status-badge status-pending">
+                <Icon icon="mdi:clock-outline" width="14" height="14" />
+                Belum Bertanding
+              </span>
+            </td>
             <td class="text-right">
               <button
                 type="button"
@@ -131,7 +153,7 @@
           </tr>
 
           <tr v-if="!draft && !rows.length">
-            <td colspan="4" class="text-center text-muted py-3">
+            <td colspan="5" class="text-center text-muted py-3">
               There are no teams in this combination yet.
             </td>
           </tr>
@@ -165,10 +187,20 @@ export default {
     initialName: String,
     rows: { type: Array, default: () => [] },
     teamsAvailable: { type: Array, default: () => [] },
+    // Set berisi teamId/bib tim yang sudah punya hasil tersimpan di
+    // kategori race yang sedang aktif — dipakai buat flag "sudah/belum
+    // bertanding" di kolom Status.
+    competedSet: { type: Set, default: () => new Set() },
     draft: { type: Object, default: null },
     loading: { type: Boolean, default: false },
   },
   computed: {
+    // "Show Result" cuma berguna kalau minimal ada tim terdaftar DAN
+    // minimal satu di antaranya sudah punya hasil tersimpan.
+    canShowResult() {
+      if (!Array.isArray(this.rows) || this.rows.length === 0) return false;
+      return this.rows.some((r) => this.hasCompeted(r));
+    },
     selectOptions() {
       const base = Array.isArray(this.teamsAvailable)
         ? this.teamsAvailable
@@ -184,6 +216,10 @@ export default {
     },
   },
   methods: {
+    hasCompeted(row) {
+      const key = String((row && (row.teamId || row.bibTeam)) || "");
+      return !!key && this.competedSet.has(key);
+    },
     onPickTeam(val) {
       this.$emit("draft-change", {
         ...(this.draft || {}),
@@ -340,6 +376,28 @@ export default {
   padding: 10px 12px;
   vertical-align: middle;
 }
+
+/* ===== Status badge (sudah/belum bertanding) ===== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-competed {
+  background: #e6f7ee;
+  color: #1a7f4f;
+  border: 1px solid #b7e5cc;
+}
+.status-pending {
+  background: #f4f5f7;
+  color: #73809a;
+  border: 1px solid #e2e6ee;
+}
 .team-table tbody td.muted {
   color: var(--muted);
 }
@@ -408,6 +466,22 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+.btn-add:disabled,
+.btn-add.disabled {
+  background: #f4f5f7;
+  border-color: #e2e6ee;
+  color: #a7b0c0;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn-add:disabled:hover,
+.btn-add.disabled:hover {
+  background: #f4f5f7;
+  border-color: #e2e6ee;
+  color: #a7b0c0;
+  box-shadow: none;
 }
 
 /* ==== SearchableSelect tweaks agar mirip mockup ==== */

@@ -695,11 +695,17 @@ function setupIPCMainHandlers() {
   // ========================================================================
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
+    // __reqId dipakai renderer utk mencocokkan balasan ke request pengirimnya
+    // sendiri saat beberapa request ditembak bersamaan (mis. 4 panel divisi/
+    // race sekaligus) — tanpa ini, ipcRenderer.once() di renderer bisa
+    // menangkap balasan milik request lain karena semuanya berbagi channel
+    // yang sama.
+    const reqId = identity && identity.__reqId;
     try {
       const res = await getTeamsRegistered(identity);
-      event.reply("get-teams-registered-reply", res);
+      event.reply("get-teams-registered-reply", { ...(res || {}), __reqId: reqId });
     } catch (error) {
-      event.reply("get-teams-registered-reply", null);
+      event.reply("get-teams-registered-reply", { __reqId: reqId });
     }
   });
 
@@ -716,13 +722,15 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("upsert-teams-registered", async (event, bucket) => {
+    const reqId = bucket && bucket.__reqId;
     try {
       const ok = await upsertTeamsRegistered(bucket);
-      event.reply("upsert-teams-registered-reply", { ok });
+      event.reply("upsert-teams-registered-reply", { ok, __reqId: reqId });
     } catch (error) {
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
+        __reqId: reqId,
       });
     }
   });
@@ -908,15 +916,17 @@ ipcMain.on("event-results:upsert", async (event, payload) => {
 
 // GET: Event Results (overall/aggregate)
 ipcMain.on("event-results:get", async function (event, filters) {
+  var f = filters || {};
+  var reqId = f.__reqId; // lihat catatan __reqId di handler get-teams-registered
   try {
-    var f = filters || {};
     var doc = await getEventResultsAggregate(f);
-    event.reply("event-results:get-reply", { ok: true, doc: doc });
+    event.reply("event-results:get-reply", { ok: true, doc: doc, __reqId: reqId });
   } catch (error) {
     event.reply("event-results:get-reply", {
       ok: false,
       doc: null,
       error: error && error.message ? error.message : String(error),
+      __reqId: reqId,
     });
   }
 });

@@ -96,19 +96,34 @@
               </div>
 
               <div class="meta-row">
-                <!-- Select category -->
-                <b-form-group
-                  label="Switch Head to Head Category:"
-                  label-for="h2hBucketSelect"
-                  class="mb-0 h2h-actionbar__select"
-                >
-                  <b-form-select
-                    id="h2hBucketSelect"
-                    :options="h2hBucketOptions"
-                    v-model="selectedH2HKey"
-                    @change="onSelectH2HBucket"
-                  />
-                </b-form-group>
+                <!-- Select category: pilih Initial dulu, baru Divisi/Race -->
+                <div class="h2h-actionbar__select">
+                  <div class="switch-label mb-1">
+                    Switch Head to Head Category:
+                  </div>
+
+                  <div class="init-tabs mb-2" v-if="initials.length">
+                    <button
+                      v-for="i in initials"
+                      :key="i.id"
+                      type="button"
+                      class="init-tab"
+                      :class="{ active: selectedInitialName === i.name }"
+                      @click="selectInitialTab(i)"
+                    >
+                      {{ i.name }}
+                    </button>
+                  </div>
+
+                  <b-form-group label-for="h2hBucketSelect" class="mb-0">
+                    <b-form-select
+                      id="h2hBucketSelect"
+                      :options="h2hOptionsForSelectedInitial"
+                      v-model="selectedH2HKey"
+                      @change="onSelectH2HBucket"
+                    />
+                  </b-form-group>
+                </div>
               </div>
             </div>
           </b-col>
@@ -1182,6 +1197,10 @@ export default {
       h2hBucketOptions: [],
       h2hBucketMap: Object.create(null),
       selectedH2HKey: "",
+      // Initial (Youth/Junior/Open dll) yang sedang dipilih di tab "Switch
+      // Head to Head Category" — dropdown di bawahnya cuma menampilkan
+      // kombinasi Divisi/Race milik Initial ini, mengikuti pola Sprint.
+      selectedInitialName: "",
       currentBucket: null,
       roundResultsRootKey: null,
       booyanActive: { r1: false, r2: false, l1: false, l2: false },
@@ -1212,6 +1231,26 @@ export default {
   },
 
   computed: {
+    // Kombinasi Divisi/Race (mis. "R4 MEN") milik Initial yang sedang aktif
+    // saja — labelnya tidak perlu lagi menyertakan nama Initial karena sudah
+    // dipilih lewat tab di atasnya.
+    h2hOptionsForSelectedInitial() {
+      const opts = this.h2hBucketOptions || [];
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.h2hBucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.h2hBucketMap[o.value];
+          return {
+            value: o.value,
+            text: `${b.divisionName} ${b.raceName}`,
+          };
+        });
+    },
     headToHeadCats() {
       const payload = safeParse(
         localStorage.getItem("raceStartPayload") || "{}",
@@ -1511,7 +1550,13 @@ export default {
   },
 
   beforeRouteLeave(to, from, next) {
-    this.clearAllRoundResults();
+    // JANGAN clearAllRoundResults() di sini — itu menghapus cache lokal
+    // (roundResultsRootKey) tanpa syarat setiap kali user pindah halaman,
+    // termasuk saat hasil penalty/waktu yang baru diinput BELUM sempat
+    // diklik "Save Round"/"Save All Rounds"/"Save Overall". Cache-nya sudah
+    // ter-scope per bucket (division/race/initial) lewat roundResultsRootKey,
+    // jadi aman dibiarkan tersimpan — akan otomatis termuat lagi lewat
+    // loadRoundResultsForCurrentRound() saat user kembali ke bucket ini.
     next();
   },
 
@@ -1528,7 +1573,8 @@ export default {
     }
 
     await this.loadDataScore("HEAD_TO_HEAD");
-    await this.loadDataPenalties("HEAD_TO_HEAD");
+    await this.loadDataPenalties();
+    await this.loadRaceSettings();
 
     // build opsi statik dari kategori event (fallback ke default bila kosong)
     this.buildStaticH2HOptions();
@@ -2973,6 +3019,12 @@ export default {
       const b = this.h2hBucketMap[key];
       if (!b) return;
 
+      // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat
+      // (bucket "ALL INITIAL" agregat tidak py satu Initial spesifik)
+      if (!b._isAggregate && b.initialName) {
+        this.selectedInitialName = b.initialName;
+      }
+
       // set teams
       this.participant = (b.teams || []).map((t) => ({ ...t }));
 
@@ -3033,6 +3085,21 @@ export default {
     // --- handler perubahan select ---
     async onSelectH2HBucket(key) {
       await this.fetchH2HBucketTeamsByKey(key);
+    },
+
+    // === Klik tab Initial (Youth/Junior/Open dll) ===
+    async selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+
+      const target = String(i.name).toUpperCase();
+      const match = (this.h2hBucketOptions || []).find((o) => {
+        const b = this.h2hBucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+
+      if (match) {
+        await this.onSelectH2HBucket(match.value);
+      }
     },
 
     // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
@@ -4041,40 +4108,76 @@ export default {
     },
 
     async loadDataPenalties() {
+      // Yes/No (dipakai dropdown R1/R2/L1/L2) bukan pilihan detik penalti —
+      // ini murni hasil negosiasi marker, dipakai onPenaltyChange() utk
+      // menghitung PB (0/50/100) otomatis. Tidak ada di optionPenalties,
+      // jadi tetap statis di sini.
+      this.ynChoices = [
+        { label: "Yes", value: "Y" },
+        { label: "No", value: "N" },
+      ];
+
       try {
-        ipcRenderer.send("option-penalties", "HEAD_TO_HEAD");
+        // PENTING: tipe di database tersimpan sbg "HEADTOHEAD" (tanpa
+        // underscore) — mengirim "HEAD_TO_HEAD" tidak pernah cocok dgn
+        // dokumen manapun, sehingga query selalu kosong dan SEMUA dropdown
+        // penalty (S/CL/F) selalu tanpa pilihan sama sekali.
+        ipcRenderer.send("option-penalties", "HEADTOHEAD");
 
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          if (!payload || !payload[0] || !payload[0].data) {
-            this.sChoices = [];
-            this.fChoices = [];
-            this.clChoices = [];
-            this.ynChoices = [];
-            return;
-          }
-
-          const arr = payload[0].data; // semua kategori
-          if (!Array.isArray(arr)) return;
-
-          // helper untuk ambil kategori
-          const getChoices = (key) => {
-            const cat = arr.find(
-              (d) =>
-                d.category && d.category.toUpperCase() === key.toUpperCase()
-            );
-            return cat && Array.isArray(cat.choices) ? cat.choices : [];
-          };
-
-          this.sChoices = getChoices("START");
-          this.fChoices = getChoices("FINISH");
-          this.clChoices = getChoices("CLASSIC");
-          this.ynChoices = getChoices("YESNO");
+          // Bentuk data di DB adalah list datar {label, value, timePen}[]
+          // (sama seperti SPRINT/SLALOM/DRR/RX) — BUKAN dikelompokkan per
+          // kategori {category, choices}[]. S, CL, dan F sama-sama dropdown
+          // "berapa detik penalti" jadi memakai list yang sama.
+          const data =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
+          this.sChoices = data;
+          this.fChoices = data;
+          this.clChoices = data;
         });
       } catch (error) {
         this.sChoices = [];
         this.fChoices = [];
         this.clChoices = [];
-        this.ynChoices = [];
+      }
+    },
+
+    // PS (Pen. Start), CL (Cut Line), dan PF (Pen. Finish) bisa
+    // dikustomisasi independen per-event lewat modal Race Settings. Kalau
+    // event ini belum pernah diatur, sChoices/clChoices/fChoices dari
+    // optionPenalties (global, diisi loadDataPenalties()) tetap dipakai.
+    async loadRaceSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const h2hSettings = res && res.ok && res.settings && res.settings.h2h;
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: "",
+                  }))
+                : null;
+
+            const sList = h2hSettings && toList(h2hSettings.startPenalties);
+            const clList = h2hSettings && toList(h2hSettings.cutLinePenalties);
+            const fList = h2hSettings && toList(h2hSettings.finishPenalties);
+
+            if (sList) this.sChoices = sList;
+            if (clList) this.clChoices = clList;
+            if (fList) this.fChoices = fList;
+
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", this.currentEventId);
+        });
+      } catch (error) {
+        // biarkan sChoices/clChoices/fChoices dari sumber global jika gagal
+        // memuat override
       }
     },
     /** Method podium config */
@@ -4612,11 +4715,14 @@ export default {
       localStorage.removeItem("raceStartPayload");
       localStorage.removeItem("participantByCategories");
       localStorage.removeItem("currentCategories");
-      localStorage.removeItem("h2hRoundResults");
 
+      // TIDAK memanggil clearAllRoundResults() di sini — tombol Back ini
+      // sering diklik tanpa wasit sadar hasil round terbaru belum di-Save
+      // ke database. Cache lokal per-bucket aman dibiarkan; akan otomatis
+      // termuat lagi lewat loadRoundResultsForCurrentRound() kalau bucket
+      // ini dibuka lagi nanti.
       this.participant = [];
       this.titleCategories = "";
-      this.clearAllRoundResults(); // NEW
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
   },
@@ -4660,6 +4766,45 @@ export default {
 
 #h2hBucketSelect:hover {
   border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+.switch-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b3445;
+}
+
+/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn halaman Details/Sprint */
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+}
+
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 /* ---- End styling utk Switch DRR Category select ---- */

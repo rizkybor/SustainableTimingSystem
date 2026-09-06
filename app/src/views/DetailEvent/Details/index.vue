@@ -153,6 +153,7 @@
         :initial-name="initialActive.selected.name"
         :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
         :teams-available="availableFor(combo.division, combo.race)"
+        :competed-set="competedSetFor(combo.panelKey)"
         :draft="draftMap[combo.panelKey]"
         :loading="loadingByPanel[combo.panelKey]"
         @add-draft="addDraft(combo.division, combo.race)"
@@ -205,6 +206,7 @@
       :id="'event-settings-modal'"
       :event-id="eventId"
       :event-name="safeEventName"
+      :saving="settingsLoading.active"
       @update-settings="handleUpdateSettings"
     />
 
@@ -276,6 +278,12 @@ export default {
       // per-panel (div_race) token, bukan satu field bersama — supaya refresh
       // beberapa panel yang berjalan bersamaan tidak saling menimpa token guard
       lastTokenByPanel: {},
+      // per-panel: Set berisi teamId/bib tim yang SUDAH punya hasil
+      // tersimpan (rankedByCats/scored terisi) utk kategori race yang
+      // sedang aktif (raceActive.selected.name) — dipakai buat flag
+      // "sudah bertanding" / "belum bertanding" di daftar Registered Teams.
+      competedTeamsByPanel: {},
+      lastResultsTokenByPanel: {},
       loadingByPanel: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -922,9 +930,18 @@ export default {
      * IDENTITY BUILDERS (event/initial/division/race)
      * =======================================================*/
     _buildIdentity(div, race) {
-      // pakai computed eventId; fallback ke route param
+      return this._buildIdentityForCategory(
+        div,
+        race,
+        this._safeSelectedName(this.raceActive)
+      );
+    },
+
+    // Sama seperti _buildIdentity, tapi eventName (race category) bisa
+    // ditentukan eksplisit — dipakai autoFillFromPreviousCategory() utk
+    // membangun identity kategori SEBELUMNYA (bukan yang sedang aktif).
+    _buildIdentityForCategory(div, race, categoryName) {
       const eventId = this.eventId || this.$route.params.id || "";
-      const eventName = this._safeSelectedName(this.raceActive);
       const initialName = this._safeSelectedName(this.initialActive);
 
       return {
@@ -932,7 +949,7 @@ export default {
         initialId: this._matchId(this.events.categoriesInitial, initialName),
         raceId: this._matchId(this.events.categoriesRace, race),
         divisionId: this._matchId(this.events.categoriesDivision, div),
-        eventName: String(eventName).toUpperCase(),
+        eventName: String(categoryName || "").toUpperCase(),
         initialName: String(initialName).toUpperCase(),
         raceName: String(race).toUpperCase(),
         divisionName: String(div).toUpperCase(),
@@ -1114,7 +1131,8 @@ export default {
         return { div, race, ok: false, reason: "identity-incomplete" };
       }
 
-      // Token untuk menangkal balasan telat (race condition)
+      // Token untuk menangkal balasan telat (race condition antar panggilan
+      // berurutan utk panel yang sama)
       const token = [
         identity.eventName,
         identity.initialName,
@@ -1126,11 +1144,27 @@ export default {
       this.lastTokenByPanel[panelKey] = token;
       this.$set(this.loadingByPanel, panelKey, true);
 
+      // reqId untuk mencocokkan balasan ke request INI secara spesifik.
+      // refreshVisibleBuckets() menembak 4 request (R4/R6 x MEN/WOMEN)
+      // BERSAMAAN lewat channel IPC yang sama ("get-teams-registered-reply")
+      // — pakai ipcRenderer.once() polos di sini akan salah menangkap
+      // balasan milik panel lain (siapa pun yang baru pertama tiba), bukan
+      // punya diri sendiri. reqId + ipcRenderer.on (bukan once) + filter
+      // manual memastikan tiap request cuma memproses balasannya sendiri.
+      const reqId = panelKey + "|" + token + "|" + Math.random();
+
       return await new Promise((resolve) => {
+        let settled = false;
+
         const onReply = (_e, bucket) => {
+          if (!bucket || bucket.__reqId !== reqId) return; // bukan balasan utk request ini
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
+
           if (this.lastTokenByPanel[panelKey] !== token) return resolve(); // abaikan balasan usang
           this.$set(this.loadingByPanel, panelKey, false);
-          if (bucket && Array.isArray(bucket.teams)) {
+          if (Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
             resolve({ div, race, ok: true });
           } else {
@@ -1139,12 +1173,14 @@ export default {
           }
         };
 
-        ipcRenderer.send("get-teams-registered", identity);
-        ipcRenderer.once("get-teams-registered-reply", onReply);
+        ipcRenderer.on("get-teams-registered-reply", onReply);
+        ipcRenderer.send("get-teams-registered", { ...identity, __reqId: reqId });
 
         // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
-          ipcRenderer.off("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
           // hanya matikan loading kalau tidak ada request lebih baru untuk panel ini
           if (this.lastTokenByPanel[panelKey] === token) {
             this.$set(this.loadingByPanel, panelKey, false);
@@ -1154,17 +1190,274 @@ export default {
       });
     },
 
+    // Nama kategori (raceCategories[].key, dipakai sbg raceActive.selected.name)
+    // tidak selalu sama persis dengan nama yang ditulis ke
+    // eventResult.categories[].name saat hasil disimpan dari masing-masing
+    // halaman race (lihat konstanta K di Sprint/H2H/Slalom/DRR/RX Race.vue).
+    _resultCategoryName(raceKey) {
+      const map = {
+        SPRINT: "SPRINT",
+        HEAD2HEAD: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      return map[String(raceKey || "").toUpperCase()] || String(raceKey || "").toUpperCase();
+    },
+
+    // Ambil daftar tim yang SUDAH punya hasil tersimpan (utk kategori race
+    // aktif) pada kombinasi divisi/race ini, lalu simpan sbg Set di
+    // competedTeamsByPanel[panelKey] supaya TeamPanel bisa menampilkan flag
+    // "sudah/belum bertanding".
+    async loadEventResultsForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastResultsTokenByPanel[panelKey] = token;
+
+      const categoryName = this._resultCategoryName(identity.eventName);
+      const reqId = "results|" + panelKey + "|" + token;
+
+      await new Promise((resolve) => {
+        let settled = false;
+
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener("event-results:get-reply", onReply);
+          if (settled) return;
+          settled = true;
+
+          if (this.lastResultsTokenByPanel[panelKey] !== token) return resolve();
+
+          const eventResult =
+            res && res.ok && res.doc && Array.isArray(res.doc.eventResult)
+              ? res.doc.eventResult
+              : [];
+
+          const competed = new Set();
+          eventResult.forEach((entry) => {
+            const cat = (entry.categories || []).find(
+              (c) => String(c.name || "").toUpperCase() === categoryName
+            );
+            const hasResult =
+              cat &&
+              ((cat.rankedByCats !== "" && cat.rankedByCats != null) ||
+                (cat.scored !== "" && cat.scored != null));
+            if (hasResult) {
+              const key = String(entry.teamId || entry.bib || "");
+              if (key) competed.add(key);
+            }
+          });
+
+          this.$set(this.competedTeamsByPanel, panelKey, competed);
+          resolve();
+        };
+
+        ipcRenderer.on("event-results:get-reply", onReply);
+        ipcRenderer.send("event-results:get", { ...identity, __reqId: reqId });
+
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("event-results:get-reply", onReply);
+          resolve();
+        }, 3000);
+      });
+    },
+
+    // Set tim yang sudah bertanding utk panel ini — dipakai template lewat
+    // prop competed-set di <team-panel>.
+    competedSetFor(panelKey) {
+      return this.competedTeamsByPanel[panelKey] || new Set();
+    },
+
+    // Fetch satu kali (reqId-safe, aman dipanggil bersamaan dgn request lain
+    // di channel yang sama) — dipakai autoFillFromPreviousCategory() utk
+    // mengintip bucket/hasil kategori LAIN (bukan yg sedang ditampilkan di
+    // panel), jadi tidak numpang di state loadingByPanel/lastTokenByPanel.
+    _fetchOnce(channel, payload, reqId) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const replyChannel = channel + "-reply";
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          if (settled) return;
+          settled = true;
+          resolve(res);
+        };
+        ipcRenderer.on(replyChannel, onReply);
+        ipcRenderer.send(channel, { ...payload, __reqId: reqId });
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          resolve(null);
+        }, 4000);
+      });
+    },
+
+    // Nama kategori tepat SEBELUM `categoryName`, mengikuti urutan
+    // categoriesEvent SESUAI EVENT INI (bukan urutan tetap kartu Race
+    // Category) — null kalau categoryName adalah yang pertama / tidak
+    // ditemukan.
+    _previousCategoryName(categoryName) {
+      const list = Array.isArray(this.events.categoriesEvent)
+        ? this.events.categoriesEvent
+        : [];
+      const names = list.map((c) => String((c && c.name) || "").toUpperCase());
+      const idx = names.indexOf(String(categoryName || "").toUpperCase());
+      if (idx <= 0) return null;
+      return names[idx - 1];
+    },
+
+    // Kalau panel (div/race) kategori yang SEDANG dibuka masih kosong,
+    // otomatis isi dengan tim yang SUDAH BERTANDING (bukan cuma terdaftar)
+    // di kategori sebelumnya (urutan categoriesEvent event ini) utk
+    // kombinasi divisi/race/initial yang sama. Tim yang pernah dihapus
+    // manual dari kategori ini (tercatat di excludedTeams) TIDAK ikut
+    // ditambahkan lagi. Add Team manual tetap berjalan seperti biasa —
+    // fitur ini cuma pre-fill sekali saat panel masih kosong.
+    async autoFillFromPreviousCategory(div, race) {
+      const currentName = this._safeSelectedName(this.raceActive);
+      const prevName = this._previousCategoryName(currentName);
+      if (!prevName) return;
+
+      // Panel sekarang sudah ada isinya (baik dari DB maupun auto-fill
+      // sebelumnya) -> jangan timpa/duplikasi.
+      const already = this.getTeamsBy(div, race, currentName);
+      if (already.length) return;
+
+      const currentIdentity = this._buildIdentityForCategory(
+        div,
+        race,
+        currentName
+      );
+      if (
+        !currentIdentity.eventId ||
+        !currentIdentity.initialId ||
+        !currentIdentity.raceId ||
+        !currentIdentity.divisionId
+      ) {
+        return;
+      }
+
+      const reqBase = [
+        currentIdentity.eventId,
+        currentIdentity.initialId,
+        currentIdentity.raceId,
+        currentIdentity.divisionId,
+        div,
+        race,
+        Date.now(),
+        Math.random(),
+      ].join("|");
+
+      // ambil bucket kategori ini sendiri -> cek excludedTeams (tombstone
+      // penghapusan manual)
+      const currentDocRes = await this._fetchOnce(
+        "get-teams-registered",
+        currentIdentity,
+        "autofill-cur|" + reqBase
+      );
+      const currentDoc = currentDocRes || {};
+      const excluded = new Set(
+        (Array.isArray(currentDoc.excludedTeams)
+          ? currentDoc.excludedTeams
+          : []
+        ).map(
+          (t) =>
+            String((t && t.nameTeam) || "").toUpperCase() +
+            "|" +
+            String((t && t.bibTeam) || "")
+        )
+      );
+
+      // ambil roster kategori SEBELUMNYA utk kombinasi yang sama
+      const prevIdentity = this._buildIdentityForCategory(div, race, prevName);
+      const prevDocRes = await this._fetchOnce(
+        "get-teams-registered",
+        prevIdentity,
+        "autofill-prev|" + reqBase
+      );
+      const prevTeams =
+        prevDocRes && Array.isArray(prevDocRes.teams) ? prevDocRes.teams : [];
+      if (!prevTeams.length) return;
+
+      // ambil dokumen hasil (dipakai bersama lintas kategori) utk tahu
+      // siapa yang SUDAH BERTANDING (bukan cuma terdaftar) di kategori
+      // sebelumnya
+      const resultsRes = await this._fetchOnce(
+        "event-results:get",
+        currentIdentity,
+        "autofill-res|" + reqBase
+      );
+      const eventResult =
+        resultsRes && resultsRes.ok && resultsRes.doc && Array.isArray(resultsRes.doc.eventResult)
+          ? resultsRes.doc.eventResult
+          : [];
+
+      const competedKeys = new Set();
+      eventResult.forEach((entry) => {
+        const cat = (entry.categories || []).find(
+          (c) => this._resultCategoryName(prevName) === String((c && c.name) || "").toUpperCase()
+        );
+        const hasResult =
+          cat &&
+          ((cat.rankedByCats !== "" && cat.rankedByCats != null) ||
+            (cat.scored !== "" && cat.scored != null));
+        if (hasResult) {
+          const key = String((entry && entry.teamId) || (entry && entry.bib) || "");
+          if (key) competedKeys.add(key);
+        }
+      });
+      if (!competedKeys.size) return;
+
+      const teamsToAdd = prevTeams.filter((t) => {
+        const idKey = String((t && t.teamId) || (t && t.bibTeam) || "");
+        const exKey =
+          String((t && t.nameTeam) || "").toUpperCase() +
+          "|" +
+          String((t && t.bibTeam) || "");
+        return competedKeys.has(idKey) && !excluded.has(exKey);
+      });
+      if (!teamsToAdd.length) return;
+
+      await this._fetchOnce(
+        "upsert-teams-registered",
+        { ...currentIdentity, teams: teamsToAdd },
+        "autofill-add|" + reqBase
+      );
+
+      await this.loadTeamsRegistered(div, race);
+    },
+
     async refreshVisibleBuckets() {
       await this.$nextTick();
       const jobs = [];
-      if (this.showPanel("R4", "MEN"))
-        jobs.push(this.loadTeamsRegistered("R4", "MEN"));
-      if (this.showPanel("R4", "WOMEN"))
-        jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
-      if (this.showPanel("R6", "MEN"))
-        jobs.push(this.loadTeamsRegistered("R6", "MEN"));
-      if (this.showPanel("R6", "WOMEN"))
-        jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
+      const combos = [];
+      if (this.showPanel("R4", "MEN")) combos.push(["R4", "MEN"]);
+      if (this.showPanel("R4", "WOMEN")) combos.push(["R4", "WOMEN"]);
+      if (this.showPanel("R6", "MEN")) combos.push(["R6", "MEN"]);
+      if (this.showPanel("R6", "WOMEN")) combos.push(["R6", "WOMEN"]);
+
+      combos.forEach(([div, race]) => {
+        jobs.push(
+          this.loadTeamsRegistered(div, race).then(() =>
+            this.autoFillFromPreviousCategory(div, race)
+          )
+        );
+        jobs.push(this.loadEventResultsForPanel(div, race));
+      });
       await Promise.all(jobs);
     },
 

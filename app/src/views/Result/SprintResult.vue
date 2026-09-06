@@ -251,6 +251,7 @@
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
       :raceCats="sprintCats"
+      :categories="visibleCategories"
       @close="showOverallModal = false"
     />
   </div>
@@ -267,6 +268,12 @@ import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -339,6 +346,13 @@ export default {
       results: [],
       showPdf: false,
       eventInfo: {},
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check di buildAggregateFromDoc() (modal Print Result
+      // Overall) — lihat src/utils/registeredTeamsFilter.js
+      registeredBuckets: [],
+      // Race Category yang benar-benar dipilih utk event ini — null =
+      // fail-open (tampilkan semua kolom kategori)
+      enabledCategoryKeys: null,
       dataScore: [
         { ranking: 1, score: 100 },
         { ranking: 2, score: 92 },
@@ -388,6 +402,9 @@ export default {
   },
 
   computed: {
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
     hasEventLogo() {
       var ev = this.eventInfo || {};
       var logos = ev.eventFiles;
@@ -510,6 +527,8 @@ export default {
     const q = this.$route.query || {};
     if (q.eventId) {
       await this.loadEventById(q.eventId);
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
     }
 
     this.loadSprintResult();
@@ -602,14 +621,39 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore = 0;
-        if (t && t.totalScore != null) {
-          totalScore = Number(t.totalScore);
-          if (!Number.isFinite(totalScore))
-            totalScore = Number(t.totalScore) || 0;
-        } else {
-          totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb saat ini — mencegah skor
+        // basi (tim sudah dihapus/dipindah dari Registered Teams) tetap
+        // muncul di Print Result Overall.
+        var initialName = doc && doc.initialName;
+        var raceName = doc && doc.raceName;
+        var divisionName = doc && doc.divisionName;
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SPRINT", initialName, raceName, divisionName, teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
         }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "HEAD2HEAD", initialName, raceName, divisionName, teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SLALOM", initialName, raceName, divisionName, teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "DRR", initialName, raceName, divisionName, teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "RX", initialName, raceName, divisionName, teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
+
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         rows.push({
           no: i + 1,
           teamName: teamName,
@@ -958,6 +1002,149 @@ export default {
             detail:
               (res && res.error) || "Perubahan tidak tersimpan ke database.",
           });
+          return;
+        }
+        // Editan di halaman Result (mis. koreksi penalty/waktu) tetap harus
+        // ikut memperbarui dokumen "View Overall" — kalau tidak, ranking di
+        // View Overall diam-diam jadi usang begitu ada koreksi di sini.
+        this.upsertEventResults(q, this.results);
+      });
+    },
+
+    // === merge hasil SPRINT (versi terkoreksi di halaman Result) ke
+    // dokumen event-results (kategori lain aman) — mirror logika yang sama
+    // dgn SprintRace.vue supaya View Overall selalu ikut ter-update. ===
+    async upsertEventResults(identity, rows) {
+      const K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      const toNumOrEmpty = (v) => (v || v === 0 ? v : "");
+
+      const baseFilter = {
+        eventId: String(identity.eventId || ""),
+        initialId: String(identity.initialId || ""),
+        raceId: String(identity.raceId || ""),
+        divisionId: String(identity.divisionId || ""),
+      };
+
+      const incoming = new Map();
+      (rows || []).forEach((r) => {
+        const key = String(r.teamId || r.bibTeam || "");
+        if (!key) return;
+        const ranked = r.ranked || r.ranked === 0 ? r.ranked : "";
+        const scored = ranked !== "" ? this.getScoreByRanked(ranked) : "";
+        incoming.set(key, {
+          teamId: r.teamId || "",
+          teamName: r.nameTeam || "",
+          bib: r.bibTeam || "",
+          sprintCat: {
+            name: K.SPRINT,
+            rankedByCats: toNumOrEmpty(ranked),
+            scored: toNumOrEmpty(scored),
+          },
+          totalRanked: toNumOrEmpty(ranked),
+          totalScore: toNumOrEmpty(scored),
+        });
+      });
+
+      let existingDoc = null;
+      try {
+        const gres = await new Promise((resolve) => {
+          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      const now = new Date();
+      const payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: "SPRINT",
+        initialName: String(identity.initialName || this.sprintCats.initial || ""),
+        raceName: String(identity.raceName || this.sprintCats.race || ""),
+        divisionName: String(identity.divisionName || this.sprintCats.division || ""),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+
+        const map = new Map();
+        (Array.isArray(existingDoc.eventResult) ? existingDoc.eventResult : []).forEach(
+          (row) => {
+            const k = String((row && row.teamId) || (row && row.bib) || "");
+            if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+        );
+
+        incoming.forEach((inc, key) => {
+          let prev = map.get(key);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: "",
+              totalScore: "",
+            };
+          }
+          const prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          const foundIdx = prevCats.findIndex(
+            (c) => String((c && c.name) || "").toUpperCase() === K.SPRINT
+          );
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.sprintCat;
+          else prevCats.push(inc.sprintCat);
+
+          map.set(key, {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+        });
+
+        payload.eventResult = Array.from(map.values());
+      } else {
+        payload.eventResult = Array.from(incoming.values()).map((inc) => ({
+          teamId: inc.teamId,
+          teamName: inc.teamName,
+          bib: inc.bib,
+          categories: [
+            inc.sprintCat,
+            { name: K.H2H, rankedByCats: "", scored: "" },
+            { name: K.SLALOM, rankedByCats: "", scored: "" },
+            { name: K.DRR, rankedByCats: "", scored: "" },
+            { name: K.RX, rankedByCats: "", scored: "" },
+          ],
+          totalRanked: inc.totalRanked,
+          totalScore: inc.totalScore,
+        }));
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Sync Overall gagal",
+            detail: (res && res.error) || "Unknown error",
+          });
         }
       });
     },
@@ -982,12 +1169,20 @@ export default {
           divisionName: String(q.divisionName || ""),
         };
 
-        const timeoutId = setTimeout(() => resolve(null), 5000);
+        // reqId supaya balasan channel ini tidak ketukar dengan request lain
+        // yang kebetulan nembak IPC "get-teams-registered" bersamaan (mis.
+        // halaman Details yang fetch beberapa panel divisi/race sekaligus).
+        const reqId = "sprintResult|" + Date.now() + "|" + Math.random();
+        let settled = false;
 
-        ipcRenderer.send("get-teams-registered", identity);
-        ipcRenderer.once("get-teams-registered-reply", (_e, bucket) => {
+        const onReply = (_e, bucket) => {
+          if (!bucket || bucket.__reqId !== reqId) return;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
           clearTimeout(timeoutId);
-          if (!bucket || !Array.isArray(bucket.teams)) {
+
+          if (!Array.isArray(bucket.teams)) {
             resolve(null);
             return;
           }
@@ -997,7 +1192,17 @@ export default {
             if (n) names.add(n);
           });
           resolve(names);
-        });
+        };
+
+        const timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          resolve(null);
+        }, 5000);
+
+        ipcRenderer.on("get-teams-registered-reply", onReply);
+        ipcRenderer.send("get-teams-registered", { ...identity, __reqId: reqId });
       });
     },
 

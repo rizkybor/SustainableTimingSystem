@@ -79,26 +79,24 @@
               <th rowspan="2" class="team-col">Team Name</th>
               <th rowspan="2" class="w-70 text-center">BIB</th>
 
-              <th colspan="2" class="group sprint text-center">Sprint</th>
-              <th colspan="2" class="group h2h text-center">H2H</th>
-              <th colspan="2" class="group slalom text-center">Slalom</th>
-              <th colspan="2" class="group drr text-center">DRR</th>
-              <th colspan="2" class="group rx text-center">Rafting Cross</th>
+              <th
+                v-for="cat in categories"
+                :key="cat.key"
+                colspan="2"
+                class="group text-center"
+                :class="cat.cssClass"
+              >
+                {{ cat.label }}
+              </th>
 
               <th rowspan="2" class="w-110 text-center">Total Score</th>
               <th rowspan="2" class="w-110 text-center">Rank Overall</th>
             </tr>
             <tr>
-              <th class="sub">Score</th>
-              <th class="sub">Ranked</th>
-              <th class="sub">Score</th>
-              <th class="sub">Ranked</th>
-              <th class="sub">Score</th>
-              <th class="sub">Ranked</th>
-              <th class="sub">Score</th>
-              <th class="sub">Ranked</th>
-              <th class="sub">Score</th>
-              <th class="sub">Ranked</th>
+              <template v-for="cat in categories">
+                <th class="sub" :key="cat.key + '-score'">Score</th>
+                <th class="sub" :key="cat.key + '-rank'">Ranked</th>
+              </template>
             </tr>
           </thead>
 
@@ -111,20 +109,14 @@
               </td>
               <td class="text-center">{{ r.bib }}</td>
 
-              <td class="text-center">{{ r.sprintScore }}</td>
-              <td class="text-center">{{ r.sprintRank }}</td>
-
-              <td class="text-center">{{ r.h2hScore }}</td>
-              <td class="text-center">{{ r.h2hRank }}</td>
-
-              <td class="text-center">{{ r.slalomScore }}</td>
-              <td class="text-center">{{ r.slalomRank }}</td>
-
-              <td class="text-center">{{ r.drrScore }}</td>
-              <td class="text-center">{{ r.drrRank }}</td>
-
-              <td class="text-center">{{ r.rxScore }}</td>
-              <td class="text-center">{{ r.rxRank }}</td>
+              <template v-for="cat in categories">
+                <td class="text-center" :key="cat.key + '-score'">
+                  {{ r[cat.scoreField] }}
+                </td>
+                <td class="text-center" :key="cat.key + '-rank'">
+                  {{ r[cat.rankField] }}
+                </td>
+              </template>
 
               <td class="text-center bold">{{ r.totalScore }}</td>
               <td class="text-center bold">{{ r.rank }}</td>
@@ -160,6 +152,7 @@
 <script>
 import defaultImg from "@/assets/images/default-second.jpeg";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
 
 export default {
   name: "OverallResult",
@@ -171,6 +164,7 @@ export default {
       type: Object,
       default: () => ({ initial: "-", division: "-", race: "-" }),
     },
+    categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
     heroImage: { type: String, default: "" },
   },

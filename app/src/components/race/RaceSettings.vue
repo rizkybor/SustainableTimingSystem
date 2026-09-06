@@ -4,9 +4,10 @@
     v-model="localShow"
     hide-footer
     centered
-    size="lg"
+    size="xl"
     body-class="p-0"
-    content-class="rounded-20 overflow-hidden"
+    content-class="rounded-20 overflow-hidden rs-modal"
+    scrollable
   >
     <template #modal-header>
       <div class="d-flex justify-content-between align-items-center w-100">
@@ -21,12 +22,166 @@
     <!-- Body -->
     <div class="p-4" v-if="!loading">
       <div class="p-4">
-        <!-- HEAD TO HEAD -->
-        <div class="rs-card mb-3">
+        <!-- SPRINT -->
+        <div class="rs-card mb-3" v-if="showSprint">
           <div class="px-3 py-3">
-            <div class="h4 font-weight-bold mb-3">Head to Head</div>
+            <div
+              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              @click="toggleSection('sprint')"
+            >
+              <Icon
+                :icon="
+                  collapsedSections.sprint
+                    ? 'mdi:chevron-right'
+                    : 'mdi:chevron-down'
+                "
+                class="mr-1"
+              />
+              Sprint
+            </div>
+
+            <div v-show="!collapsedSections.sprint">
+            <!-- PEN. START (PS) -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Pilihan Pen. Start (PS)</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.sprint.startPenalties.length >= maxSprintPenalties"
+                @click="addPenaltyRow('sprint', 'startPenalties')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.sprint.startPenalties.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted flex-grow-1">Label</small>
+              <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                >Detik</small
+              >
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              v-for="(p, idx) in draft.sprint.startPenalties"
+              :key="'sprint-ps-' + idx"
+              class="d-flex align-items-center mb-2"
+              style="gap: 10px"
+            >
+              <b-form-input
+                v-model="p.label"
+                placeholder="Label (mis. False Start)"
+                style="border-radius: 10px"
+                class="flex-grow-1"
+              />
+              <b-form-input
+                v-model.number="p.value"
+                type="number"
+                min="0"
+                max="600"
+                placeholder="Detik"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+              <b-button
+                size="sm"
+                variant="outline-danger"
+                style="border-radius: 8px"
+                :disabled="draft.sprint.startPenalties.length <= 1"
+                @click="removePenaltyRow('sprint', 'startPenalties', idx)"
+              >
+                ✕
+              </b-button>
+            </div>
+            <small class="text-muted d-block mb-3">
+              Default FAJI: 0 (tidak ada), 50 (kesalahan start).
+            </small>
+
+            <!-- PEN. FINISH (PF) -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Pilihan Pen. Finish (PF)</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.sprint.finishPenalties.length >= maxSprintPenalties"
+                @click="addPenaltyRow('sprint', 'finishPenalties')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.sprint.finishPenalties.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted flex-grow-1">Label</small>
+              <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                >Detik</small
+              >
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              v-for="(p, idx) in draft.sprint.finishPenalties"
+              :key="'sprint-pf-' + idx"
+              class="d-flex align-items-center mb-2"
+              style="gap: 10px"
+            >
+              <b-form-input
+                v-model="p.label"
+                placeholder="Label (mis. Pelanggaran Elektronik)"
+                style="border-radius: 10px"
+                class="flex-grow-1"
+              />
+              <b-form-input
+                v-model.number="p.value"
+                type="number"
+                min="0"
+                max="600"
+                placeholder="Detik"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+              <b-button
+                size="sm"
+                variant="outline-danger"
+                style="border-radius: 8px"
+                :disabled="draft.sprint.finishPenalties.length <= 1"
+                @click="removePenaltyRow('sprint', 'finishPenalties', idx)"
+              >
+                ✕
+              </b-button>
+            </div>
+            <small class="text-muted">
+              Default FAJI: 0 (tidak ada), 10 (pelanggaran elektronik finish).
+            </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- HEAD TO HEAD -->
+        <div class="rs-card mb-3" v-if="showH2H">
+          <div class="px-3 py-3">
+            <div
+              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              @click="toggleSection('h2h')"
+            >
+              <Icon
+                :icon="
+                  collapsedSections.h2h ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                "
+                class="mr-1"
+              />
+              Head to Head
+            </div>
+
+            <div v-show="!collapsedSections.h2h">
             <div class="font-weight-bold mb-2">Bouyan Setting</div>
-            <div class="d-flex flex-wrap align-items-center" style="gap: 28px">
+            <div
+              class="d-flex flex-wrap align-items-center mb-4"
+              style="gap: 28px"
+            >
               <b-form-checkbox class="rs-switch" switch v-model="draft.h2h.R1"
                 >R1</b-form-checkbox
               >
@@ -40,13 +195,90 @@
                 >L2</b-form-checkbox
               >
             </div>
+
+            <div
+              v-for="grp in h2hPenaltyGroups"
+              :key="grp.key"
+              class="mb-4"
+            >
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <div class="font-weight-bold">{{ grp.title }}</div>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.h2h[grp.key].length >= maxSprintPenalties"
+                  @click="addPenaltyRow('h2h', grp.key)"
+                >
+                  + Tambah
+                </b-button>
+              </div>
+              <div
+                v-if="draft.h2h[grp.key].length"
+                class="d-flex mb-1"
+                style="gap: 10px"
+              >
+                <small class="text-muted flex-grow-1">Label</small>
+                <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                  >Detik</small
+                >
+                <span style="width: 32px; flex: 0 0 32px"></span>
+              </div>
+              <div
+                v-for="(p, idx) in draft.h2h[grp.key]"
+                :key="grp.key + '-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  v-model="p.label"
+                  placeholder="Label"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-form-input
+                  v-model.number="p.value"
+                  type="number"
+                  min="0"
+                  max="600"
+                  placeholder="Detik"
+                  style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.h2h[grp.key].length <= 1"
+                  @click="removePenaltyRow('h2h', grp.key, idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            </div>
           </div>
         </div>
 
         <!-- SLALOM -->
-        <div class="rs-card mb-3">
+        <div class="rs-card mb-3" v-if="showSlalom">
           <div class="px-3 py-3">
-            <div class="h4 font-weight-bold mb-3">Slalom</div>
+            <div
+              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              @click="toggleSection('slalom')"
+            >
+              <Icon
+                :icon="
+                  collapsedSections.slalom
+                    ? 'mdi:chevron-right'
+                    : 'mdi:chevron-down'
+                "
+                class="mr-1"
+              />
+              Slalom
+            </div>
+            <div v-show="!collapsedSections.slalom">
             <div class="font-weight-bold mb-2">Gates Setting</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Gate</label>
@@ -63,13 +295,26 @@
               <small class="text-danger">Min {{ minGate }} Gate</small>
               <small class="text-danger">Max {{ maxGate }} Gate</small>
             </div>
+            </div>
           </div>
         </div>
 
         <!-- DOWN RIVER RACE -->
-        <div class="rs-card mb-3">
+        <div class="rs-card mb-3" v-if="showDrr">
           <div class="px-3 py-3">
-            <div class="h4 font-weight-bold mb-3">Down River Race</div>
+            <div
+              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              @click="toggleSection('drr')"
+            >
+              <Icon
+                :icon="
+                  collapsedSections.drr ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                "
+                class="mr-1"
+              />
+              Down River Race
+            </div>
+            <div v-show="!collapsedSections.drr">
             <div class="font-weight-bold mb-2">Section Setting</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Total Section</label>
@@ -86,13 +331,26 @@
               <small class="text-danger">Min {{ minSection }} Section</small>
               <small class="text-danger">Max {{ maxSection }} Section</small>
             </div>
+            </div>
           </div>
         </div>
 
         <!-- RAFTING CROSS -->
-        <div class="rs-card mb-3">
+        <div class="rs-card mb-3" v-if="showRx">
           <div class="px-3 py-3">
-            <div class="h4 font-weight-bold mb-3">Rafting Cross</div>
+            <div
+              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              @click="toggleSection('rx')"
+            >
+              <Icon
+                :icon="
+                  collapsedSections.rx ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                "
+                class="mr-1"
+              />
+              Rafting Cross
+            </div>
+            <div v-show="!collapsedSections.rx">
             <div class="font-weight-bold mb-2">Heat Setting</div>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="mb-0 font-weight-500">Teams per Heat</label>
@@ -140,7 +398,16 @@
                 >Gate 2</b-form-checkbox
               >
             </div>
+            </div>
           </div>
+        </div>
+
+        <div
+          v-if="!showSprint && !showH2H && !showSlalom && !showDrr && !showRx"
+          class="text-center text-muted py-4"
+        >
+          Belum ada Race Category yang dipilih untuk event ini. Atur dulu di
+          Event Settings.
         </div>
 
         <!-- Footer -->
@@ -168,9 +435,43 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { Icon } from "@iconify/vue2";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+
+// Default sesuai Pasal 37 & 43 FAJI: PS (Pen. Start) = 0/50 detik,
+// PF (Pen. Finish) = 0/10 detik. PS dan PF diatur independen.
+const DEFAULT_START_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_FINISH_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+];
+
+// Default H2H PS/CL/PF — sebelumnya berbagi satu list yang sama (0/5/10/50),
+// sekarang tiap satu (PS, CL, PF) diatur independen.
+const DEFAULT_H2H_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
 
 const DEFAULT_SETTINGS = {
-  h2h: { R1: true, R2: true, L1: true, L2: true },
+  sprint: {
+    startPenalties: DEFAULT_START_PENALTIES.map((p) => ({ ...p })),
+    finishPenalties: DEFAULT_FINISH_PENALTIES.map((p) => ({ ...p })),
+  },
+  h2h: {
+    R1: true,
+    R2: true,
+    L1: true,
+    L2: true,
+    startPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
+    cutLinePenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
+    finishPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
+  },
   slalom: { totalGate: 14 },
   drr: { totalSection: 5 },
   rx: {
@@ -183,6 +484,7 @@ const DEFAULT_SETTINGS = {
 
 export default {
   name: "RaceSettingsModal",
+  components: { Icon },
   props: {
     id: { type: String, default: "race-settings-modal" },
     value: { type: Boolean, default: false },
@@ -193,6 +495,7 @@ export default {
     maxSection: { type: Number, default: 6 },
     minTeamsPerHeat: { type: Number, default: 3 },
     maxTeamsPerHeat: { type: Number, default: 8 },
+    maxSprintPenalties: { type: Number, default: 8 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
   },
@@ -202,7 +505,46 @@ export default {
       loading: false,
       saving: false, // <-- untuk disable tombol Update
       draft: this.mergeWithDefaults(this.settings),
+      // null = belum dimuat/gagal dimuat -> fail-open (tampilkan semua
+      // kategori) supaya kegagalan fetch tidak diam-diam menyembunyikan
+      // konfigurasi yang valid. Set berisi key kategori (SPRINT/HEAD2HEAD/
+      // SLALOM/DRR/RX) kalau berhasil dimuat.
+      enabledCategoryKeys: null,
+      // per-kategori: true = konten config-nya sedang disembunyikan
+      // (chevron kanan), false = terbuka (chevron bawah). Default SEMUA
+      // true (tersembunyi), sama seperti Judges Configuration.
+      collapsedSections: {
+        sprint: true,
+        h2h: true,
+        slalom: true,
+        drr: true,
+        rx: true,
+      },
     };
+  },
+  computed: {
+    showSprint() {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SPRINT");
+    },
+    showH2H() {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("HEAD2HEAD");
+    },
+    showSlalom() {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SLALOM");
+    },
+    showDrr() {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("DRR");
+    },
+    showRx() {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("RX");
+    },
+    h2hPenaltyGroups() {
+      return [
+        { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
+        { key: "cutLinePenalties", title: "Pilihan Cut Line (CL)" },
+        { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
+      ];
+    },
   },
   watch: {
     value(v) {
@@ -210,6 +552,7 @@ export default {
       if (v) {
         this.loading = true;
         this.fetchSettingsIPC();
+        this.fetchEnabledCategories();
       }
     },
     localShow(v) {
@@ -234,9 +577,18 @@ export default {
     },
   },
   mounted() {
-    if (this.eventId) this.fetchSettingsIPC();
+    if (this.eventId) {
+      this.fetchSettingsIPC();
+      this.fetchEnabledCategories();
+    }
   },
   methods: {
+    toggleSection(key) {
+      this.$set(this.collapsedSections, key, !this.collapsedSections[key]);
+    },
+    async fetchEnabledCategories() {
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(this.eventId);
+    },
     _clone(obj) {
       try {
         return JSON.parse(JSON.stringify(obj || {}));
@@ -251,12 +603,43 @@ export default {
         const n = parseInt(v, 10);
         return Number.isFinite(n) ? n : fb;
       };
+      const cleanList = (raw, fallback) => {
+        const arr = Array.isArray(raw) ? raw : fallback;
+        const clean = arr.slice(0, this.maxSprintPenalties).map((p) => ({
+          label: String((p && p.label) || "").slice(0, 40) || "0",
+          value: Math.max(0, Math.min(600, toInt(p && p.value, 0))),
+        }));
+        return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
+      };
+
       return {
+        sprint: {
+          startPenalties: cleanList(
+            src.sprint && src.sprint.startPenalties,
+            DEFAULT_START_PENALTIES
+          ),
+          finishPenalties: cleanList(
+            src.sprint && src.sprint.finishPenalties,
+            DEFAULT_FINISH_PENALTIES
+          ),
+        },
         h2h: {
           R1: !!(src.h2h && src.h2h.R1),
           R2: !!(src.h2h && src.h2h.R2),
           L1: !!(src.h2h && src.h2h.L1),
           L2: !!(src.h2h && src.h2h.L2),
+          startPenalties: cleanList(
+            src.h2h && src.h2h.startPenalties,
+            DEFAULT_H2H_PENALTIES
+          ),
+          cutLinePenalties: cleanList(
+            src.h2h && src.h2h.cutLinePenalties,
+            DEFAULT_H2H_PENALTIES
+          ),
+          finishPenalties: cleanList(
+            src.h2h && src.h2h.finishPenalties,
+            DEFAULT_H2H_PENALTIES
+          ),
         },
         slalom: {
           totalGate: toInt(src.slalom && src.slalom.totalGate, 14),
@@ -327,12 +710,48 @@ export default {
       this.localShow = false;
     },
 
+    // scope: "sprint" | "h2h" — generik supaya editor list Label+Detik tidak
+    // perlu diduplikasi per kategori.
+    addPenaltyRow(scope, listKey) {
+      const list = this.draft[scope] && this.draft[scope][listKey];
+      if (!list || list.length >= this.maxSprintPenalties) return;
+      list.push({ label: "", value: 0 });
+    },
+
+    removePenaltyRow(scope, listKey, idx) {
+      const list = this.draft[scope] && this.draft[scope][listKey];
+      if (!list || list.length <= 1) return;
+      list.splice(idx, 1);
+    },
+
     confirm() {
       if (!this.eventId) {
         return;
       }
 
       // 1) Clamp nilai lokal
+      const cleanPenaltyList = (list) =>
+        (list || []).map((p) => {
+          const value = Math.max(0, Math.min(600, parseInt(p.value, 10) || 0));
+          const label = String(p.label || "").trim() || String(value);
+          return { label, value };
+        });
+      this.draft.sprint.startPenalties = cleanPenaltyList(
+        this.draft.sprint.startPenalties
+      );
+      this.draft.sprint.finishPenalties = cleanPenaltyList(
+        this.draft.sprint.finishPenalties
+      );
+      this.draft.h2h.startPenalties = cleanPenaltyList(
+        this.draft.h2h.startPenalties
+      );
+      this.draft.h2h.cutLinePenalties = cleanPenaltyList(
+        this.draft.h2h.cutLinePenalties
+      );
+      this.draft.h2h.finishPenalties = cleanPenaltyList(
+        this.draft.h2h.finishPenalties
+      );
+
       const gRaw =
         this.draft && this.draft.slalom && this.draft.slalom.totalGate;
       const sRaw = this.draft && this.draft.drr && this.draft.drr.totalSection;
@@ -431,6 +850,43 @@ export default {
 /* Konten modal (kena karena global) */
 .rounded-20 {
   border-radius: 20px;
+}
+
+/* Batasi tinggi modal & jadikan layout fleksibel supaya bisa discroll saat
+   konten (mis. banyak list penalty) melebihi tinggi layar.
+   PENTING: pakai !important — BootstrapVue's `centered` + `scrollable`
+   sekaligus menghasilkan class `.modal-dialog-centered.modal-dialog-
+   scrollable .modal-content { max-height: none }` yang spesifisitasnya
+   (3 class) lebih tinggi dari .rs-modal (1 class), jadi tanpa !important
+   batas tinggi ini akan selalu kalah/tidak berpengaruh. */
+.rs-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 65vh !important;
+  overflow: hidden;
+}
+
+.rs-modal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+}
+
+.rs-modal .modal-body {
+  overflow: auto;
+}
+
+/* Header tiap card kategori — klik utk expand/collapse config-nya */
+.rs-section-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+.rs-section-toggle:hover {
+  color: #1c4c7a;
 }
 
 /* Tombol close bulat merah */

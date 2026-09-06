@@ -100,6 +100,15 @@ async function deleteTeamInBucket({ identity, team }) {
     ]
   );
 
+  // Catat sbg "dikecualikan" (tombstone) supaya fitur auto-fill dari
+  // kategori sebelumnya (Details page) tidak diam-diam menambahkan tim ini
+  // lagi setelah sengaja dihapus manual dari kategori ini.
+  if (result.modifiedCount > 0) {
+    await coll.updateOne(iden, {
+      $addToSet: { excludedTeams: { nameTeam, bibTeam } },
+    });
+  }
+
   return { ok: result.modifiedCount > 0 };
 }
 

@@ -267,6 +267,15 @@ async function updateAssets(payload) {
     set.raceDirectorSignature = payload.raceDirectorSignature || null;
   }
 
+  // Poster Event (opsional, gambar tunggal) — dipakai kartu event di Home
+  // (Events List). Sama seperti signature: hanya di-set kalau dikirim
+  // eksplisit (termasuk null utk hapus); kalau tidak dikirim, nilai lama
+  // di DB dibiarkan apa adanya.
+  if (payload && Object.prototype.hasOwnProperty.call(payload, "poster")) {
+    set.poster = payload.poster || null;
+    set.poster_url = (payload.poster && payload.poster.secure_url) || "";
+  }
+
   const update = { $set: set };
 
   var db = await getDb();

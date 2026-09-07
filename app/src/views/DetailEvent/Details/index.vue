@@ -87,8 +87,12 @@
           Judges Settings
         </b-button>
 
-        <b-button class="btn-race-settings" @click="openRaceSettings">
+        <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
           Race Settings
+        </b-button>
+
+        <b-button variant="outline-danger" class="btn-race-reset" @click="openResetDataModal">
+          Reset Data
         </b-button>
       </div>
 
@@ -219,6 +223,79 @@
       :initial-name="initialActive.selected.name"
       :teams-available="availableTeams"
     />
+
+    <!-- MODAL: konfirmasi Reset Data -->
+    <b-modal
+      v-model="showResetDataModal"
+      title="Reset Data Event"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="resetInProgress"
+      hide-footer
+      @hidden="onResetModalHidden"
+    >
+      <p class="mb-2">
+        Tindakan ini akan <strong>menghapus semua hasil & data kompetisi</strong>
+        (Sprint, Head to Head, Slalom, DRR, Rafting Cross) pada event
+        <strong>{{ events.eventName || "-" }}</strong> ini — termasuk waktu,
+        penalti, bracket, dan Heat yang sudah tersimpan.
+      </p>
+      <p class="mb-2">
+        <strong>Registered Teams di SEMUA kategori</strong> (assignment tim
+        ke divisi/race/initial) juga ikut dikosongkan — tim harus di-assign
+        ulang dari awal. Profil tim itu sendiri (nama, bib, dsb.) tidak ikut
+        terhapus dan tetap tersedia untuk didaftarkan lagi.
+      </p>
+      <p class="mb-3">
+        Pengaturan event (Race/Judges/Event Settings)
+        <strong>tidak</strong> ikut terhapus. Tindakan ini
+        <strong>tidak dapat dibatalkan</strong>.
+      </p>
+
+      <b-form-group v-if="!resetInProgress">
+        <label class="small text-muted mb-1">
+          Ketik <strong>MAKOPLANET</strong> untuk konfirmasi:
+        </label>
+        <b-form-input
+          v-model="resetConfirmText"
+          placeholder="MAKOPLANET"
+          autocomplete="off"
+          @keyup.enter="confirmResetData"
+        />
+      </b-form-group>
+
+      <div v-else class="mb-3">
+        <b-progress
+          :value="resetProgressPercent"
+          :max="100"
+          show-progress
+          animated
+          variant="danger"
+          class="mb-2"
+        />
+        <div class="small text-muted">
+          {{ resetProgressLabel }} — {{ resetProgressPercent }}%
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end" style="gap: 8px">
+        <b-button
+          variant="outline-secondary"
+          :disabled="resetInProgress"
+          @click="showResetDataModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          variant="danger"
+          :disabled="resetConfirmText !== RESET_CONFIRM_PHRASE || resetInProgress"
+          @click="confirmResetData"
+        >
+          <b-spinner small v-if="resetInProgress" class="mr-1" />
+          {{ resetInProgress ? "Mereset..." : "Reset Data" }}
+        </b-button>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -239,6 +316,7 @@ const LEVEL_SCOPE_MAP = {
 var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
 var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
 var FOLDER_COMMITTEE_SIGNATURE = "sustainable-js/committee-signature";
+var FOLDER_EVENT_POSTER = "sustainable-js/event-poster";
 
 import { uploadOne as _uploadOne, uploadMany as _uploadMany } from "@/utils/cloudinaryUpload";
 import sprintPng from "@/assets/images/Rectangle-3.png";
@@ -247,6 +325,7 @@ import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
 import rxPng from "@/assets/images/Rectangle-5.png";
 import { ipcRenderer } from "electron";
+import { clearAllForEvent } from "@/utils/localStoreSprint";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
@@ -292,6 +371,12 @@ export default {
       },
       showRaceSettings: false,
       showEventSettings: false,
+      showResetDataModal: false,
+      resetConfirmText: "",
+      resetInProgress: false,
+      resetProgressPercent: 0,
+      resetProgressLabel: "",
+      RESET_CONFIRM_PHRASE: "MAKOPLANET",
       showTeamDetails: false,
       selectedTeamForDetails: null,
       selectedTeamDivision: "",
@@ -739,6 +824,11 @@ export default {
             )
           : null;
 
+        // ===== 3.6) UPLOAD POSTER EVENT (opsional, gambar tunggal) =====
+        const newPoster = payload.posterFile
+          ? await _uploadOne(payload.posterFile, FOLDER_EVENT_POSTER)
+          : null;
+
         // ===== 4) UPDATE DB ASSETS (URL saja) =====
         this._setLoading(true, "Memperbarui aset di database…", 85);
         const assetsDoc = {
@@ -764,6 +854,12 @@ export default {
           assetsDoc.raceDirectorSignature = newRdSignature.result;
         } else if (payload.removeRaceDirectorSignature) {
           assetsDoc.raceDirectorSignature = null;
+        }
+
+        if (newPoster && newPoster.ok) {
+          assetsDoc.poster = newPoster.result;
+        } else if (payload.removePoster) {
+          assetsDoc.poster = null;
         }
 
         ipcRenderer.send("services:update:event-assets", assetsDoc);
@@ -827,6 +923,113 @@ export default {
 
     openJudgeSettings() {
       this.showJudgeSettings = true;
+    },
+
+    openResetDataModal() {
+      this.resetConfirmText = "";
+      this.showResetDataModal = true;
+    },
+
+    onResetModalHidden() {
+      if (!this.resetInProgress) this.resetConfirmText = "";
+    },
+
+    // Bersihkan cache localStorage per-event punya Sprint (`sprintLocal:`)
+    // & H2H (`h2hRoundResults:`) — satu-satunya 2 kategori yang punya cache
+    // hasil di localStorage renderer ini; Slalom/DRR/RX murni server-side.
+    _clearLocalCachesForEvent(eventId) {
+      try {
+        clearAllForEvent(eventId);
+      } catch (e) {
+        /* noop */
+      }
+      try {
+        const prefix = "h2hRoundResults:" + String(eventId) + "|";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        /* noop */
+      }
+    },
+
+    // ambil daftar koleksi yang akan dihapus dari backend (1 sumber
+    // kebenaran, sinkron dengan RESET_COLLECTIONS di resetEventData.js)
+    // supaya progress bar tahu berapa total step & label tiap step.
+    _fetchResetCollectionsList() {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:reset-data:collections-reply", (_e, list) =>
+          resolve(Array.isArray(list) ? list : [])
+        );
+        ipcRenderer.send("event:reset-data:collections");
+      });
+    },
+
+    _resetOneCollection(eventId, collection) {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:reset-data:step-reply", (_e, r) => resolve(r));
+        ipcRenderer.send("event:reset-data:step", { eventId, collection });
+      });
+    },
+
+    async confirmResetData() {
+      if (this.resetConfirmText !== this.RESET_CONFIRM_PHRASE) return;
+      const eventId = this.eventId || this.$route.params.id || "";
+      if (!eventId) return;
+
+      this.resetInProgress = true;
+      this.resetProgressPercent = 0;
+      this.resetProgressLabel = "Menyiapkan...";
+      try {
+        const collections = await this._fetchResetCollectionsList();
+        const total = collections.length || 1;
+
+        for (let i = 0; i < collections.length; i++) {
+          const { name, label } = collections[i];
+          this.resetProgressLabel = `Menghapus ${label}... (${i + 1}/${
+            collections.length
+          })`;
+          const r = await this._resetOneCollection(eventId, name);
+          if (!r || !r.ok) {
+            throw new Error(
+              (r && r.error) || `Gagal menghapus koleksi ${name}`
+            );
+          }
+          this.resetProgressPercent = Math.round(((i + 1) / total) * 100);
+        }
+
+        this.resetProgressLabel = "Membersihkan cache lokal...";
+        this._clearLocalCachesForEvent(eventId);
+        this.competedTeamsByPanel = {};
+        this.resultAvailMap = {
+          R4_MEN: false,
+          R4_WOMEN: false,
+          R6_MEN: false,
+          R6_WOMEN: false,
+        };
+        this.resetProgressPercent = 100;
+
+        this.showResetDataModal = false;
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Reset Data berhasil",
+          detail: "Semua hasil kompetisi event ini sudah dikosongkan.",
+        });
+        await this.refreshVisibleBuckets();
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Reset Data gagal",
+          detail: err && err.message ? err.message : String(err),
+        });
+      } finally {
+        this.resetInProgress = false;
+        this.resetProgressPercent = 0;
+        this.resetProgressLabel = "";
+      }
     },
 
     onUpdateRaceSettings(payload) {
@@ -1509,6 +1712,11 @@ export default {
                 return allowSet.has(String(tt || "").toLowerCase());
               });
             }
+
+            // Jangan tampilkan tim yang statusnya Inactive (statusId !== 0)
+            // di dropdown "Pilih Tim" Registered Teams — hanya tim Active
+            // yang boleh di-assign ke kategori/bucket manapun.
+            items = items.filter((t) => Number((t && t.statusId) || 0) === 0);
 
             this.availableTeams = items.map((t) => ({
               id:
@@ -2506,6 +2714,16 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+.btn-race-reset {
+  background: #f9aa00;
+  border: 1px solid #fcfcfc;
+  color: #fcfcfc;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+  transition: all 0.25s ease;
 }
 
 .upload-hud {

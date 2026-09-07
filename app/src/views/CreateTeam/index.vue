@@ -91,6 +91,24 @@
 
             <!-- Actions -->
             <div class="d-flex mt-4 justify-content-end">
+              <input
+                ref="bulkFileInput"
+                type="file"
+                accept=".xlsx,.xls"
+                class="d-none"
+                @change="onBulkFileSelected"
+              />
+              <b-button
+                style="border-radius: 12px"
+                variant="outline-secondary"
+                class="mr-2"
+                :disabled="bulkParsing"
+                @click="$refs.bulkFileInput.click()"
+              >
+                <b-spinner small v-if="bulkParsing" class="mr-1" />
+                <Icon v-else icon="mdi:file-excel-outline" width="18" height="18" />
+                {{ bulkParsing ? "Membaca file..." : "Import from Excel" }}
+              </b-button>
               <b-button
                 style="border-radius: 12px"
                 variant="outline-info"
@@ -376,6 +394,98 @@
         </b-form-group>
       </b-form>
     </b-modal>
+
+    <!-- Import from Excel: preview + konfirmasi -->
+    <b-modal
+      id="modal-bulk-import-team"
+      v-model="showBulkImportModal"
+      title="Import Teams from Excel"
+      size="lg"
+      scrollable
+      :no-close-on-backdrop="bulkImporting"
+      :no-close-on-esc="bulkImporting"
+      hide-footer
+    >
+      <p class="mb-2 text-muted small">
+        File: <strong>{{ bulkFileName || "-" }}</strong> — kolom
+        <strong>Asal PENGPROV</strong> diambil sebagai nama tim.
+      </p>
+
+      <b-form-group label="Team Type untuk semua tim di bawah" label-class="label-strong">
+        <b-form-select
+          size="sm"
+          v-model="bulkTeamType"
+          :options="optionTeamTypes"
+          value-field="value"
+          text-field="name"
+          class="input-soft"
+          style="border-radius: 12px"
+          :disabled="bulkImporting"
+        >
+          <template #first>
+            <b-form-select-option :value="null" disabled
+              >Select type</b-form-select-option
+            >
+          </template>
+        </b-form-select>
+      </b-form-group>
+
+      <div v-if="!bulkRows.length" class="text-center text-muted py-4">
+        Tidak ada nilai "Asal PENGPROV" yang ditemukan di file ini.
+      </div>
+      <div v-else class="table-responsive">
+        <b-table
+          striped
+          small
+          hover
+          :items="bulkRows"
+          :fields="bulkFields"
+          class="mb-0"
+        >
+          <template #head(selected)>
+            <b-form-checkbox
+              :checked="allNewSelected"
+              :indeterminate="someNewSelected && !allNewSelected"
+              :disabled="bulkImporting"
+              @change="toggleSelectAllBulkRows"
+            />
+          </template>
+          <template #cell(selected)="row">
+            <b-form-checkbox
+              v-model="row.item.selected"
+              :disabled="row.item.duplicate || bulkImporting"
+            />
+          </template>
+          <template #cell(nameTeam)="row">
+            {{ row.item.nameTeam }}
+          </template>
+          <template #cell(status)="row">
+            <span v-if="row.item.duplicate" class="status-pill status-upcoming">
+              Sudah ada
+            </span>
+            <span v-else class="status-pill status-success">Baru</span>
+          </template>
+        </b-table>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3" style="gap: 8px">
+        <b-button
+          variant="outline-secondary"
+          :disabled="bulkImporting"
+          @click="showBulkImportModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          variant="outline-info"
+          :disabled="!canConfirmBulkImport"
+          @click="confirmBulkImport"
+        >
+          <b-spinner small v-if="bulkImporting" class="mr-1" />
+          {{ bulkImporting ? "Mengimpor..." : `Import ${selectedBulkCount} Team${selectedBulkCount === 1 ? "" : "s"}` }}
+        </b-button>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -384,6 +494,12 @@ import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { COUNTRIES } from "@/utils/countries";
+import * as XLSX from "xlsx";
+
+// Nama kolom di file Excel (Google Form response) yang jadi sumber nama tim
+// bulk import — dicocokkan case-insensitive/trim, bukan posisi kolom, supaya
+// tahan kalau urutan kolom lain berubah.
+const BULK_IMPORT_SOURCE_HEADER = "asal pengprov";
 
 export default {
   name: "SustainableTimingSystemCreateTeam",
@@ -423,6 +539,19 @@ export default {
         statusId: 0,
         countryCode: "",
       },
+
+      // ---- Bulk Import from Excel ----
+      bulkParsing: false,
+      bulkImporting: false,
+      showBulkImportModal: false,
+      bulkFileName: "",
+      bulkTeamType: null,
+      bulkRows: [], // [{ nameTeam, duplicate, selected }]
+      bulkFields: [
+        { key: "selected", label: "" },
+        { key: "nameTeam", label: "Team Name (Asal PENGPROV)" },
+        { key: "status", label: "Status" },
+      ],
     };
   },
   computed: {
@@ -458,6 +587,25 @@ export default {
       if (this.filterType === "ALL") return list;
       const sel = String(this.filterType).toLowerCase();
       return list.filter((t) => String(t.typeTeam || "").toLowerCase() === sel);
+    },
+
+    selectedBulkCount() {
+      return (this.bulkRows || []).filter((r) => r.selected).length;
+    },
+    canConfirmBulkImport() {
+      return (
+        !this.bulkImporting &&
+        !!this.bulkTeamType &&
+        this.selectedBulkCount > 0
+      );
+    },
+    allNewSelected() {
+      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      return selectable.length > 0 && selectable.every((r) => r.selected);
+    },
+    someNewSelected() {
+      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      return selectable.some((r) => r.selected);
     },
   },
   async mounted() {
@@ -630,6 +778,133 @@ export default {
             type: "error",
             message: "Failed",
             detail: (res && res.error) || "Gagal mengubah team.",
+          });
+        }
+      });
+    },
+
+    // ---- Bulk Import from Excel ----
+    onBulkFileSelected(e) {
+      const file = e && e.target && e.target.files && e.target.files[0];
+      // reset value supaya pilih file yang SAMA lagi tetap memicu @change
+      if (e && e.target) e.target.value = "";
+      if (!file) return;
+
+      this.bulkParsing = true;
+      this.bulkFileName = file.name;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+          const existingNames = new Set(
+            (this.teams || []).map((t) =>
+              String(t.nameTeam || "").trim().toUpperCase()
+            )
+          );
+
+          const seen = new Set();
+          const names = [];
+          rows.forEach((row) => {
+            // cari key kolom "Asal PENGPROV" case-insensitive/trim (header
+            // asli bisa beda kapitalisasi/spasi antar-export Google Form)
+            const key = Object.keys(row || {}).find(
+              (k) => k.trim().toLowerCase() === BULK_IMPORT_SOURCE_HEADER
+            );
+            if (!key) return;
+            const val = String(row[key] || "").trim().toUpperCase();
+            if (!val || seen.has(val)) return;
+            seen.add(val);
+            names.push(val);
+          });
+
+          this.bulkRows = names.map((nameTeam) => {
+            const duplicate = existingNames.has(nameTeam);
+            return { nameTeam, duplicate, selected: !duplicate };
+          });
+
+          if (!this.bulkRows.length) {
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              message: "Tidak ada data",
+              detail:
+                'Kolom "Asal PENGPROV" tidak ditemukan atau kosong di file ini.',
+            });
+          }
+
+          this.bulkTeamType = null;
+          this.showBulkImportModal = true;
+        } catch (err) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Gagal membaca file",
+            detail: err && err.message ? err.message : String(err),
+          });
+        } finally {
+          this.bulkParsing = false;
+        }
+      };
+      reader.onerror = () => {
+        this.bulkParsing = false;
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Gagal membaca file",
+          detail: "File tidak bisa dibaca.",
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    },
+
+    toggleSelectAllBulkRows(checked) {
+      (this.bulkRows || []).forEach((r) => {
+        if (!r.duplicate) r.selected = checked;
+      });
+    },
+
+    confirmBulkImport() {
+      if (!this.canConfirmBulkImport) return;
+
+      const docs = (this.bulkRows || [])
+        .filter((r) => r.selected && !r.duplicate)
+        .map((r) => ({
+          typeTeam: String(this.bulkTeamType || "").trim(),
+          nameTeam: r.nameTeam,
+          bibTeam: "",
+          startOrder: "",
+          praStart: "",
+          intervalRace: "",
+          statusId: 0,
+          countryCode: "",
+        }));
+
+      if (!docs.length) return;
+
+      this.bulkImporting = true;
+      ipcRenderer.send("teams:bulk-insert", docs);
+      ipcRenderer.once("teams:bulk-insert-reply", (_e, res) => {
+        this.bulkImporting = false;
+        if (res && res.ok) {
+          const skipped = res.skippedCount || 0;
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Import selesai",
+            detail: `${res.insertedCount || 0} tim berhasil dibuat${
+              skipped ? `, ${skipped} dilewati (sudah ada)` : ""
+            }.`,
+          });
+          this.showBulkImportModal = false;
+          this.bulkRows = [];
+          this.loadTeams();
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Import gagal",
+            detail: (res && res.error) || "Gagal mengimpor data tim.",
           });
         }
       });

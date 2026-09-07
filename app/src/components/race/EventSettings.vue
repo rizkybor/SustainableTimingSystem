@@ -208,6 +208,48 @@
           </b-form-group>
         </section>
 
+        <!-- ===================== Poster Event ===================== -->
+        <section class="uploader-section">
+          <div class="section-title">Poster Event</div>
+          <div class="text-muted small mb-2">
+            Ditampilkan sebagai gambar kartu event di halaman Events List.
+          </div>
+
+          <div class="sig-upload">
+            <div class="sig-upload-row">
+              <img
+                v-if="posterPreview || posterUrl"
+                :src="posterPreview || posterUrl"
+                class="poster-thumb"
+                alt="Poster preview"
+              />
+              <div v-else class="poster-thumb poster-thumb-empty">No poster</div>
+
+              <div class="sig-upload-actions">
+                <input
+                  ref="posterInput"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  class="d-none"
+                  @change="onPosterFileChange"
+                />
+                <b-button size="sm" variant="outline-primary" @click="$refs.posterInput.click()">
+                  Choose Image
+                </b-button>
+                <b-button
+                  v-if="posterPreview || posterUrl"
+                  size="sm"
+                  variant="outline-danger"
+                  @click="removePosterFile"
+                >
+                  Remove
+                </b-button>
+              </div>
+            </div>
+            <div class="hint-danger mt-1">PNG/JPEG, maksimum {{ maxSizeMB }}MB</div>
+          </div>
+        </section>
+
         <!-- ===================== Event Logo ===================== -->
         <section class="uploader-section">
           <div class="section-title">Event Logo</div>
@@ -601,6 +643,12 @@ export default {
       removeChiefJudgeSignature: false,
       removeRaceDirectorSignature: false,
 
+      // ===== Poster Event (opsional, gambar tunggal) =====
+      posterFile: null, // File baru yang dipilih, belum diupload
+      posterUrl: "", // URL yang sudah tersimpan di DB
+      posterPreview: "", // object URL lokal utk file yang baru dipilih
+      removePoster: false, // true kalau user menghapus poster yang sudah ada
+
       // true sesaat setelah tombol Update diklik, sampai prop `saving`
       // (dikendalikan parent) kembali ke false — dipakai watcher `saving`
       // di bawah utk tahu kapan boleh menutup modal.
@@ -631,6 +679,7 @@ export default {
     if (this.technicalDelegateSignaturePreview) URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
     if (this.chiefJudgeSignaturePreview) URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
     if (this.raceDirectorSignaturePreview) URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+    if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
   },
 
   watch: {
@@ -663,6 +712,11 @@ export default {
         this.removeTechnicalDelegateSignature = false;
         this.removeChiefJudgeSignature = false;
         this.removeRaceDirectorSignature = false;
+
+        if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+        this.posterFile = null;
+        this.posterPreview = "";
+        this.removePoster = false;
 
         var self = this;
         function onReply(_e, ev) {
@@ -706,6 +760,13 @@ export default {
           self.raceDirectorSignatureUrl =
             ev && ev.raceDirectorSignature && ev.raceDirectorSignature.secure_url
               ? String(ev.raceDirectorSignature.secure_url)
+              : "";
+
+          self.posterUrl =
+            ev && ev.poster && ev.poster.secure_url
+              ? String(ev.poster.secure_url)
+              : ev && ev.poster_url
+              ? String(ev.poster_url)
               : "";
 
           self.existingEventUrls   = ev && ev.eventFiles && Array.isArray(ev.eventFiles) ? ev.eventFiles.slice() : [];
@@ -1058,6 +1119,41 @@ export default {
       }
     },
 
+    onPosterFileChange: function (e) {
+      var file = e && e.target && e.target.files ? e.target.files[0] : null;
+      if (e && e.target) e.target.value = "";
+      if (!file) return;
+
+      var isImg = /image\/(png|jpeg)/i.test(file.type || "") || /\.(png|jpe?g)$/i.test(file.name || "");
+      if (!isImg) {
+        var msg1 = "Poster harus berformat PNG atau JPEG";
+        if (this.$bvToast) this.$bvToast.toast(msg1, { title: "Format tidak didukung", variant: "warning", solid: true });
+        else alert(msg1);
+        return;
+      }
+      var sizeOk = file.size <= this.maxSizeMB * 1024 * 1024;
+      if (!sizeOk) {
+        var msg2 = "Ukuran poster maksimum " + this.maxSizeMB + "MB";
+        if (this.$bvToast) this.$bvToast.toast(msg2, { title: "File terlalu besar", variant: "warning", solid: true });
+        else alert(msg2);
+        return;
+      }
+
+      if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+      this.posterFile = file;
+      this.posterPreview = URL.createObjectURL(file);
+      this.removePoster = false;
+    },
+    removePosterFile: function () {
+      if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+      this.posterFile = null;
+      this.posterPreview = "";
+      if (this.posterUrl) {
+        this.removePoster = true;
+        this.posterUrl = "";
+      }
+    },
+
     onUpdate: function () {
       this.waitingForSave = true;
 
@@ -1103,6 +1199,10 @@ export default {
         removeTechnicalDelegateSignature: this.removeTechnicalDelegateSignature,
         removeChiefJudgeSignature: this.removeChiefJudgeSignature,
         removeRaceDirectorSignature: this.removeRaceDirectorSignature,
+
+        // ===== Poster Event (File baru, opsional) =====
+        posterFile: this.posterFile,
+        removePoster: this.removePoster,
       };
 
       this.$emit("update-settings", payload);
@@ -1263,6 +1363,26 @@ export default {
   border: 1px dashed #cbd5e1;
 }
 .sig-upload-actions { display: flex; align-items: center; gap: 8px; }
+
+.poster-thumb {
+  width: 90px;
+  height: 120px;
+  object-fit: cover;
+  background: #fff;
+  border: 1px solid #e6ebf4;
+  border-radius: 8px;
+  padding: 2px;
+}
+.poster-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 11px;
+  background: #fafafa;
+  border: 1px dashed #cbd5e1;
+  text-align: center;
+}
 
 /* Footer */
 .footer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }

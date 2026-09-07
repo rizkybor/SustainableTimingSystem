@@ -4,6 +4,12 @@ module.exports = {
     electronBuilder: {
       preload: "src/preload.js",
       nodeIntegration: true,
+      // default plugin cuma nge-watch src/background.js utk restart Electron
+      // di mode dev — file yang di-require dari situ (services/controllers)
+      // tidak ikut ke-watch, jadi perubahan di sana butuh restart manual.
+      // Ditambah eksplisit di sini supaya restart Electron OTOMATIS tiap
+      // handler IPC / controller backend berubah.
+      mainProcessWatch: ["src/services/**/*.js", "src/controllers/**/*.js"],
       externals: [
         "serialport",
         "mongodb",

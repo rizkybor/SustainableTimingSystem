@@ -80,6 +80,7 @@ const {
 
 const {
   insertNewTeam,
+  insertManyTeams,
   getAllTeams,
   deleteTeamById,
   updateTeamById,
@@ -111,6 +112,11 @@ const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
+const {
+  resetEventData,
+  deleteOneCollectionForEvent,
+  RESET_COLLECTIONS,
+} = require("../controllers/DELETE/resetEventData");
 const {
   insertChatMessage,
   listChatMessagesByEvent,
@@ -309,6 +315,45 @@ function setupIPCMainHandlers() {
     } catch (error) {
       event.reply("delete-event-reply", {
         ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset Data": hapus semua hasil/kompetisi (Sprint/H2H/Slalom/DRR/RX)
+  // milik satu event, tanpa menyentuh data tim terdaftar & pengaturan event.
+  ipcMain.on("event:reset-data", async (event, eventId) => {
+    try {
+      const result = await resetEventData(eventId);
+      event.reply("event:reset-data-reply", result);
+    } catch (error) {
+      event.reply("event:reset-data-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // daftar koleksi yang dihapus Reset Data — dipakai renderer utk
+  // menampilkan progress bar bertahap (1 request per koleksi)
+  ipcMain.on("event:reset-data:collections", (event) => {
+    event.reply(
+      "event:reset-data:collections-reply",
+      RESET_COLLECTIONS.map((c) => ({ name: c.name, label: c.label }))
+    );
+  });
+
+  // hapus SATU koleksi saja — dipanggil berkali-kali oleh renderer (satu per
+  // koleksi) supaya progress reset bisa ditampilkan bertahap
+  ipcMain.on("event:reset-data:step", async (event, { eventId, collection, __reqId } = {}) => {
+    try {
+      const result = await deleteOneCollectionForEvent(eventId, collection);
+      event.reply("event:reset-data:step-reply", { ...result, __reqId });
+    } catch (error) {
+      event.reply("event:reset-data:step-reply", {
+        ok: false,
+        collection,
+        __reqId,
         error: error && error.message ? error.message : String(error),
       });
     }
@@ -639,6 +684,19 @@ function setupIPCMainHandlers() {
       event.reply("insert-new-team-reply", { ok: true, ...result });
     } catch (e) {
       event.reply("insert-new-team-reply", {
+        ok: false,
+        error: String((e && e.message) || e),
+      });
+    }
+  });
+
+  // Bulk Insert (fitur "Import from Excel" di Create New Team)
+  ipcMain.on("teams:bulk-insert", async (event, docs) => {
+    try {
+      const result = await insertManyTeams(docs);
+      event.reply("teams:bulk-insert-reply", { ok: true, ...result });
+    } catch (e) {
+      event.reply("teams:bulk-insert-reply", {
         ok: false,
         error: String((e && e.message) || e),
       });

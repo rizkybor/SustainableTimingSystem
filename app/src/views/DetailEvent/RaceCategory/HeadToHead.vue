@@ -4069,6 +4069,26 @@ export default {
         A.result.winLose = null;
         B.result.winLose = null;
 
+        // BUG FIX: sama seperti evaluateHeatWinnersForCurrentRound() — tim
+        // yang di-flag DNF/DNS/DSQ punya waktu kosong, jadi tanpa
+        // penanganan khusus di sini Win/Lose-nya tidak pernah terisi
+        // (dianggap "waktu belum lengkap") padahal lawannya jelas menang.
+        const BAD_FLAGS = ["DNF", "DNS", "DSQ"];
+        const badA = BAD_FLAGS.includes(A.result && A.result.flag);
+        const badB = BAD_FLAGS.includes(B.result && B.result.flag);
+        if (badA || badB) {
+          if (badA && badB) {
+            // kedua sisi di-flag → tidak ada pemenang otomatis
+          } else if (badA) {
+            A.result.winLose = "Lose";
+            B.result.winLose = "Win";
+          } else {
+            A.result.winLose = "Win";
+            B.result.winLose = "Lose";
+          }
+          return;
+        }
+
         const tA = this.parsesTime(
           (A.result && (A.result.totalTime || A.result.raceTime)) || ""
         );
@@ -4641,6 +4661,39 @@ export default {
         const P2 = map.get(n2);
         if (!P1 || !P2) return;
 
+        // BUG FIX: tim yang di-flag DNF/DNS/DSQ (markFlag()) sengaja
+        // mengosongkan raceTime/totalTime-nya — kalau winner HANYA
+        // ditentukan dari perbandingan waktu (di bawah), match ini TIDAK
+        // PERNAH punya pemenang (isFinite(T1/T2) selalu false utk sisi yang
+        // di-flag) padahal lawannya jelas menang. Akibatnya bracket macet
+        // permanen di match ini (advanceToNextRound() menolak lanjut selama
+        // masih ada match "undecided", dan TIDAK ADA cara manual lain utk
+        // set pemenang). Tim yang di-flag otomatis KALAH dari lawannya yang
+        // py waktu sah; kalau KEDUA sisi sama2 di-flag, tidak ada pemenang
+        // yang bisa ditentukan otomatis (operator perlu keputusan manual).
+        const BAD_FLAGS = ["DNF", "DNS", "DSQ"];
+        const flag1 = P1.result && P1.result.flag;
+        const flag2 = P2.result && P2.result.flag;
+        const bad1 = BAD_FLAGS.includes(flag1);
+        const bad2 = BAD_FLAGS.includes(flag2);
+
+        if (bad1 || bad2) {
+          if (bad1 && bad2) {
+            m.winner = null;
+            P1.result.winLose = null;
+            P2.result.winLose = null;
+          } else if (bad1) {
+            m.winner = m.team2;
+            P1.result.winLose = "Lose";
+            P2.result.winLose = "Win";
+          } else {
+            m.winner = m.team1;
+            P1.result.winLose = "Win";
+            P2.result.winLose = "Lose";
+          }
+          return;
+        }
+
         const t1 =
           (P1.result && (P1.result.totalTime || P1.result.raceTime)) || "";
         const t2 =
@@ -4742,6 +4795,35 @@ export default {
 
       const target = this.participant[targetIndex];
       if (!target || !target.result) return;
+
+      // BUG FIX: `target.result` adalah SATU object yang dipakai bersama
+      // lintas SEMUA babak (lihat catatan _teamResultTime()/buildRoundRows()).
+      // onPenaltyChange() di bawah (evaluateHeatWinnersForCurrentRound,
+      // persistRoundResults, dst) SEMUANYA terikat ke this.currentRound /
+      // visibleParticipants. Kalau tim dari pesan realtime Judges Dashboard
+      // ini bukan bagian dari babak yang SEDANG ditampilkan di layar,
+      // perubahan ini akan diam2 HILANG begitu babak asli tim ini dimuat
+      // (loadRoundResultsForCurrentRound() me-reset result dari kosong lalu
+      // merge HANYA dari snapshot localStorage — update realtime ini tidak
+      // pernah sempat ke-persist ke babak yg benar). Drpd silently
+      // kehilangan data, tolak & beri tahu operator supaya pindah ke babak
+      // yang sesuai dulu.
+      const targetNameUp = String(
+        target.nameTeam || target.teamName || ""
+      ).toUpperCase();
+      const inCurrentRound = (this.teamsInCurrentRound || []).some(
+        (n) => String(n).toUpperCase() === targetNameUp
+      );
+      if (!inCurrentRound) {
+        this.notify(
+          "warning",
+          `Update realtime utk "${
+            target.nameTeam || target.teamName
+          }" diabaikan — babak tim ini tidak sedang ditampilkan. Buka babak yang sesuai dulu.`,
+          "Realtime Penalty"
+        );
+        return;
+      }
 
       this.ensurePenaltiesObject(target.result);
       const p = target.result.penalties;

@@ -168,7 +168,6 @@
         @delete-row="deleteRow(combo.division, combo.race, $event)"
         @start-race="handleStartRace"
         @show-result="showResult(combo.division, combo.race)"
-        @view-details="openTeamDetails(combo.division, combo.race, $event)"
       />
 
       <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
@@ -230,15 +229,6 @@
       @update-settings="handleUpdateSettings"
     />
 
-    <team-details-modal
-      v-model="showTeamDetails"
-      :team="selectedTeamForDetails"
-      :race-name="raceActive.selected.name"
-      :division-name="selectedTeamDivision"
-      :race-category-name="selectedTeamRace"
-      :initial-name="initialActive.selected.name"
-      :teams-available="availableTeams"
-    />
 
     <!-- MODAL: konfirmasi Reset Data -->
     <b-modal
@@ -346,7 +336,6 @@ import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import EventSettingsModal from "@/components/race/EventSettings.vue";
-import TeamDetailsModal from "@/components/race/TeamDetailsModal.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
@@ -358,7 +347,6 @@ export default {
     RaceSettingsModal,
     JudgeSettingsModal,
     EventSettingsModal,
-    TeamDetailsModal,
   },
   data() {
     return {
@@ -393,10 +381,6 @@ export default {
       resetProgressPercent: 0,
       resetProgressLabel: "",
       RESET_CONFIRM_PHRASE: "MAKOPLANET",
-      showTeamDetails: false,
-      selectedTeamForDetails: null,
-      selectedTeamDivision: "",
-      selectedTeamRace: "",
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -1290,13 +1274,6 @@ export default {
           divisionName: idt.divisionName,
         },
       });
-    },
-
-    openTeamDetails(div, race, row) {
-      this.selectedTeamForDetails = row;
-      this.selectedTeamDivision = div;
-      this.selectedTeamRace = race;
-      this.showTeamDetails = true;
     },
 
     /* =========================================================

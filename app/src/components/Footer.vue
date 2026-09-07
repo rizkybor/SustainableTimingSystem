@@ -1,7 +1,7 @@
 <template>
   <div>
      <footer class="sts-footer text-center py-4" style="color: white;">
-      ©{{ new Date().getFullYear() }} Sustainable Timing System with Jendela Kode. All rights reserved.
+      ©{{ new Date().getFullYear() }} STiming System with Jendela Cakra Digital. All rights reserved.
     </footer>
   </div>
 </template>

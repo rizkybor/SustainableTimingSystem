@@ -190,7 +190,7 @@
                         </b-button>
 
                         <b-button
-                          v-if="formEvent.poster"
+                          v-if="formEvent.poster || posterTempPath"
                           size="sm"
                           variant="outline-danger"
                           class="mt-2"
@@ -623,7 +623,6 @@ export default {
 
   async mounted() {
     await this.loadOptions();
-    await this.checkValueStorage();
   },
 
   watch: {
@@ -703,23 +702,6 @@ export default {
         });
       }
     },
-    async checkValueStorage() {
-      const dataStorage = localStorage.getItem("formNewEvent");
-      let datas = null;
-      try {
-        datas = dataStorage ? JSON.parse(dataStorage) : null;
-      } catch (_e) {
-        // draft rusak/tidak valid → abaikan, jangan sampai mounted() gagal total
-        localStorage.removeItem("formNewEvent");
-      }
-      if (datas) {
-        this.formEvent = datas;
-        if (datas.poster && datas.poster.secure_url) {
-          this.posterPreview = datas.poster.secure_url;
-        }
-      }
-    },
-
     async loadOptions() {
       await this.setOptionLevel();
       await this.setOptionCategoriesEvent();
@@ -757,11 +739,6 @@ export default {
       ipcRenderer.once("option-categories-race-reply", (_e, data) => {
         this.optionRaces = data || [];
       });
-    },
-
-    goTo() {
-      localStorage.removeItem("formNewEvent");
-      this.$router.push("/");
     },
 
     validateForm() {
@@ -920,6 +897,14 @@ export default {
       } finally {
         this.formEvent.poster = null;
         this.posterPreview = "";
+        // BUG FIX: "Upload Image" hanya MEMILIH file lokal & preview-nya —
+        // upload sungguhan ke Cloudinary baru terjadi belakangan di
+        // handleAfterInsert() (setelah event ke-insert ke DB), yang cuma
+        // mengecek `posterTempPath`. Tanpa baris ini, klik "Remove" cuma
+        // membersihkan preview & formEvent.poster, tapi posterTempPath yang
+        // masih menunjuk ke file lama tetap ikut ke-upload saat Submit —
+        // poster yang "sudah dihapus" diam-diam muncul lagi di event.
+        this.posterTempPath = null;
       }
     },
 
@@ -1119,7 +1104,6 @@ export default {
       });
       const self = this;
       setTimeout(function () {
-        localStorage.removeItem("formNewEvent");
         self.$router.push("/");
       }, 1500);
     },

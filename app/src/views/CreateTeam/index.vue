@@ -210,18 +210,6 @@
                 <CountryFlag :code="row.item.countryCode" />
               </template>
 
-              <!-- BIB -->
-              <template #cell(bibTeam)="row">
-                <span
-                  v-if="row.item.bibTeam"
-                  class="status-pill status-neutral"
-                  title="BIB"
-                >
-                  <span class="dot"></span> {{ row.item.bibTeam }}
-                </span>
-                <span v-else class="text-muted">—</span>
-              </template>
-
               <!-- Type -->
               <template #cell(typeTeam)="row">
                 <span class="font-weight-bold text-dark">{{
@@ -355,14 +343,6 @@
             class="input-soft"
             required
             placeholder="Enter team name"
-          />
-        </b-form-group>
-
-        <b-form-group label="BIB" label-class="label-strong">
-          <b-form-input
-            v-model="editForm.bibTeam"
-            class="input-soft"
-            placeholder="Optional BIB"
           />
         </b-form-group>
 
@@ -526,7 +506,6 @@ export default {
           thClass: "text-uppercase",
         },
         { key: "nameTeam", label: "Team Name" },
-        { key: "bibTeam", label: "BIB" },
         { key: "typeTeam", label: "Type" },
         { key: "statusId", label: "Status" },
         { key: "actions", label: "", class: "text-right" },
@@ -535,7 +514,6 @@ export default {
         _id: null,
         typeTeam: null,
         nameTeam: "",
-        bibTeam: "",
         statusId: 0,
         countryCode: "",
       },
@@ -732,7 +710,6 @@ export default {
         _id: this._toStringId(item._id),
         typeTeam: item.typeTeam || null,
         nameTeam: item.nameTeam || "",
-        bibTeam: item.bibTeam || "",
         statusId: Number(item.statusId) || 0, // ≤ pastikan number
         countryCode: item.countryCode || "",
       };
@@ -758,7 +735,6 @@ export default {
         _id: this._toStringId(this.editForm._id),
         typeTeam: String(this.editForm.typeTeam || "").trim(),
         nameTeam: String(this.editForm.nameTeam || "").trim(),
-        bibTeam: String(this.editForm.bibTeam || "").trim(),
         statusId: Number(this.editForm.statusId) || 0,
         countryCode: String(this.editForm.countryCode || "").trim(),
       };

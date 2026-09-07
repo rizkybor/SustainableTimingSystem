@@ -1293,43 +1293,69 @@
     <!-- MODAL: Heat Assignment (seluruh kategori Head to Head di event ini) -->
     <b-modal
       v-model="heatModalVisible"
-      title="Heat Assignment – Head to Head"
       size="xl"
       scrollable
       hide-footer
       content-class="heat-modal"
     >
-      <div v-if="!heatModalGroups.length" class="text-center text-muted py-4">
-        Belum ada nomor Heat yang terassign di kategori Head to Head manapun
-        pada event ini.
-      </div>
-      <div v-else>
-        <div
-          v-for="group in heatModalGroups"
-          :key="group.heat"
-          class="heat-group mb-3"
-        >
-          <div class="heat-group__title">Heat {{ group.heat }}</div>
-          <table class="table table-sm heat-group__table mb-0">
-            <thead>
-              <tr>
-                <th style="width: 40px">#</th>
-                <th style="width: 26%">Tim</th>
-                <th class="text-left" style="width: 90px">Bib</th>
-                <th class="text-left">Kategori (Divisi Race – Initial)</th>
-                <th style="width: 140px">Babak</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(t, idx) in group.teams" :key="idx">
-                <td>{{ idx + 1 }}</td>
-                <td>{{ t.nameTeam || "-" }}</td>
-                <td class="text-left">{{ t.bibTeam || "-" }}</td>
-                <td class="text-left">{{ t.category }}</td>
-                <td>{{ t.round || "-" }}</td>
-              </tr>
-            </tbody>
-          </table>
+      <template #modal-header>
+        <h5 class="modal-title">Heat Assignment – Head to Head</h5>
+        <div class="d-flex align-items-center" style="gap: 8px">
+          <button
+            type="button"
+            class="btn-action btn-outline-secondary"
+            :disabled="isDownloadingHeatModalPdf"
+            @click="downloadHeatAssignmentPdf"
+            v-b-tooltip.hover="'Download daftar Heat Assignment ini sebagai PDF'"
+          >
+            <b-spinner v-if="isDownloadingHeatModalPdf" small class="mr-1" />
+            <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+            {{ isDownloadingHeatModalPdf ? "Menyiapkan PDF…" : "Download PDF" }}
+          </button>
+          <button
+            type="button"
+            class="close"
+            aria-label="Tutup"
+            @click="heatModalVisible = false"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      </template>
+
+      <div ref="heatModalCaptureArea">
+        <div v-if="!heatModalGroups.length" class="text-center text-muted py-4">
+          Belum ada nomor Heat yang terassign di kategori Head to Head manapun
+          pada event ini.
+        </div>
+        <div v-else>
+          <div
+            v-for="group in heatModalGroups"
+            :key="group.heat"
+            class="heat-group mb-3"
+          >
+            <div class="heat-group__title">Heat {{ group.heat }}</div>
+            <table class="table table-sm heat-group__table mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 40px">#</th>
+                  <th style="width: 26%">Tim</th>
+                  <th class="text-left" style="width: 90px">Bib</th>
+                  <th class="text-left">Kategori (Divisi Race – Initial)</th>
+                  <th style="width: 140px">Babak</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(t, idx) in group.teams" :key="idx">
+                  <td>{{ idx + 1 }}</td>
+                  <td>{{ t.nameTeam || "-" }}</td>
+                  <td class="text-left">{{ t.bibTeam || "-" }}</td>
+                  <td class="text-left">{{ t.category }}</td>
+                  <td>{{ t.round || "-" }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </b-modal>
@@ -1402,6 +1428,7 @@ import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
+import logoSts from "@/assets/images/logo-sts.png";
 import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
@@ -1580,6 +1607,7 @@ export default {
       // di-minimize — klik header "Penalties Group" utk toggle.
       penaltiesCollapsed: false,
       isDownloadingBracketPdf: false,
+      isDownloadingHeatModalPdf: false,
       // state modal "pilih tim" saat slot kosong di bagan diklik — tim
       // ditaruh LANGSUNG ke slot (matchIndex + side) ini, TANPA Heat apa pun.
       assignPicker: { show: false, roundId: null, matchIndex: null, side: null },
@@ -4220,11 +4248,194 @@ export default {
       this.heatModalVisible = true;
     },
 
+    // Muat gambar (mis. logo) jadi data URL + dimensi asli — dipakai utk
+    // menempelkan logo ke PDF via jsPDF.addImage(), yang butuh data URL
+    // (bukan sekadar path/URL import webpack).
+    _loadImageAsDataUrl(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx2d = canvas.getContext("2d");
+          ctx2d.drawImage(img, 0, 0);
+          resolve({
+            dataUrl: canvas.toDataURL("image/png"),
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+          });
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    },
+
+    // Tanggal event utk keterangan di PDF bagan — pakai startDateEvent
+    // (+endDateEvent kalau beda) dari dokumen event, format "DD MMM YYYY".
+    _formatEventDateForPdf() {
+      const ev = this.dataEventSafe || {};
+      const fmt = (v) => {
+        if (!v) return "";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      };
+      const start = fmt(ev.startDateEvent);
+      const end = fmt(ev.endDateEvent);
+      if (start && end && start !== end) return `${start} - ${end}`;
+      return start || end || "";
+    },
+
     // Capture LANGSUNG DOM bagan yang sedang tampil (heat badge, highlight
     // menang/kalah, dll. apa adanya) jadi PDF — bukan render ulang lewat
     // template PDF terpisah (beda dgn Print Round/All Round/Overall yang
     // pakai HeadToHeadPdfResult), krn bagannya sendiri sudah representasi
     // visual final yang mau di-export.
+    // Layout dasar semua PDF H2H (logo/keterangan/margin konten) — satu
+    // sumber angka spy "professional" & konsisten antar downloadBracketPdf()
+    // & downloadHeatAssignmentPdf(), bukan angka acak yang beda2 tiap fungsi.
+    _pdfLayout() {
+      return {
+        pageMargin: 14, // mm — margin luar standar dokumen cetak
+        // tinggi "kop" (logo STS kiri + logo Event & keterangan kanan) —
+        // cukup longgar utk logo Event (maks 14mm) + judul + 2 baris teks
+        // kanan atas tanpa numpuk sama gambar bagan/tabel di bawahnya.
+        headerHeight: 48, // mm
+        logoWidth: 34, // mm — logo STS lebar (aspect ~512x150) jadi cukup besar tanpa makan tinggi header
+      };
+    },
+
+    // Logo di pojok kiri atas halaman, sejajar vertikal dgn kop keterangan.
+    async _addLogoToPdf(pdf) {
+      try {
+        const { pageMargin, logoWidth } = this._pdfLayout();
+        const logo = await this._loadImageAsDataUrl(logoSts);
+        const logoH = (logo.height / logo.width) * logoWidth;
+        pdf.addImage(logo.dataUrl, "PNG", pageMargin, pageMargin, logoWidth, logoH);
+      } catch (logoErr) {
+        // logo gagal dimuat — lanjut tanpa logo drpd gagal total
+      }
+    },
+
+    // Logo EVENT (dari eventFiles, beda dgn logo STS di pojok kiri) di
+    // pojok KANAN atas, di ATAS blok keterangan Event/Round/Category.
+    // Return tinggi (mm) yang terpakai supaya _addInfoBlockToPdf() tau
+    // harus mulai menulis teks dari mana (spy tidak numpuk sama logo ini).
+    async _addEventLogoToPdf(pdf) {
+      try {
+        const url = this.eventLogoUrl;
+        if (!url) return 0;
+        const { pageMargin } = this._pdfLayout();
+        const logo = await this._loadImageAsDataUrl(url);
+        const maxH = 14; // mm
+        const maxW = 32; // mm
+        let h = maxH;
+        let w = (logo.width / logo.height) * h;
+        if (w > maxW) {
+          w = maxW;
+          h = (logo.height / logo.width) * w;
+        }
+        const pageW = pdf.internal.pageSize.getWidth();
+        const x = pageW - pageMargin - w;
+        pdf.addImage(logo.dataUrl, "PNG", x, pageMargin, w, h);
+        return h;
+      } catch (logoErr) {
+        // logo event gagal dimuat (mis. CORS) — lanjut tanpa logo drpd gagal total
+        return 0;
+      }
+    },
+
+    // jsPDF 1.x (font Helvetica bawaan) cuma bisa render WinAnsi/Latin-1 —
+    // karakter di luar itu (en dash "–", em dash "—", smart quotes, dst,
+    // sering ke-copy-paste dari nama kategori/divisi) bikin encoder-nya
+    // salah deteksi & nulis string sbg UTF-16 + BOM ("þÿ" + spasi di antara
+    // tiap huruf). Ganti dulu ke padanan ASCII sebelum di-render ke PDF.
+    _sanitizePdfText(str) {
+      return String(str == null ? "" : str)
+        .replace(/[–—]/g, "-") // en dash, em dash -> hyphen
+        .replace(/[‘’]/g, "'") // smart single quotes
+        .replace(/[“”]/g, '"') // smart double quotes
+        .replace(/…/g, "...") // ellipsis
+        .replace(/[   ]/g, " ") // non-breaking spaces
+        // eslint-disable-next-line no-control-regex
+        .replace(/[^\x00-\x7f]/g, ""); // sisa karakter non-ASCII lain
+    },
+
+    // Keterangan (Event/Tanggal/Round/Category dll) di pojok KANAN atas,
+    // rapi & right-aligned. `lines` = array of { label, value } ATAU string
+    // polos (baris pertama = judul/Event name, dibuat bold & sedikit lebih
+    // gelap; baris lain "Label: value" abu-abu). `topOffsetMm` menggeser
+    // titik mulai ke bawah kalau ada logo event yang sudah dipasang di atas
+    // blok ini (lihat _addEventLogoToPdf), spy tidak numpuk.
+    _addInfoBlockToPdf(pdf, lines, topOffsetMm = 0) {
+      try {
+        const { pageMargin } = this._pdfLayout();
+        const pageW = pdf.internal.pageSize.getWidth();
+        const rightX = pageW - pageMargin;
+        let y = pageMargin + 3.5 + topOffsetMm;
+
+        const filtered = (lines || []).filter((l) =>
+          typeof l === "string" ? l && l !== "-" : l && l.value && l.value !== "-"
+        );
+
+        filtered.forEach((l, i) => {
+          const isTitle = i === 0 && typeof l === "string";
+          if (isTitle) {
+            pdf.setFont(undefined, "bold");
+            pdf.setFontSize(11);
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(this._sanitizePdfText(l), rightX, y, { align: "right" });
+            y += 5.5;
+          } else {
+            const text =
+              typeof l === "string" ? l : `${l.label}: ${l.value}`;
+            pdf.setFont(undefined, "normal");
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(this._sanitizePdfText(text), rightX, y, { align: "right" });
+            y += 4.2;
+          }
+        });
+        pdf.setFont(undefined, "normal");
+      } catch (infoErr) {
+        // gagal nulis keterangan — lanjut simpan PDF apa adanya
+      }
+    },
+
+    // Tempelkan canvas hasil capture ke halaman PDF, di-skalakan supaya PAS
+    // (fit) di dalam area konten (di bawah kop logo/keterangan, dikurangi
+    // margin standar di kiri/kanan/bawah) sambil mempertahankan aspect
+    // ratio aslinya — dicentang di tengah area itu. Dipakai supaya ukuran
+    // PDF SELALU A4 baku, brp pun ukuran/rasio bagan atau tabel yang
+    // di-capture (lebar/sempit, panjang/pendek).
+    _addFittedImageToPdf(pdf, canvas) {
+      const { pageMargin, headerHeight } = this._pdfLayout();
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const contentTop = headerHeight;
+      const maxW = pageW - pageMargin * 2;
+      const maxH = pageH - contentTop - pageMargin;
+
+      const ratio = canvas.width / canvas.height;
+      let drawW = maxW;
+      let drawH = drawW / ratio;
+      if (drawH > maxH) {
+        drawH = maxH;
+        drawW = drawH * ratio;
+      }
+      const x = (pageW - drawW) / 2;
+      const y = contentTop + (maxH - drawH) / 2;
+
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", x, y, drawW, drawH);
+    },
+
     async downloadBracketPdf() {
       const el = this.$refs.bracketCaptureArea;
       if (!el) {
@@ -4239,13 +4450,31 @@ export default {
           backgroundColor: "#ffffff",
           useCORS: true,
         });
-        const imgData = canvas.toDataURL("image/png");
+
         const pdf = new jsPDF({
-          orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-          unit: "px",
-          format: [canvas.width, canvas.height],
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
         });
-        pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+
+        this._addFittedImageToPdf(pdf, canvas);
+        await this._addLogoToPdf(pdf);
+        const eventLogoH = await this._addEventLogoToPdf(pdf);
+
+        const roundLabel = this.currentRound
+          ? this.currentRound.bronze
+            ? "Final B"
+            : this.currentRound.name
+          : "-";
+        this._addInfoBlockToPdf(
+          pdf,
+          [
+            String(this.dataEventSafe.eventName || "-"),
+            this._formatEventDateForPdf(),
+            `Round: ${roundLabel} - Category: ${this.titleCategories || "-"}`,
+          ],
+          eventLogoH ? eventLogoH + 2 : 0
+        );
 
         const safeName = String(this.titleCategories || "event")
           .trim()
@@ -4256,6 +4485,57 @@ export default {
         this.notify("error", String(err), "Gagal export PDF Bracket");
       } finally {
         this.isDownloadingBracketPdf = false;
+      }
+    },
+
+    // Download modal "Heat Assignment – Head to Head" (lintas SEMUA
+    // kategori H2H event ini) sebagai PDF — pola sama dgn downloadBracketPdf()
+    // tapi capture area-nya isi modal (tabel per-Heat), bukan bagan, dan
+    // halamannya A4 Portrait (lebih cocok utk daftar tabel memanjang ke bawah).
+    async downloadHeatAssignmentPdf() {
+      const el = this.$refs.heatModalCaptureArea;
+      if (!el) {
+        this.notify("warning", "Konten belum tersedia untuk di-export.", "Info");
+        return;
+      }
+      this.isDownloadingHeatModalPdf = true;
+      try {
+        await this.$nextTick();
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+        });
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        this._addFittedImageToPdf(pdf, canvas);
+        await this._addLogoToPdf(pdf);
+        const eventLogoH = await this._addEventLogoToPdf(pdf);
+
+        this._addInfoBlockToPdf(
+          pdf,
+          [
+            String(this.dataEventSafe.eventName || "-"),
+            this._formatEventDateForPdf(),
+            "Semua Kategori Head to Head",
+          ],
+          eventLogoH ? eventLogoH + 2 : 0
+        );
+
+        const safeName = String(this.dataEventSafe.eventName || "event")
+          .trim()
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "");
+        pdf.save(`H2H-Heat-Assignment-${safeName || "event"}.pdf`);
+      } catch (err) {
+        this.notify("error", String(err), "Gagal export PDF Heat Assignment");
+      } finally {
+        this.isDownloadingHeatModalPdf = false;
       }
     },
 
@@ -6472,8 +6752,7 @@ td {
 }
 /* saat capture utk Download Bracket (PDF) — hilangkan highlight biru
    "Babak Aktif" (badge + background biru match-footer), sisakan cuma
-   label nama babak (.vtb-round-badge). Win/Lose hijau/merah TIDAK
-   terpengaruh krn itu class terpisah (.vtb-player.winner/.defeated). */
+   label nama babak (.vtb-round-badge). */
 .pdf-export-mode .vtb-active-round-badge {
   display: none !important;
 }
@@ -6485,6 +6764,16 @@ td {
 .pdf-export-mode >>> .vtb-item-players:has(.vtb-match-footer--active) {
   border-color: #cbd2dc !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+}
+/* BUG FIX: box-shadow inset (border hijau/merah kiri Win/Lose) di-render
+   html2canvas sbg potongan diagonal yang jelek (keterbatasan library, bukan
+   masalah CSS-nya) — di export PDF, hilangkan cuma box-shadow-nya, sisakan
+   tint background hijau/merah yang tetap render bersih. */
+.pdf-export-mode >>> .vtb-player.winner {
+  box-shadow: none !important;
+}
+.pdf-export-mode >>> .vtb-player.defeated {
+  box-shadow: none !important;
 }
 .vtb-active-round-badge {
   display: inline-flex;
@@ -6559,7 +6848,10 @@ td {
   user-select: none;
 }
 .penalties-group-th:hover {
-  background: #eef2f7;
+  /* thead background gelap (#383838) + teks putih — hover HARUS tetap
+     gelap (bukan warna terang spt #eef2f7 sebelumnya) supaya teks putihnya
+     tidak "hilang" ketika di-hover */
+  background: #4d4d4d;
 }
 
 /* kolom Heat di tabel hasil — read-only, cuma menampilkan Heat yang sudah
@@ -6966,6 +7258,15 @@ thead th[colspan="8"] {
 <!-- unscoped: b-modal renders its content outside this component's scoped
      CSS reach (portalled to <body>), sama seperti kasus di EventSettings.vue -->
 <style>
+/* Tooltip BootstrapVue (v-b-tooltip) di-append ke <body>, jadi z-index
+   bawaannya (1070) lebih tinggi drpd Navbar (z-index: 1000 di App.vue) —
+   akibatnya tooltip tombol2 di header H2H (yg posisinya dekat/menempel
+   Navbar) tampil MENIMPA Navbar. Turunkan supaya tooltip selalu di BAWAH
+   Navbar, tanpa mengubah tampilan tooltip itu sendiri. */
+.tooltip {
+  z-index: 990 !important;
+}
+
 .heat-modal {
   max-height: 85vh !important;
 }

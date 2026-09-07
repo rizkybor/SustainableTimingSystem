@@ -743,7 +743,15 @@
                          TBD/BYE utk assign tim, klik badge "Heat N" utk
                          ubah nomornya). Kolom ini cuma menampilkan hasilnya. -->
                     <td style="min-width: 110px">
-                      <span v-if="item.result && item.result.heat" class="h2h-heat-readonly">
+                      <span
+                        v-if="isByeTeam(item)"
+                        class="badge badge-light"
+                        >BYE</span
+                      >
+                      <span
+                        v-else-if="item.result && item.result.heat"
+                        class="h2h-heat-readonly"
+                      >
                         Heat {{ item.result.heat }}
                       </span>
                       <span v-else class="text-muted small">—</span>
@@ -776,11 +784,6 @@
                       <div>
                         {{ item.nameTeam }}
                         <CountryFlag :code="flagFor(item.nameTeam)" />
-                        <span
-                          v-if="isByeTeam(item)"
-                          class="badge badge-light ml-2"
-                          >BYE</span
-                        >
                       </div>
                     </td>
                     <!-- BIB TEAM -->

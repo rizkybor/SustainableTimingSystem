@@ -51,14 +51,22 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="results.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
           variant="outline-primary"
@@ -233,6 +241,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -624,6 +633,18 @@ export default {
       }
     },
     onBeforeDownload() {},
+
+    downloadExcel() {
+      const rows = (this.results || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.name || "-",
+        BIB: r.bib || "-",
+        Ranked: r.ranked || "-",
+        Score: r.score || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Head to Head Result - ${eventName}`, rows, "H2H Result");
+    },
     onPdfGenerated() {
       this.showPdf = false;
     },

@@ -92,10 +92,13 @@
                         :key="'start-' + index"
                         type="button"
                         class="btn custom-btn btn-block"
-                        :disabled="hasStartTime(button)"
+                        :disabled="hasStartTime(button) || isByeTeam(button)"
                         :class="
-                          hasStartTime(button) ? 'btn-secondary' : 'btn-info'
+                          hasStartTime(button) || isByeTeam(button)
+                            ? 'btn-secondary'
+                            : 'btn-info'
                         "
+                        :title="isByeTeam(button) ? 'Tim BYE — tidak perlu waktu' : ''"
                         @click="
                           $emit('update-time', digitTimeStart, index, 'start')
                         "
@@ -152,10 +155,13 @@
                         :key="'finish-' + index"
                         type="button"
                         class="btn custom-btn btn-block"
-                        :disabled="hasFinishTime(button)"
+                        :disabled="hasFinishTime(button) || isByeTeam(button)"
                         :class="
-                          hasFinishTime(button) ? 'btn-secondary' : 'btn-info'
+                          hasFinishTime(button) || isByeTeam(button)
+                            ? 'btn-secondary'
+                            : 'btn-info'
                         "
+                        :title="isByeTeam(button) ? 'Tim BYE — tidak perlu waktu' : ''"
                         @click="
                           $emit('update-time', digitTimeFinish, index, 'finish')
                         "
@@ -189,6 +195,10 @@ export default {
     participant: { type: Array, default: () => [] },
     digitTimeStart: { type: String, default: "" },
     digitTimeFinish: { type: String, default: "" },
+    // nama tim yang sedang BYE (mis. dari Head to Head) — tombol BIB mereka
+    // di-disable krn tidak pernah balapan. Kosong/tidak dipakai di kategori
+    // lain (Sprint/Slalom/dll.) yang tidak punya konsep BYE.
+    byeNames: { type: Array, default: () => [] },
   },
   computed: {},
   methods: {
@@ -240,6 +250,12 @@ export default {
     },
     getBib(btn) {
       return btn && typeof btn.bibTeam !== "undefined" ? btn.bibTeam : "-";
+    },
+    isByeTeam(btn) {
+      if (!this.byeNames || !this.byeNames.length) return false;
+      const nm = String((btn && (btn.nameTeam || btn.teamName)) || "").toUpperCase();
+      if (!nm) return false;
+      return this.byeNames.some((n) => String(n).toUpperCase() === nm);
     },
   },
 };

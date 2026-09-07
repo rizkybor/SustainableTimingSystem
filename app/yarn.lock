@@ -13208,7 +13208,14 @@ vue-template-es2015-compiler@^1.9.0:
   resolved "https://registry.npmjs.org/vue-template-es2015-compiler/-/vue-template-es2015-compiler-1.9.1.tgz"
   integrity sha512-4gDntzrifFnCEvyoO8PqyJDmguXgVPxKiIxrBKjIowvL9l+N66196+72XVYR8BBf1Uv1Fgt3bGevJ+sEmxfZzw==
 
-vue@*, vue@^2.5.18, vue@^2.6.10, vue@2.x:
+vue-tournament-bracket@2.1.4:
+  version "2.1.4"
+  resolved "https://registry.npmjs.org/vue-tournament-bracket/-/vue-tournament-bracket-2.1.4.tgz"
+  integrity sha512-8B2gLZBj1LOyGQXpFwS231IAWzOmfeghRKscML4Jsbv3l6iO6t1epBBviaL4/RTWbwOmwzjVB/CaPz4LQIVNwQ==
+  dependencies:
+    vue "^2.6.14"
+
+vue@*, vue@^2.5.18, vue@^2.6.10, vue@^2.6.14, vue@2.x:
   version "2.7.16"
   resolved "https://registry.npmjs.org/vue/-/vue-2.7.16.tgz"
   integrity sha512-4gCtFXaAA3zYZdTp5s4Hl2sozuySsgz4jy1EnpBHNfpMa9dK1ZCG7viqBPCwXtmgc8nHqUsAu3G4gtmXkkY3Sw==
@@ -13639,7 +13646,7 @@ xdg-basedir@^4.0.0:
   resolved "https://registry.npmjs.org/xdg-basedir/-/xdg-basedir-4.0.0.tgz"
   integrity sha512-PSNhEJDejZYV7h50BohL09Er9VaIefr2LMAf3OEmpCkjOi34eYyQYAXUTjEQtZJTKcF0E2UKTh+osDLsgNim9Q==
 
-xlsx@*:
+xlsx@^0.18.5:
   version "0.18.5"
   resolved "https://registry.npmjs.org/xlsx/-/xlsx-0.18.5.tgz"
   integrity sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==

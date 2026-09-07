@@ -148,6 +148,7 @@
                 </div>
               </div>
 
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -162,7 +163,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -177,20 +180,28 @@
                 }"
               ></span>
 
+              <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- path pill -->
               <div class="mb-1">
                 <span
                   class="path-pill"
                   :class="{ 'path-pill--empty': !selectPath }"
                   :title="selectPath || 'No device selected'"
                 >
-                  <Icon icon="mdi:usb-port" width="16" height="16" class="mr-1" />
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
                   <span class="truncate">{{
                     selectPath || "No device selected"
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>

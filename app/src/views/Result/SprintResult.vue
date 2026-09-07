@@ -61,14 +61,23 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="results.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
+          text="Download Result"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
           variant="outline-primary"
@@ -274,6 +283,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -387,6 +397,9 @@ export default {
         { ranking: 31, score: 14 },
         { ranking: 32, score: 12 },
       ],
+      // score fallback utk rank di luar daftar dataScore (Race Settings ->
+      // Sprint -> "Score utk Rank N+ dan seterusnya")
+      sprintDefaultScoreBeyondRank: 0,
       showOverallModal: false,
       dataAggregate: {
         header: {
@@ -529,6 +542,7 @@ export default {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
 
     this.loadSprintResult();
@@ -754,6 +768,44 @@ export default {
       }
     },
 
+    // Score by Rank per-event (Race Settings) — override tabel default
+    // (dulunya global/hardcoded lewat optionRanked "SPRINT") kalau event
+    // ini sudah dikustomisasi.
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const scoreByRank =
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.sprint &&
+              Array.isArray(res.settings.sprint.scoreByRank)
+                ? res.settings.sprint.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.sprintDefaultScoreBeyondRank =
+              Number(
+                res &&
+                  res.settings &&
+                  res.settings.sprint &&
+                  res.settings.sprint.defaultScoreBeyondRank
+              ) || 0;
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan dataScore default kalau gagal memuat override
+      }
+    },
+
     async toggleOfficial() {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
@@ -783,7 +835,16 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return m ? m.score : 0;
+      if (m) return m.score;
+      // rank di luar daftar (mis. list cuma diisi Rank 1-5) → pakai score
+      // fallback "Rank N+ dan seterusnya" dari Race Settings, kalau ada
+      const maxRank = this.dataScore.length
+        ? Math.max(...this.dataScore.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.sprintDefaultScoreBeyondRank || 0;
+      }
+      return 0;
     },
 
     /** Normalisasi baris hasil; aman untuk 2 bentuk: flat atau r.result */
@@ -1326,6 +1387,26 @@ export default {
 
     onPdfGenerated() {
       this.showPdf = false;
+    },
+
+    downloadExcel() {
+      const rows = (this.results || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        "Penalty Time": r.penaltyTime || "00:00:00.000",
+        "Start Time": r.startTime || "00:00:00.000",
+        "Finish Time": r.finishTime || "00:00:00.000",
+        "Race Time": r.raceTime || "00:00:00.000",
+        Result: r.resultTime || "00:00:00.000",
+        Ranked: r.ranked || "-",
+        Score:
+          r.score !== undefined && r.score !== null && r.score !== ""
+            ? r.score
+            : this.getScoreByRanked(r.ranked) || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Sprint Result - ${eventName}`, rows, "Sprint Result");
     },
   },
 };

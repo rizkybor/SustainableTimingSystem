@@ -51,14 +51,22 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="buckets.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -230,6 +238,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportSheetsToExcel } from "@/utils/exportExcel";
 
 export default {
   name: "EventOverallResult",
@@ -555,6 +564,32 @@ export default {
       }
     },
     onBeforeDownload() {},
+
+    downloadExcel() {
+      const cats = this.visibleCategories || [];
+      const sheets = (this.buckets || []).map((b) => {
+        const rows = (b.rows || []).map((row, i) => {
+          const obj = {
+            No: i + 1,
+            "Team Name": row.teamName || "-",
+            BIB: row.bib || "-",
+          };
+          cats.forEach((cat) => {
+            obj[`${cat.label} Score`] = row[cat.scoreField] || 0;
+            obj[`${cat.label} Ranked`] = row[cat.rankField] || "-";
+          });
+          obj["Total Score"] = row.totalScore || 0;
+          obj["Rank Overall"] = row.rank || "-";
+          return obj;
+        });
+        return {
+          name: `${b.divisionName || ""} ${b.raceName || ""} ${b.initialName || ""}`.trim(),
+          rows,
+        };
+      });
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportSheetsToExcel(`Event Overall Result - ${eventName}`, sheets);
+    },
     onPdfGenerated() {
       this.showPdf = false;
     },

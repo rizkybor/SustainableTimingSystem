@@ -26,6 +26,56 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   ];
   const MAX_SPRINT_PENALTIES = 8;
   const MAX_H2H_PENALTIES = 8;
+  const MAX_SPRINT_SCORE_ROWS = 64;
+
+  // Default tabel Rank -> Score Sprint, dulunya global/hardcoded lewat
+  // koleksi optionRanked (type "SPRINT") — sekarang bisa dikustomisasi
+  // per-event lewat Race Settings.
+  const DEFAULT_SPRINT_SCORE_BY_RANK = [
+    { ranking: 1, score: 100 },
+    { ranking: 2, score: 92 },
+    { ranking: 3, score: 86 },
+    { ranking: 4, score: 82 },
+    { ranking: 5, score: 79 },
+    { ranking: 6, score: 76 },
+    { ranking: 7, score: 73 },
+    { ranking: 8, score: 70 },
+    { ranking: 9, score: 67 },
+    { ranking: 10, score: 64 },
+    { ranking: 11, score: 61 },
+    { ranking: 12, score: 58 },
+    { ranking: 13, score: 55 },
+    { ranking: 14, score: 52 },
+    { ranking: 15, score: 49 },
+    { ranking: 16, score: 46 },
+    { ranking: 17, score: 43 },
+    { ranking: 18, score: 40 },
+    { ranking: 19, score: 38 },
+    { ranking: 20, score: 36 },
+    { ranking: 21, score: 34 },
+    { ranking: 22, score: 32 },
+    { ranking: 23, score: 30 },
+    { ranking: 24, score: 28 },
+    { ranking: 25, score: 26 },
+    { ranking: 26, score: 24 },
+    { ranking: 27, score: 22 },
+    { ranking: 28, score: 20 },
+    { ranking: 29, score: 18 },
+    { ranking: 30, score: 16 },
+    { ranking: 31, score: 14 },
+    { ranking: 32, score: 12 },
+  ];
+
+  // Rank selalu dinormalisasi berurutan 1..N sesuai urutan array yang
+  // dikirim (bukan nilai `ranking` dari client) — mencegah rank ganda/bolong.
+  const cleanScoreByRank = (raw, fallback) => {
+    const arr = Array.isArray(raw) && raw.length > 0 ? raw : fallback;
+    const clean = arr.slice(0, MAX_SPRINT_SCORE_ROWS).map((p, idx) => ({
+      ranking: idx + 1,
+      score: Math.max(0, Math.min(1000, parseInt(p && p.score, 10) || 0)),
+    }));
+    return clean.length > 0 ? clean : fallback;
+  };
 
   const cleanPenaltyList = (raw, fallback, max) => {
     const arr = Array.isArray(raw) ? raw : fallback;
@@ -56,6 +106,22 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
       finishPenalties: cleanPenaltyList(
         incoming.sprint && incoming.sprint.finishPenalties,
         DEFAULT_FINISH_PENALTIES
+      ),
+      scoreByRank: cleanScoreByRank(
+        incoming.sprint && incoming.sprint.scoreByRank,
+        DEFAULT_SPRINT_SCORE_BY_RANK
+      ),
+      // score utk rank di luar daftar scoreByRank (mis. list cuma Rank 1-5,
+      // Rank 6 dst semua dapat score ini). 0 = tidak dapat score.
+      defaultScoreBeyondRank: Math.max(
+        0,
+        Math.min(
+          1000,
+          parseInt(
+            incoming.sprint && incoming.sprint.defaultScoreBeyondRank,
+            10
+          ) || 0
+        )
       ),
     },
     h2h: {

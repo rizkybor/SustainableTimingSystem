@@ -51,14 +51,22 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="rows.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
           variant="outline-primary"
@@ -78,15 +86,23 @@
           <Icon icon="mdi:sitemap" class="mr-2" /> Print Bracket
         </b-button>
 
-        <b-button
+        <b-dropdown
           variant="outline-secondary"
           class="action-btn"
+          toggle-class="d-flex align-items-center"
           :disabled="loading"
-          @click="generateAllOverallPdf"
         >
-          <Icon icon="mdi:trophy-outline" class="mr-2" /> Print Overall (All
-          Categories)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:trophy-outline" class="mr-2" /> Print Overall (All
+            Categories)
+          </template>
+          <b-dropdown-item @click="generateAllOverallPdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadAllOverallExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -323,6 +339,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel, exportSheetsToExcel } from "@/utils/exportExcel";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -751,6 +768,41 @@ export default {
     onBeforeDownload() {},
     onPdfGenerated() {
       this.showPdf = false;
+    },
+
+    downloadExcel() {
+      const rows = (this.rows || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        "Race Time": r.raceTime || "-",
+        "Penalty Time": r.penaltyTime || "-",
+        "Total Time": r.totalTime || "-",
+        Ranked: r.ranked || "-",
+        Score: r.score || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Rafting Cross Result - ${eventName}`, rows, "RX Result");
+    },
+
+    async downloadAllOverallExcel() {
+      try {
+        await this.loadAllCategoriesOverall();
+        const sheets = (this.allCategoriesOverall || []).map((cat) => ({
+          name: `${cat.divisionName || ""} ${cat.raceName || ""} ${cat.initialName || ""}`.trim(),
+          rows: (cat.rows || []).map((r, idx) => ({
+            No: idx + 1,
+            "Team Name": r.nameTeam || "-",
+            BIB: r.bibTeam || "-",
+            Ranked: r.ranked || "-",
+            Score: r.score || 0,
+          })),
+        }));
+        const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+        exportSheetsToExcel(`RX Overall All Categories - ${eventName}`, sheets);
+      } catch (e) {
+        this.error = "Gagal membuat Excel overall semua kategori";
+      }
     },
 
     // bucket kategori RX yang sedang dibuka (dipakai untuk bracket & overall lintas kategori)

@@ -153,7 +153,7 @@
                 </div>
               </div>
 
-              <!-- connect -->
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -168,7 +168,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -204,6 +206,7 @@
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>
@@ -653,6 +656,9 @@ export default {
       dataPenaltiesStart: [],
       dataPenaltiesFinish: [],
       dataScore: [],
+      // score fallback utk rank di luar daftar dataScore (Race Settings ->
+      // Sprint -> "Score utk Rank N+ dan seterusnya")
+      sprintDefaultScoreBeyondRank: 0,
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -1081,6 +1087,24 @@ export default {
             if (startList) this.dataPenaltiesStart = startList;
             if (finishList) this.dataPenaltiesFinish = finishList;
 
+            // Score by Rank per-event (Race Settings) — override tabel
+            // global optionRanked "SPRINT" kalau event ini sudah dikustomisasi
+            const scoreByRank =
+              sprintSettings && Array.isArray(sprintSettings.scoreByRank)
+                ? sprintSettings.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = [
+                scoreByRank.map((p) => ({
+                  ranking: Number(p.ranking) || 0,
+                  score: Number(p.score) || 0,
+                })),
+              ];
+            }
+            this.sprintDefaultScoreBeyondRank = Number(
+              sprintSettings && sprintSettings.defaultScoreBeyondRank
+            ) || 0;
+
             resolve();
           });
           ipcRenderer.send("race-settings:get", this.currentEventId);
@@ -1403,8 +1427,18 @@ export default {
     },
 
     getScoreByRanked(ranked) {
-      const m = this.dataScore[0].find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      const list = this.dataScore[0] || [];
+      const m = list.find((d) => d.ranking === ranked);
+      if (m) return m.score;
+      // rank di luar daftar (mis. list cuma diisi Rank 1-5) → pakai score
+      // fallback "Rank N+ dan seterusnya" dari Race Settings, kalau ada
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.sprintDefaultScoreBeyondRank || 0;
+      }
+      return null;
     },
 
     toggleSortRanked() {
@@ -2001,6 +2035,23 @@ td {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-danger/
+   .btn-outline-danger (global, single class) karena atribut data-v-xxxx
+   scoped menambah spesifisitas — tanpa override ini, tombol "Reset"
+   tampil putih/netral biasa walau variant="danger" sudah benar. */
+.btn-action.btn-danger,
+.btn-action.btn-outline-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+.btn-action.btn-danger:hover,
+.btn-action.btn-outline-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
 }
 
 /* Connect/Disconnect: .btn-action's white background above wins by default

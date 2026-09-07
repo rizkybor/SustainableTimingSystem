@@ -60,15 +60,23 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           v-if="sessionMode == 'all'"
           :disabled="results.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button-group class="mr-3 custom-btn-group">
           <b-button
@@ -407,6 +415,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 /* ========= Helpers ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -1412,6 +1421,31 @@ export default {
       } catch {
         this.error = "Gagal membuat PDF";
       }
+    },
+
+    downloadExcel() {
+      const rows = (this.results || []).map((r) => ({
+        No: r.teamIndex || "-",
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        Run: r.session || "-",
+        "Start Pen.": r.startPenalty || 0,
+        "Finish Pen.": r.finishPenalty || 0,
+        "Gate Pen.": r.sectionPenalty || 0,
+        "Total Pen.": r.totalPenalty || 0,
+        "Penalty Time": r.penaltyTime || "00:00:00.000",
+        "Start Time": r.startTime || "00:00:00.000",
+        "Finish Time": r.finishTime || "00:00:00.000",
+        "Race Time": r.raceTime || "00:00:00.000",
+        Result: r.resultTime || "00:00:00.000",
+        Ranked: r.ranked || "-",
+        Score:
+          r.score !== undefined && r.score !== null && r.score !== ""
+            ? r.score
+            : this.getScoreByRanked(r.ranked) || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Slalom Result - ${eventName}`, rows, "Slalom Result");
     },
     onPdfGenerated() {
       this.showPdf = false;

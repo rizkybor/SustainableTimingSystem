@@ -4,7 +4,18 @@
       <b-row class="align-items-center justify-content-between">
         <!-- Left: Title -->
         <b-col cols="12" md="6" class="mb-2 mb-md-0">
-          <div class="font-weight-bold">
+          <div
+            class="font-weight-bold panel-toggle"
+            role="button"
+            :aria-expanded="!collapsed ? 'true' : 'false'"
+            @click="collapsed = !collapsed"
+          >
+            <Icon
+              :icon="collapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'"
+              class="mr-1"
+              width="20"
+              height="20"
+            />
             {{ title }} – {{ initialName || "—" }}
           </div>
         </b-col>
@@ -47,7 +58,7 @@
       </b-row>
     </div>
 
-    <div class="panel-body" :class="{ 'is-loading': loading }">
+    <div v-show="!collapsed" class="panel-body" :class="{ 'is-loading': loading }">
       <div v-if="loading" class="panel-loading-overlay">
         <b-spinner small variant="primary" class="mr-2" />
         <span>Memuat data tim…</span>
@@ -193,6 +204,22 @@ export default {
     competedSet: { type: Set, default: () => new Set() },
     draft: { type: Object, default: null },
     loading: { type: Boolean, default: false },
+    // panel paling atas per kategori (comboIdx === 0 di parent) default
+    // terbuka, sisanya default tertutup — lihat watcher `eventName` di
+    // bawah: instance panel ini dipakai ulang lintas kategori (panelKey
+    // generik R4_MEN/R4_WOMEN/dst, sama di semua kategori), jadi collapsed
+    // perlu di-reset manual tiap kategori (eventName) berganti.
+    defaultCollapsed: { type: Boolean, default: false },
+  },
+  data() {
+    return {
+      collapsed: this.defaultCollapsed,
+    };
+  },
+  watch: {
+    eventName() {
+      this.collapsed = this.defaultCollapsed;
+    },
   },
   computed: {
     // "Show Result" cuma berguna kalau minimal ada tim terdaftar DAN
@@ -307,6 +334,16 @@ export default {
 /* opsional: spasi antar tombol bila Bootstrap < v5 */
 .gap-2 > * + * {
   margin-left: 0.5rem;
+}
+
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.panel-toggle:hover {
+  opacity: 0.8;
 }
 
 /* konsisten padding panel */

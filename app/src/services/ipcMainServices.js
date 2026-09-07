@@ -117,6 +117,7 @@ const {
   deleteOneCollectionForEvent,
   RESET_COLLECTIONS,
 } = require("../controllers/DELETE/resetEventData");
+const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
 const {
   insertChatMessage,
   listChatMessagesByEvent,
@@ -354,6 +355,21 @@ function setupIPCMainHandlers() {
         ok: false,
         collection,
         __reqId,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset All" di halaman Head to Head — hapus semua data kompetisi H2H
+  // (seluruh kategori/bucket) utk satu event, tanpa menyentuh Sprint/
+  // Slalom/DRR/RX di event yang sama.
+  ipcMain.on("h2h:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetH2HDataForEvent(eventId);
+      event.reply("h2h:reset-all-reply", result);
+    } catch (error) {
+      event.reply("h2h:reset-all-reply", {
+        ok: false,
         error: error && error.message ? error.message : String(error),
       });
     }
@@ -1016,14 +1032,19 @@ ipcMain.on("h2h:bracket:get", async (e, bucket) => {
 });
 
 ipcMain.on("h2h:bracket:save", async (e, payload) => {
+  // __reqId digemakan balik supaya renderer bisa mencocokkan balasan ke
+  // request pengirimnya sendiri — saveBracketToDB() di HeadToHead.vue bisa
+  // terpanggil berkali-kali cepat berurutan (tiap Heat berubah, advance
+  // round, dll.) tanpa saling menunggu; tanpa __reqId, ipcRenderer.once()
+  // di renderer akan salah menangkap balasan milik request lain karena
+  // semuanya berbagi channel "h2h:bracket:save-reply" yang sama.
+  const reqId = payload && payload.__reqId;
   try {
-    const { bucket, rounds, showBronze, settings } = payload;
-    e.reply(
-      "h2h:bracket:save-reply",
-      await upsertBracket(bucket, rounds, { showBronze, settings })
-    );
+    const { bucket, rounds, showBronze, settings } = payload || {};
+    const result = await upsertBracket(bucket, rounds, { showBronze, settings });
+    e.reply("h2h:bracket:save-reply", { ...result, __reqId: reqId });
   } catch (err) {
-    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err) });
+    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err), __reqId: reqId });
   }
 });
 

@@ -153,8 +153,93 @@
                 ✕
               </b-button>
             </div>
-            <small class="text-muted">
+            <small class="text-muted d-block mb-3">
               Default FAJI: 0 (tidak ada), 10 (pelanggaran elektronik finish).
+            </small>
+
+            <hr class="rs-divider" />
+
+            <!-- SCORE BY RANK -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Score by Rank</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.sprint.scoreByRank.length >= maxSprintScoreRows"
+                @click="addScoreRow"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.sprint.scoreByRank.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted" style="width: 70px; flex: 0 0 70px"
+                >Rank</small
+              >
+              <small class="text-muted flex-grow-1">Score</small>
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              class="rs-score-list"
+              style="max-height: 260px; overflow-y: auto"
+            >
+              <div
+                v-for="(p, idx) in draft.sprint.scoreByRank"
+                :key="'sprint-score-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  :value="p.ranking"
+                  disabled
+                  style="border-radius: 10px; width: 70px; flex: 0 0 70px"
+                />
+                <b-form-input
+                  v-model.number="p.score"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  placeholder="Score"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.sprint.scoreByRank.length <= 1"
+                  @click="removeScoreRow(idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1 mb-2">
+              Rank menyesuaikan urutan baris otomatis.
+            </small>
+
+            <div class="d-flex align-items-center mt-2" style="gap: 10px">
+              <div class="font-weight-bold" style="white-space: nowrap">
+                Score utk Rank {{ draft.sprint.scoreByRank.length + 1 }} dan
+                seterusnya
+              </div>
+              <b-form-input
+                v-model.number="draft.sprint.defaultScoreBeyondRank"
+                type="number"
+                min="0"
+                max="1000"
+                placeholder="0"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Berlaku utk semua tim dengan peringkat di luar daftar di atas
+              (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
+              kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
             </div>
           </div>
@@ -257,6 +342,7 @@
                 </b-button>
               </div>
             </div>
+
             </div>
           </div>
         </div>
@@ -449,6 +535,43 @@ const DEFAULT_FINISH_PENALTIES = [
   { label: "10", value: 10 },
 ];
 
+// Default tabel Rank -> Score Sprint (sama dgn optionRanked type "SPRINT"
+// yang sebelumnya hardcoded/global) — sekarang bisa dikustomisasi per-event.
+const DEFAULT_SPRINT_SCORE_BY_RANK = [
+  { ranking: 1, score: 100 },
+  { ranking: 2, score: 92 },
+  { ranking: 3, score: 86 },
+  { ranking: 4, score: 82 },
+  { ranking: 5, score: 79 },
+  { ranking: 6, score: 76 },
+  { ranking: 7, score: 73 },
+  { ranking: 8, score: 70 },
+  { ranking: 9, score: 67 },
+  { ranking: 10, score: 64 },
+  { ranking: 11, score: 61 },
+  { ranking: 12, score: 58 },
+  { ranking: 13, score: 55 },
+  { ranking: 14, score: 52 },
+  { ranking: 15, score: 49 },
+  { ranking: 16, score: 46 },
+  { ranking: 17, score: 43 },
+  { ranking: 18, score: 40 },
+  { ranking: 19, score: 38 },
+  { ranking: 20, score: 36 },
+  { ranking: 21, score: 34 },
+  { ranking: 22, score: 32 },
+  { ranking: 23, score: 30 },
+  { ranking: 24, score: 28 },
+  { ranking: 25, score: 26 },
+  { ranking: 26, score: 24 },
+  { ranking: 27, score: 22 },
+  { ranking: 28, score: 20 },
+  { ranking: 29, score: 18 },
+  { ranking: 30, score: 16 },
+  { ranking: 31, score: 14 },
+  { ranking: 32, score: 12 },
+];
+
 // Default H2H PS/CL/PF — sebelumnya berbagi satu list yang sama (0/5/10/50),
 // sekarang tiap satu (PS, CL, PF) diatur independen.
 const DEFAULT_H2H_PENALTIES = [
@@ -462,6 +585,11 @@ const DEFAULT_SETTINGS = {
   sprint: {
     startPenalties: DEFAULT_START_PENALTIES.map((p) => ({ ...p })),
     finishPenalties: DEFAULT_FINISH_PENALTIES.map((p) => ({ ...p })),
+    scoreByRank: DEFAULT_SPRINT_SCORE_BY_RANK.map((p) => ({ ...p })),
+    // score utk tim dgn rank di luar daftar scoreByRank (mis. list cuma
+    // diisi Rank 1-5, sisanya 6+ semua dapat score ini). 0 = tidak dapat
+    // score.
+    defaultScoreBeyondRank: 0,
   },
   h2h: {
     R1: true,
@@ -496,6 +624,7 @@ export default {
     minTeamsPerHeat: { type: Number, default: 3 },
     maxTeamsPerHeat: { type: Number, default: 8 },
     maxSprintPenalties: { type: Number, default: 8 },
+    maxSprintScoreRows: { type: Number, default: 64 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
   },
@@ -612,6 +741,18 @@ export default {
         return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
       };
 
+      const cleanScoreList = (raw, fallback) => {
+        const arr =
+          Array.isArray(raw) && raw.length > 0 ? raw : fallback;
+        const clean = arr
+          .slice(0, this.maxSprintScoreRows)
+          .map((p, idx) => ({
+            ranking: idx + 1,
+            score: Math.max(0, Math.min(1000, toInt(p && p.score, 0))),
+          }));
+        return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
+      };
+
       return {
         sprint: {
           startPenalties: cleanList(
@@ -621,6 +762,17 @@ export default {
           finishPenalties: cleanList(
             src.sprint && src.sprint.finishPenalties,
             DEFAULT_FINISH_PENALTIES
+          ),
+          scoreByRank: cleanScoreList(
+            src.sprint && src.sprint.scoreByRank,
+            DEFAULT_SPRINT_SCORE_BY_RANK
+          ),
+          defaultScoreBeyondRank: Math.max(
+            0,
+            Math.min(
+              1000,
+              toInt(src.sprint && src.sprint.defaultScoreBeyondRank, 0)
+            )
           ),
         },
         h2h: {
@@ -724,6 +876,22 @@ export default {
       list.splice(idx, 1);
     },
 
+    // Rank di list "Score by Rank" selalu berurutan 1..N mengikuti posisi
+    // baris (bukan input bebas) — supaya tidak ada rank ganda/bolong.
+    addScoreRow() {
+      const list = this.draft.sprint.scoreByRank;
+      if (!list || list.length >= this.maxSprintScoreRows) return;
+      const last = list[list.length - 1];
+      list.push({ ranking: list.length + 1, score: last ? last.score : 0 });
+    },
+
+    removeScoreRow(idx) {
+      const list = this.draft.sprint.scoreByRank;
+      if (!list || list.length <= 1) return;
+      list.splice(idx, 1);
+      list.forEach((p, i) => (p.ranking = i + 1));
+    },
+
     confirm() {
       if (!this.eventId) {
         return;
@@ -750,6 +918,17 @@ export default {
       );
       this.draft.h2h.finishPenalties = cleanPenaltyList(
         this.draft.h2h.finishPenalties
+      );
+
+      this.draft.sprint.scoreByRank = (this.draft.sprint.scoreByRank || []).map(
+        (p, idx) => ({
+          ranking: idx + 1,
+          score: Math.max(0, Math.min(1000, parseInt(p.score, 10) || 0)),
+        })
+      );
+      this.draft.sprint.defaultScoreBeyondRank = Math.max(
+        0,
+        Math.min(1000, parseInt(this.draft.sprint.defaultScoreBeyondRank, 10) || 0)
       );
 
       const gRaw =
@@ -851,6 +1030,13 @@ export default {
 .rounded-20 {
   border-radius: 20px;
 }
+
+.rs-divider {
+  border: none;
+  border-top: 1px dashed #d9dee6;
+  margin: 4px 0 16px;
+}
+
 
 /* Batasi tinggi modal & jadikan layout fleksibel supaya bisa discroll saat
    konten (mis. banyak list penalty) melebihi tinggi layar.

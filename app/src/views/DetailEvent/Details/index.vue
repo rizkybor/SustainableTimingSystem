@@ -155,6 +155,7 @@
         :race="combo.race"
         :event-name="raceActive.selected.name"
         :initial-name="initialActive.selected.name"
+        :default-collapsed="comboIdx !== 0"
         :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
         :teams-available="availableFor(combo.division, combo.race)"
         :competed-set="competedSetFor(combo.panelKey)"
@@ -173,6 +174,21 @@
       <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
         Belum ada konfigurasi divisi/race untuk event ini.
       </div>
+
+      <!-- Peringatan: H2H butuh minimal 3 tim terdaftar sebelum di-start -->
+      <b-alert
+        :show="showH2HMinTeamsWarning"
+        variant="danger"
+        class="mt-4 mb-0 d-flex align-items-center"
+      >
+        <Icon icon="mdi:alert-octagon-outline" width="20" height="20" class="mr-2" />
+        <span>
+          Minimal <strong>3 tim</strong> harus ter-assign di tabel Registered
+          Teams – HEAD2HEAD Category sebelum memulai race. Saat ini baru
+          <strong>{{ totalRegisteredTeamsForActiveCategory }} tim</strong>
+          terdaftar.
+        </span>
+      </b-alert>
 
       <div class="d-flex align-items-center justify-content-end mt-5 mb-2">
         <b-button
@@ -513,6 +529,23 @@ export default {
     visibleDivisionRaceCombos() {
       return this.DIVISION_RACE_COMBOS.filter((c) =>
         this.showPanel(c.division, c.race)
+      );
+    },
+    // Total tim yang sudah ter-assign di SEMUA panel Registered Teams utk
+    // kategori (raceActive) yang sedang aktif — dijumlah lintas kombinasi
+    // divisi/race yang tampil, bukan cuma satu panel.
+    totalRegisteredTeamsForActiveCategory() {
+      const evName = this.raceActive.selected.name;
+      return (this.visibleDivisionRaceCombos || []).reduce((sum, combo) => {
+        return sum + this.getTeamsBy(combo.division, combo.race, evName).length;
+      }, 0);
+    },
+    // Peringatan merah: H2H butuh minimal 3 tim terdaftar sebelum operator
+    // klik "START HEAD2HEAD RACE" (bracket 1v1 tidak masuk akal dgn <3 tim).
+    showH2HMinTeamsWarning() {
+      return (
+        String(this.raceActive.selected.name).toUpperCase() === "HEAD2HEAD" &&
+        this.totalRegisteredTeamsForActiveCategory < 3
       );
     },
     hasEventLogo() {
@@ -2716,14 +2749,23 @@ export default {
   cursor: pointer;
 }
 
+/* Aksi destruktif (hapus semua hasil kompetisi event) — sengaja dibuat
+   solid merah & menonjol, BUKAN gaya netral seperti tombol settings
+   lainnya, supaya operator langsung sadar ini aksi berisiko sebelum klik. */
 .btn-race-reset {
-  background: #f9aa00;
-  border: 1px solid #fcfcfc;
-  color: #fcfcfc;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: #ffffff;
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
   transition: all 0.25s ease;
+}
+.btn-race-reset:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.45);
 }
 
 .upload-hud {

@@ -126,13 +126,10 @@
           >Cancel</b-button
         >
         <div>
-          <b-button
-            variant="outline-primary"
-            class="mr-2"
-            @click="generatePdfOverall"
-          >
-            Download Result
-          </b-button>
+          <b-dropdown variant="outline-primary" class="mr-2" text="Download Result">
+            <b-dropdown-item @click="generatePdfOverall">PDF</b-dropdown-item>
+            <b-dropdown-item @click="downloadExcel">Excel (.xlsx)</b-dropdown-item>
+          </b-dropdown>
         </div>
       </div>
     </div>
@@ -173,6 +170,7 @@ import VueHtml2pdf from "vue-html2pdf";
 import OverallPdf from "../../views/DetailEvent/ResultComponent/Overall/by-alltime.vue";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 export default {
   name: "PrintOverallModal",
@@ -291,6 +289,26 @@ export default {
         this.error = "Gagal membuat PDF";
       }
     },
+
+    downloadExcel() {
+      const cats = this.categories || [];
+      const rows = (this.processedRows || []).map((r) => {
+        const obj = {
+          No: r.rank,
+          "Team Name": r.teamName || "-",
+          BIB: r.bib || "-",
+        };
+        cats.forEach((cat) => {
+          obj[`${cat.label} Score`] = r[cat.scoreField] || 0;
+          obj[`${cat.label} Ranked`] = r[cat.rankField] || "-";
+        });
+        obj["Total Score"] = r.totalScore || 0;
+        obj["Rank Overall"] = r.rank || "-";
+        return obj;
+      });
+      exportRowsToExcel(this.pdfFilenameOverall, rows, "Overall");
+    },
+
     onPdfGenerated() {
       this.showPdf = false;
     },

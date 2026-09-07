@@ -139,7 +139,7 @@
                 </div>
               </div>
 
-              <!-- connect -->
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -154,7 +154,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -190,6 +192,7 @@
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>
@@ -2759,6 +2762,23 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-danger/
+   .btn-outline-danger (global, single class) karena atribut data-v-xxxx
+   scoped menambah spesifisitas — tanpa override ini, tombol "Reset"
+   tampil putih/netral biasa walau variant="danger" sudah benar. */
+.btn-action.btn-danger,
+.btn-action.btn-outline-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+.btn-action.btn-danger:hover,
+.btn-action.btn-outline-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
 }
 
 /* Connect/Disconnect: .btn-action's white background above wins by default

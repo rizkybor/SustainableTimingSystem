@@ -97,6 +97,91 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
     { label: "50", value: 50 },
   ];
 
+  // Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
+  // "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
+  // dikustomisasi per-event lewat Race Settings (pola sama dgn Sprint).
+  const DEFAULT_H2H_SCORE_BY_RANK = [
+    { ranking: 1, score: 100 },
+    { ranking: 2, score: 92 },
+    { ranking: 3, score: 86 },
+    { ranking: 4, score: 82 },
+    { ranking: 5, score: 79 },
+    { ranking: 6, score: 76 },
+    { ranking: 7, score: 73 },
+    { ranking: 8, score: 70 },
+    { ranking: 9, score: 67 },
+    { ranking: 10, score: 64 },
+    { ranking: 11, score: 61 },
+    { ranking: 12, score: 58 },
+    { ranking: 13, score: 55 },
+    { ranking: 14, score: 52 },
+    { ranking: 15, score: 49 },
+    { ranking: 16, score: 46 },
+    { ranking: 17, score: 43 },
+    { ranking: 18, score: 40 },
+    { ranking: 19, score: 38 },
+    { ranking: 20, score: 36 },
+    { ranking: 21, score: 34 },
+    { ranking: 22, score: 32 },
+    { ranking: 23, score: 30 },
+    { ranking: 24, score: 28 },
+    { ranking: 25, score: 26 },
+    { ranking: 26, score: 24 },
+    { ranking: 27, score: 22 },
+    { ranking: 28, score: 20 },
+    { ranking: 29, score: 18 },
+    { ranking: 30, score: 16 },
+    { ranking: 31, score: 14 },
+    { ranking: 32, score: 12 },
+  ];
+
+  // Default tabel Rank -> Score Slalom & DRR, sama persis dgn optionRanked
+  // type "SLALOM" (dan tabel hardcoded DRR) yang sebelumnya
+  // hardcoded/global — sekarang bisa dikustomisasi per-event.
+  const DEFAULT_SLALOM_SCORE_BY_RANK = [
+    { ranking: 1, score: 350 },
+    { ranking: 2, score: 322 },
+    { ranking: 3, score: 301 },
+    { ranking: 4, score: 287 },
+    { ranking: 5, score: 277 },
+    { ranking: 6, score: 266 },
+    { ranking: 7, score: 256 },
+    { ranking: 8, score: 245 },
+    { ranking: 9, score: 235 },
+    { ranking: 10, score: 224 },
+    { ranking: 11, score: 214 },
+    { ranking: 12, score: 203 },
+    { ranking: 13, score: 193 },
+    { ranking: 14, score: 182 },
+    { ranking: 15, score: 172 },
+    { ranking: 16, score: 161 },
+    { ranking: 17, score: 151 },
+    { ranking: 18, score: 140 },
+    { ranking: 19, score: 133 },
+    { ranking: 20, score: 126 },
+    { ranking: 21, score: 119 },
+    { ranking: 22, score: 112 },
+    { ranking: 23, score: 105 },
+    { ranking: 24, score: 98 },
+    { ranking: 25, score: 91 },
+    { ranking: 26, score: 84 },
+    { ranking: 27, score: 77 },
+    { ranking: 28, score: 70 },
+    { ranking: 29, score: 63 },
+    { ranking: 30, score: 56 },
+    { ranking: 31, score: 49 },
+    { ranking: 32, score: 42 },
+  ];
+  const DEFAULT_DRR_SCORE_BY_RANK = DEFAULT_SLALOM_SCORE_BY_RANK.map((p) => ({
+    ...p,
+  }));
+
+  // RX belum punya kurva sendiri — dibuat mirip Sprint dulu sesuai
+  // permintaan (bisa dikustomisasi belakangan per-event).
+  const DEFAULT_RX_SCORE_BY_RANK = DEFAULT_SPRINT_SCORE_BY_RANK.map((p) => ({
+    ...p,
+  }));
+
   const cleanSettings = {
     sprint: {
       startPenalties: cleanPenaltyList(
@@ -144,17 +229,61 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
         DEFAULT_H2H_PENALTIES,
         MAX_H2H_PENALTIES
       ),
+      scoreByRank: cleanScoreByRank(
+        incoming.h2h && incoming.h2h.scoreByRank,
+        DEFAULT_H2H_SCORE_BY_RANK
+      ),
+      // score utk rank di luar daftar scoreByRank (mis. list cuma Rank 1-4,
+      // Rank 5 dst semua dapat score ini). 0 = tidak dapat score.
+      defaultScoreBeyondRank: Math.max(
+        0,
+        Math.min(
+          1000,
+          parseInt(
+            incoming.h2h && incoming.h2h.defaultScoreBeyondRank,
+            10
+          ) || 0
+        )
+      ),
     },
     slalom: {
       totalGate: Math.max(
         1,
         Math.min(14, parseInt(incoming.slalom && incoming.slalom.totalGate, 10) || 14)
       ),
+      scoreByRank: cleanScoreByRank(
+        incoming.slalom && incoming.slalom.scoreByRank,
+        DEFAULT_SLALOM_SCORE_BY_RANK
+      ),
+      defaultScoreBeyondRank: Math.max(
+        0,
+        Math.min(
+          1000,
+          parseInt(
+            incoming.slalom && incoming.slalom.defaultScoreBeyondRank,
+            10
+          ) || 0
+        )
+      ),
     },
     drr: {
       totalSection: Math.max(
         1,
         Math.min(6, parseInt(incoming.drr && incoming.drr.totalSection, 10) || 5)
+      ),
+      scoreByRank: cleanScoreByRank(
+        incoming.drr && incoming.drr.scoreByRank,
+        DEFAULT_DRR_SCORE_BY_RANK
+      ),
+      defaultScoreBeyondRank: Math.max(
+        0,
+        Math.min(
+          1000,
+          parseInt(
+            incoming.drr && incoming.drr.defaultScoreBeyondRank,
+            10
+          ) || 0
+        )
       ),
     },
     rx: (() => {
@@ -182,6 +311,20 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
         qualifiersPerHeat,
         gate1: { enabled: gate1Enabled },
         gate2: { enabled: gate2Enabled },
+        scoreByRank: cleanScoreByRank(
+          incoming.rx && incoming.rx.scoreByRank,
+          DEFAULT_RX_SCORE_BY_RANK
+        ),
+        defaultScoreBeyondRank: Math.max(
+          0,
+          Math.min(
+            1000,
+            parseInt(
+              incoming.rx && incoming.rx.defaultScoreBeyondRank,
+              10
+            ) || 0
+          )
+        ),
       };
     })(),
   };

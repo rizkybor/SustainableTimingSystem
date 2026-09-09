@@ -159,6 +159,7 @@
         :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
         :teams-available="availableFor(combo.division, combo.race)"
         :competed-set="competedSetFor(combo.panelKey)"
+        :h2h-status-map="h2hStatusFor(combo.panelKey)"
         :draft="draftMap[combo.panelKey]"
         :loading="loadingByPanel[combo.panelKey]"
         @add-draft="addDraft(combo.division, combo.race)"
@@ -367,6 +368,14 @@ export default {
       // "sudah bertanding" / "belum bertanding" di daftar Registered Teams.
       competedTeamsByPanel: {},
       lastResultsTokenByPanel: {},
+      // per-panel: Map (key by bib/nama team, uppercased) -> status detail
+      // { status: "pending"|"in-round"|"done", roundName } — KHUSUS kategori
+      // HEAD2HEAD, dipakai TeamPanel utk menampilkan status 3-tingkat
+      // (Belum Bertanding / Bertanding di Round X / Sudah Selesai
+      // Bertanding), dibangun dari bagan (h2h_brackets) + hasil per-round
+      // (h2h_results) — bukan cuma flag "sudah/belum" seperti kategori lain.
+      h2hStatusByPanel: {},
+      lastH2HStatusTokenByPanel: {},
       loadingByPanel: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -1021,6 +1030,7 @@ export default {
         this.resetProgressLabel = "Membersihkan cache lokal...";
         this._clearLocalCachesForEvent(eventId);
         this.competedTeamsByPanel = {};
+        this.h2hStatusByPanel = {};
         this.resultAvailMap = {
           R4_MEN: false,
           R4_WOMEN: false,
@@ -1493,6 +1503,116 @@ export default {
       return this.competedTeamsByPanel[panelKey] || new Set();
     },
 
+    // KHUSUS HEAD2HEAD: bangun status 3-tingkat per tim (Belum Bertanding /
+    // Bertanding di Round X / Sudah Selesai Bertanding) dari struktur bagan
+    // (h2h_brackets, tahu slot tim ada di round mana) + hasil per-round
+    // (h2h_results, tahu Win/Lose Final A/B) — beda dari kategori lain yang
+    // cuma py flag "sudah/belum" biner (loadEventResultsForPanel()).
+    async loadH2HStatusForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastH2HStatusTokenByPanel[panelKey] = token;
+
+      const bucket = {
+        eventId: identity.eventId,
+        initialId: identity.initialId,
+        raceId: identity.raceId,
+        divisionId: identity.divisionId,
+      };
+      const reqIdBase = "h2hstatus|" + panelKey + "|" + token;
+
+      const [bracketRes, resultsRes] = await Promise.all([
+        this._fetchOnce("h2h:bracket:get", bucket, reqIdBase + "|bracket"),
+        this._fetchOnce("h2h:results:getAll", bucket, reqIdBase + "|results"),
+      ]);
+
+      // panel sudah minta ulang (mis. ganti divisi/race cepat) -> buang balasan basi
+      if (this.lastH2HStatusTokenByPanel[panelKey] !== token) return;
+
+      const rounds =
+        bracketRes &&
+        bracketRes.ok &&
+        bracketRes.item &&
+        Array.isArray(bracketRes.item.rounds)
+          ? bracketRes.item.rounds
+          : [];
+      const resultRows =
+        resultsRes && resultsRes.ok && Array.isArray(resultsRes.items)
+          ? resultsRes.items
+          : [];
+
+      const statusMap = this._computeH2HStatusMap(rounds, resultRows);
+      this.$set(this.h2hStatusByPanel, panelKey, statusMap);
+    },
+
+    // rounds: array bagan (urutan besar->kecil, Final B disisipkan sebelum
+    // Final A — lihat buildEmptyBracket() di HeadToHead.vue) dgn
+    // round.matches[].team1/team2 = { name, bibTeam }. resultRows: dokumen
+    // h2h_results (roundId, nameTeam, result.winLose). Utk tiap tim, ambil
+    // round TERAKHIR (index tertinggi di array) tempat namanya muncul di
+    // sebuah slot — itu round paling "maju" yang pernah dicapai tim ini.
+    _computeH2HStatusMap(rounds, resultRows) {
+      const statusMap = {};
+      const list = Array.isArray(rounds) ? rounds : [];
+      const rows = Array.isArray(resultRows) ? resultRows : [];
+
+      const latestByTeam = new Map();
+      list.forEach((round, idx) => {
+        const matches = Array.isArray(round && round.matches) ? round.matches : [];
+        matches.forEach((m) => {
+          [m && m.team1, m && m.team2].forEach((slot) => {
+            const nm = String((slot && slot.name) || "").trim().toUpperCase();
+            if (!nm) return;
+            const prev = latestByTeam.get(nm);
+            if (!prev || idx > prev.roundIndex) {
+              latestByTeam.set(nm, {
+                roundIndex: idx,
+                roundId: String((round && round.id) || ""),
+                roundName: String((round && round.name) || ""),
+              });
+            }
+          });
+        });
+      });
+
+      const FINAL_NAMES = new Set(["FINAL A", "FINAL B"]);
+
+      latestByTeam.forEach((info, teamNameUpper) => {
+        let status = "in-round";
+        if (FINAL_NAMES.has(String(info.roundName || "").toUpperCase())) {
+          const hasWinLose = rows.some(
+            (r) =>
+              String((r && r.roundId) || "") === info.roundId &&
+              String((r && r.nameTeam) || "").trim().toUpperCase() ===
+                teamNameUpper &&
+              r.result &&
+              (r.result.winLose === "Win" || r.result.winLose === "Lose")
+          );
+          if (hasWinLose) status = "done";
+        }
+        statusMap[teamNameUpper] = { status, roundName: info.roundName };
+      });
+
+      return statusMap;
+    },
+
+    // Status detail per tim (khusus HEAD2HEAD) utk panel ini — dipakai
+    // template lewat prop h2h-status-map di <team-panel>. null = belum
+    // dimuat / bukan kategori HEAD2HEAD -> TeamPanel fallback ke flag biner.
+    h2hStatusFor(panelKey) {
+      return this.h2hStatusByPanel[panelKey] || null;
+    },
+
     // Fetch satu kali (reqId-safe, aman dipanggil bersamaan dgn request lain
     // di channel yang sama) — dipakai autoFillFromPreviousCategory() utk
     // mengintip bucket/hasil kategori LAIN (bukan yg sedang ditampilkan di
@@ -1670,6 +1790,9 @@ export default {
           )
         );
         jobs.push(this.loadEventResultsForPanel(div, race));
+        if (this._safeSelectedName(this.raceActive) === "HEAD2HEAD") {
+          jobs.push(this.loadH2HStatusForPanel(div, race));
+        }
       });
       await Promise.all(jobs);
     },

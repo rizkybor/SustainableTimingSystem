@@ -587,18 +587,24 @@
               <button
                 type="button"
                 class="h2h-action-btn"
+                :disabled="isPrintingRound"
                 @click="printCurrentRoundVuePdf"
                 v-b-tooltip.hover="'Print hasil babak yang sedang aktif'"
               >
-                <Icon icon="mdi:printer-outline" class="mr-1" /> Print
+                <b-spinner v-if="isPrintingRound" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingRound ? "Menyiapkan…" : "Print" }}
               </button>
               <button
                 type="button"
                 class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingRound"
                 @click="saveCurrentRoundToDB"
                 v-b-tooltip.hover="'Simpan hasil babak aktif ke database'"
               >
-                <Icon icon="mdi:content-save-outline" class="mr-1" /> Save
+                <b-spinner v-if="isSavingRound" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingRound ? "Menyimpan…" : "Save" }}
               </button>
             </div>
 
@@ -608,18 +614,24 @@
               <button
                 type="button"
                 class="h2h-action-btn"
+                :disabled="isPrintingAllRounds"
                 @click="printAllRoundVuePdf"
                 v-b-tooltip.hover="'Print seluruh babak sekaligus'"
               >
-                <Icon icon="mdi:printer-outline" class="mr-1" /> Print
+                <b-spinner v-if="isPrintingAllRounds" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingAllRounds ? "Menyiapkan…" : "Print" }}
               </button>
               <button
                 type="button"
                 class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingAllRounds"
                 @click="saveAllRoundToDB"
                 v-b-tooltip.hover="'Simpan seluruh babak ke database'"
               >
-                <Icon icon="mdi:content-save-outline" class="mr-1" /> Save
+                <b-spinner v-if="isSavingAllRounds" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingAllRounds ? "Menyimpan…" : "Save" }}
               </button>
             </div>
 
@@ -629,18 +641,24 @@
               <button
                 type="button"
                 class="h2h-action-btn"
+                :disabled="isPrintingOverall"
                 @click="printOverallVuePdf"
                 v-b-tooltip.hover="'Print ranking overall kategori ini'"
               >
-                <Icon icon="mdi:printer-outline" class="mr-1" /> Print
+                <b-spinner v-if="isPrintingOverall" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingOverall ? "Menyiapkan…" : "Print" }}
               </button>
               <button
                 type="button"
                 class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingOverall"
                 @click="saveOverallToDB"
                 v-b-tooltip.hover="'Simpan overall kategori ini ke database'"
               >
-                <Icon icon="mdi:content-save-outline" class="mr-1" /> Save
+                <b-spinner v-if="isSavingOverall" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingOverall ? "Menyimpan…" : "Save" }}
               </button>
             </div>
           </div>
@@ -1085,7 +1103,7 @@
       :float-layout="false"
       :enable-download="true"
       :preview-modal="false"
-      :paginate-elements-by-height="1400"
+      :manual-pagination="true"
       :pdf-quality="2"
       :filename="pdfFilename"
       pdf-format="a4"
@@ -1591,6 +1609,23 @@ export default {
       penaltiesCollapsed: false,
       isDownloadingBracketPdf: false,
       isDownloadingHeatModalPdf: false,
+      // BUG FIX: tombol Print/Save (Round/All Round/Overall) dulu tidak
+      // py pengaman apa pun terhadap klik ganda/beruntun — Save memakai
+      // ipcRenderer.once(`${channel}-reply}`) TANPA request-id (beda dgn
+      // saveBracketToDB() yg sudah py __reqId), jadi 2 klik cepat ke
+      // tombol Save yang SAMA bisa membuat balasan permintaan pertama
+      // "tertangkap" oleh listener permintaan kedua (atau sebaliknya) —
+      // notifikasi salah/dobel, atau upsertEventResultsH2H() ke-trigger
+      // dobel. Print pun bisa tumpang tindih (generatePdf() dipanggil lagi
+      // sebelum proses render sebelumnya selesai, isi pdfMode/pdfRound...
+      // masih dipakai bersama 1 komponen vue-html2pdf). Flag ini menahan
+      // klik kedua selagi proses pertama masih berjalan.
+      isSavingRound: false,
+      isSavingAllRounds: false,
+      isSavingOverall: false,
+      isPrintingRound: false,
+      isPrintingAllRounds: false,
+      isPrintingOverall: false,
       // state modal "pilih tim" saat slot kosong di bagan diklik — tim
       // ditaruh LANGSUNG ke slot (matchIndex + side) ini, TANPA Heat apa pun.
       assignPicker: { show: false, roundId: null, matchIndex: null, side: null },
@@ -1628,6 +1663,9 @@ export default {
       editResult: false,
       dataPenalties: [],
       dataScore: [],
+      // score utk tim dgn rank di luar daftar dataScore (Race Settings ->
+      // H2H -> Score by Rank -> "Score utk Rank N+ dan seterusnya").
+      h2hDefaultScoreBeyondRank: 0,
       isRankedDescending: false,
 
       /** penting: tipe konsisten */
@@ -3020,97 +3058,181 @@ export default {
 
     // === Print Round ===
     async printCurrentRoundVuePdf() {
+      // BUG FIX: tidak ada pengaman thd klik ganda/beruntun — generatePdf()
+      // kedua bisa terpanggil sblm proses pertama selesai render, padahal
+      // keduanya berbagi state (pdfMode/pdfRound/pdfRoundRows) & 1 instance
+      // <vue-html2pdf> yg sama, jadi hasil PDF-nya bisa tercampur.
+      if (this.isPrintingRound) return;
       const r = this.currentRound;
       if (!r) return;
 
       const rows = this.sortRowsByBracketAndBye(this.buildRoundRows(r), r);
+      if (!rows || !rows.length) {
+        this.notify("warning", "Tidak ada data round ini.", "Print Round");
+        return;
+      }
 
-      this.pdfMode = "round";
-      this.pdfFilename = "Result - " + (r.bronze ? "Final B" : r.name) + ".pdf";
-      this.pdfRound = r;
-      this.pdfRoundRows = rows;
+      this.isPrintingRound = true;
+      try {
+        this.pdfMode = "round";
+        this.pdfFilename = "Result - " + (r.bronze ? "Final B" : r.name) + ".pdf";
+        this.pdfRound = r;
+        this.pdfRoundRows = rows;
 
-      await this._renderAndDownloadPdf(logger.error);
+        await this._renderAndDownloadPdf(logger.error);
+      } finally {
+        this.isPrintingRound = false;
+      }
     },
 
     // === Print All Round ===
     async printAllRoundVuePdf() {
-      const roundsSheets = this._applyBracketSortToRoundsSheets(
-        this.buildAllRoundsPackage()
-      );
+      if (this.isPrintingAllRounds) return;
+      this.isPrintingAllRounds = true;
+      try {
+        const roundsSheets = this._applyBracketSortToRoundsSheets(
+          this.buildAllRoundsPackage()
+        );
 
-      this.pdfMode = "allround";
-      this.pdfFilename = "All Rounds — Results.pdf";
-      this.pdfOverallPkg = { rounds: roundsSheets, placements: [] };
+        this.pdfMode = "allround";
+        this.pdfFilename = "All Rounds — Results.pdf";
+        this.pdfOverallPkg = { rounds: roundsSheets, placements: [] };
 
-      await this._renderAndDownloadPdf(logger.error);
+        await this._renderAndDownloadPdf(logger.error);
+      } finally {
+        this.isPrintingAllRounds = false;
+      }
     },
 
     // === Print Overall ===
     async printOverallVuePdf() {
-      const pkg = this.buildOverallPackage();
-      if (pkg && Array.isArray(pkg.rounds)) {
-        this._applyBracketSortToRoundsSheets(pkg.rounds);
+      if (this.isPrintingOverall) return;
+      this.isPrintingOverall = true;
+      try {
+        const pkg = this.buildOverallPackage();
+        if (pkg && Array.isArray(pkg.rounds)) {
+          this._applyBracketSortToRoundsSheets(pkg.rounds);
+        }
+
+        this.pdfMode = "overall";
+        this.pdfFilename = "Overall Result.pdf";
+        this.pdfOverallPkg = pkg;
+
+        await this._renderAndDownloadPdf(logger.warn);
+      } finally {
+        this.isPrintingOverall = false;
       }
-
-      this.pdfMode = "overall";
-      this.pdfFilename = "Overall Result.pdf";
-      this.pdfOverallPkg = pkg;
-
-      await this._renderAndDownloadPdf(logger.warn);
     },
 
     // === Save Round (DB) ===
     async saveCurrentRoundToDB() {
-      const r = this.currentRound;
-      if (!r)
-        return this.notify("warning", "Tidak ada babak aktif.", "Save Round");
+      // BUG FIX: sama seperti Print — dulu tidak ada pengaman klik ganda.
+      // _saveH2HToDBAndSyncOverall() memakai ipcRenderer.once() TANPA
+      // request-id (beda dgn saveBracketToDB() yg sudah py __reqId), jadi
+      // 2 klik cepat bisa membuat balasan permintaan pertama "tertangkap"
+      // oleh listener permintaan kedua — notifikasi salah/dobel, atau
+      // upsertEventResultsH2H() (auto-sync ke Overall) ke-trigger dobel.
+      if (this.isSavingRound) return;
 
-      const bucket = this._currentBucketOrThrow();
-      const rows = this.buildRoundRows(r);
-      if (!rows || !rows.length) {
-        return this.notify(
-          "warning",
-          "Tidak ada data round ini.",
-          "Save Round"
-        );
+      const r = this.currentRound;
+      if (!r) {
+        this.notify("warning", "Tidak ada babak aktif.", "Save Round");
+        return;
       }
 
-      this._saveH2HToDBAndSyncOverall(
-        "h2h:round:save",
-        {
-          bucket,
-          roundId: String(r.id),
-          roundName: r.bronze ? "Final B" : r.name,
-          rows,
-        },
-        "Hasil round tersimpan."
-      );
-      this.saveBracketToDB();
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save Round");
+        return;
+      }
+
+      const rows = this.buildRoundRows(r);
+      if (!rows || !rows.length) {
+        this.notify("warning", "Tidak ada data round ini.", "Save Round");
+        return;
+      }
+
+      this.isSavingRound = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:round:save",
+          {
+            bucket,
+            roundId: String(r.id),
+            roundName: r.bronze ? "Final B" : r.name,
+            rows,
+          },
+          "Hasil round tersimpan."
+        );
+        this.saveBracketToDB();
+      } finally {
+        this.isSavingRound = false;
+      }
     },
 
     // === Save All Round (DB) ===
     async saveAllRoundToDB() {
-      const bucket = this._currentBucketOrThrow();
+      if (this.isSavingAllRounds) return;
+
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save All Round");
+        return;
+      }
+
       const roundsSheets = this.buildAllRoundsPackage();
 
-      this._saveH2HToDBAndSyncOverall(
-        "h2h:rounds:saveMany",
-        { bucket, roundsSheets },
-        "Semua round tersimpan."
-      );
+      this.isSavingAllRounds = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:rounds:saveMany",
+          { bucket, roundsSheets },
+          "Semua round tersimpan."
+        );
+      } finally {
+        this.isSavingAllRounds = false;
+      }
     },
 
     // === Save Overall (DB) ===
     async saveOverallToDB() {
-      const bucket = this._currentBucketOrThrow();
-      const overallPkg = this.buildOverallPackage();
+      if (this.isSavingOverall) return;
 
-      this._saveH2HToDBAndSyncOverall(
-        "h2h:overall:save",
-        { bucket, overallPkg },
-        "Overall tersimpan."
-      );
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save Overall");
+        return;
+      }
+
+      const overallPkg = this.buildOverallPackage();
+      // BUG FIX: dulu tidak dicek — klik "Save Overall" sebelum Final A/B
+      // (atau babak apa pun) selesai akan menyimpan dokumen Overall KOSONG
+      // ke database tanpa pemberitahuan apa pun ke operator.
+      if (!overallPkg || !overallPkg.overallRows || !overallPkg.overallRows.length) {
+        this.notify(
+          "warning",
+          "Belum ada hasil yang bisa disimpan sbg Overall (belum ada babak yang selesai).",
+          "Save Overall"
+        );
+        return;
+      }
+
+      this.isSavingOverall = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:overall:save",
+          { bucket, overallPkg },
+          "Overall tersimpan."
+        );
+      } finally {
+        this.isSavingOverall = false;
+      }
     },
 
     // === merge hasil OVERALL H2H ke dokumen event-results (kategori lain aman) ===
@@ -3165,6 +3287,24 @@ export default {
         return;
       }
 
+      // BUG FIX: dulu teamId SELALU dikosongkan di sini ("tidak tersedia
+      // di paket overall") — tapi teamId SEBENARNYA tersedia, cuma bukan
+      // di overallRows, melainkan di this.participantArr (live list tim
+      // kategori H2H ini, py field teamId asli dari normalizeTeamForH2H()).
+      // Akibat teamId selalu kosong: kolom "Sudah Bertanding" di tabel
+      // Registered Teams (TeamPanel.vue -> hasCompeted()) TIDAK PERNAH
+      // menyala utk tim yg hasil "sudah bertanding"-nya berasal dari H2H —
+      // hasCompeted() mencocokkan row.teamId (ID asli, ada) ke Set yg
+      // (krn entry.teamId kosong) malah ke-isi row.bibTeam sbg fallback,
+      // jadi key-nya tidak akan pernah cocok. Sprint/kategori lain sudah
+      // benar meneruskan teamId asli — H2H tadinya sengaja dikosongkan.
+      var teamIdByKey = new Map();
+      (self.participantArr || []).forEach(function (p) {
+        var k = teamKeyFrom(p.nameTeam || p.teamName || "", p.bibTeam || "");
+        var tid = String(p.teamId || "");
+        if (k && tid) teamIdByKey.set(k, tid);
+      });
+
       // siapkan incoming map: key = NAME|BIB → { ... }
       var incoming = new Map();
       var i = 0;
@@ -3178,7 +3318,7 @@ export default {
         if (key) {
           incoming.set(key, {
             key: key,
-            teamId: "", // tidak tersedia di paket overall → biarkan kosong
+            teamId: teamIdByKey.get(key) || "",
             teamName: nm,
             bib: bb,
             h2hCat: {
@@ -5234,6 +5374,23 @@ export default {
             if (clList) this.clChoices = clList;
             if (fList) this.fChoices = fList;
 
+            // Score by Rank per-event (Race Settings) — override tabel
+            // global optionRanked "HEADTOHEAD" (dimuat loadDataScore()) kalau
+            // event ini sudah dikustomisasi. Dipakai scoreForRank()/
+            // getScoreByRanked() yg jadi sumber skor "Save Overall".
+            const scoreByRank =
+              h2hSettings && Array.isArray(h2hSettings.scoreByRank)
+                ? h2hSettings.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.h2hDefaultScoreBeyondRank =
+              Number(h2hSettings && h2hSettings.defaultScoreBeyondRank) || 0;
+
             resolve();
           });
           ipcRenderer.send("race-settings:get", this.currentEventId);
@@ -6148,7 +6305,17 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      if (m) return m.score;
+      // rank di luar daftar (mis. list cuma diisi Rank 1-4) → pakai score
+      // fallback "Rank N+ dan seterusnya" dari Race Settings, kalau ada.
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.h2hDefaultScoreBeyondRank || 0;
+      }
+      return null;
     },
 
     async updateTime(val, visIndex, title) {
@@ -6416,6 +6583,11 @@ export default {
 }
 .h2h-action-btn:hover {
   background: #eef4ff;
+}
+.h2h-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 /* Save = tombol solid (nulis ke DB, konsekuensinya lebih besar drpd cuma
    generate file PDF) supaya beda bobot visual dgn Print. */

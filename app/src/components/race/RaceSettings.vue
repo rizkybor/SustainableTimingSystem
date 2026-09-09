@@ -167,7 +167,7 @@
                 variant="outline-primary"
                 style="border-radius: 8px"
                 :disabled="draft.sprint.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow"
+                @click="addScoreRow('sprint')"
               >
                 + Tambah
               </b-button>
@@ -212,7 +212,7 @@
                   variant="outline-danger"
                   style="border-radius: 8px"
                   :disabled="draft.sprint.scoreByRank.length <= 1"
-                  @click="removeScoreRow(idx)"
+                  @click="removeScoreRow('sprint', idx)"
                 >
                   ✕
                 </b-button>
@@ -343,6 +343,91 @@
               </div>
             </div>
 
+            <hr class="rs-divider" />
+
+            <!-- SCORE BY RANK -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Score by Rank</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.h2h.scoreByRank.length >= maxSprintScoreRows"
+                @click="addScoreRow('h2h')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.h2h.scoreByRank.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted" style="width: 70px; flex: 0 0 70px"
+                >Rank</small
+              >
+              <small class="text-muted flex-grow-1">Score</small>
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              class="rs-score-list"
+              style="max-height: 260px; overflow-y: auto"
+            >
+              <div
+                v-for="(p, idx) in draft.h2h.scoreByRank"
+                :key="'h2h-score-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  :value="p.ranking"
+                  disabled
+                  style="border-radius: 10px; width: 70px; flex: 0 0 70px"
+                />
+                <b-form-input
+                  v-model.number="p.score"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  placeholder="Score"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.h2h.scoreByRank.length <= 1"
+                  @click="removeScoreRow('h2h', idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1 mb-2">
+              Rank menyesuaikan urutan baris otomatis.
+            </small>
+
+            <div class="d-flex align-items-center mt-2" style="gap: 10px">
+              <div class="font-weight-bold" style="white-space: nowrap">
+                Score utk Rank {{ draft.h2h.scoreByRank.length + 1 }} dan
+                seterusnya
+              </div>
+              <b-form-input
+                v-model.number="draft.h2h.defaultScoreBeyondRank"
+                type="number"
+                min="0"
+                max="1000"
+                placeholder="0"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Berlaku utk semua tim dengan peringkat di luar daftar di atas
+              (mis. isi list Rank 1–4, lalu isi di sini utk Rank 5+). Isi 0
+              kalau tim di luar daftar tidak mendapat score sama sekali.
+            </small>
+
             </div>
           </div>
         </div>
@@ -381,6 +466,91 @@
               <small class="text-danger">Min {{ minGate }} Gate</small>
               <small class="text-danger">Max {{ maxGate }} Gate</small>
             </div>
+
+            <hr class="rs-divider" />
+
+            <!-- SCORE BY RANK -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Score by Rank</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.slalom.scoreByRank.length >= maxSprintScoreRows"
+                @click="addScoreRow('slalom')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.slalom.scoreByRank.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted" style="width: 70px; flex: 0 0 70px"
+                >Rank</small
+              >
+              <small class="text-muted flex-grow-1">Score</small>
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              class="rs-score-list"
+              style="max-height: 260px; overflow-y: auto"
+            >
+              <div
+                v-for="(p, idx) in draft.slalom.scoreByRank"
+                :key="'slalom-score-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  :value="p.ranking"
+                  disabled
+                  style="border-radius: 10px; width: 70px; flex: 0 0 70px"
+                />
+                <b-form-input
+                  v-model.number="p.score"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  placeholder="Score"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.slalom.scoreByRank.length <= 1"
+                  @click="removeScoreRow('slalom', idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1 mb-2">
+              Rank menyesuaikan urutan baris otomatis.
+            </small>
+
+            <div class="d-flex align-items-center mt-2" style="gap: 10px">
+              <div class="font-weight-bold" style="white-space: nowrap">
+                Score utk Rank {{ draft.slalom.scoreByRank.length + 1 }} dan
+                seterusnya
+              </div>
+              <b-form-input
+                v-model.number="draft.slalom.defaultScoreBeyondRank"
+                type="number"
+                min="0"
+                max="1000"
+                placeholder="0"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Berlaku utk semua tim dengan peringkat di luar daftar di atas
+              (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
+              kalau tim di luar daftar tidak mendapat score sama sekali.
+            </small>
             </div>
           </div>
         </div>
@@ -417,6 +587,91 @@
               <small class="text-danger">Min {{ minSection }} Section</small>
               <small class="text-danger">Max {{ maxSection }} Section</small>
             </div>
+
+            <hr class="rs-divider" />
+
+            <!-- SCORE BY RANK -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Score by Rank</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.drr.scoreByRank.length >= maxSprintScoreRows"
+                @click="addScoreRow('drr')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.drr.scoreByRank.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted" style="width: 70px; flex: 0 0 70px"
+                >Rank</small
+              >
+              <small class="text-muted flex-grow-1">Score</small>
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              class="rs-score-list"
+              style="max-height: 260px; overflow-y: auto"
+            >
+              <div
+                v-for="(p, idx) in draft.drr.scoreByRank"
+                :key="'drr-score-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  :value="p.ranking"
+                  disabled
+                  style="border-radius: 10px; width: 70px; flex: 0 0 70px"
+                />
+                <b-form-input
+                  v-model.number="p.score"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  placeholder="Score"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.drr.scoreByRank.length <= 1"
+                  @click="removeScoreRow('drr', idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1 mb-2">
+              Rank menyesuaikan urutan baris otomatis.
+            </small>
+
+            <div class="d-flex align-items-center mt-2" style="gap: 10px">
+              <div class="font-weight-bold" style="white-space: nowrap">
+                Score utk Rank {{ draft.drr.scoreByRank.length + 1 }} dan
+                seterusnya
+              </div>
+              <b-form-input
+                v-model.number="draft.drr.defaultScoreBeyondRank"
+                type="number"
+                min="0"
+                max="1000"
+                placeholder="0"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Berlaku utk semua tim dengan peringkat di luar daftar di atas
+              (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
+              kalau tim di luar daftar tidak mendapat score sama sekali.
+            </small>
             </div>
           </div>
         </div>
@@ -484,6 +739,91 @@
                 >Gate 2</b-form-checkbox
               >
             </div>
+
+            <hr class="rs-divider" />
+
+            <!-- SCORE BY RANK -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Score by Rank</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.rx.scoreByRank.length >= maxSprintScoreRows"
+                @click="addScoreRow('rx')"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <div
+              v-if="draft.rx.scoreByRank.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted" style="width: 70px; flex: 0 0 70px"
+                >Rank</small
+              >
+              <small class="text-muted flex-grow-1">Score</small>
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              class="rs-score-list"
+              style="max-height: 260px; overflow-y: auto"
+            >
+              <div
+                v-for="(p, idx) in draft.rx.scoreByRank"
+                :key="'rx-score-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  :value="p.ranking"
+                  disabled
+                  style="border-radius: 10px; width: 70px; flex: 0 0 70px"
+                />
+                <b-form-input
+                  v-model.number="p.score"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  placeholder="Score"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.rx.scoreByRank.length <= 1"
+                  @click="removeScoreRow('rx', idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1 mb-2">
+              Rank menyesuaikan urutan baris otomatis.
+            </small>
+
+            <div class="d-flex align-items-center mt-2" style="gap: 10px">
+              <div class="font-weight-bold" style="white-space: nowrap">
+                Score utk Rank {{ draft.rx.scoreByRank.length + 1 }} dan
+                seterusnya
+              </div>
+              <b-form-input
+                v-model.number="draft.rx.defaultScoreBeyondRank"
+                type="number"
+                min="0"
+                max="1000"
+                placeholder="0"
+                style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+              />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Berlaku utk semua tim dengan peringkat di luar daftar di atas
+              (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
+              kalau tim di luar daftar tidak mendapat score sama sekali.
+            </small>
             </div>
           </div>
         </div>
@@ -581,6 +921,91 @@ const DEFAULT_H2H_PENALTIES = [
   { label: "50", value: 50 },
 ];
 
+// Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
+// "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
+// dikustomisasi per-event (pola sama dgn DEFAULT_SPRINT_SCORE_BY_RANK).
+const DEFAULT_H2H_SCORE_BY_RANK = [
+  { ranking: 1, score: 100 },
+  { ranking: 2, score: 92 },
+  { ranking: 3, score: 86 },
+  { ranking: 4, score: 82 },
+  { ranking: 5, score: 79 },
+  { ranking: 6, score: 76 },
+  { ranking: 7, score: 73 },
+  { ranking: 8, score: 70 },
+  { ranking: 9, score: 67 },
+  { ranking: 10, score: 64 },
+  { ranking: 11, score: 61 },
+  { ranking: 12, score: 58 },
+  { ranking: 13, score: 55 },
+  { ranking: 14, score: 52 },
+  { ranking: 15, score: 49 },
+  { ranking: 16, score: 46 },
+  { ranking: 17, score: 43 },
+  { ranking: 18, score: 40 },
+  { ranking: 19, score: 38 },
+  { ranking: 20, score: 36 },
+  { ranking: 21, score: 34 },
+  { ranking: 22, score: 32 },
+  { ranking: 23, score: 30 },
+  { ranking: 24, score: 28 },
+  { ranking: 25, score: 26 },
+  { ranking: 26, score: 24 },
+  { ranking: 27, score: 22 },
+  { ranking: 28, score: 20 },
+  { ranking: 29, score: 18 },
+  { ranking: 30, score: 16 },
+  { ranking: 31, score: 14 },
+  { ranking: 32, score: 12 },
+];
+
+// Default tabel Rank -> Score Slalom & DRR, sama persis dgn optionRanked
+// type "SLALOM" (dan tabel hardcoded DRR) yang sebelumnya
+// hardcoded/global — sekarang bisa dikustomisasi per-event.
+const DEFAULT_SLALOM_SCORE_BY_RANK = [
+  { ranking: 1, score: 350 },
+  { ranking: 2, score: 322 },
+  { ranking: 3, score: 301 },
+  { ranking: 4, score: 287 },
+  { ranking: 5, score: 277 },
+  { ranking: 6, score: 266 },
+  { ranking: 7, score: 256 },
+  { ranking: 8, score: 245 },
+  { ranking: 9, score: 235 },
+  { ranking: 10, score: 224 },
+  { ranking: 11, score: 214 },
+  { ranking: 12, score: 203 },
+  { ranking: 13, score: 193 },
+  { ranking: 14, score: 182 },
+  { ranking: 15, score: 172 },
+  { ranking: 16, score: 161 },
+  { ranking: 17, score: 151 },
+  { ranking: 18, score: 140 },
+  { ranking: 19, score: 133 },
+  { ranking: 20, score: 126 },
+  { ranking: 21, score: 119 },
+  { ranking: 22, score: 112 },
+  { ranking: 23, score: 105 },
+  { ranking: 24, score: 98 },
+  { ranking: 25, score: 91 },
+  { ranking: 26, score: 84 },
+  { ranking: 27, score: 77 },
+  { ranking: 28, score: 70 },
+  { ranking: 29, score: 63 },
+  { ranking: 30, score: 56 },
+  { ranking: 31, score: 49 },
+  { ranking: 32, score: 42 },
+];
+const DEFAULT_DRR_SCORE_BY_RANK = DEFAULT_SLALOM_SCORE_BY_RANK.map((p) => ({
+  ...p,
+}));
+
+// RX belum punya kurva sendiri — dibuat mirip Sprint dulu sesuai
+// permintaan (bisa dikustomisasi belakangan per-event).
+const DEFAULT_RX_SCORE_BY_RANK = DEFAULT_SPRINT_SCORE_BY_RANK.map((p) => ({
+  ...p,
+}));
+
 const DEFAULT_SETTINGS = {
   sprint: {
     startPenalties: DEFAULT_START_PENALTIES.map((p) => ({ ...p })),
@@ -599,14 +1024,26 @@ const DEFAULT_SETTINGS = {
     startPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
     cutLinePenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
     finishPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
+    scoreByRank: DEFAULT_H2H_SCORE_BY_RANK.map((p) => ({ ...p })),
+    defaultScoreBeyondRank: 0,
   },
-  slalom: { totalGate: 14 },
-  drr: { totalSection: 5 },
+  slalom: {
+    totalGate: 14,
+    scoreByRank: DEFAULT_SLALOM_SCORE_BY_RANK.map((p) => ({ ...p })),
+    defaultScoreBeyondRank: 0,
+  },
+  drr: {
+    totalSection: 5,
+    scoreByRank: DEFAULT_DRR_SCORE_BY_RANK.map((p) => ({ ...p })),
+    defaultScoreBeyondRank: 0,
+  },
   rx: {
     teamsPerHeat: 4,
     qualifiersPerHeat: 2,
     gate1: { enabled: true },
     gate2: { enabled: true },
+    scoreByRank: DEFAULT_RX_SCORE_BY_RANK.map((p) => ({ ...p })),
+    defaultScoreBeyondRank: 0,
   },
 };
 
@@ -792,12 +1229,45 @@ export default {
             src.h2h && src.h2h.finishPenalties,
             DEFAULT_H2H_PENALTIES
           ),
+          scoreByRank: cleanScoreList(
+            src.h2h && src.h2h.scoreByRank,
+            DEFAULT_H2H_SCORE_BY_RANK
+          ),
+          defaultScoreBeyondRank: Math.max(
+            0,
+            Math.min(
+              1000,
+              toInt(src.h2h && src.h2h.defaultScoreBeyondRank, 0)
+            )
+          ),
         },
         slalom: {
           totalGate: toInt(src.slalom && src.slalom.totalGate, 14),
+          scoreByRank: cleanScoreList(
+            src.slalom && src.slalom.scoreByRank,
+            DEFAULT_SLALOM_SCORE_BY_RANK
+          ),
+          defaultScoreBeyondRank: Math.max(
+            0,
+            Math.min(
+              1000,
+              toInt(src.slalom && src.slalom.defaultScoreBeyondRank, 0)
+            )
+          ),
         },
         drr: {
           totalSection: toInt(src.drr && src.drr.totalSection, 5),
+          scoreByRank: cleanScoreList(
+            src.drr && src.drr.scoreByRank,
+            DEFAULT_DRR_SCORE_BY_RANK
+          ),
+          defaultScoreBeyondRank: Math.max(
+            0,
+            Math.min(
+              1000,
+              toInt(src.drr && src.drr.defaultScoreBeyondRank, 0)
+            )
+          ),
         },
         rx: (() => {
           const teamsPerHeat = Math.max(
@@ -827,6 +1297,17 @@ export default {
             qualifiersPerHeat,
             gate1: { enabled: gate1Enabled },
             gate2: { enabled: gate2Enabled },
+            scoreByRank: cleanScoreList(
+              src.rx && src.rx.scoreByRank,
+              DEFAULT_RX_SCORE_BY_RANK
+            ),
+            defaultScoreBeyondRank: Math.max(
+              0,
+              Math.min(
+                1000,
+                toInt(src.rx && src.rx.defaultScoreBeyondRank, 0)
+              )
+            ),
           };
         })(),
       };
@@ -878,15 +1359,17 @@ export default {
 
     // Rank di list "Score by Rank" selalu berurutan 1..N mengikuti posisi
     // baris (bukan input bebas) — supaya tidak ada rank ganda/bolong.
-    addScoreRow() {
-      const list = this.draft.sprint.scoreByRank;
+    // scope: "sprint" | "h2h" — generik supaya editor Score by Rank tidak
+    // perlu diduplikasi per kategori (sama pola dgn addPenaltyRow()).
+    addScoreRow(scope) {
+      const list = this.draft[scope] && this.draft[scope].scoreByRank;
       if (!list || list.length >= this.maxSprintScoreRows) return;
       const last = list[list.length - 1];
       list.push({ ranking: list.length + 1, score: last ? last.score : 0 });
     },
 
-    removeScoreRow(idx) {
-      const list = this.draft.sprint.scoreByRank;
+    removeScoreRow(scope, idx) {
+      const list = this.draft[scope] && this.draft[scope].scoreByRank;
       if (!list || list.length <= 1) return;
       list.splice(idx, 1);
       list.forEach((p, i) => (p.ranking = i + 1));
@@ -929,6 +1412,40 @@ export default {
       this.draft.sprint.defaultScoreBeyondRank = Math.max(
         0,
         Math.min(1000, parseInt(this.draft.sprint.defaultScoreBeyondRank, 10) || 0)
+      );
+
+      this.draft.h2h.scoreByRank = (this.draft.h2h.scoreByRank || []).map(
+        (p, idx) => ({
+          ranking: idx + 1,
+          score: Math.max(0, Math.min(1000, parseInt(p.score, 10) || 0)),
+        })
+      );
+      this.draft.h2h.defaultScoreBeyondRank = Math.max(
+        0,
+        Math.min(1000, parseInt(this.draft.h2h.defaultScoreBeyondRank, 10) || 0)
+      );
+
+      const cleanScoreByRank = (list) =>
+        (list || []).map((p, idx) => ({
+          ranking: idx + 1,
+          score: Math.max(0, Math.min(1000, parseInt(p.score, 10) || 0)),
+        }));
+      const cleanBeyondRank = (v) =>
+        Math.max(0, Math.min(1000, parseInt(v, 10) || 0));
+
+      this.draft.slalom.scoreByRank = cleanScoreByRank(
+        this.draft.slalom.scoreByRank
+      );
+      this.draft.slalom.defaultScoreBeyondRank = cleanBeyondRank(
+        this.draft.slalom.defaultScoreBeyondRank
+      );
+      this.draft.drr.scoreByRank = cleanScoreByRank(this.draft.drr.scoreByRank);
+      this.draft.drr.defaultScoreBeyondRank = cleanBeyondRank(
+        this.draft.drr.defaultScoreBeyondRank
+      );
+      this.draft.rx.scoreByRank = cleanScoreByRank(this.draft.rx.scoreByRank);
+      this.draft.rx.defaultScoreBeyondRank = cleanBeyondRank(
+        this.draft.rx.defaultScoreBeyondRank
       );
 
       const gRaw =

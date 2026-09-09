@@ -14,6 +14,7 @@ const {
   upsertAllRounds,
   upsertOverall,
   getOverall,
+  getAllResults,
 } = require("../controllers/INSERT/upsertHeadToHead.js");
 
 const {
@@ -1024,10 +1025,22 @@ ipcMain.on("event-results:get-all-by-event", async function (event, eventId) {
 
 // HEAD 2 HEAD
 ipcMain.on("h2h:bracket:get", async (e, bucket) => {
+  // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+  // mencocokkan balasan ke request-nya sendiri (mis. loadH2HStatusForPanel()
+  // di Details/index.vue, yang bisa fetch beberapa panel bersamaan) bisa
+  // pakai ipcRenderer.on()+cek __reqId alih2 once() polos yang rawan salah
+  // tangkap balasan panel lain — pemanggil lama yang tidak kirim __reqId
+  // tidak terpengaruh (field ini cuma ada kalau diminta).
+  const reqId = bucket && bucket.__reqId;
   try {
-    e.reply("h2h:bracket:get-reply", await getBracket(bucket));
+    const result = await getBracket(bucket);
+    e.reply("h2h:bracket:get-reply", { ...result, __reqId: reqId });
   } catch (err) {
-    e.reply("h2h:bracket:get-reply", { ok: false, error: String(err) });
+    e.reply("h2h:bracket:get-reply", {
+      ok: false,
+      error: String(err),
+      __reqId: reqId,
+    });
   }
 });
 
@@ -1086,6 +1099,20 @@ ipcMain.on("h2h:overall:get", async (e, bucket) => {
     e.reply("h2h:overall:get-reply", await getOverall(bucket));
   } catch (err) {
     e.reply("h2h:overall:get-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:results:getAll", async (e, bucket) => {
+  const reqId = bucket && bucket.__reqId;
+  try {
+    const result = await getAllResults(bucket);
+    e.reply("h2h:results:getAll-reply", { ...result, __reqId: reqId });
+  } catch (err) {
+    e.reply("h2h:results:getAll-reply", {
+      ok: false,
+      error: String(err),
+      __reqId: reqId,
+    });
   }
 });
 

@@ -499,6 +499,7 @@ export default {
       },
       dataPenalties: [],
       dataScore: [],
+      rxDefaultScoreBeyondRank: 0,
 
       rounds: [],
       currentRoundIndex: -1,
@@ -746,6 +747,10 @@ export default {
                   enabled: !!(res.settings.rx.gate2 && res.settings.rx.gate2.enabled),
                 },
               };
+              if (Array.isArray(res.settings.rx.scoreByRank) && res.settings.rx.scoreByRank.length) {
+                this.dataScore = res.settings.rx.scoreByRank;
+              }
+              this.rxDefaultScoreBeyondRank = Number(res.settings.rx.defaultScoreBeyondRank) || 0;
             }
             resolve();
           });
@@ -942,7 +947,15 @@ export default {
     },
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return m ? m.score : 0;
+      if (m) return m.score;
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.rxDefaultScoreBeyondRank || 0;
+      }
+      return 0;
     },
     /* =========================================================
      * SOCKET / IPC (Judges Dashboard realtime)

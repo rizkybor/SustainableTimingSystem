@@ -130,18 +130,42 @@
             </td>
             <td>{{ r.bibTeam }}</td>
             <td>
-              <span
-                v-if="hasCompeted(r)"
-                class="status-badge status-competed"
-                title="Tim ini sudah punya hasil tersimpan di kategori ini"
-              >
-                <Icon icon="mdi:check-circle" width="14" height="14" />
-                Sudah Bertanding
-              </span>
-              <span v-else class="status-badge status-pending">
-                <Icon icon="mdi:clock-outline" width="14" height="14" />
-                Belum Bertanding
-              </span>
+              <template v-if="h2hStatusMap">
+                <span
+                  v-if="h2hStatusForRow(r).status === 'done'"
+                  class="status-badge status-competed"
+                  title="Final A / Final B sudah punya Win/Lose utk tim ini"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Selesai Bertanding
+                </span>
+                <span
+                  v-else-if="h2hStatusForRow(r).status === 'in-round'"
+                  class="status-badge status-in-round"
+                  title="Tim ini sedang berada di round tsb pada bagan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Bertanding di Round {{ h2hStatusForRow(r).roundName }}
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding
+                </span>
+              </template>
+              <template v-else>
+                <span
+                  v-if="hasCompeted(r)"
+                  class="status-badge status-competed"
+                  title="Tim ini sudah punya hasil tersimpan di kategori ini"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Bertanding
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding
+                </span>
+              </template>
             </td>
             <td class="text-right">
               <button
@@ -194,6 +218,12 @@ export default {
     // kategori race yang sedang aktif — dipakai buat flag "sudah/belum
     // bertanding" di kolom Status.
     competedSet: { type: Set, default: () => new Set() },
+    // KHUSUS HEAD2HEAD: Object (key = nama tim, uppercased) -> { status:
+    // "pending"|"in-round"|"done", roundName } — kalau diisi (non-null),
+    // kolom Status menampilkan 3 tingkat (Belum Bertanding / Bertanding di
+    // Round X / Sudah Selesai Bertanding) alih2 flag biner competedSet.
+    // null/undefined = kategori lain, pakai competedSet seperti biasa.
+    h2hStatusMap: { type: Object, default: null },
     draft: { type: Object, default: null },
     loading: { type: Boolean, default: false },
     // panel paling atas per kategori (comboIdx === 0 di parent) default
@@ -238,6 +268,16 @@ export default {
     hasCompeted(row) {
       const key = String((row && (row.teamId || row.bibTeam)) || "");
       return !!key && this.competedSet.has(key);
+    },
+    // KHUSUS HEAD2HEAD — cocokkan by nama tim (uppercased), sesuai kunci yg
+    // dipakai _computeH2HStatusMap() di Details/index.vue (bagan H2H hanya
+    // simpan nama+bib per slot, bukan teamId).
+    h2hStatusForRow(row) {
+      const nm = String((row && (row.nameTeam || row.teamName)) || "")
+        .trim()
+        .toUpperCase();
+      const found = nm && this.h2hStatusMap ? this.h2hStatusMap[nm] : null;
+      return found || { status: "pending", roundName: "" };
     },
     onPickTeam(val) {
       this.$emit("draft-change", {
@@ -426,6 +466,11 @@ export default {
   background: #f4f5f7;
   color: #73809a;
   border: 1px solid #e2e6ee;
+}
+.status-in-round {
+  background: #fff4e0;
+  color: #a86400;
+  border: 1px solid #f5d999;
 }
 .team-table tbody td.muted {
   color: var(--muted);

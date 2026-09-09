@@ -86,6 +86,24 @@
         >
           <Icon icon="mdi:table-large" class="mr-2" /> View Overall
         </b-button>
+
+        <b-dropdown
+          variant="outline-secondary"
+          class="action-btn"
+          toggle-class="d-flex align-items-center"
+          :disabled="switchCategoryOptions.length === 0"
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Category
+          </template>
+          <b-dropdown-item
+            v-for="opt in switchCategoryOptions"
+            :key="opt.key"
+            @click="goToCategoryResult(opt.resultPath)"
+          >
+            {{ opt.label }}
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -336,6 +354,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { getSwitchCategoryOptions } from "@/utils/resultCategories";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 
@@ -470,12 +489,16 @@ export default {
         { ranking: 31, score: 49 },
         { ranking: 32, score: 42 },
       ],
+      drrDefaultScoreBeyondRank: 0,
     };
   },
 
   computed: {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    switchCategoryOptions() {
+      return getSwitchCategoryOptions("DRR", this.enabledCategoryKeys);
     },
     hasEventLogo() {
       const ev = this.eventInfo || {};
@@ -665,6 +688,7 @@ export default {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     } else {
       const ev = pickEventFromStore();
       this.eventInfo = {
@@ -693,6 +717,41 @@ export default {
   mounted() {},
 
   methods: {
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const scoreByRank =
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.drr &&
+              Array.isArray(res.settings.drr.scoreByRank)
+                ? res.settings.drr.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.drrDefaultScoreBeyondRank =
+              Number(
+                res &&
+                  res.settings &&
+                  res.settings.drr &&
+                  res.settings.drr.defaultScoreBeyondRank
+              ) || 0;
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan dataScore default kalau gagal memuat override
+      }
+    },
+
     // Validasi sederhana HH:MM:SS.mmm → return true/false
     isValidHMSms(str) {
       if (!str || typeof str !== "string") return false;
@@ -737,6 +796,14 @@ export default {
     },
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
+    },
+
+    goToCategoryResult(resultPath) {
+      if (!resultPath) return;
+      this.$router.push({
+        path: `/event-detail/${this.$route.params.id}/${resultPath}`,
+        query: { ...this.$route.query },
+      });
     },
 
     // ambil detail event dari IPC
@@ -967,11 +1034,14 @@ export default {
     getScoreByRanked(ranked) {
       let i = 0;
       const r = Number(ranked);
+      let maxRank = 0;
       while (i < this.dataScore.length) {
         const row = this.dataScore[i];
+        if (row && row.ranking > maxRank) maxRank = row.ranking;
         if (row && row.ranking === r) return row.score;
         i++;
       }
+      if (r > maxRank) return this.drrDefaultScoreBeyondRank || 0;
       return 0;
     },
 

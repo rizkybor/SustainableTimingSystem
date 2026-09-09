@@ -112,6 +112,24 @@
         >
           <Icon icon="mdi:table-large" class="mr-2" /> View Overall
         </b-button>
+
+        <b-dropdown
+          variant="outline-secondary"
+          class="action-btn"
+          toggle-class="d-flex align-items-center"
+          :disabled="switchCategoryOptions.length === 0"
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Category
+          </template>
+          <b-dropdown-item
+            v-for="opt in switchCategoryOptions"
+            :key="opt.key"
+            @click="goToCategoryResult(opt.resultPath)"
+          >
+            {{ opt.label }}
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -415,6 +433,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { getSwitchCategoryOptions } from "@/utils/resultCategories";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 
 /* ========= Helpers ========= */
@@ -506,12 +525,16 @@ export default {
         { ranking: 29, score: 12 },
         { ranking: 30, score: 10 },
       ],
+      slalomDefaultScoreBeyondRank: 0,
     };
   },
 
   computed: {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    switchCategoryOptions() {
+      return getSwitchCategoryOptions("SLALOM", this.enabledCategoryKeys);
     },
     hasEventLogo() {
       const ev = this.eventInfo || {};
@@ -772,6 +795,7 @@ export default {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
 
     // muat data slalom
@@ -779,6 +803,40 @@ export default {
   },
 
   methods: {
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const scoreByRank =
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.slalom &&
+              Array.isArray(res.settings.slalom.scoreByRank)
+                ? res.settings.slalom.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.slalomDefaultScoreBeyondRank =
+              Number(
+                res &&
+                  res.settings &&
+                  res.settings.slalom &&
+                  res.settings.slalom.defaultScoreBeyondRank
+              ) || 0;
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan dataScore default kalau gagal memuat override
+      }
+    },
     buildAggregateFromDoc: function (doc, eventInfo) {
       var headerTitle = "";
       if (doc && typeof doc.eventName === "string") headerTitle = doc.eventName;
@@ -1264,6 +1322,14 @@ export default {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
+    goToCategoryResult(resultPath) {
+      if (!resultPath) return;
+      this.$router.push({
+        path: `/event-detail/${this.$route.params.id}/${resultPath}`,
+        query: { ...this.$route.query },
+      });
+    },
+
     async loadEventById(eventId) {
       try {
         this.loading = true;
@@ -1316,7 +1382,15 @@ export default {
 
     getScoreByRanked(ranked) {
       const found = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return found ? found.score : 0;
+      if (found) return found.score;
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.slalomDefaultScoreBeyondRank || 0;
+      }
+      return 0;
     },
 
     timeToMs(str) {

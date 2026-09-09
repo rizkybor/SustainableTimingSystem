@@ -115,14 +115,14 @@
                   : 0
               }}
             </td>
-            <td class="mono">
+            <td class="mono pen-time-red">
               {{
                 row && row.result && row.result.penaltyTime
                   ? row.result.penaltyTime
                   : "-"
               }}
             </td>
-            <td class="mono text-strong">
+            <td class="mono text-strong total-time-green">
               {{
                 row && row.result && row.result.totalTime
                   ? row.result.totalTime
@@ -338,6 +338,10 @@ export default {
 .text-center { text-align: center; }
 .text-strong { font-weight: 700; }
 .mono { font-family: monospace; }
+/* Penalty Time merah, Result (total time stlh penalti) hijau — biar
+   langsung kebaca dampaknya, sama seperti PDF Head to Head. */
+.score-table td.pen-time-red { color: #d9534f; }
+.score-table td.total-time-green { color: #148a3b; }
 
 /* ==== FOOTER: SIGNATURE (70% - 30%) ==== */
 .sign.sign-two {

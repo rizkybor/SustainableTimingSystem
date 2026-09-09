@@ -109,6 +109,15 @@
                 <th>Heat</th>
                 <th>Team Name</th>
                 <th>BIB</th>
+                <th class="pen-col">PS</th>
+                <th class="pen-col">CL</th>
+                <th class="pen-col">R1</th>
+                <th class="pen-col">R2</th>
+                <th class="pen-col">L1</th>
+                <th class="pen-col">L2</th>
+                <th class="pen-col">PB</th>
+                <th class="pen-col">PF</th>
+                <th class="pen-col">PO</th>
                 <th>Penalty Time</th>
                 <th>Penalty Sum</th>
                 <th>Start Time</th>
@@ -128,16 +137,25 @@
                   <span v-if="r.flag" class="flag-badge">{{ r.flag }}</span>
                 </td>
                 <td class="text-center">{{ r.bib }}</td>
-                <td class="mono">{{ r.penaltyTime }}</td>
+                <td class="pen-col text-center">{{ penVal(r, "s") }}</td>
+                <td class="pen-col text-center">{{ penVal(r, "cl") }}</td>
+                <td class="pen-col text-center" :class="penClass(r, 'r1')">{{ penVal(r, "r1") }}</td>
+                <td class="pen-col text-center" :class="penClass(r, 'r2')">{{ penVal(r, "r2") }}</td>
+                <td class="pen-col text-center" :class="penClass(r, 'l1')">{{ penVal(r, "l1") }}</td>
+                <td class="pen-col text-center" :class="penClass(r, 'l2')">{{ penVal(r, "l2") }}</td>
+                <td class="pen-col text-center">{{ penVal(r, "pb") }}</td>
+                <td class="pen-col text-center">{{ penVal(r, "f") }}</td>
+                <td class="pen-col text-center">{{ penVal(r, "o") }}</td>
+                <td class="mono pen-time-red">{{ r.penaltyTime }}</td>
                 <td class="text-center">{{ r.penaltySum }}</td>
                 <td class="mono">{{ r.start }}</td>
                 <td class="mono">{{ r.finish }}</td>
                 <td class="mono">{{ r.race }}</td>
-                <td class="mono text-strong">{{ r.total }}</td>
-                <td class="text-center">{{ r.winLose || "" }}</td>
+                <td class="mono text-strong total-time-green">{{ r.total }}</td>
+                <td class="text-center" :class="winLoseClass(r.winLose)">{{ r.winLose || "" }}</td>
               </tr>
               <tr v-if="!pdfRoundRows || pdfRoundRows.length === 0">
-                <td class="empty" colspan="12">No data</td>
+                <td class="empty" colspan="20">No data</td>
               </tr>
             </tbody>
           </table>
@@ -344,6 +362,15 @@
                 <th>Heat</th>
                 <th>Team Name</th>
                 <th>BIB</th>
+                <th class="pen-col">PS</th>
+                <th class="pen-col">CL</th>
+                <th class="pen-col">R1</th>
+                <th class="pen-col">R2</th>
+                <th class="pen-col">L1</th>
+                <th class="pen-col">L2</th>
+                <th class="pen-col">PB</th>
+                <th class="pen-col">PF</th>
+                <th class="pen-col">PO</th>
                 <th>Penalty Time</th>
                 <th>Penalty Sum</th>
                 <th>Start Time</th>
@@ -362,16 +389,25 @@
                   <CountryFlag :code="flagFor(row.team)" />
                 </td>
                 <td class="text-center">{{ row.bib }}</td>
-                <td class="mono">{{ row.penaltyTime }}</td>
+                <td class="pen-col text-center">{{ penVal(row, "s") }}</td>
+                <td class="pen-col text-center">{{ penVal(row, "cl") }}</td>
+                <td class="pen-col text-center" :class="penClass(row, 'r1')">{{ penVal(row, "r1") }}</td>
+                <td class="pen-col text-center" :class="penClass(row, 'r2')">{{ penVal(row, "r2") }}</td>
+                <td class="pen-col text-center" :class="penClass(row, 'l1')">{{ penVal(row, "l1") }}</td>
+                <td class="pen-col text-center" :class="penClass(row, 'l2')">{{ penVal(row, "l2") }}</td>
+                <td class="pen-col text-center">{{ penVal(row, "pb") }}</td>
+                <td class="pen-col text-center">{{ penVal(row, "f") }}</td>
+                <td class="pen-col text-center">{{ penVal(row, "o") }}</td>
+                <td class="mono pen-time-red">{{ row.penaltyTime }}</td>
                 <td class="mono">{{ row.penaltySum }}</td>
                 <td class="mono">{{ row.start }}</td>
                 <td class="mono">{{ row.finish }}</td>
                 <td class="mono">{{ row.race }}</td>
-                <td class="mono text-strong">{{ row.total }}</td>
-                <td class="text-center">{{ row.winLose || "" }}</td>
+                <td class="mono text-strong total-time-green">{{ row.total }}</td>
+                <td class="text-center" :class="winLoseClass(row.winLose)">{{ row.winLose || "" }}</td>
               </tr>
               <tr v-if="!R.rows || R.rows.length === 0">
-                <td class="empty" colspan="9">No data</td>
+                <td class="empty" colspan="18">No data</td>
               </tr>
             </tbody>
           </table>
@@ -473,6 +509,32 @@ export default {
         .trim()
         .toUpperCase();
       return (this.countryMap && this.countryMap[key]) || "";
+    },
+    // Nilai satu kolom Penalties Group (PS/CL/R1/R2/L1/L2/PB/PF/PO) dari
+    // row hasil H2H — sama seperti getTotalPenalty() di HeadToHead.vue,
+    // key R1/R2/L1/L2 berisi "Y"/"N" (booyan corner), sisanya angka detik.
+    // "—" kalau belum diisi sama sekali (null/undefined), biar beda dgn 0.
+    penVal(row, key) {
+      var p = row && row.penalties;
+      if (!p || typeof p !== "object") return "—";
+      var v = p[key];
+      if (v === null || v === undefined || v === "") return "—";
+      return String(v);
+    },
+    // Warna khusus utk kolom booyan corner (R1/R2/L1/L2) yg isinya "Y"/"N"
+    // — hijau kalau kena (Y), merah kalau tidak (N). Selain itu (mis. "—"
+    // belum diisi) dibiarkan warna default.
+    penClass(row, key) {
+      var v = this.penVal(row, key);
+      if (v === "Y") return "pen-yes";
+      if (v === "N") return "pen-no";
+      return "";
+    },
+    // Win hijau, Lose merah — Bye/kosong dibiarkan warna default.
+    winLoseClass(value) {
+      if (value === "Win") return "win-text";
+      if (value === "Lose") return "lose-text";
+      return "";
     },
   },
 };
@@ -579,6 +641,45 @@ export default {
 }
 .score-table tbody td {
   font-size: 12px;
+}
+/* Kolom Penalties Group (PS/CL/R1/R2/L1/L2/PB/PF/PO) — font & padding
+   lebih kecil drpd kolom lain krn isinya cuma 1 huruf/angka pendek,
+   supaya tabel tidak melebar berlebihan walau ditambah 9 kolom baru. */
+.score-table th.pen-col,
+.score-table td.pen-col {
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 9px;
+}
+.score-table th.pen-col {
+  font-size: 9px;
+}
+/* Booyan corner (R1/R2/L1/L2) — hijau kalau kena (Y), merah kalau tidak
+   (N), supaya langsung kebaca sekilas tanpa perlu baca teksnya. */
+.score-table td.pen-yes {
+  color: #148a3b;
+  font-weight: 800;
+}
+.score-table td.pen-no {
+  color: #d9534f;
+  font-weight: 800;
+}
+/* Penalty Time (waktu tambahan krn penalti) merah, Total Time (hasil
+   akhir stlh ditambah penalti) hijau — biar langsung kebaca dampaknya. */
+.score-table td.pen-time-red {
+  color: #d9534f;
+}
+.score-table td.total-time-green {
+  color: #148a3b;
+}
+/* Win or Lose — Win hijau, Lose merah, biar langsung kebaca hasilnya. */
+.score-table td.win-text {
+  color: #148a3b;
+  font-weight: 800;
+}
+.score-table td.lose-text {
+  color: #d9534f;
+  font-weight: 800;
 }
 .score-table tbody tr:nth-child(odd) {
   background: #fafcff;

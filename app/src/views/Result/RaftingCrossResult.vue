@@ -103,6 +103,24 @@
             <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
           </b-dropdown-item>
         </b-dropdown>
+
+        <b-dropdown
+          variant="outline-secondary"
+          class="action-btn"
+          toggle-class="d-flex align-items-center"
+          :disabled="switchCategoryOptions.length === 0"
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Category
+          </template>
+          <b-dropdown-item
+            v-for="opt in switchCategoryOptions"
+            :key="opt.key"
+            @click="goToCategoryResult(opt.resultPath)"
+          >
+            {{ opt.label }}
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -339,6 +357,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { getSwitchCategoryOptions } from "@/utils/resultCategories";
 import { exportRowsToExcel, exportSheetsToExcel } from "@/utils/exportExcel";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -392,6 +411,9 @@ export default {
   computed: {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    switchCategoryOptions() {
+      return getSwitchCategoryOptions("RX", this.enabledCategoryKeys);
     },
     hasEventLogo() {
       var logos = this.eventInfo.eventFiles;
@@ -497,6 +519,13 @@ export default {
   methods: {
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
+    },
+    goToCategoryResult(resultPath) {
+      if (!resultPath) return;
+      this.$router.push({
+        path: `/event-detail/${this.$route.params.id}/${resultPath}`,
+        query: { ...this.$route.query },
+      });
     },
     async toggleOfficial() {
       const q = this.$route.query || {};

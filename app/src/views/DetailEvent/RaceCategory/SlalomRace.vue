@@ -963,6 +963,7 @@ export default {
       selectedSession: {},
       dataPenalties: [],
       dataScore: [],
+      slalomDefaultScoreBeyondRank: 0,
       penaltiesWrapped: false,
 
       // ====== SOCKET ======
@@ -1167,9 +1168,23 @@ export default {
         const scoreObj = this.dataScore.find(function (d) {
           return Number(d.ranking) === rank;
         });
+        let score = 0;
+        if (scoreObj) {
+          score = Number(scoreObj.score);
+        } else {
+          const maxRank = this.dataScore.length
+            ? Math.max.apply(
+                null,
+                this.dataScore.map(function (d) {
+                  return Number(d.ranking);
+                })
+              )
+            : 0;
+          if (rank > maxRank) score = this.slalomDefaultScoreBeyondRank || 0;
+        }
         map[it.id] = {
           rank: rank,
-          score: scoreObj ? Number(scoreObj.score) : 0,
+          score: score,
         };
       }
       return map;
@@ -2204,6 +2219,18 @@ export default {
               var parsed = parseInt(res.settings.slalom.totalGate, 10);
               if (Number.isFinite(parsed) && parsed > 0) n = parsed;
             }
+            if (
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.slalom &&
+              Array.isArray(res.settings.slalom.scoreByRank) &&
+              res.settings.slalom.scoreByRank.length
+            ) {
+              this.dataScore = res.settings.slalom.scoreByRank;
+              this.slalomDefaultScoreBeyondRank =
+                Number(res.settings.slalom.defaultScoreBeyondRank) || 0;
+            }
             this.SLALOM_GATES = buildGates(n);
             this.syncAllTeamsPenaltiesLength();
             resolve(this.SLALOM_GATES);
@@ -2813,14 +2840,17 @@ export default {
         if (!Number.isFinite(rank) || rank <= 0) return 0;
         var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
         var i = 0;
+        var maxRank = 0;
         while (i < ds.length) {
           var d = ds[i];
+          if (Number(d.ranking) > maxRank) maxRank = Number(d.ranking);
           if (Number(d.ranking) === Number(rank)) {
             var sc = Number(d.score);
             return Number.isFinite(sc) ? sc : 0;
           }
           i++;
         }
+        if (rank > maxRank) return self.slalomDefaultScoreBeyondRank || 0;
         return 0;
       }
 

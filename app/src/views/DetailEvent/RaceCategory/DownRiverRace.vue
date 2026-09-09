@@ -776,6 +776,7 @@ export default {
       editResult: false,
       dataPenalties: [],
       dataScore: [],
+      drrDefaultScoreBeyondRank: 0,
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -1875,6 +1876,15 @@ export default {
           if (res && res.ok && res.settings && res.settings.drr) {
             const c = parseInt(res.settings.drr.totalSection, 10);
             if (Number.isFinite(c) && c > 0) count = c;
+
+            if (
+              Array.isArray(res.settings.drr.scoreByRank) &&
+              res.settings.drr.scoreByRank.length
+            ) {
+              this.dataScore = res.settings.drr.scoreByRank;
+            }
+            this.drrDefaultScoreBeyondRank =
+              Number(res.settings.drr.defaultScoreBeyondRank) || 0;
           }
 
           this.applyDrrSectionCount(count);
@@ -2127,7 +2137,15 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      if (m) return m.score;
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.drrDefaultScoreBeyondRank || 0;
+      }
+      return null;
     },
 
     toggleSortRanked() {
@@ -2374,14 +2392,17 @@ export default {
         if (!Number.isFinite(rank) || rank <= 0) return 0;
         var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
         var i = 0;
+        var maxRank = 0;
         while (i < ds.length) {
           var d = ds[i] || {};
+          if (Number(d.ranking) > maxRank) maxRank = Number(d.ranking);
           if (Number(d.ranking) === Number(rank)) {
             var sc = Number(d.score);
             return Number.isFinite(sc) ? sc : 0;
           }
           i++;
         }
+        if (rank > maxRank) return self.drrDefaultScoreBeyondRank || 0;
         return 0;
       }
 

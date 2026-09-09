@@ -291,22 +291,14 @@
               </button>
 
               <button
-                v-if="
-                  (visibleParticipants && visibleParticipants.length) ||
-                  currentRound == 'Semifinals'
-                "
-                class="btn-action btn-secondary"
-                @click="populateBronzeFromSemis"
-                v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
-              >
-                <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
-              </button>
-
-              <button
                 v-if="currentRound && !currentRound.bronze"
                 class="btn-action btn-outline-success"
                 @click="advanceToNextRound"
-                v-b-tooltip.hover="'Pindahkan semua pemenang babak ini ke babak berikutnya'"
+                v-b-tooltip.hover="
+                  currentRound && currentRound.size === 4
+                    ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
+                    : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
+                "
               >
                 <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
                 Advance to Next Round
@@ -424,6 +416,16 @@
                   <CountryFlag :code="flagFor(player.name)" />
                 </span>
                 <span v-if="player.time" class="vtb-team-time">{{ player.time }}</span>
+                <span v-if="player.medal" class="vtb-medal-badge">
+                  <Icon
+                    v-if="player.medal !== 'fourth'"
+                    :icon="'mdi:medal'"
+                    class="vtb-medal-icon"
+                    :class="'vtb-medal-icon--' + player.medal"
+                    :title="player.medal === 'gold' ? 'Juara 1' : player.medal === 'silver' ? 'Juara 2' : 'Juara 3'"
+                  />
+                  <span v-else class="vtb-fourth-label" title="Juara 4">4th</span>
+                </span>
               </span>
               <span
                 v-else
@@ -479,6 +481,16 @@
                     <CountryFlag :code="flagFor(player.name)" />
                   </span>
                   <span v-if="player.time" class="vtb-team-time">{{ player.time }}</span>
+                  <span v-if="player.medal" class="vtb-medal-badge">
+                    <Icon
+                      v-if="player.medal !== 'fourth'"
+                      :icon="'mdi:medal'"
+                      class="vtb-medal-icon"
+                      :class="'vtb-medal-icon--' + player.medal"
+                      :title="player.medal === 'gold' ? 'Juara 1' : player.medal === 'silver' ? 'Juara 2' : 'Juara 3'"
+                    />
+                    <span v-else class="vtb-fourth-label" title="Juara 4">4th</span>
+                  </span>
                 </span>
                 <span
                   v-else
@@ -544,38 +556,6 @@
       </div>
 
       <!-- /bracket -->
-    </div>
-
-    <!-- PODIUM — cuma terisi setelah Final (& Final B kalau ada) selesai -->
-    <div v-if="hasAnyPodium" class="px-5 mb-4">
-      <div class="podium-card">
-        <div class="podium-card__title">
-          <Icon icon="mdi:trophy-outline" class="mr-1" />
-          Podium — {{ titleCategories || "-" }}
-        </div>
-        <div class="podium-list">
-          <div v-if="podium.gold" class="podium-row podium-row--gold">
-            <span class="podium-row__rank">🥇</span>
-            <CountryFlag :code="flagFor(podium.gold)" />
-            <span class="podium-row__name">{{ podium.gold }}</span>
-          </div>
-          <div v-if="podium.silver" class="podium-row podium-row--silver">
-            <span class="podium-row__rank">🥈</span>
-            <CountryFlag :code="flagFor(podium.silver)" />
-            <span class="podium-row__name">{{ podium.silver }}</span>
-          </div>
-          <div v-if="podium.bronze" class="podium-row podium-row--bronze">
-            <span class="podium-row__rank">🥉</span>
-            <CountryFlag :code="flagFor(podium.bronze)" />
-            <span class="podium-row__name">{{ podium.bronze }}</span>
-          </div>
-          <div v-if="podium.fourth" class="podium-row podium-row--fourth">
-            <span class="podium-row__rank">4th</span>
-            <CountryFlag :code="flagFor(podium.fourth)" />
-            <span class="podium-row__name">{{ podium.fourth }}</span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Racetime Output -->
@@ -1898,15 +1878,6 @@ export default {
         else if (n2 && !n1) names.push(n2);
       });
       return names;
-    },
-    hasAnyPodium() {
-      return !!(
-        this.podium &&
-        (this.podium.gold ||
-          this.podium.silver ||
-          this.podium.bronze ||
-          this.podium.fourth)
-      );
     },
     dataEventSafe() {
       return this.dataEvent && typeof this.dataEvent === "object"
@@ -5507,12 +5478,30 @@ export default {
         // abu-abu, bukan otomatis kelihatan "kalah" (merah) sebelum
         // pertandingannya benar2 selesai.
         const isWinner = m.winner ? m.winner.name === name : null;
+
+        // Medali (pengganti section "Podium" yang dihapus) — cuma muncul
+        // di Final A (gold utk menang, silver utk kalah) & Final B (bronze
+        // utk menang, yg kalah/4th dapat teks "4th" bold-italic — bukan
+        // ikon medali — sesuai permintaan). Diam2 null kalau match belum
+        // py pemenang (isWinner === null).
+        let medal = null;
+        const isFinalA = !round.bronze && round.size === 2;
+        const isFinalB = !!round.bronze;
+        if (isFinalA) {
+          if (isWinner === true) medal = "gold";
+          else if (isWinner === false) medal = "silver";
+        } else if (isFinalB) {
+          if (isWinner === true) medal = "bronze";
+          else if (isWinner === false) medal = "fourth";
+        }
+
         return {
           id: name,
           name,
           bib: team.bibTeam || "",
           isPlaceholder: false,
           winner: isWinner,
+          medal,
           roundId: round.id,
           matchIndex: idx,
           side,
@@ -5732,11 +5721,77 @@ export default {
           String(team.name || "").trim().toUpperCase()
       );
 
+      // BUG FIX: reset "mulai dari nol" saat tim maju babak (dilakukan
+      // sekali oleh advanceToNextRound() lewat _resetParticipantResultsByName())
+      // bisa "hilang" lagi kalau operator sempat membuka tab babak
+      // SEBELUMNYA (mis. Semifinal) di antara klik Advance dan klik
+      // assign-ke-slot ini — loadRoundResultsForCurrentRound() MEMANG BENAR
+      // memulihkan waktu
+      // asli babak lama itu ke `result` yang dipakai bersama (supaya tab
+      // itu tampil benar), tapi begitu terjadi, status "sudah direset utk
+      // babak baru" jadi hilang. Assign-ke-slot ini lalu menyimpan APA
+      // ADANYA `result` yang sedang aktif — yang ternyata sudah "kembali"
+      // berisi waktu babak lama itu — bocor ke babak baru (Final A/Final
+      // B, dst). Perbaikan: SELALU pastikan tim ini fresh SEBELUM
+      // disimpan, KECUALI babak ini sendiri sudah pernah punya catatan
+      // tersimpan utk tim ini (mis. sempat dihapus dari slot lalu
+      // ditambahkan lagi ke babak yang SAMA — hasilnya harus tetap ada).
+      this._ensureFreshResultForRoundEntry(team, round);
+
       this._recomputeMatchByeState(match);
 
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
       this._bumpParticipantReactivity();
+    },
+
+    // Reset live `p.result` ke kosong HANYA kalau babak `round` ini belum
+    // pernah punya snapshot tersimpan utk tim `team` — jadi aman dipanggil
+    // berulang tanpa menghapus data yang memang sudah sah milik babak ini.
+    _ensureFreshResultForRoundEntry(team, round) {
+      if (!team || !team.name || !round) return;
+      const p = this._findParticipantByTeam(team);
+      if (!p) return;
+
+      // BUG FIX: cek pertama cuma mengecek APAKAH baris tersimpan sudah
+      // ADA — tapi advanceToNextRound() SENDIRI sudah menulis baris
+      // placeholder (result KOSONG) utk tim ini ke
+      // babak baru saat memindahkannya ke pool. Jadi "baris sudah ada"
+      // SELALU true utk tim yang baru saja maju babak, dan reset di sini
+      // jadi tidak pernah kejadian — persis skenario yang bocor. Yang
+      // benar dicek: apakah baris itu py DATA WAKTU SUNGGUHAN (bukan
+      // placeholder kosong). Kalau tidak ada waktu sungguhan tersimpan,
+      // tetap paksa reset (aman/idempoten) — cuma lewati reset kalau tim
+      // ini MEMANG sudah py catatan hasil race asli di babak ini.
+      if (this.roundResultsRootKey) {
+        const all = readAllRoundResults(this.roundResultsRootKey);
+        const rows = Array.isArray(all[String(round.id)]) ? all[String(round.id)] : [];
+        const row = rows.find(
+          (r) =>
+            String((r && r.nameTeam) || "").trim().toUpperCase() ===
+            String(team.name).trim().toUpperCase()
+        );
+        const hasRealData = !!(
+          row &&
+          row.result &&
+          (row.result.startTime || row.result.raceTime)
+        );
+        if (hasRealData) {
+          // BUG FIX: dulu cuma "return" (tidak disentuh) di sini — tapi
+          // live `p.result` saat itu belum tentu SAMA dgn hasil asli yang
+          // sudah tersimpan (bisa saja live-nya kebetulan lagi kosong/isi
+          // babak lain krn alasan lain) — persist yang dipanggil SETELAH
+          // fungsi ini tetap akan menyimpan APA ADANYA live state itu,
+          // menimpa data asli tanpa sengaja. Pulihkan dulu live state dari
+          // data asli babak ini, baru aman dibiarkan tersimpan lagi.
+          p.result = { ...p.result, ...row.result };
+          this.ensurePenaltiesObject(p.result);
+          return;
+        }
+      }
+
+      p.result = this.makeEmptyResult();
+      this.ensurePenaltiesObject(p.result);
     },
 
     // Klik tim yang SUDAH terisi di bagan -> "Hapus dari Slot" -> tim itu
@@ -5845,15 +5900,47 @@ export default {
     },
 
     /** Pindahkan semua pemenang babak aktif ke pool babak kompetitif berikutnya */
+    // Memindahkan pemenang babak aktif ke pool babak berikutnya (Final A,
+    // dst). KHUSUS kalau babak yang ditinggalkan adalah Semifinal, tombol
+    // ini SEKALIGUS mengarahkan 2 tim yang KALAH ke pool Final B — operator
+    // tidak perlu lagi tombol "Assign Final B" terpisah (dulu ada, sekarang
+    // digabung ke sini atas permintaan user, sekaligus menutup seluruh
+    // kelas bug "tim kalah bawa waktu Semifinal ke Final B" yang muncul
+    // krn ada jeda antara klik Advance & klik Assign Final B — di mana
+    // operator sempat membuka tab Semifinal lagi di antaranya, memulihkan
+    // waktu asli ke `result` yang dipakai bersama sebelum akhirnya
+    // ke-assign salah ke Final B. Sekarang keduanya jadi SATU aksi atomik.
     advanceToNextRound() {
       const round = this.currentRound;
-      if (!round || round.bronze) return;
+      if (!round || round.bronze) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Tidak ada babak kompetitif yang sedang aktif.",
+            { variant: "warning", autoHideDelay: 2500, title: "Tidak bisa lanjut" }
+          );
+        return;
+      }
 
       if (!round.matches.length || (round.pool || []).length) {
         this.$bvToast &&
           this.$bvToast.toast(
             "Masih ada tim yang belum dipasangkan Heat pada babak ini.",
             { variant: "warning", autoHideDelay: 2500, title: "Belum lengkap" }
+          );
+        return;
+      }
+
+      const orphanEmpty = round.matches.filter(
+        (m) =>
+          !m.bye &&
+          !(m.team1 && m.team1.name) &&
+          !(m.team2 && m.team2.name)
+      );
+      if (orphanEmpty.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            `Ada ${orphanEmpty.length} slot match yang masih kosong (belum diisi tim apa pun). Isi dulu slot itu di bagan sebelum lanjut.`,
+            { variant: "warning", autoHideDelay: 3000, title: "Belum lengkap" }
           );
         return;
       }
@@ -5877,11 +5964,54 @@ export default {
           break;
         }
       }
-      if (nextRoundIndex === -1) return;
+      if (nextRoundIndex === -1) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Ini sudah babak terakhir (Final) — tidak ada babak berikutnya untuk dituju.",
+            { variant: "info", autoHideDelay: 2500, title: "Sudah Final" }
+          );
+        return;
+      }
 
       const winners = round.matches
         .map((m) => m.winner)
         .filter((w) => w && w.name);
+
+      if (!winners.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Tidak ada pemenang yang bisa dipindahkan ke babak berikutnya.",
+            { variant: "danger", autoHideDelay: 3000, title: "Advance gagal" }
+          );
+        return;
+      }
+
+      const next = this.rounds[nextRoundIndex];
+
+      // Khusus meninggalkan Semifinal (size 4, bukan bronze): sekaligus
+      // siapkan pool Final B dari 2 tim yang kalah. Skip diam2 (bukan
+      // error) kalau Final B tidak ada di bagan ini, atau sudah pernah
+      // terisi 2 tim sebelumnya (mis. Reset manual/assign ulang) — winners
+      // tetap lanjut ke Final A seperti biasa.
+      const isLeavingSemifinal = !round.bronze && round.size === 4;
+      let bronze = null;
+      let bronzeLosers = [];
+      if (isLeavingSemifinal) {
+        bronze = this.rounds.find((r) => r.bronze) || null;
+        if (bronze) {
+          const bronzeHas1 = !!(bronze.matches[0] && bronze.matches[0].team1 && bronze.matches[0].team1.name);
+          const bronzeHas2 = !!(bronze.matches[0] && bronze.matches[0].team2 && bronze.matches[0].team2.name);
+          if (!bronzeHas1 || !bronzeHas2) {
+            const losers = round.matches.map((m) => {
+              if (!m.winner) return null;
+              const lose =
+                m.winner.name === (m.team1 && m.team1.name) ? m.team2 : m.team1;
+              return lose && lose.name ? lose : null;
+            });
+            if (losers[0] && losers[1]) bronzeLosers = [losers[0], losers[1]];
+          }
+        }
+      }
 
       // PENTING: item.result (start/finish/heat/dll.) adalah satu object yang
       // dipakai bersama lintas SEMUA babak (bukan per-round). Kalau tidak
@@ -5890,17 +6020,37 @@ export default {
       // Reset dulu supaya tim yang maju betul-betul berstatus "menunggu
       // di-assign manual ke slot bagan babak baru" tanpa Heat.
       this._resetParticipantResultsByName(winners.map((w) => w.name));
-
-      const next = this.rounds[nextRoundIndex];
       next.pool = (next.pool || []).concat(
         winners.map((w) => ({ name: w.name, bibTeam: w.bibTeam || "" }))
       );
+
+      if (bronzeLosers.length === 2) {
+        // sama seperti pemenang — reset dulu supaya waktu Semifinal tidak
+        // ikut terbawa ke Final B (Final B mulai kosong dari nol).
+        this._resetParticipantResultsByName(bronzeLosers.map((l) => l.name));
+        bronze.pool = [
+          { name: bronzeLosers[0].name, bibTeam: bronzeLosers[0].bibTeam || "" },
+          { name: bronzeLosers[1].name, bibTeam: bronzeLosers[1].bibTeam || "" },
+        ];
+      }
 
       // next.matches sudah pre-populated kosong (lihat makeEmptyRound) —
       // operator klik-assign tim yang menang satu per satu ke slot bagan
       // babak ini, sama seperti Round 1. Heat TIDAK auto-diisi di sini.
       this.currentRoundIndex = nextRoundIndex;
-      this.persistRoundResults();
+      this.persistRoundResults(); // persist Final A (babak yg baru jadi aktif)
+
+      if (bronzeLosers.length === 2) {
+        // Final B BUKAN babak yang baru aktif (Final A yang aktif) — harus
+        // di-persist eksplisit di sini, persis pola _persistAfterCrossRoundEdit().
+        this.persistRoundResultsFor(bronze);
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Pemenang lanjut ke Final A, tim yang kalah otomatis diarahkan ke Final B.",
+            { variant: "success", autoHideDelay: 2500, title: "Advance berhasil" }
+          );
+      }
+
       // auto-save — lihat catatan di assignTeamToMatchSlot() soal kenapa ini perlu
       this.saveBracketToDB(true);
     },
@@ -5921,59 +6071,6 @@ export default {
       });
     },
 
-    /** Isi Bronze (3rd place) setelah SF selesai — 2 tim kalah menunggu Heat */
-    populateBronzeFromSemis() {
-      const sfIdx = this.rounds.findIndex((r) => !r.bronze && r.size === 4);
-      const bronzeIdx = this.rounds.findIndex((r) => r.bronze);
-      if (sfIdx === -1 || bronzeIdx === -1) return;
-
-      const sf = this.rounds[sfIdx];
-      const bronze = this.rounds[bronzeIdx];
-      if (sf.matches.length < 2) return;
-
-      // asumsikan pemenang sudah di-set; ambil 'kalah' dari masing-masing semi
-      const losers = sf.matches.map((m) => {
-        if (!m.winner) return null;
-        const lose =
-          m.winner && m.winner.name === (m.team1 && m.team1.name)
-            ? m.team2
-            : m.team1;
-        return lose && lose.name ? lose : null;
-      });
-
-      if (losers[0] && losers[1]) {
-        // sama seperti advanceToNextRound: bersihkan heat/waktu semifinal
-        // milik 2 tim kalah ini sebelum masuk pool Final B.
-        this._resetParticipantResultsByName([losers[0].name, losers[1].name]);
-
-        bronze.pool = [
-          { name: losers[0].name, bibTeam: losers[0].bibTeam || "" },
-          { name: losers[1].name, bibTeam: losers[1].bibTeam || "" },
-        ];
-        // bronze.matches sudah pre-populated 1 slot kosong (makeEmptyRound) —
-        // operator klik-assign kedua tim kalah semifinal ke slot itu manual.
-
-        // BUG FIX: tombol "Assign Final B" bisa diklik dari babak/tab MANAPUN
-        // (tidak mengubah currentRoundIndex sama sekali) — persistRoundResults()
-        // polos akan salah menyimpan ke babak yang KEBETULAN sedang
-        // ditampilkan, bukan ke Semifinal (yang baru kehilangan 2 losernya)
-        // atau Final B (yang baru dapat pool) — lihat catatan
-        // _persistAfterCrossRoundEdit(). Simpan eksplisit ke KEDUA babak yang
-        // benar2 terpengaruh, lalu pulihkan babak yang sedang ditampilkan
-        // kalau ternyata beda dari keduanya.
-        this.persistRoundResultsFor(sf);
-        this.persistRoundResultsFor(bronze);
-        if (
-          this.currentRound &&
-          this.currentRound.id !== sf.id &&
-          this.currentRound.id !== bronze.id
-        ) {
-          this.loadRoundResultsForCurrentRound();
-        }
-        // auto-save — lihat catatan di assignTeamToMatchSlot() soal kenapa ini perlu
-        this.saveBracketToDB(true);
-      }
-    },
 
     /** SIGN BRACKET */
     /** load dari payload baru */
@@ -6789,6 +6886,43 @@ td {
   gap: 4px;
   min-width: 0;
 }
+/* Medali di sebelah KANAN Time (bukan sebelah nama) — pengganti section
+   "Podium" terpisah yang dihapus. Cuma muncul di kartu Final A
+   (gold/silver) & Final B (bronze utk menang, teks "4th" bold-italic utk
+   yg kalah). Dibungkus lingkaran putih supaya kontras & konsisten
+   tampilannya di atas latar hijau/merah menang-kalah kartu bagan. */
+.vtb-medal-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  margin-left: 2px;
+}
+.vtb-medal-icon {
+  width: 13px;
+  height: 13px;
+}
+.vtb-medal-icon--gold {
+  color: #d4af37;
+}
+.vtb-medal-icon--silver {
+  color: #9aa5b1;
+}
+.vtb-medal-icon--bronze {
+  color: #b56a34;
+}
+.vtb-fourth-label {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 9px;
+  color: #475569;
+  line-height: 1;
+}
 .vtb-team-time {
   flex: 0 0 auto;
   font-size: 11px;
@@ -7281,63 +7415,6 @@ thead th[colspan="8"] {
   border-radius: 6px;
 }
 
-/* Podium — dipindah ke bawah bagan (dulu nempel di panel Connect Racetime
-   di atas, membingungkan krn tidak nyambung konteksnya) */
-.podium-card {
-  background: #ffffff;
-  border: 1px solid #e5e9f0;
-  border-radius: 16px;
-  padding: 18px 20px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-}
-.podium-card__title {
-  font-weight: 800;
-  font-size: 15px;
-  color: #1e293b;
-  margin-bottom: 12px;
-}
-.podium-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.podium-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 13px;
-  background: #f8fafc;
-  border: 1px solid #e5e9f0;
-}
-.podium-row__rank {
-  font-size: 16px;
-}
-.podium-row__name {
-  white-space: nowrap;
-}
-.podium-row--gold {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
-}
-.podium-row--silver {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #334155;
-}
-.podium-row--bronze {
-  background: #fff7ed;
-  border-color: #fdba74;
-  color: #9a3412;
-}
-.podium-row--fourth {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #475569;
-}
 </style>
 
 <!-- unscoped: b-modal renders its content outside this component's scoped

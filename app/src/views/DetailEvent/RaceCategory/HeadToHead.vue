@@ -5889,11 +5889,14 @@ export default {
       // babak baru" jadi hilang. Assign-ke-slot ini lalu menyimpan APA
       // ADANYA `result` yang sedang aktif — yang ternyata sudah "kembali"
       // berisi waktu babak lama itu — bocor ke babak baru (Final A/Final
-      // B, dst). Perbaikan: SELALU pastikan tim ini fresh SEBELUM
-      // disimpan, KECUALI babak ini sendiri sudah pernah punya catatan
-      // tersimpan utk tim ini (mis. sempat dihapus dari slot lalu
-      // ditambahkan lagi ke babak yang SAMA — hasilnya harus tetap ada).
-      this._ensureFreshResultForRoundEntry(team, round);
+      // B, dst). Perbaikan: SELALU pastikan SELURUH peserta babak ini
+      // fresh SEBELUM disimpan (bukan cuma tim yang baru diassign — tim
+      // LAIN yang sudah lebih dulu ada di babak ini bisa saja live
+      // result-nya juga masih membawa babak lain), KECUALI babak ini
+      // sendiri sudah pernah punya catatan tersimpan utk tim itu (mis.
+      // sempat dihapus dari slot lalu ditambahkan lagi ke babak yang SAMA
+      // — hasilnya harus tetap ada). Lihat _ensureFreshResultsForRound().
+      this._ensureFreshResultsForRound(round);
 
       this._recomputeMatchByeState(match);
 
@@ -5951,6 +5954,30 @@ export default {
       this.ensurePenaltiesObject(p.result);
     },
 
+    // BUG FIX: _persistAfterCrossRoundEdit() menyimpan snapshot SATU BABAK
+    // PENUH (participantsForRound() — semua match + pool babak itu), bukan
+    // cuma 2 tim yang baru diedit. Kalau HANYA 2 tim yang baru diedit yang
+    // di-"fresh"-kan (assignTeamToMatchSlot/renumberMatchHeat lama), tim
+    // LAIN di babak yang sama yang live p.result-nya kebetulan masih
+    // membawa data babak LAIN (mis. baru dipulihkan lewat
+    // loadRoundResultsForCurrentRound() krn tab babak lain sempat dibuka)
+    // ikut ke-persist APA ADANYA saat itu — waktu babak lain "bocor" ke
+    // tim yang sama sekali tidak disentuh oleh aksi operator saat ini.
+    // Panggil ini SEBELUM mengubah field spesifik (heat/assign/dst.) di
+    // ketiga entry point cross-round edit, supaya SELURUH peserta babak
+    // ini benar2 merefleksikan data babak ini sebelum di-persist.
+    _ensureFreshResultsForRound(round) {
+      if (!round) return;
+      this.participantsForRound(round).forEach((p) => {
+        const name = p && (p.nameTeam || p.teamName);
+        if (!name) return;
+        this._ensureFreshResultForRoundEntry(
+          { name, bibTeam: p.bibTeam || "" },
+          round
+        );
+      });
+    },
+
     // Klik tim yang SUDAH terisi di bagan -> "Hapus dari Slot" -> tim itu
     // dilepas & kembali ke pool. Reuse _resetParticipantResultsByName supaya
     // bersih total (heat, start/finish time, penalti, dll.).
@@ -5980,6 +6007,14 @@ export default {
 
       const removed = match[player.side];
       if (!removed || !removed.name) return;
+
+      // Pastikan SELURUH peserta babak ini fresh dulu (bukan cuma tim yang
+      // dihapus) — _persistAfterCrossRoundEdit() di bawah menyimpan
+      // snapshot SATU BABAK PENUH, jadi tim lain di babak yang sama yang
+      // live result-nya kebetulan masih membawa babak lain juga harus
+      // dipulihkan dulu, sama seperti assignTeamToMatchSlot()/
+      // renumberMatchHeat().
+      this._ensureFreshResultsForRound(round);
 
       this._resetParticipantResultsByName([removed.name]);
       this.$set(match, player.side, { name: "", bibTeam: "" });
@@ -6041,6 +6076,19 @@ export default {
           );
         return;
       }
+
+      // BUG FIX: `p.result` adalah SATU object yang dipakai bersama lintas
+      // SEMUA babak, dan operator BISA mengubah Heat match babak X sambil
+      // tabel sedang menampilkan babak Y (Y != X) — lihat catatan cross-
+      // round di _persistAfterCrossRoundEdit(). _persistAfterCrossRoundEdit()
+      // di bawah menyimpan snapshot SATU BABAK PENUH (semua match + pool
+      // babak X), bukan cuma 2 tim di match ini — jadi SEMUA peserta babak
+      // X harus dipastikan fresh dulu (bukan cuma 2 tim match ini), kalau
+      // tidak tim LAIN di babak yang sama yang live result-nya kebetulan
+      // masih membawa babak lain ikut ke-persist tercampur juga. Panggil
+      // SEBELUM match.heat diubah supaya urutan operasi selalu: pulihkan
+      // semua peserta ke data babak ini -> baru tempelkan heat baru.
+      this._ensureFreshResultsForRound(round);
 
       match.heat = newHeat;
       [match.team1, match.team2].forEach((t) => {

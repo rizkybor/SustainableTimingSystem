@@ -1606,10 +1606,17 @@ export default {
       return statusMap;
     },
 
-    // Status detail per tim (khusus HEAD2HEAD) utk panel ini — dipakai
-    // template lewat prop h2h-status-map di <team-panel>. null = belum
-    // dimuat / bukan kategori HEAD2HEAD -> TeamPanel fallback ke flag biner.
+    // Status detail per tim (KHUSUS HEAD2HEAD) utk panel ini — dipakai
+    // template lewat prop h2h-status-map di <team-panel>. null kalau
+    // kategori aktif BUKAN HEAD2HEAD, supaya TeamPanel selalu fallback ke
+    // flag biner Sudah/Belum Bertanding utk Sprint/Slalom/DRR/RX — WAJIB
+    // dicek di sini (bukan cuma di loadH2HStatusForPanel yg mengisi cache),
+    // karena panelKey (mis. "R4_MEN") dipakai bersama lintas kategori:
+    // tanpa guard ini, begitu H2H pernah dibuka lalu ganti kategori,
+    // h2hStatusByPanel[panelKey] yang lama masih ada dan bakal salah
+    // ke-apply ke kategori lain yang panelKey-nya sama.
     h2hStatusFor(panelKey) {
+      if (this._safeSelectedName(this.raceActive) !== "HEAD2HEAD") return null;
       return this.h2hStatusByPanel[panelKey] || null;
     },
 

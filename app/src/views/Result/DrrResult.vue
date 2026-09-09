@@ -91,18 +91,20 @@
           variant="outline-secondary"
           class="action-btn"
           toggle-class="d-flex align-items-center"
-          :disabled="switchCategoryOptions.length === 0"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch DRR
+            Category
           </template>
-          <b-dropdown-item
-            v-for="opt in switchCategoryOptions"
-            :key="opt.key"
-            @click="goToCategoryResult(opt.resultPath)"
-          >
-            {{ opt.label }}
-          </b-dropdown-item>
+          <div class="switch-category-panel px-3 py-2">
+            <b-form-select
+              :options="bucketData.bucketOptions"
+              :value="currentBucketKey"
+              size="sm"
+              @change="goToBucket"
+            />
+          </div>
         </b-dropdown>
       </div>
     </div>
@@ -354,7 +356,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
-import { getSwitchCategoryOptions } from "@/utils/resultCategories";
+import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 
@@ -497,8 +499,22 @@ export default {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
     },
-    switchCategoryOptions() {
-      return getSwitchCategoryOptions("DRR", this.enabledCategoryKeys);
+    // Kombinasi statis Divisi x Race x Initial (dari config event, sama
+    // seperti buildDrrOptions() di DownRiverRace.vue) — dipakai switcher
+    // "Switch DRR Category" (flat select, sama seperti Race Detail-nya).
+    bucketData() {
+      const q = this.$route.query || {};
+      const eventId = String(q.eventId || this.$route.params.id || "");
+      return buildStaticBucketOptions(this.eventInfo, eventId);
+    },
+    currentBucketKey() {
+      const q = this.$route.query || {};
+      return [
+        String(q.eventId || ""),
+        String(q.initialId || ""),
+        String(q.raceId || ""),
+        String(q.divisionId || ""),
+      ].join("|");
     },
     hasEventLogo() {
       const ev = this.eventInfo || {};
@@ -798,11 +814,21 @@ export default {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
 
-    goToCategoryResult(resultPath) {
-      if (!resultPath) return;
+    goToBucket(key) {
+      const b = this.bucketData.bucketMap[key];
+      if (!b) return;
       this.$router.push({
-        path: `/event-detail/${this.$route.params.id}/${resultPath}`,
-        query: { ...this.$route.query },
+        path: this.$route.path,
+        query: {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "DRR",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        },
       });
     },
 
@@ -1704,4 +1730,10 @@ export default {
   align-items: center;
   font-size: 14px;
 }
+
+/* ---- Styling utk Switch DRR Category (dropdown toolbar) ---- */
+.switch-category-panel {
+  min-width: 260px;
+}
+/* ---- End styling utk Switch DRR Category ---- */
 </style>

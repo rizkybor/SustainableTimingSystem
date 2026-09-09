@@ -92,18 +92,32 @@
           variant="outline-secondary"
           class="action-btn"
           toggle-class="d-flex align-items-center"
-          :disabled="switchCategoryOptions.length === 0"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Sprint
+            Category
           </template>
-          <b-dropdown-item
-            v-for="opt in switchCategoryOptions"
-            :key="opt.key"
-            @click="goToCategoryResult(opt.resultPath)"
-          >
-            {{ opt.label }}
-          </b-dropdown-item>
+          <div class="switch-category-panel px-3 py-2">
+            <div class="init-tabs mb-2" v-if="bucketInitials.length">
+              <button
+                v-for="i in bucketInitials"
+                :key="i.id"
+                type="button"
+                class="init-tab"
+                :class="{ active: selectedInitialName === i.name }"
+                @click="selectInitialTab(i)"
+              >
+                {{ i.name }}
+              </button>
+            </div>
+            <b-form-select
+              :options="bucketOptionsForSelectedInitial"
+              :value="currentBucketKey"
+              size="sm"
+              @change="goToBucket"
+            />
+          </div>
         </b-dropdown>
       </div>
     </div>
@@ -301,7 +315,7 @@ import {
 } from "@/utils/registeredTeamsFilter";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
-import { getSwitchCategoryOptions } from "@/utils/resultCategories";
+import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 
 /* ========= Helpers localStorage ========= */
@@ -430,6 +444,9 @@ export default {
         },
         rows: [],
       },
+      // Switch Sprint Category (sama pola dgn SprintRace.vue): tab Initial
+      // yg sedang dipilih di switcher toolbar.
+      selectedInitialName: "",
     };
   },
 
@@ -437,8 +454,44 @@ export default {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
     },
-    switchCategoryOptions() {
-      return getSwitchCategoryOptions("SPRINT", this.enabledCategoryKeys);
+    // Kombinasi statis Divisi x Race x Initial (dari config event, sama
+    // seperti buildStaticSprintOptions() di SprintRace.vue) — dipakai
+    // switcher "Switch Sprint Category" supaya berpindah bucket TANPA
+    // balik ke Dashboard, identik dgn switcher di halaman Race Detail-nya.
+    bucketData() {
+      const q = this.$route.query || {};
+      const eventId = String(q.eventId || this.$route.params.id || "");
+      return buildStaticBucketOptions(this.eventInfo, eventId);
+    },
+    bucketInitials() {
+      return this.bucketData.initials;
+    },
+    // Opsi Divisi/Race saja (Initial sudah dipilih lewat tab) — label tanpa
+    // nama Initial, sama seperti sprintOptionsForSelectedInitial().
+    bucketOptionsForSelectedInitial() {
+      const opts = this.bucketData.bucketOptions;
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.bucketData.bucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.bucketData.bucketMap[o.value];
+          return { value: o.value, text: `${b.divisionName} ${b.raceName}` };
+        });
+    },
+    // Key bucket yg SEDANG ditampilkan (dari $route.query saat ini) —
+    // dipakai supaya <b-form-select> menunjukkan pilihan yg aktif.
+    currentBucketKey() {
+      const q = this.$route.query || {};
+      return [
+        String(q.eventId || ""),
+        String(q.initialId || ""),
+        String(q.raceId || ""),
+        String(q.divisionId || ""),
+      ].join("|");
     },
     hasEventLogo() {
       var ev = this.eventInfo || {};
@@ -566,19 +619,42 @@ export default {
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
       await this.loadRaceSettings(q.eventId);
     }
+    this.selectedInitialName = String(q.initialName || "").toUpperCase();
 
     this.loadSprintResult();
   },
   mounted() {},
   methods: {
-    // pindah ke halaman Result kategori lain, tetap bawa bucket
-    // (eventId/initialId/raceId/divisionId dkk) yang sama lewat query
-    goToCategoryResult(resultPath) {
-      if (!resultPath) return;
+    // Switch Sprint Category (sama pola dgn onSelectSprintBucket() +
+    // selectInitialTab() di SprintRace.vue) — navigasi ke Sprint Result yg
+    // SAMA dgn bucket (Initial/Divisi/Race) baru; router-view di-key by
+    // fullPath (lihat DetailEvent/index.vue) supaya halaman full-remount &
+    // memuat ulang data bucket barunya dari created().
+    goToBucket(key) {
+      const b = this.bucketData.bucketMap[key];
+      if (!b) return;
       this.$router.push({
-        path: `/event-detail/${this.$route.params.id}/${resultPath}`,
-        query: { ...this.$route.query },
+        path: this.$route.path,
+        query: {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "SPRINT",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        },
       });
+    },
+    selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+      const target = String(i.name).toUpperCase();
+      const match = this.bucketData.bucketOptions.find((o) => {
+        const b = this.bucketData.bucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+      if (match) this.goToBucket(match.value);
     },
 
     // builder data untuk modal Overall (header + rows)
@@ -1674,4 +1750,37 @@ export default {
   object-fit: contain;
   border-radius: 10px;
 }
+
+/* ---- Styling utk Switch Sprint Category (dropdown toolbar) ---- */
+.switch-category-panel {
+  min-width: 260px;
+}
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+}
+/* ---- End styling utk Switch Sprint Category ---- */
 </style>

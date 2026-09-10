@@ -63,13 +63,16 @@
       <div class="right-actions">
         <b-dropdown
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
-          text="Download Result"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:download" class="mr-2" /> Download Result
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <b-dropdown-item @click="generatePdf">
             <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
@@ -80,23 +83,26 @@
         </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
 
         <b-dropdown
-          variant="outline-secondary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
           no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Sprint
-            Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch Sprint Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <div class="switch-category-panel px-3 py-2">
             <div class="init-tabs mb-2" v-if="bucketInitials.length">
@@ -179,10 +185,12 @@
               <th class="text-center">No</th>
               <th class="text-start">Team Name</th>
               <th class="text-center">BIB</th>
-              <th class="text-center">Penalty Time</th>
               <th class="text-center">Start Time</th>
+              <th class="text-center">Pen. Start (PS)</th>
+              <th class="text-center">Pen. Finish (PF)</th>
               <th class="text-center">Finish Time</th>
               <th class="text-center">Race Time</th>
+              <th class="text-center">Penalty Time</th>
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
               <th class="text-center">Score</th>
@@ -199,17 +207,6 @@
                 </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td class="text-center" style="color: red">
-                <input
-                  v-if="!isOfficial"
-                  type="text"
-                  class="cell-input"
-                  placeholder="00:00:00.000"
-                  :value="r.penaltyTime"
-                  @change="onEditTimeField(r, 'penaltyTime', $event.target.value)"
-                />
-                <span v-else>{{ r.penaltyTime || "00:00:000" }}</span>
-              </td>
               <td class="text-center">
                 <input
                   v-if="!isOfficial"
@@ -220,6 +217,50 @@
                   @change="onEditTimeField(r, 'startTime', $event.target.value)"
                 />
                 <span v-else>{{ r.startTime || "00:00:000" }}</span>
+              </td>
+              <!-- BUG FIX: dulu Penalty Time yg diketik bebas — seharusnya
+                   operator memilih Pen. Start/Pen. Finish dari daftar (sama
+                   seperti menu Sprint Details), Penalty Time cuma HASIL
+                   perhitungan, bukan input langsung. -->
+              <td class="text-center">
+                <select
+                  v-if="!isOfficial"
+                  class="cell-input"
+                  :value="r.startPenalty"
+                  @change="
+                    r.startPenalty = Number($event.target.value);
+                    onPenaltyDropdownChange(r);
+                  "
+                >
+                  <option
+                    v-for="p in dataPenaltiesStart"
+                    :key="'sp-' + idx + '-' + p.value"
+                    :value="p.value"
+                  >
+                    {{ p.label }}
+                  </option>
+                </select>
+                <span v-else>{{ r.startPenalty || 0 }}</span>
+              </td>
+              <td class="text-center">
+                <select
+                  v-if="!isOfficial"
+                  class="cell-input"
+                  :value="r.finishPenalty"
+                  @change="
+                    r.finishPenalty = Number($event.target.value);
+                    onPenaltyDropdownChange(r);
+                  "
+                >
+                  <option
+                    v-for="p in dataPenaltiesFinish"
+                    :key="'fp-' + idx + '-' + p.value"
+                    :value="p.value"
+                  >
+                    {{ p.label }}
+                  </option>
+                </select>
+                <span v-else>{{ r.finishPenalty || 0 }}</span>
               </td>
               <td class="text-center">
                 <input
@@ -233,6 +274,9 @@
                 <span v-else>{{ r.finishTime || "00:00:000" }}</span>
               </td>
               <td class="bold text-center">{{ r.raceTime || "00:00:000" }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.penaltyTime || "00:00:000" }}
+              </td>
               <td class="bold text-center" style="color: green">
                 {{ r.resultTime || "00:00:000" }}
               </td>
@@ -433,6 +477,11 @@ export default {
       // score fallback utk rank di luar daftar dataScore (Race Settings ->
       // Sprint -> "Score utk Rank N+ dan seterusnya")
       sprintDefaultScoreBeyondRank: 0,
+      // Daftar pilihan Pen. Start (PS) / Pen. Finish (PF) — {label,value,
+      // timePen}[], sama pola dgn SprintRace.vue: default dari optionPenalties
+      // (global), di-override per-event lewat Race Settings kalau ada.
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
       showOverallModal: false,
       dataAggregate: {
         header: {
@@ -538,17 +587,25 @@ export default {
       return parts.join(" - ");
     },
     sprintCats() {
+      // BUG FIX: dulu localStorage (raceStartPayload) diprioritaskan di atas
+      // $route.query — cocok dulu krn satu-satunya cara masuk ke halaman ini
+      // adalah dari Race Detail yg selalu menulis localStorage bucket SAAT
+      // ITU JUGA (selalu sinkron dgn query). Sekarang "Switch Sprint
+      // Category" berpindah bucket murni lewat query (router push), TANPA
+      // menyentuh localStorage — localStorage jadi bucket LAMA yg basi,
+      // sehingga judul tetap menampilkan bucket sebelumnya walau tabel
+      // hasil di bawahnya sudah benar pindah. Balik urutannya: query dulu.
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem("raceStartPayload") || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
         // urutan sesuai permintaan: Initial, Race, Division
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
     // eventInfo() {
@@ -613,6 +670,7 @@ export default {
   async created() {
     // ambil event langsung dari IPC
     const q = this.$route.query || {};
+    await this.loadDataPenalties("SPRINT");
     if (q.eventId) {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
@@ -876,6 +934,38 @@ export default {
       }
     },
 
+    // Daftar pilihan Pen. Start/Finish global (optionPenalties "SPRINT") —
+    // dipakai sbg fallback sebelum Race Settings per-event dimuat, sama
+    // pola dgn loadDataPenalties() di SprintRace.vue.
+    async loadDataPenalties(type) {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          const data =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
+          this.dataPenaltiesStart = data;
+          this.dataPenaltiesFinish = data;
+        });
+      } catch (error) {
+        this.dataPenaltiesStart = [];
+        this.dataPenaltiesFinish = [];
+      }
+    },
+
+    // sekon -> "HH:MM:SS.000", sama pola dgn secondsToTimeString() di
+    // SprintRace.vue supaya timePen konsisten dgn Race Detail.
+    secondsToTimeString(totalSec) {
+      const t = Math.max(0, Number(totalSec) || 0);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+
     // Score by Rank per-event (Race Settings) — override tabel default
     // (dulunya global/hardcoded lewat optionRanked "SPRINT") kalau event
     // ini sudah dikustomisasi.
@@ -905,13 +995,68 @@ export default {
                   res.settings.sprint &&
                   res.settings.sprint.defaultScoreBeyondRank
               ) || 0;
+
+            // PS (Pen. Start) & PF (Pen. Finish) — daftar pilihan independen
+            // yg bisa dikustomisasi per-event lewat Race Settings, sama
+            // pola persis dgn loadRaceSettings() di SprintRace.vue.
+            const sprintSettings = res && res.ok && res.settings && res.settings.sprint;
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: this.secondsToTimeString(Number(p.value) || 0),
+                  }))
+                : null;
+            const startList = sprintSettings && toList(sprintSettings.startPenalties);
+            const finishList = sprintSettings && toList(sprintSettings.finishPenalties);
+            if (startList) this.dataPenaltiesStart = startList;
+            if (finishList) this.dataPenaltiesFinish = finishList;
+
             resolve();
           });
           ipcRenderer.send("race-settings:get", eventId);
         });
       } catch (error) {
-        // biarkan dataScore default kalau gagal memuat override
+        // biarkan dataScore/dataPenalties default kalau gagal memuat override
       }
+    },
+
+    // Cari opsi penalty by value (seconds) dari salah satu list — dipakai
+    // saat operator ganti pilihan Pen. Start/Finish, sama pola dgn
+    // findPenalty() di SprintRace.vue.
+    findPenaltyOption(val, list) {
+      return (
+        (list || []).find((p) => Number(p.value) === Number(val)) || {
+          value: 0,
+          timePen: "00:00:00.000",
+        }
+      );
+    },
+
+    // Dipanggil saat Pen. Start / Pen. Finish diganti di dropdown: hitung
+    // ulang Penalty Time (PS + PF) dari opsi yg dipilih (BUKAN diketik
+    // bebas), lalu Result Time, re-rank/re-score, dan simpan — sama pola
+    // dgn recalcPenalties() di SprintRace.vue (menu Sprint Details).
+    onPenaltyDropdownChange(row) {
+      const sp = this.findPenaltyOption(row.startPenalty, this.dataPenaltiesStart);
+      const fp = this.findPenaltyOption(row.finishPenalty, this.dataPenaltiesFinish);
+
+      row.startPenaltyTime = sp.timePen;
+      row.finishPenaltyTime = fp.timePen;
+      row.totalPenalty = Number(sp.value) + Number(fp.value);
+
+      const totalPenaltyTime = this.tambahWaktu(sp.timePen, fp.timePen);
+      row.penaltyTime = totalPenaltyTime;
+      row.totalPenaltyTime = totalPenaltyTime;
+
+      row.totalTime = row.raceTime
+        ? this.tambahWaktu(row.raceTime, totalPenaltyTime)
+        : "";
+      row.resultTime = row.totalTime;
+
+      this.results = this.computeRanksAndScores(this.results);
+      this.saveResultsToDb();
     },
 
     async toggleOfficial() {
@@ -1150,8 +1295,11 @@ export default {
           finishPenalty: r.finishPenalty || 0,
           penalty: r.totalPenalty || 0,
           totalPenalty: r.totalPenalty || 0,
-          startPenaltyTime: "00:00:00.000",
-          finishPenaltyTime: "00:00:00.000",
+          // BUG FIX: dulu di-hardcode "00:00:00.000" di sini apa pun nilai
+          // startPenalty/finishPenalty-nya — breakdown waktu PS/PF individual
+          // jadi selalu ke-nolkan tiap kali disimpan (walau totalnya benar).
+          startPenaltyTime: r.startPenaltyTime || "00:00:00.000",
+          finishPenaltyTime: r.finishPenaltyTime || "00:00:00.000",
           totalPenaltyTime: r.penaltyTime || "00:00:00.000",
           penaltyTime: r.penaltyTime || "00:00:00.000",
           totalTime: r.totalTime || r.resultTime || "",
@@ -1561,6 +1709,87 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Sprint Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 /* card */
 .card {

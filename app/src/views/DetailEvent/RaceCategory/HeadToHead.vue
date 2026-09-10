@@ -2075,7 +2075,13 @@ export default {
       this.dataEvent = {};
     }
 
-    await this.loadDataScore("HEAD_TO_HEAD");
+    // PENTING: tipe di database tersimpan sbg "HEADTOHEAD" (tanpa underscore)
+    // — sama seperti catatan di loadDataPenalties() di bawah. Mengirim
+    // "HEAD_TO_HEAD" tidak pernah cocok dgn dokumen manapun di optionRanked,
+    // jadi dataScore selalu kosong dan SEMUA Score di Overall selalu 0
+    // (getScoreByRanked() jatuh ke defaultScoreBeyondRank, yg default-nya 0)
+    // kecuali event ini kebetulan sudah dikustomisasi lewat Race Settings.
+    await this.loadDataScore("HEADTOHEAD");
     await this.loadDataPenalties();
     await this.loadRaceSettings();
 
@@ -5299,11 +5305,17 @@ export default {
       try {
         ipcRenderer.send("option-ranked", type);
         ipcRenderer.once("option-ranked-reply", (_e, payload) => {
-          if (payload) {
-            this.dataScore = payload[0].data;
-          } else {
-            this.dataScore = [];
-          }
+          // BUG FIX: `payload` = [] (array kosong, tidak ada dokumen yang
+          // cocok) masih truthy di JS — `payload[0].data` di sini akan
+          // throw TypeError ("Cannot read properties of undefined") yang
+          // tidak pernah ketangkap try/catch luar (callback ini async,
+          // dipanggil belakangan oleh ipcRenderer), jadi dataScore diam2
+          // tidak pernah keisi. Cek eksplisit payload[0] dulu, sama seperti
+          // pola aman di loadDataPenalties().
+          this.dataScore =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
         });
       } catch (error) {
         this.dataScore = [];

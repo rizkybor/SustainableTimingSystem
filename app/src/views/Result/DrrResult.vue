@@ -63,12 +63,16 @@
       <div class="right-actions">
         <b-dropdown
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:download" class="mr-2" /> Download Result
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <b-dropdown-item @click="generatePdf">
             <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
@@ -79,23 +83,26 @@
         </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
 
         <b-dropdown
-          variant="outline-secondary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
           no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch DRR
-            Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch DRR Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <div class="switch-category-panel px-3 py-2">
             <b-form-select
@@ -559,16 +566,21 @@ export default {
       return parts.join(" - ");
     },
     drrCats() {
+      // BUG FIX: query dulu, localStorage cuma fallback — lihat catatan
+      // di h2hCats() (HeadToHeadResult.vue)/sprintCats() (SprintResult.vue)
+      // soal kenapa localStorage-first bikin judul basi setelah "Switch
+      // DRR Category" (yg cuma ganti $route.query, tidak menyentuh
+      // localStorage).
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
 
@@ -1512,6 +1524,87 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 /* card */
 .card {

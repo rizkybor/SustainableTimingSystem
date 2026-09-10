@@ -63,12 +63,16 @@
         <b-dropdown
           v-if="sessionMode == 'all'"
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:download" class="mr-2" /> Download Result
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <b-dropdown-item @click="generatePdf">
             <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
@@ -105,23 +109,26 @@
         </b-button-group>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
 
         <b-dropdown
-          variant="outline-secondary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
           no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Slalom
-            Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch Slalom Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <div class="switch-category-panel px-3 py-2">
             <b-form-select
@@ -204,12 +211,6 @@
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
               <th class="text-center" v-if="sessionMode === 'all'">Score</th>
-              <th
-                class="text-center"
-                v-if="!isOfficial && sessionMode === 'all'"
-              >
-                Action
-              </th>
             </tr>
           </thead>
 
@@ -252,10 +253,36 @@
               <!-- Session-specific columns (tetap per baris) -->
               <td class="text-center">{{ r.session || "-" }}</td>
               <td class="text-center" style="color: red">
-                {{ r.startPenalty || 0 }}
+                <b-form-select
+                  v-if="!isOfficial"
+                  size="sm"
+                  class="small-select"
+                  :value="r.startPenalty"
+                  :options="filteredPenalties('SF')"
+                  text-field="label"
+                  value-field="value"
+                  @change="
+                    r.startPenalty = Number($event);
+                    onSlalomFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.startPenalty || 0 }}</span>
               </td>
               <td class="text-center" style="color: red">
-                {{ r.finishPenalty || 0 }}
+                <b-form-select
+                  v-if="!isOfficial"
+                  size="sm"
+                  class="small-select"
+                  :value="r.finishPenalty"
+                  :options="filteredPenalties('SF')"
+                  text-field="label"
+                  value-field="value"
+                  @change="
+                    r.finishPenalty = Number($event);
+                    onSlalomFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.finishPenalty || 0 }}</span>
               </td>
               <td class="text-center">
                 <span
@@ -272,8 +299,34 @@
               <td class="text-center" style="color: red">
                 {{ r.penaltyTime || "00:00:00.000" }}
               </td>
-              <td class="text-center">{{ r.startTime || "00:00:00.000" }}</td>
-              <td class="text-center">{{ r.finishTime || "00:00:00.000" }}</td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.startTime"
+                  @change="
+                    r.startTime = $event.target.value.trim();
+                    onSlalomFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.startTime || "00:00:00.000" }}</span>
+              </td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.finishTime"
+                  @change="
+                    r.finishTime = $event.target.value.trim();
+                    onSlalomFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.finishTime || "00:00:00.000" }}</span>
+              </td>
               <td class="bold text-center">
                 {{ r.raceTime || "00:00:00.000" }}
               </td>
@@ -300,20 +353,6 @@
                 }}
               </td>
 
-              <!-- Action (tetap hanya sekali per run; kalau mau sekali per grup, bisa dipindah ke sel merged juga) -->
-              <td
-                class="text-center"
-                v-if="!isOfficial && sessionMode === 'all'"
-              >
-                <b-button
-                  size="sm"
-                  variant="warning"
-                  class="icon-btn"
-                  @click="openEdit(r)"
-                >
-                  <Icon icon="mdi:pencil" />
-                </b-button>
-              </td>
             </tr>
           </tbody>
         </table>
@@ -346,7 +385,18 @@
             >
               <div>Gate {{ i + 1 }}</div>
               <div class="gate-val">
+                <b-form-select
+                  v-if="!isOfficial"
+                  size="sm"
+                  class="small-select"
+                  :value="val"
+                  :options="filteredPenalties('GATE')"
+                  text-field="label"
+                  value-field="value"
+                  @change="$set(gateModal.gates, i, Number($event))"
+                />
                 <span
+                  v-else
                   class="badge"
                   :class="Number(val) > 0 ? 'badge-danger' : 'badge-light'"
                 >
@@ -364,6 +414,13 @@
           </div>
 
           <div class="modal-actions">
+            <b-button
+              v-if="!isOfficial"
+              variant="success"
+              class="mr-2"
+              @click="saveGateModal"
+              >Save</b-button
+            >
             <b-button variant="secondary" @click="closeGateModal"
               >Close</b-button
             >
@@ -493,41 +550,55 @@ export default {
         team: "",
         bib: "",
         gates: [],
+        row: null,
       },
       // skema score Slalom (boleh sesuaikan)
+      // BUG FIX: dulu tabel placeholder (300, 275, 255...) yg BEDA dari
+      // tabel asli optionRanked type "SLALOM" yg sebenarnya dipakai backend
+      // (insertSlalomResult()) & default Race Settings (350, 322, 301...)
+      // — kalau r.score (hasil tersimpan) kosong, fallback getScoreByRanked()
+      // di sini bisa menampilkan angka yg TIDAK PERNAH cocok dgn yg
+      // sebenarnya bakal tersimpan. Samakan dgn tabel asli (DrrResult.vue
+      // pakai tabel yg sama persis).
       dataScore: [
-        { ranking: 1, score: 300 },
-        { ranking: 2, score: 275 },
-        { ranking: 3, score: 255 },
-        { ranking: 4, score: 240 },
-        { ranking: 5, score: 230 },
-        { ranking: 6, score: 220 },
-        { ranking: 7, score: 210 },
-        { ranking: 8, score: 200 },
-        { ranking: 9, score: 190 },
-        { ranking: 10, score: 180 },
-        { ranking: 11, score: 170 },
-        { ranking: 12, score: 160 },
-        { ranking: 13, score: 150 },
-        { ranking: 14, score: 140 },
-        { ranking: 15, score: 130 },
-        { ranking: 16, score: 120 },
-        { ranking: 17, score: 110 },
-        { ranking: 18, score: 100 },
-        { ranking: 19, score: 90 },
-        { ranking: 20, score: 80 },
-        { ranking: 21, score: 70 },
-        { ranking: 22, score: 60 },
-        { ranking: 23, score: 50 },
-        { ranking: 24, score: 40 },
-        { ranking: 25, score: 30 },
-        { ranking: 26, score: 25 },
-        { ranking: 27, score: 20 },
-        { ranking: 28, score: 15 },
-        { ranking: 29, score: 12 },
-        { ranking: 30, score: 10 },
+        { ranking: 1, score: 350 },
+        { ranking: 2, score: 322 },
+        { ranking: 3, score: 301 },
+        { ranking: 4, score: 287 },
+        { ranking: 5, score: 277 },
+        { ranking: 6, score: 266 },
+        { ranking: 7, score: 256 },
+        { ranking: 8, score: 245 },
+        { ranking: 9, score: 235 },
+        { ranking: 10, score: 224 },
+        { ranking: 11, score: 214 },
+        { ranking: 12, score: 203 },
+        { ranking: 13, score: 193 },
+        { ranking: 14, score: 182 },
+        { ranking: 15, score: 172 },
+        { ranking: 16, score: 161 },
+        { ranking: 17, score: 151 },
+        { ranking: 18, score: 140 },
+        { ranking: 19, score: 133 },
+        { ranking: 20, score: 126 },
+        { ranking: 21, score: 119 },
+        { ranking: 22, score: 112 },
+        { ranking: 23, score: 105 },
+        { ranking: 24, score: 98 },
+        { ranking: 25, score: 91 },
+        { ranking: 26, score: 84 },
+        { ranking: 27, score: 77 },
+        { ranking: 28, score: 70 },
+        { ranking: 29, score: 63 },
+        { ranking: 30, score: 56 },
+        { ranking: 31, score: 49 },
+        { ranking: 32, score: 42 },
       ],
       slalomDefaultScoreBeyondRank: 0,
+      // Daftar pilihan Start/Finish/Gate Penalty (global optionPenalties
+      // "SLALOM") — sama sumber & filter value yg dipakai SlalomRace.vue
+      // (filteredPenalties()), dipakai dropdown editable di tabel ini.
+      dataPenalties: [],
     };
   },
 
@@ -592,16 +663,21 @@ export default {
       return parts.join(" - ");
     },
     slalomCats() {
+      // BUG FIX: query dulu, localStorage cuma fallback — lihat catatan
+      // di h2hCats() (HeadToHeadResult.vue)/sprintCats() (SprintResult.vue)
+      // soal kenapa localStorage-first bikin judul basi setelah "Switch
+      // Slalom Category" (yg cuma ganti $route.query, tidak menyentuh
+      // localStorage).
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
 
@@ -808,6 +884,7 @@ export default {
 
   async created() {
     const q = this.$route.query || {};
+    await this.loadDataPenalties("SLALOM");
     if (q.eventId) {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
@@ -1129,6 +1206,9 @@ export default {
               nameTeam: teamsObj[key].nameTeam || nameTeam,
               bibTeam: bibTeam || teamsObj[key].bibTeam || "",
               session: run.session ? String(run.session) : "Run " + idx,
+              runIdx: idx,
+              startTime: R.startTime,
+              finishTime: R.finishTime,
               raceTime: R.raceTime,
               startPenalty: R.startPenalty,
               finishPenalty: R.finishPenalty,
@@ -1233,6 +1313,9 @@ export default {
               nameTeam: rrow.nameTeam,
               bibTeam: rrow.bibTeam,
               session: rrow.session,
+              runIdx: rrow.runIdx,
+              startTime: rrow.startTime,
+              finishTime: rrow.finishTime,
               raceTime: rrow.raceTime,
               startPenalty: rrow.startPenalty,
               finishPenalty: rrow.finishPenalty,
@@ -1300,6 +1383,9 @@ export default {
             nameTeam: rrow.nameTeam,
             bibTeam: rrow.bibTeam,
             session: rrow.session,
+            runIdx: rrow.runIdx,
+            startTime: rrow.startTime,
+            finishTime: rrow.finishTime,
             raceTime: rrow.raceTime,
             startPenalty: rrow.startPenalty,
             finishPenalty: rrow.finishPenalty,
@@ -1327,13 +1413,28 @@ export default {
     openGateModal(row) {
       this.gateModal.team = row && row.nameTeam ? row.nameTeam : "";
       this.gateModal.bib = row && row.bibTeam ? row.bibTeam : "";
+      // salinan (bukan referensi langsung) — edit di modal baru diterapkan
+      // ke row aslinya saat "Save" diklik, bukan diam-diam sebelum disimpan.
       this.gateModal.gates = Array.isArray(row && row.gatesDetail)
-        ? row.gatesDetail
+        ? row.gatesDetail.slice()
         : [];
+      this.gateModal.row = row || null;
       this.showGateModal = true;
     },
     closeGateModal() {
       this.showGateModal = false;
+      this.gateModal.row = null;
+    },
+    async saveGateModal() {
+      if (this.isOfficial || !this.gateModal.row) {
+        this.showGateModal = false;
+        return;
+      }
+      const row = this.gateModal.row;
+      this.$set(row, "gatesDetail", this.gateModal.gates.slice());
+      this.showGateModal = false;
+      this.gateModal.row = null;
+      await this.onSlalomFieldChange(row);
     },
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
@@ -1403,10 +1504,6 @@ export default {
         ipcRenderer.send("event:set-official", { eventId, value: nextValue });
       });
     },
-    openEdit(row) {
-      this.$emit("edit-row", row);
-    },
-
     getScoreByRanked(ranked) {
       const found = this.dataScore.find((d) => d.ranking === Number(ranked));
       if (found) return found.score;
@@ -1431,8 +1528,236 @@ export default {
       return h * 3600000 + m * 60000 + s * 1000 + mil;
     },
 
+    // ---- Editing: Start/Finish Time, Start/Finish Penalty, Gate Penalty ----
+    // (dulu tabel ini murni read-only + tombol "Action" mati total; sekarang
+    // sama pola dgn Sprint/H2H Result: editable saat UNOFFICIAL, disimpan
+    // via channel yg sama dgn menu Slalom Details.)
+
+    // Daftar pilihan penalty (global optionPenalties "SLALOM") — sumber sama
+    // dgn loadDataPenalties() di SlalomRace.vue.
+    async loadDataPenalties(type) {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        await new Promise((resolve) => {
+          ipcRenderer.send("option-penalties", type);
+          ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+            const data =
+              payload && payload[0] && Array.isArray(payload[0].data)
+                ? payload[0].data
+                : [];
+            this.dataPenalties = data;
+            resolve();
+          });
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
+    },
+
+    // context: 'SF' (Start/Finish) atau 'GATE' — sama persis dgn
+    // filteredPenalties() di SlalomRace.vue supaya daftar pilihannya identik.
+    filteredPenalties(context) {
+      if (context === "SF") {
+        return this.dataPenalties.filter(
+          (p) => p.value === 0 || p.value === 10 || p.value === 50
+        );
+      }
+      return this.dataPenalties.filter(
+        (p) => p.value === 0 || p.value === 5 || p.value === 50
+      );
+    },
+
+    _parseHmsToMs(str) {
+      const s = String(str || "").trim();
+      const m = s.match(/^(\d{1,2}):([0-5]?\d):([0-5]?\d)(?:\.(\d{1,3}))?$/);
+      if (!m) return NaN;
+      const h = parseInt(m[1], 10) || 0;
+      const mi = parseInt(m[2], 10) || 0;
+      const se = parseInt(m[3], 10) || 0;
+      const ms = parseInt((m[4] || "0").padEnd(3, "0"), 10) || 0;
+      return h * 3600000 + mi * 60000 + se * 1000 + ms;
+    },
+    _msToHms(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return "";
+      const pad = (n, w = 2) => String(Math.trunc(n)).padStart(w, "0");
+      const hh = Math.floor(ms / 3600000);
+      const mm = Math.floor((ms % 3600000) / 60000);
+      const ss = Math.floor((ms % 60000) / 1000);
+      const mss = Math.round(ms % 1000);
+      return `${pad(hh, 2)}:${pad(mm, 2)}:${pad(ss, 2)}.${pad(mss, 3)}`;
+    },
+
+    // Hitung ulang Race Time, Penalty Total/Time, dan Total/Result Time satu
+    // baris — dipanggil tiap kali Start/Finish Time, Start/Finish Penalty,
+    // atau Gate Penalty diedit.
+    recomputeSlalomRow(row) {
+      const startMs = this._parseHmsToMs(row.startTime);
+      const finishMs = this._parseHmsToMs(row.finishTime);
+      row.raceTime =
+        Number.isFinite(startMs) && Number.isFinite(finishMs) && finishMs >= startMs
+          ? this._msToHms(finishMs - startMs)
+          : "";
+
+      const gateSum = Array.isArray(row.gatesDetail)
+        ? row.gatesDetail.reduce((a, b) => a + (Number(b) || 0), 0)
+        : 0;
+      row.sectionPenalty = gateSum;
+      row.totalPenalty =
+        (Number(row.startPenalty) || 0) + (Number(row.finishPenalty) || 0) + gateSum;
+
+      const penMs = row.totalPenalty * 1000;
+      row.penaltyTime = this._msToHms(penMs) || "00:00:00.000";
+
+      const raceMs = this._parseHmsToMs(row.raceTime);
+      row.totalTime = Number.isFinite(raceMs) ? this._msToHms(raceMs + penMs) : "";
+      row.resultTime =
+        row.totalPenalty === 0 ? row.raceTime : row.totalTime || row.raceTime;
+    },
+
+    // Cari entry run asli (di this.rawResultItems, dokumen persis spt yg
+    // dikirim SlalomRace.vue via insert-slalom-result) yg cocok dgn baris
+    // tampilan `row` — dicocokkan lewat nama+bib+runIdx (bukan Object sama,
+    // krn `row` hasil bentukan ulang buildResultRows()).
+    _findRawRun(row) {
+      const items = this.rawResultItems || [];
+      const wantName = String(row.nameTeam || "").trim().toUpperCase();
+      const wantBib = String(row.bibTeam || "").trim();
+
+      function sessionIdxOf(run, ridx) {
+        const s = String((run && run.session) || "").trim().toLowerCase();
+        if (clean_1(s)) return 1;
+        if (clean_2(s)) return 2;
+        return ridx === 0 ? 1 : ridx === 1 ? 2 : null;
+      }
+      function clean_1(s) {
+        return s === "1" || /\brun\s*1\b/.test(s) || /\b1\b/.test(s);
+      }
+      function clean_2(s) {
+        return s === "2" || /\brun\s*2\b/.test(s) || /\b2\b/.test(s);
+      }
+
+      for (const doc of items) {
+        if (!doc || !Array.isArray(doc.teams)) continue;
+        for (const team of doc.teams) {
+          const tName = String((team && team.nameTeam) || "").trim().toUpperCase();
+          if (tName !== wantName) continue;
+          const tBib = String(
+            (team && (team.bibTeam || team.bibNumber)) || ""
+          ).trim();
+          if (wantBib && tBib && tBib !== wantBib) continue;
+
+          const result = Array.isArray(team.result) ? team.result : [];
+          for (let i = 0; i < result.length; i++) {
+            if (sessionIdxOf(result[i], i) === row.runIdx) {
+              return { doc, team, run: result[i] };
+            }
+          }
+        }
+      }
+      return null;
+    },
+
+    // Rank + Score keseluruhan (lintas semua tim, berdasar best run) —
+    // ditulis balik ke rawResultItems supaya yg tersimpan ke DB konsisten
+    // dgn yg ditampilkan, sama pola dgn ranking di buildResultRows().
+    _recomputeAllRanksAndScores() {
+      const self = this;
+      const bestByTeam = new Map();
+
+      (this.rawResultItems || []).forEach((doc) => {
+        if (!doc || !Array.isArray(doc.teams)) return;
+        doc.teams.forEach((team) => {
+          const key =
+            String(team.nameTeam || "").trim().toUpperCase() +
+            "|" +
+            String(team.bibTeam || team.bibNumber || "").trim();
+          const result = Array.isArray(team.result) ? team.result : [];
+          result.forEach((run) => {
+            const ms = self.timeToMs(run.totalTime || run.raceTime);
+            if (!Number.isFinite(ms)) return;
+            const prev = bestByTeam.get(key);
+            if (!prev || ms < prev.ms) bestByTeam.set(key, { ms, run });
+          });
+        });
+      });
+
+      const ranked = Array.from(bestByTeam.values()).sort((a, b) => a.ms - b.ms);
+      const bestRuns = new Set(ranked.map((v) => v.run));
+      ranked.forEach((v, idx) => {
+        const rank = idx + 1;
+        v.run.ranked = rank;
+        v.run.score = self.getScoreByRanked(rank);
+      });
+
+      // tim/run yg BUKAN best (atau tidak py waktu valid) → ranked/score 0,
+      // supaya tidak ada nilai lama yg nyangkut.
+      (this.rawResultItems || []).forEach((doc) => {
+        if (!doc || !Array.isArray(doc.teams)) return;
+        doc.teams.forEach((team) => {
+          const result = Array.isArray(team.result) ? team.result : [];
+          result.forEach((run) => {
+            if (!bestRuns.has(run)) {
+              run.ranked = 0;
+              run.score = 0;
+            }
+          });
+        });
+      });
+    },
+
+    // Simpan SEMUA dokumen (this.rawResultItems, sudah termasuk edit
+    // terbaru) — insert-slalom-result menerima array dokumen bucket persis
+    // spt ini (lihat saveSession1() dkk di SlalomRace.vue).
+    async saveRawResultsToDb() {
+      if (typeof ipcRenderer === "undefined") return;
+      await new Promise((resolve) => {
+        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+          if (!res || !res.ok) {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal menyimpan",
+              detail: (res && res.error) || "",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("insert-slalom-result", this.rawResultItems || []);
+      });
+    },
+
+    // Dipanggil tiap kali Start/Finish Time, Start/Finish Penalty, atau Gate
+    // Penalty (via saveGateModal) diedit di tabel: hitung ulang baris ini,
+    // tulis balik ke rawResultItems, re-rank+re-score SEMUA tim, refresh
+    // tampilan, lalu simpan ke DB.
+    async onSlalomFieldChange(row) {
+      if (this.isOfficial) return;
+      this.recomputeSlalomRow(row);
+
+      const found = this._findRawRun(row);
+      if (found) {
+        const r = found.run;
+        r.startTime = row.startTime || "";
+        r.finishTime = row.finishTime || "";
+        r.raceTime = row.raceTime || "";
+        r.penaltyTime = row.penaltyTime || "00:00:00.000";
+        r.totalTime = row.totalTime || "";
+        r.penaltyTotal = r.penaltyTotal && typeof r.penaltyTotal === "object" ? r.penaltyTotal : {};
+        r.penaltyTotal.start = Number(row.startPenalty) || 0;
+        r.penaltyTotal.finish = Number(row.finishPenalty) || 0;
+        r.penaltyTotal.gates = Array.isArray(row.gatesDetail)
+          ? row.gatesDetail.slice()
+          : [];
+      }
+
+      this._recomputeAllRanksAndScores();
+      this.results = this.buildResultRows(this.sessionMode);
+      await this.saveRawResultsToDb();
+    },
+
     normalizeResult(raw) {
       const base = {
+        startTime: "",
+        finishTime: "",
         raceTime: "",
         startPenalty: 0,
         finishPenalty: 0,
@@ -1453,6 +1778,11 @@ export default {
           ? p.gates.reduce((a, b) => a + (Number(b) || 0), 0)
           : 0;
 
+        // BUG FIX: dulu startTime/finishTime tidak pernah diekstrak dari
+        // `raw` (run tersimpan) — kolom Start/Finish Time di tabel selalu
+        // menampilkan fallback "00:00:00.000" apa pun data sebenarnya.
+        out.startTime = String(raw.startTime || "");
+        out.finishTime = String(raw.finishTime || "");
         out.raceTime = String(raw.raceTime || "");
         out.startPenalty = Number(p.start) || 0;
         out.finishPenalty = Number(p.finish) || 0;
@@ -1556,6 +1886,30 @@ export default {
 </script>
 
 <style scoped>
+/* Input/select editable inline di tabel (Start/Finish Time, Start/Finish
+   Penalty) — dipakai saat UNOFFICIAL. */
+.cell-input {
+  width: 100%;
+  min-width: 100px;
+  max-width: 130px;
+  text-align: center;
+  border: 1px solid #e0e3e8;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  background: #fafbfc;
+}
+.cell-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: #368eb4;
+}
+.small-select {
+  min-width: 70px;
+  border-radius: 8px;
+}
+
 /* Nonaktifkan highlight hijau pada 3 kolom ini saja */
 .best-row .no-cell,
 .best-row .team-cell,
@@ -1718,6 +2072,88 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
+
 .card {
   background: #fff;
   border-radius: 14px;

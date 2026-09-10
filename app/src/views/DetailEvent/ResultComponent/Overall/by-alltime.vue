@@ -5,92 +5,87 @@
     <div
       v-for="(pageRows, pidx) in pageChunks"
       :key="'p' + pidx"
-      class="page-block"
+      class="page"
     >
-      <!-- HERO per halaman -->
-      <section class="detail-hero" :class="{ compact: pidx > 0 }">
-        <div class="hero-bg" :style="heroBgStyle"></div>
-        <div class="hero-inner">
-          <div class="hero-row">
-            <div class="hero-logo" :class="{ compact: pidx > 0 }">
-              <img
-                v-if="logoUrl"
-                :src="logoUrl"
-                alt="Event Logo"
-                class="event-logo-img"
-              />
-              <img
-                v-else
-                :src="defaultImg"
-                alt="Event Logo"
-                class="event-logo-img"
-              />
-            </div>
-
-            <div class="hero-text">
-              <h2 class="title" :class="{ compact: pidx > 0 }">
-                {{ safe(dataEvent.eventName) }}
-              </h2>
-              <div class="meta" :class="{ compact: pidx > 0 }">
-                <span
-                  ><strong>Location</strong>:
-                  {{ safe(dataEvent.addressCity) }}</span
-                >
-                <span
-                  ><strong>River</strong>: {{ safe(dataEvent.riverName) }}</span
-                >
-                <span
-                  ><strong>Level</strong>: {{ safe(dataEvent.levelName) }}</span
-                >
-              </div>
-            </div>
-
-            <div class="stamp" :class="{ official: isOfficial }">
-              {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-            </div>
-          </div>
+      <!-- HEADER (sama pola dgn sprint-pdfResult.vue: trademark + band +
+           logo + event info, bukan hero image spt sebelumnya) -->
+      <header class="head">
+        <div class="trademark">
+          @STiming.System.424.Timestamp {{ timestamp }} #-
         </div>
-      </section>
 
-      <!-- SUBHEADER per halaman -->
-      <div class="block-head">
-        <div class="head-left">
-          <div class="muted">
-            RANK RESULT OVERALL • {{ sprintCats.initial }} •
-            {{ sprintCats.division }} • {{ sprintCats.race }}
+        <div class="band">
+          <div class="band-left">
+            <strong>SCORE BOARD</strong>
+            <span class="dot">•</span>
+            <span class="cat">OVERALL</span>
+            <span class="dot">•</span>
+            <span class="cat">
+              {{ dataEvent && dataEvent.levelName ? dataEvent.levelName : "Classification" }}
+            </span>
           </div>
-        </div>
-        <div class="head-right">
-          <div class="muted">
-            {{ todayStr }}
+          <div class="band-right">
+            <strong>
+              {{ raceCats.initial || "-" }} - {{ raceCats.division || "-" }}
+              {{ raceCats.race || "-" }}
+            </strong>
+            <span class="dot">•</span>
+            <span>{{ todayStr }}</span>
             <span v-if="pageChunks.length > 1">
               • Page {{ pidx + 1 }} / {{ pageChunks.length }}</span
             >
           </div>
         </div>
-      </div>
 
-      <!-- TABLE per halaman -->
-      <div class="table-card">
-        <table class="table table-ranking">
+        <!-- LOGO ATAS -->
+        <div
+          class="mid-image-row"
+          v-if="dataEvent && dataEvent.eventFiles && dataEvent.eventFiles.length > 0"
+        >
+          <div
+            v-for="(url, i2) in dataEvent.eventFiles"
+            :key="'logo-' + pidx + '-' + i2"
+            class="mid-image py-4"
+          >
+            <img :src="url" alt="Event Poster" />
+          </div>
+        </div>
+
+        <!-- EVENT INFO -->
+        <div class="event">
+          <div class="event-name">{{ safe(dataEvent.eventName) }}</div>
+          <div class="event-meta">
+            Kp/Ds. {{ safe(dataEvent.addressVillage) }}, Kel.
+            {{ safe(dataEvent.addressDistrict) }}, Kec.
+            {{ safe(dataEvent.addressSubDistrict) }}, Kota
+            {{ safe(dataEvent.addressCity) }}, {{ safe(dataEvent.addressProvince) }}
+            – {{ safe(dataEvent.addressState) }} ({{ safe(dataEvent.addressZipCode) }})
+            • {{ safe(dataEvent.riverName) }}
+          </div>
+        </div>
+      </header>
+
+      <!-- TABLE -->
+      <section>
+        <table class="score-table">
           <thead>
             <tr>
-              <th rowspan="2" class="small w-60">No</th>
+              <th rowspan="2" class="w-60">No</th>
               <th rowspan="2" class="team-col">Team Name</th>
-              <th rowspan="2" class="w-70 text-center">BIB</th>
+              <th rowspan="2" class="w-70">BIB</th>
 
               <th
                 v-for="cat in categories"
                 :key="cat.key"
                 colspan="2"
-                class="group text-center"
+                class="group"
                 :class="cat.cssClass"
               >
                 {{ cat.label }}
               </th>
 
-              <th rowspan="2" class="w-110 text-center">Total Score</th>
-              <th rowspan="2" class="w-110 text-center">Rank Overall</th>
+              <th rowspan="2" class="w-110">Total Score</th>
+              <th rowspan="2" class="w-110">Rank Overall</th>
             </tr>
             <tr>
               <template v-for="cat in categories">
@@ -103,7 +98,7 @@
           <tbody>
             <tr v-for="r in pageRows" :key="r.rank">
               <td class="text-center">{{ r.rank }}</td>
-              <td>
+              <td class="text-strong">
                 {{ r.teamName }}
                 <CountryFlag :code="r.countryCode" />
               </td>
@@ -118,39 +113,64 @@
                 </td>
               </template>
 
-              <td class="text-center bold">{{ r.totalScore }}</td>
-              <td class="text-center bold">{{ r.rank }}</td>
+              <td class="text-center text-strong total-time-green">
+                {{ r.totalScore }}
+              </td>
+              <td class="text-center text-strong">{{ r.rank }}</td>
+            </tr>
+            <tr v-if="!pageRows || pageRows.length === 0">
+              <td class="empty" :colspan="3 + categories.length * 2 + 2">
+                No data
+              </td>
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <!-- SIGNATURE -->
+      <div class="sign sign-two">
+        <div class="sign-left">
+          <div class="sig-card">
+            <div class="sign-title">Chief Judge</div>
+            <img
+              v-if="dataEvent.chiefJudgeSignature && dataEvent.chiefJudgeSignature.secure_url"
+              :src="dataEvent.chiefJudgeSignature.secure_url"
+              class="sign-img"
+              alt="Chief Judge signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">{{ safe(dataEvent.chiefJudge) }}</div>
+          </div>
+        </div>
+
+        <div class="sign-right">
+          <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial }">
+            {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+          </span>
+        </div>
       </div>
 
-      <!-- PAGE BREAK (kecuali terakhir) -->
+      <!-- SPONSOR -->
+      <div
+        class="mid-image-sponsor-row"
+        v-if="dataEvent && dataEvent.sponsorFiles && dataEvent.sponsorFiles.length > 0"
+      >
+        <div
+          v-for="(url, i3) in dataEvent.sponsorFiles"
+          :key="'sponsor-' + pidx + '-' + i3"
+          class="mid-image-sponsor pt-5"
+        >
+          <img :src="url" alt="Event Sponsor" />
+        </div>
+      </div>
+
+      <!-- PAGE BREAK (kecuali halaman terakhir) -->
       <div v-if="pidx < pageChunks.length - 1" class="page-break"></div>
-    </div>
-
-    <!-- FOOTER (opsional) di halaman terakhir -->
-    <div class="pdf-footer">
-      <div class="col">
-        <div class="label">Chief Judge</div>
-        <img
-          v-if="dataEvent.chiefJudgeSignature && dataEvent.chiefJudgeSignature.secure_url"
-          :src="dataEvent.chiefJudgeSignature.secure_url"
-          class="sign-img"
-          alt="Chief Judge signature"
-        />
-        <div class="signature">{{ safe(dataEvent.chiefJudge) }}</div>
-      </div>
-      <div class="col text-right">
-        <div class="label">Printed</div>
-        <div class="signature">{{ todayStr }}</div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import defaultImg from "@/assets/images/default-second.jpeg";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
 
@@ -160,41 +180,33 @@ export default {
   props: {
     dataEvent: { type: Object, default: () => ({}) },
     rows: { type: Array, default: () => [] },
-    sprintCats: {
+    raceCats: {
       type: Object,
       default: () => ({ initial: "-", division: "-", race: "-" }),
     },
     categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
-    heroImage: { type: String, default: "" },
   },
   data() {
-    return { defaultImg, pageSize: 10 };
+    return { pageSize: 10 };
   },
   computed: {
-    logoUrl() {
-      const logos = this.dataEvent && this.dataEvent.event_logo;
-      if (Array.isArray(logos) && logos.length) {
-        const first = logos[0];
-        if (typeof first === "string") return first;
-        if (first && typeof first === "object" && typeof first.url === "string")
-          return first.url;
-      }
-      return "";
-    },
     todayStr() {
       const d = new Date();
-      return d.toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
     },
-    heroBgStyle() {
-      const url =
-        this.heroImage ||
-        "https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop";
-      return { backgroundImage: "url('" + url + "')" };
+    timestamp() {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      const ss = String(d.getSeconds()).padStart(2, "0");
+      return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
     },
     processedRows() {
       const toNum = function (v) {
@@ -272,172 +284,125 @@ export default {
 </script>
 
 <style scoped>
-/* -------- Base -------- */
+/* === LAYOUT CETAK LANDSCAPE A4 (sama pola dgn sprint-pdfResult.vue) === */
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+* {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
 .pdf-wrap {
-  padding: 18px 22px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+/* ==== PAGE CONTAINER ==== */
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(210mm - 16mm);
+  padding: 5mm 8mm 0;
   font-size: 12px;
-  color: #1d2433;
-}
-
-/* -------- HERO -------- */
-.detail-hero {
-  position: relative;
-  overflow: hidden;
-  border-radius: 10px;
-}
-.detail-hero .hero-bg {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  filter: saturate(1.1);
-}
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-.detail-hero .hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 16px 18px;
-}
-.hero-row {
-  display: grid;
-  grid-template-columns: 120px 1fr 140px;
-  grid-gap: 12px;
-  align-items: center;
-}
-
-.hero-logo {
-  width: 110px;
-  height: 110px;
-  border-radius: 16px;
+  color: #17202a;
   background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-.hero-logo.compact {
-  width: 80px;
-  height: 80px;
-}
-.event-logo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 8px;
 }
 
-/* Judul + meta */
-.hero-text .title {
-  color: #fff;
-  font-weight: 800;
-  font-size: 24px;
-  margin: 0 0 4px;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-}
-.hero-text .title.compact {
-  font-size: 18px;
-}
-.hero-text .meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 600;
-}
-.hero-text .meta.compact {
-  gap: 10px;
-  font-size: 11px;
-}
-
-/* Stamp */
-.stamp {
-  justify-self: end;
-  color: #d9534f;
-  border: 2px solid #d9534f;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  transform: rotate(4deg);
-  background: rgba(255, 255, 255, 0.1);
-}
-.stamp.official {
-  color: #148a3b;
-  border-color: #148a3b;
-  transform: none;
-  background: rgba(20, 138, 59, 0.12);
-}
-
-/* -------- Subheader -------- */
-.block-head {
-  margin: 10px 2px 8px;
+/* ==== HEADER ==== */
+.band {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-}
-.muted {
-  color: #6a707c;
+  align-items: center;
+  background: rgb(24, 116, 165);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 8px;
+  margin-bottom: 4mm;
   font-weight: 700;
 }
-
-/* -------- Table -------- */
-.table-card {
-  border: 1px solid #e9edf3;
-  border-radius: 10px;
-  overflow: hidden;
+.band .dot {
+  margin: 0 4px;
+  opacity: 0.9;
 }
-.table {
+.event {
+  text-align: center;
+  margin-bottom: 3mm;
+}
+.event-name {
+  font-weight: 800;
+  font-size: 16px;
+  color: rgb(24, 116, 165);
+  margin-bottom: 2px;
+}
+.event-meta {
+  font-size: 9.5px;
+  color: rgb(24, 116, 165);
+}
+
+/* ==== TABLE ==== */
+.score-table {
   width: 100%;
   border-collapse: collapse;
+  border: 1px solid #dde6ee;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 6mm;
   table-layout: fixed;
-  font-size: 12px;
 }
-.table thead th,
-.table tbody td {
-  border: 1px solid #e6e9ef;
-  padding: 8px 8px;
+.score-table th,
+.score-table td {
+  border-bottom: 1px solid #f1f4f8;
+  padding: 5px 7px;
+  text-align: center;
 }
-
-/* Header 2 baris */
-.table thead th {
-  background: #f4f6f9;
+.score-table thead th {
+  background: rgb(240, 250, 255);
+  text-transform: uppercase;
+  font-size: 11px;
   font-weight: 800;
 }
-.table thead th.group {
-  font-size: 13px;
-}
-.table thead th.group.sprint {
+.score-table thead th.group.sprint {
   background: #d9e8ff;
 }
-.table thead th.group.h2h {
+.score-table thead th.group.h2h {
   background: #ffe0c7;
 }
-.table thead th.group.slalom {
+.score-table thead th.group.slalom {
   background: #fff2b8;
 }
-.table thead th.group.drr {
+.score-table thead th.group.drr {
   background: #ccf7d9;
 }
-.table thead th.sub {
+.score-table thead th.group.rx {
+  background: #e3d9ff;
+}
+.score-table thead th.sub {
   background: #ffffff;
   font-weight: 700;
 }
-
-/* Body */
-.table tbody tr:nth-child(even) {
-  background: #fafbfc;
+.score-table tbody td {
+  font-size: 11.5px;
 }
-.bold {
-  font-weight: 800;
+.score-table tbody tr:nth-child(odd) {
+  background: #fafcff;
+}
+.score-table td.empty {
+  padding: 14px;
+  color: #8a95a3;
+  font-style: italic;
 }
 .text-center {
   text-align: center;
+}
+.text-strong {
+  font-weight: 700;
+}
+.total-time-green {
+  color: #148a3b;
 }
 
 /* Kolom width */
@@ -452,32 +417,113 @@ export default {
 }
 .team-col {
   width: 210px;
+  text-align: left !important;
 }
 
-/* -------- Footer -------- */
-.pdf-footer {
+/* ==== FOOTER: SIGNATURE (70% - 30%) ==== */
+.sign.sign-two {
+  display: grid;
+  grid-template-columns: 70% 30%;
+  align-items: end;
+  margin-top: 2mm;
+  padding-inline: 4mm;
+  page-break-inside: avoid;
+}
+.sign-left {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-top: 10px;
+  justify-items: start;
+  align-items: end;
 }
-.pdf-footer .col {
-  position: relative;
+.sig-card {
+  text-align: left;
+  min-height: 16mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
-.pdf-footer .label {
-  font-weight: 600;
-  margin-bottom: 38px;
+.sign-title {
+  color: #8a95a3;
+  font-size: 9px;
+  margin: 0 0 3mm 0;
 }
-.pdf-footer .sign-img {
-  position: absolute;
-  top: 14px;
-  left: 0;
-  height: 30px;
-  max-width: 160px;
+.sign-line {
+  height: 1.8px;
+  background: rgb(24, 116, 165);
+  width: 60mm;
+  margin: 14mm 0 2mm;
+  border-radius: 2px;
+}
+.sign-img {
+  height: 14mm;
+  max-width: 60mm;
+  object-fit: contain;
+  margin: 2mm 0 2mm;
+}
+.sign-name {
+  font-weight: 700;
+  font-size: 10.8px;
+  color: #1f2937;
+}
+
+/* ==== KOLOM KANAN (STAMP) ==== */
+.sign-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  text-align: right;
+}
+.unofficial-stamp {
+  color: #d9534f;
+  text-transform: uppercase;
+  border: 1.5px solid #d9534f;
+  padding: 5px 10px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.6px;
+  display: inline-block;
+  opacity: 0.9;
+  font-weight: 800;
+  font-size: 14px;
+}
+.official-stamp {
+  color: #148a3b;
+  border-color: #148a3b;
+}
+
+/* ==== LOGO ATAS & SPONSOR ==== */
+.mid-image-row,
+.mid-image-sponsor-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2mm;
+  margin: 2mm 0;
+}
+.mid-image img {
+  height: 70px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
-.pdf-footer .signature {
-  font-weight: 800;
+.mid-image-sponsor img {
+  height: 35px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+.mid-image-sponsor-row {
+  margin-top: auto;
+}
+
+/* ==== WATERMARK / TRADEMARK ==== */
+.trademark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(-8mm, 2mm);
+  font-family: monospace;
+  font-size: 8px;
+  color: #8b8b8b;
+  opacity: 0.7;
 }
 
 /* -------- Page break -------- */
@@ -485,17 +531,11 @@ export default {
   page-break-after: always;
   break-after: page;
 }
-.page-block {
-  margin-bottom: 6px;
-}
 
 /* -------- Print tweaks -------- */
 @media print {
   .pdf-wrap {
-    padding: 14px 16px;
-  }
-  .hero-text .title {
-    font-size: 22px;
+    padding: 0;
   }
 }
 </style>

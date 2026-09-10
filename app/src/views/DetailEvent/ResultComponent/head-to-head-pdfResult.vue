@@ -37,11 +37,11 @@
         <div
           class="mid-image-row"
           v-if="
-            eventData && eventData.event_logo && eventData.event_logo.length > 0
+            eventData && eventData.eventFiles && eventData.eventFiles.length > 0
           "
         >
           <div
-            v-for="(url, index) in eventData.event_logo"
+            v-for="(url, index) in eventData.eventFiles"
             :key="index"
             class="mid-image py-4"
           >
@@ -232,11 +232,11 @@
       <div
         class="mid-image-sponsor-row"
         v-if="
-          eventData && eventData.event_logo && eventData.event_logo.length > 0
+          eventData && eventData.sponsorFiles && eventData.sponsorFiles.length > 0
         "
       >
         <div
-          v-for="(url, index) in eventData.event_logo"
+          v-for="(url, index) in eventData.sponsorFiles"
           :key="'sponsor-' + index"
           class="mid-image-sponsor py-4"
         >
@@ -247,6 +247,181 @@
 
     <!-- ================== MULTI PAGE (ALLROUND) ================== -->
     <div v-else>
+      <!-- HALAMAN RINGKASAN OVERALL (sebelum breakdown per babak) — dipakai
+           "Download Result" di HeadToHeadResult.vue supaya PDF-nya lengkap:
+           ringkasan Overall dulu, baru breakdown Penalties Group tiap babak
+           (sebelumnya PDF ini cuma py mode "overall" TANPA breakdown babak
+           sama sekali, jadi Penalties Group tidak pernah ikut ter-export). -->
+      <div
+        v-if="
+          pdfOverallPkg &&
+          pdfOverallPkg.overallRows &&
+          pdfOverallPkg.overallRows.length
+        "
+        class="page page--per-round"
+      >
+        <header class="head">
+          <div class="trademark">
+            @STiming.System.424.Timestamp {{ timestamp }} #-
+          </div>
+
+          <div class="band">
+            <div class="band-left">
+              <strong>SCORE BOARD</strong>
+              <span class="dot">•</span>
+              <span class="cat">HEAD TO HEAD</span>
+              <span class="dot">•</span>
+              <span class="cat">
+                {{
+                  eventData && eventData.levelName
+                    ? eventData.levelName
+                    : "Classification"
+                }}
+              </span>
+            </div>
+            <div class="band-right">
+              <strong>
+                {{ headToHeadCats.initial || "H2H" }} -
+                {{ headToHeadCats.division || "DIV" }}
+                {{ headToHeadCats.race || "RACE" }}
+              </strong>
+              <span class="dot">•</span>
+              <span>{{ today }}</span>
+            </div>
+          </div>
+
+          <div
+            class="mid-image-row"
+            v-if="
+              eventData && eventData.eventFiles && eventData.eventFiles.length > 0
+            "
+          >
+            <div
+              v-for="(url, i4) in eventData.eventFiles"
+              :key="'logo-ovr-' + i4"
+              class="mid-image py-4"
+            >
+              <img :src="url" alt="Event Poster" />
+            </div>
+          </div>
+
+          <div class="event">
+            <div class="event-name">
+              {{ eventData && eventData.eventName ? eventData.eventName : "-" }}
+            </div>
+            <div class="event-meta">
+              Kp/Ds.
+              {{
+                eventData && eventData.addressVillage
+                  ? eventData.addressVillage
+                  : "-"
+              }}, Kel.
+              {{
+                eventData && eventData.addressDistrict
+                  ? eventData.addressDistrict
+                  : "-"
+              }}, Kec.
+              {{
+                eventData && eventData.addressSubDistrict
+                  ? eventData.addressSubDistrict
+                  : "-"
+              }}, Kota
+              {{
+                eventData && eventData.addressCity
+                  ? eventData.addressCity
+                  : "-"
+              }},
+              {{
+                eventData && eventData.addressProvince
+                  ? eventData.addressProvince
+                  : "-"
+              }}
+              –
+              {{
+                eventData && eventData.addressState
+                  ? eventData.addressState
+                  : "-"
+              }}
+              ({{
+                eventData && eventData.addressZipCode
+                  ? eventData.addressZipCode
+                  : "-"
+              }}) •
+              {{ eventData && eventData.riverName ? eventData.riverName : "-" }}
+            </div>
+          </div>
+        </header>
+
+        <section class="table-wrap">
+          <h3 class="sheet-title">Overall Result</h3>
+          <table class="score-table score-table--center" style="margin-bottom: 10px">
+            <thead>
+              <tr>
+                <th class="text-center">No</th>
+                <th class="text-center">Team</th>
+                <th class="text-center">BIB</th>
+                <th class="text-center">Score</th>
+                <th class="text-center">Rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(r, i) in pdfOverallPkg.overallRows"
+                :key="'ovr-allround-' + (r.ranked || i)"
+              >
+                <td class="text-center">{{ i + 1 }}</td>
+                <td class="text-center text-strong">
+                  {{ r.name }}
+                  <CountryFlag :code="flagFor(r.name)" />
+                </td>
+                <td class="text-center">{{ r.bib }}</td>
+                <td class="text-center">{{ r.score }}</td>
+                <td class="text-center">{{ r.ranked }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <footer class="sign">
+          <div class="sign-col">
+            <div class="sign-title">Chief Judge</div>
+            <img
+              v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
+              :src="eventData.chiefJudgeSignature.secure_url"
+              class="sign-img"
+              alt="Chief Judge signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">
+              {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
+            </div>
+          </div>
+          <div class="sign-col stamp-col">
+            <span
+              class="unofficial-stamp"
+              :class="{ 'official-stamp': isOfficial }"
+            >
+              {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+            </span>
+          </div>
+        </footer>
+
+        <div
+          class="mid-image-sponsor-row"
+          v-if="
+            eventData && eventData.sponsorFiles && eventData.sponsorFiles.length > 0
+          "
+        >
+          <div
+            v-for="(url, i5) in eventData.sponsorFiles"
+            :key="'logo-ovr-btm-' + i5"
+            class="mid-image-sponsor py-4"
+          >
+            <img :src="url" alt="Event Sponsor" />
+          </div>
+        </div>
+      </div>
+
       <div
         v-for="(R, idx) in pdfOverallPkg && pdfOverallPkg.rounds
           ? pdfOverallPkg.rounds
@@ -290,12 +465,12 @@
             class="mid-image-row"
             v-if="
               eventData &&
-              eventData.event_logo &&
-              eventData.event_logo.length > 0
+              eventData.eventFiles &&
+              eventData.eventFiles.length > 0
             "
           >
             <div
-              v-for="(url, i2) in eventData.event_logo"
+              v-for="(url, i2) in eventData.eventFiles"
               :key="'logo-top-' + i2"
               class="mid-image py-4"
             >
@@ -444,11 +619,11 @@
         <div
           class="mid-image-sponsor-row"
           v-if="
-            eventData && eventData.event_logo && eventData.event_logo.length > 0
+            eventData && eventData.sponsorFiles && eventData.sponsorFiles.length > 0
           "
         >
           <div
-            v-for="(url, i3) in eventData.event_logo"
+            v-for="(url, i3) in eventData.sponsorFiles"
             :key="'logo-btm-' + i3"
             class="mid-image-sponsor py-4"
           >
@@ -776,13 +951,21 @@ export default {
   gap: 2mm;
 }
 .mid-image img {
-  width: 80px;
-  height: 80px;
+  /* BUG FIX: dulu width+height sama2 di-fix (80x80, kotak) — html2canvas
+     (dipakai vue-html2pdf) tidak selalu menghormati object-fit:contain,
+     jadi logo non-persegi ke-stretch paksa jadi kotak (gepeng). Samakan
+     dgn sprint-pdfResult.vue: cuma height yg di-fix, width auto ikut
+     rasio asli gambar — proporsional apapun bentuk logonya.
+  */
+  height: 70px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 .mid-image-sponsor img {
-  width: 40px;
-  height: 40px;
+  height: 35px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 

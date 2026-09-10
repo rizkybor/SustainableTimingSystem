@@ -29,10 +29,10 @@
       <!-- TOP LOGO(S) -->
       <div
         class="mid-image-row"
-        v-if="data && data.event_logo && data.event_logo.length > 0"
+        v-if="data && data.eventFiles && data.eventFiles.length > 0"
       >
         <div
-          v-for="(url, index) in data.event_logo"
+          v-for="(url, index) in data.eventFiles"
           :key="index"
           class="mid-image py-4"
         >
@@ -189,10 +189,10 @@
     <!-- SPONSOR LOGO(S) -->
     <div
       class="mid-image-sponsor-row"
-      v-if="data && data.event_logo && data.event_logo.length > 0"
+      v-if="data && data.sponsorFiles && data.sponsorFiles.length > 0"
     >
       <div
-        v-for="(url, index) in data.event_logo"
+        v-for="(url, index) in data.sponsorFiles"
         :key="index"
         class="mid-image-sponsor py-4"
       >
@@ -437,8 +437,15 @@ export default {
   margin: 2mm 0;
 }
 .mid-image img {
-  width: 80px;
-  height: 80px;
+  /* BUG FIX: dulu width+height sama2 di-fix (80x80, kotak) — html2canvas
+     (dipakai vue-html2pdf) tidak selalu menghormati object-fit:contain,
+     jadi logo non-persegi ke-stretch paksa jadi kotak (gepeng). Samakan
+     dgn sprint-pdfResult.vue: cuma height yg di-fix, width auto ikut
+     rasio asli gambar — proporsional apapun bentuk logonya.
+  */
+  height: 70px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 .mid-image-sponsor-row {
@@ -446,8 +453,9 @@ export default {
   margin-bottom: 0;
 }
 .mid-image-sponsor img {
-  width: 40px;
-  height: 40px;
+  height: 35px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 

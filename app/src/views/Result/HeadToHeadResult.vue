@@ -53,12 +53,16 @@
       <div class="right-actions">
         <b-dropdown
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:download" class="mr-2" /> Download Result
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <b-dropdown-item @click="generatePdf">
             <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
@@ -69,23 +73,26 @@
         </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
 
         <b-dropdown
-          variant="outline-secondary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
           no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:swap-horizontal" class="mr-2" /> Switch Head to
-            Head Category
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch Head to Head Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <div class="switch-category-panel px-3 py-2">
             <div class="init-tabs mb-2" v-if="bucketInitials.length">
@@ -150,61 +157,253 @@
         <b-spinner small class="mr-2" /> Loading results...
       </div>
 
-      <!-- PODIUM -->
-      <div class="rx-podium mb-4" v-if="!loading && podium.length">
-        <b-row>
-          <b-col md="3" v-for="p in podium" :key="p.ranked">
-            <div class="rx-podium-card">
-              <div class="rx-podium-place">#{{ p.ranked }}</div>
-              <div class="rx-podium-name">
-                {{ p.name || "-" }}
-                <CountryFlag :code="flagFor(p.name)" />
-              </div>
-              <div class="rx-podium-bib">BIB {{ p.bib || "-" }}</div>
-            </div>
-          </b-col>
-        </b-row>
+      <!-- ROUND TABS: pindah tampilan antar babak (Quarterfinals/Semifinals/
+           Final B/Final A/dst.), plus tab "Overall" utk hasil akhir -->
+      <div class="round-tabs mb-3" v-if="tabs.length > 1">
+        <button
+          v-for="t in tabs"
+          :key="t.id"
+          type="button"
+          class="round-tab"
+          :class="{ active: activeTab === t.id }"
+          @click="selectTab(t.id)"
+        >
+          {{ t.label }}
+        </button>
       </div>
 
-      <!-- Empty state -->
-      <EmptyStateFull
-        v-if="!loading && results.length === 0"
-        :img-src="require('@/assets/images/404.png')"
-        title="No data available"
-        subtitle="Hasil Head to Head belum tersedia untuk kategori ini."
-        primary-text="Kembali ke Event"
-        @primary="goBack"
-      />
-
-      <!-- Table -->
-      <div v-else class="table-wrap">
-        <table class="result-table">
-          <thead>
-            <tr>
-              <th class="text-center">No</th>
-              <th class="text-start">Team Name</th>
-              <th class="text-center">BIB</th>
-              <th class="text-center">Ranked</th>
-              <th class="text-center">Score</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr v-for="(r, idx) in results" :key="idx">
-              <td class="text-center">{{ idx + 1 }}</td>
-              <td>
-                <div class="team">
-                  {{ r.name || "-" }}
-                  <CountryFlag :code="flagFor(r.name)" />
+      <template v-if="activeTab === 'overall'">
+        <!-- PODIUM -->
+        <div class="rx-podium mb-4" v-if="!loading && podium.length">
+          <b-row>
+            <b-col md="3" v-for="p in podium" :key="p.ranked">
+              <div class="rx-podium-card">
+                <div class="rx-podium-place">#{{ p.ranked }}</div>
+                <div class="rx-podium-name">
+                  {{ p.name || "-" }}
+                  <CountryFlag :code="flagFor(p.name)" />
                 </div>
-              </td>
-              <td class="text-center">{{ r.bib || "-" }}</td>
-              <td class="text-center">{{ r.ranked || "-" }}</td>
-              <td class="text-center">{{ r.score || 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                <div class="rx-podium-bib">BIB {{ p.bib || "-" }}</div>
+              </div>
+            </b-col>
+          </b-row>
+        </div>
+
+        <!-- Empty state -->
+        <EmptyStateFull
+          v-if="!loading && results.length === 0"
+          :img-src="require('@/assets/images/404.png')"
+          title="No data available"
+          subtitle="Hasil Head to Head belum tersedia untuk kategori ini."
+          primary-text="Kembali ke Event"
+          @primary="goBack"
+        />
+
+        <!-- Table Overall -->
+        <div v-else class="table-wrap">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th class="text-center">No</th>
+                <th class="text-start">Team Name</th>
+                <th class="text-center">BIB</th>
+                <th class="text-center">Ranked</th>
+                <th class="text-center">Score</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-for="(r, idx) in results" :key="idx">
+                <td class="text-center">{{ idx + 1 }}</td>
+                <td>
+                  <div class="team">
+                    {{ r.name || "-" }}
+                    <CountryFlag :code="flagFor(r.name)" />
+                  </div>
+                </td>
+                <td class="text-center">{{ r.bib || "-" }}</td>
+                <td class="text-center">{{ r.ranked || "-" }}</td>
+                <td class="text-center">{{ r.score || 0 }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- Table per-babak: lengkap + editable Start/Finish Time & Penalties Group -->
+      <template v-else>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="text-muted small">
+            <span v-if="isOfficial">
+              Hasil sudah <strong>OFFICIAL</strong> — klik status di kanan
+              atas utk kembali ke UNOFFICIAL sebelum bisa mengedit.
+            </span>
+            <span v-else>
+              Ubah Start Time / Finish Time / Penalties Group lalu klik Save
+              Round utk menyimpan.
+            </span>
+          </div>
+          <b-button
+            variant="success"
+            size="sm"
+            :disabled="savingRound || !editRows.length || isOfficial"
+            @click="saveRoundEdits"
+          >
+            <b-spinner v-if="savingRound" small class="mr-1" />
+            {{ savingRound ? "Menyimpan…" : "Save Round" }}
+          </b-button>
+        </div>
+
+        <EmptyStateFull
+          v-if="!editRows.length"
+          :img-src="require('@/assets/images/404.png')"
+          title="Belum ada tim di babak ini"
+          subtitle="Babak ini belum punya tim yang di-assign ke bagan."
+        />
+
+        <div v-else class="table-wrap">
+          <table class="result-table round-result-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="text-center">No</th>
+                <th rowspan="2" class="text-start">Team Name</th>
+                <th rowspan="2" class="text-center">BIB</th>
+                <th rowspan="2" class="text-center">Heat</th>
+                <th rowspan="2" class="text-center">Start Time</th>
+                <th rowspan="2" class="text-center">Finish Time</th>
+                <th rowspan="2" class="text-center">Race Time</th>
+                <th colspan="9" class="text-center">Penalties Group</th>
+                <th rowspan="2" class="text-center">Pen. Total</th>
+                <th rowspan="2" class="text-center">Pen. Time</th>
+                <th rowspan="2" class="text-center">Result</th>
+                <th rowspan="2" class="text-center">Win/Lose</th>
+              </tr>
+              <tr>
+                <th class="text-center pen-col">PS</th>
+                <th class="text-center pen-col">CL</th>
+                <th class="text-center pen-col">R1</th>
+                <th class="text-center pen-col">R2</th>
+                <th class="text-center pen-col">L1</th>
+                <th class="text-center pen-col">L2</th>
+                <th class="text-center pen-col">PB</th>
+                <th class="text-center pen-col">PF</th>
+                <th class="text-center pen-col">PO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, idx) in editRows" :key="r.name + '-' + r.bib">
+                <td class="text-center">{{ idx + 1 }}</td>
+                <td>
+                  <div class="team">
+                    {{ r.name || "-" }}
+                    <CountryFlag :code="flagFor(r.name)" />
+                  </div>
+                </td>
+                <td class="text-center">{{ r.bib || "-" }}</td>
+                <td class="text-center">{{ r.heat != null ? r.heat : "-" }}</td>
+                <td>
+                  <b-form-input
+                    v-model="r.startTime"
+                    size="sm"
+                    placeholder="00:00:00.000"
+                    style="min-width: 120px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td>
+                  <b-form-input
+                    v-model="r.finishTime"
+                    size="sm"
+                    placeholder="00:00:00.000"
+                    style="min-width: 120px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="text-center text-monospace">
+                  {{ r.raceTime || "-" }}
+                </td>
+                <td class="pen-col">
+                  <b-form-input
+                    v-model.number="r.s"
+                    type="number"
+                    min="0"
+                    size="sm"
+                    style="min-width: 60px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-input
+                    v-model.number="r.cl"
+                    type="number"
+                    min="0"
+                    size="sm"
+                    style="min-width: 60px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col text-center">{{ r.r1 || "—" }}</td>
+                <td class="pen-col text-center">{{ r.r2 || "—" }}</td>
+                <td class="pen-col text-center">{{ r.l1 || "—" }}</td>
+                <td class="pen-col text-center">{{ r.l2 || "—" }}</td>
+                <td class="pen-col">
+                  <b-form-input
+                    v-model.number="r.pb"
+                    type="number"
+                    min="0"
+                    size="sm"
+                    style="min-width: 60px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-input
+                    v-model.number="r.f"
+                    type="number"
+                    min="0"
+                    size="sm"
+                    style="min-width: 60px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-input
+                    v-model.number="r.o"
+                    type="number"
+                    min="0"
+                    size="sm"
+                    style="min-width: 60px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="text-center">{{ r.penaltyTotal || 0 }}</td>
+                <td class="text-center text-monospace">
+                  {{ r.penaltyTime || "00:00:00.000" }}
+                </td>
+                <td class="text-center text-monospace bold">
+                  {{ r.totalTime || "-" }}
+                </td>
+                <td
+                  class="text-center bold"
+                  :class="{
+                    'win-text': r.winLose === 'Win',
+                    'lose-text': r.winLose === 'Lose',
+                  }"
+                >
+                  {{ r.winLose || "-" }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </div>
 
     <!-- Komponen PDF (disembunyikan dari layar, tapi ada di DOM) -->
@@ -215,7 +414,7 @@
       :float-layout="false"
       :enable-download="true"
       :preview-modal="false"
-      :paginate-elements-by-height="1400"
+      :manual-pagination="true"
       :pdf-quality="2"
       :filename="pdfFilename"
       pdf-format="a4"
@@ -235,7 +434,7 @@
       <section slot="pdf-content">
         <HeadToHeadPdf
           :data="pdfEventData"
-          pdfMode="overall"
+          pdfMode="allround"
           :pdfOverallPkg="pdfOverallPkg"
           :isOfficial="isOfficial"
           :headToHeadCats="h2hCats"
@@ -274,7 +473,7 @@ import {
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
-import { exportRowsToExcel } from "@/utils/exportExcel";
+import { exportSheetsToExcel } from "@/utils/exportExcel";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -318,12 +517,35 @@ export default {
       showOverallModal: false,
       dataAggregate: null,
       selectedInitialName: "",
+      // Round tabs: "overall" (default, hasil akhir) atau id round bagan
+      // (Quarterfinals/Semifinals/Final A/Final B dst.) — lihat tabs().
+      activeTab: "overall",
+      // Struktur bagan (h2h_brackets) — dipakai membangun daftar tab +
+      // daftar tim per babak (siapa lawan siapa, nomor Heat).
+      bracketRounds: [],
+      // Semua baris hasil TERSIMPAN lintas babak (h2h_results) — dipakai
+      // mengisi editRows dgn data yg sudah ada saat pindah tab.
+      roundResultsRaw: [],
+      // Baris yang SEDANG diedit utk babak aktif (activeTab, kalau bukan
+      // "overall") — salinan lokal, baru dikirim ke DB saat "Save Round".
+      editRows: [],
+      savingRound: false,
     };
   },
 
   computed: {
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    // Daftar tab: tiap babak di bagan (urutan sesuai h2h_brackets.rounds,
+    // Final B sudah disisipkan sebelum Final A oleh HeadToHead.vue) +
+    // "Overall" di akhir sbg tab hasil akhir (default aktif).
+    tabs() {
+      const roundTabs = (this.bracketRounds || []).map((r) => ({
+        id: r.id,
+        label: r.bronze ? "Final B" : r.name,
+      }));
+      return [...roundTabs, { id: "overall", label: "Overall" }];
     },
     bucketData() {
       const q = this.$route.query || {};
@@ -375,16 +597,27 @@ export default {
       return "";
     },
     h2hCats() {
+      // BUG FIX: dulu localStorage (RACE_PAYLOAD_KEY) diprioritaskan di atas
+      // $route.query — cocok dulu krn satu-satunya cara masuk ke halaman ini
+      // adalah dari Race Detail yg selalu menulis localStorage bucket SAAT
+      // ITU JUGA (selalu sinkron dgn query). Sekarang "Switch Head to Head
+      // Category" berpindah bucket murni lewat query (router push), TANPA
+      // menyentuh localStorage — localStorage jadi bucket LAMA yg basi,
+      // sehingga judul "HEAD TO HEAD RESULT | ..." tetap menampilkan bucket
+      // sebelumnya walau tabel hasil di bawahnya sudah benar pindah (tabel
+      // pakai resolveBucket(), yg SUDAH benar memprioritaskan query). Balik
+      // urutannya: query dulu (mencerminkan bucket yg BENAR2 sedang
+      // ditampilkan), localStorage cuma fallback kalau query kosong.
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
     pdfFilename() {
@@ -414,7 +647,65 @@ export default {
           ranked: r.ranked,
           score: r.score,
         })),
+        // Breakdown lengkap per babak (Start/Finish/Race Time + Penalties
+        // Group PS/CL/R1/R2/L1/L2/PB/PF/PO) — dipakai pdfMode "allround" di
+        // head-to-head-pdfResult.vue supaya "Download Result" PDF-nya
+        // lengkap, bukan cuma ringkasan Overall Score/Rank.
+        rounds: this.pdfRoundsForExport,
       };
+    },
+    // Bentuk ulang bracketRounds + roundResultsRaw jadi { roundId, roundName,
+    // rows:[...] } per babak, dgn field name yg sama persis dgn yg dipakai
+    // buildRoundRows() di HeadToHead.vue (dan yg sudah dirender pdfMode
+    // "allround") — no/heat/team/bib/penalties/penaltyTime/penaltySum/
+    // start/finish/race/total/winLose.
+    pdfRoundsForExport() {
+      return (this.bracketRounds || []).map((round) => {
+        const seen = new Set();
+        const rows = [];
+        (round.matches || []).forEach((m) => {
+          [m.team1, m.team2].forEach((t) => {
+            if (!t || !t.name) return;
+            const key =
+              String(t.name).toUpperCase() + "|" + String(t.bibTeam || "");
+            if (seen.has(key)) return;
+            seen.add(key);
+
+            const saved = this.roundResultsRaw.find(
+              (row) =>
+                String(row.roundId) === String(round.id) &&
+                String(row.nameTeam || "").toUpperCase() ===
+                  String(t.name).toUpperCase()
+            );
+            const sr = (saved && saved.result) || {};
+            const pen =
+              sr.penalties && typeof sr.penalties === "object"
+                ? sr.penalties
+                : {};
+
+            rows.push({
+              no: rows.length + 1,
+              heat: m.heat != null ? m.heat : null,
+              team: t.name,
+              bib: t.bibTeam || "",
+              penalties: pen,
+              penaltyTime: sr.penaltyTime || "00:00:00.000",
+              penaltySum: Number(sr.penalty) || 0,
+              start: sr.startTime || "",
+              finish: sr.finishTime || "",
+              race: sr.raceTime || "",
+              total: sr.totalTime || "",
+              winLose: sr.winLose || "",
+            });
+          });
+        });
+
+        return {
+          roundId: round.id,
+          roundName: round.bronze ? "Final B" : round.name,
+          rows,
+        };
+      });
     },
   },
 
@@ -427,6 +718,7 @@ export default {
     }
     this.selectedInitialName = String(q.initialName || "").toUpperCase();
     await this.loadH2HResult();
+    await this.loadBracketAndRoundResults();
   },
 
   methods: {
@@ -558,6 +850,296 @@ export default {
         });
         ipcRenderer.send("h2h:overall:get", bucket);
       });
+    },
+
+    // Fetch satu kali (reqId-safe) — h2h:bracket:get & h2h:results:getAll
+    // echo balik __reqId (lihat ipcMainServices.js), jadi aman dipanggil
+    // brengan tanpa risiko salah tangkap balasan channel yg sama.
+    _fetchOnce(channel, payload) {
+      return new Promise((resolve) => {
+        const replyChannel = channel + "-reply";
+        const reqId = Date.now() + "-" + Math.random().toString(36).slice(2);
+        let settled = false;
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          resolve(res);
+        };
+        ipcRenderer.on(replyChannel, onReply);
+        ipcRenderer.send(channel, { ...payload, __reqId: reqId });
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          resolve(null);
+        }, 5000);
+      });
+    },
+
+    // Muat struktur bagan (utk daftar tab + tim per babak) & semua hasil
+    // per-round tersimpan (utk mengisi editRows) — dipanggil sekali saat
+    // halaman dibuka, lalu dipakai ulang tiap kali pindah tab.
+    async loadBracketAndRoundResults() {
+      if (typeof ipcRenderer === "undefined") return;
+      const bucket = this.resolveBucket();
+      if (
+        !bucket.eventId ||
+        !bucket.initialId ||
+        !bucket.raceId ||
+        !bucket.divisionId
+      ) {
+        return;
+      }
+
+      const [bracketRes, resultsRes] = await Promise.all([
+        this._fetchOnce("h2h:bracket:get", bucket),
+        this._fetchOnce("h2h:results:getAll", bucket),
+      ]);
+
+      this.bracketRounds =
+        bracketRes &&
+        bracketRes.ok &&
+        bracketRes.item &&
+        Array.isArray(bracketRes.item.rounds)
+          ? bracketRes.item.rounds.map((r) => ({
+              id: r.id,
+              name: r.name,
+              bronze: !!r.bronze,
+              matches: Array.isArray(r.matches) ? r.matches : [],
+            }))
+          : [];
+      this.roundResultsRaw =
+        resultsRes && resultsRes.ok && Array.isArray(resultsRes.items)
+          ? resultsRes.items
+          : [];
+    },
+
+    _findRound(id) {
+      return (this.bracketRounds || []).find((r) => String(r.id) === String(id)) || null;
+    },
+
+    selectTab(id) {
+      this.activeTab = id;
+      if (id !== "overall") {
+        this.buildEditRowsForRound(id);
+      }
+    },
+
+    // Bangun daftar baris editable utk satu babak: semua tim yg SUDAH
+    // ditempatkan di slot match babak ini (dari struktur bagan), diisi
+    // dgn hasil tersimpan kalau ada (h2h_results), atau kosong kalau
+    // belum pernah di-input sama sekali.
+    buildEditRowsForRound(roundId) {
+      const round = this._findRound(roundId);
+      if (!round) {
+        this.editRows = [];
+        return;
+      }
+
+      const seen = new Set();
+      const rows = [];
+      (round.matches || []).forEach((m) => {
+        [m.team1, m.team2].forEach((t) => {
+          if (!t || !t.name) return;
+          const key = String(t.name).toUpperCase() + "|" + String(t.bibTeam || "");
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          const saved = this.roundResultsRaw.find(
+            (row) =>
+              String(row.roundId) === String(roundId) &&
+              String(row.nameTeam || "").toUpperCase() ===
+                String(t.name).toUpperCase()
+          );
+          const sr = (saved && saved.result) || {};
+          const pen =
+            sr.penalties && typeof sr.penalties === "object" ? sr.penalties : {};
+
+          rows.push({
+            name: t.name,
+            bib: t.bibTeam || "",
+            heat: m.heat != null ? m.heat : null,
+            startTime: sr.startTime || "",
+            finishTime: sr.finishTime || "",
+            raceTime: sr.raceTime || "",
+            s: pen.s !== undefined && pen.s !== null ? pen.s : "",
+            cl: pen.cl !== undefined && pen.cl !== null ? pen.cl : "",
+            r1: pen.r1 || "",
+            r2: pen.r2 || "",
+            l1: pen.l1 || "",
+            l2: pen.l2 || "",
+            pb: pen.pb !== undefined && pen.pb !== null ? pen.pb : "",
+            f: pen.f !== undefined && pen.f !== null ? pen.f : "",
+            o: pen.o !== undefined && pen.o !== null ? pen.o : "",
+            penaltyTotal: 0,
+            penaltyTime: sr.penaltyTime || "00:00:00.000",
+            totalTime: sr.totalTime || "",
+            winLose: sr.winLose || "",
+          });
+        });
+      });
+
+      rows.forEach((r) => this.recomputeRow(r));
+      this.editRows = rows;
+      this.computeWinLoseForEditRows();
+    },
+
+    // ---- Helper waktu (HH:MM:SS.mmm <-> ms) — mandiri per halaman, sama
+    // pola dgn Result page lain (tiap halaman self-contained, tdk ada util
+    // waktu bersama di codebase ini).
+    _parseHmsToMs(str) {
+      const s = String(str || "").trim();
+      const m = s.match(/^(\d{1,2}):([0-5]?\d):([0-5]?\d)(?:\.(\d{1,3}))?$/);
+      if (!m) return NaN;
+      const h = parseInt(m[1], 10) || 0;
+      const mi = parseInt(m[2], 10) || 0;
+      const se = parseInt(m[3], 10) || 0;
+      const ms = parseInt((m[4] || "0").padEnd(3, "0"), 10) || 0;
+      return h * 3600000 + mi * 60000 + se * 1000 + ms;
+    },
+    _msToHms(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return "";
+      const pad = (n, w) => String(Math.trunc(n)).padStart(w, "0");
+      const hh = Math.floor(ms / 3600000);
+      const mm = Math.floor((ms % 3600000) / 60000);
+      const ss = Math.floor((ms % 60000) / 1000);
+      const mss = Math.round(ms % 1000);
+      return `${pad(hh, 2)}:${pad(mm, 2)}:${pad(ss, 2)}.${pad(mss, 3)}`;
+    },
+
+    // Hitung ulang Race Time (Finish - Start), Penalty Total/Time, dan
+    // Total Time (Race + Penalty) satu baris — dipanggil tiap kali field
+    // Start/Finish/Penalties diedit. Catatan: PB di sini adalah field
+    // yang diedit LANGSUNG (detik), BUKAN dihitung otomatis dari
+    // R1/R2/L1/L2 seperti di halaman Race Detail (HeadToHead.vue) — mesin
+    // hitung booyan-mode di sana bergantung pengaturan event (Judges
+    // Configuration) yg sengaja tidak diduplikasi di sini supaya tidak
+    // ada dua implementasi aturan yg bisa berbeda hasil.
+    recomputeRow(row) {
+      const startMs = this._parseHmsToMs(row.startTime);
+      const finishMs = this._parseHmsToMs(row.finishTime);
+      row.raceTime =
+        Number.isFinite(startMs) && Number.isFinite(finishMs) && finishMs >= startMs
+          ? this._msToHms(finishMs - startMs)
+          : "";
+
+      const penSeconds = ["s", "cl", "pb", "f", "o"].reduce(
+        (sum, k) => sum + (Number(row[k]) || 0),
+        0
+      );
+      row.penaltyTotal = penSeconds;
+      row.penaltyTime = this._msToHms(penSeconds * 1000) || "00:00:00.000";
+
+      const raceMs = this._parseHmsToMs(row.raceTime);
+      row.totalTime = Number.isFinite(raceMs)
+        ? this._msToHms(raceMs + penSeconds * 1000)
+        : "";
+    },
+
+    onRowFieldChange(row) {
+      this.recomputeRow(row);
+      this.computeWinLoseForEditRows();
+    },
+
+    // Win/Lose per match: bandingkan Total Time kedua sisi match yg sama
+    // (pairing sudah pasti dari posisi slot bagan, bukan dari Heat).
+    computeWinLoseForEditRows() {
+      const round = this._findRound(this.activeTab);
+      if (!round) return;
+      (round.matches || []).forEach((m) => {
+        const n1 = m.team1 && m.team1.name;
+        const n2 = m.team2 && m.team2.name;
+        if (!n1 || !n2) return;
+        const row1 = this.editRows.find((r) => r.name === n1);
+        const row2 = this.editRows.find((r) => r.name === n2);
+        if (!row1 || !row2) return;
+        const t1 = this._parseHmsToMs(row1.totalTime);
+        const t2 = this._parseHmsToMs(row2.totalTime);
+        if (!Number.isFinite(t1) || !Number.isFinite(t2)) {
+          row1.winLose = "";
+          row2.winLose = "";
+          return;
+        }
+        if (t1 < t2) {
+          row1.winLose = "Win";
+          row2.winLose = "Lose";
+        } else if (t2 < t1) {
+          row1.winLose = "Lose";
+          row2.winLose = "Win";
+        } else {
+          row1.winLose = "";
+          row2.winLose = "";
+        }
+      });
+    },
+
+    async saveRoundEdits() {
+      // Guard tambahan (selain :disabled di tombol/input) — hasil yg sudah
+      // OFFICIAL tidak boleh diedit lagi lewat jalur mana pun.
+      if (this.isOfficial) return;
+      if (this.activeTab === "overall" || typeof ipcRenderer === "undefined") return;
+      const round = this._findRound(this.activeTab);
+      if (!round || !this.editRows.length) return;
+
+      const bucket = this.resolveBucket();
+      const rows = this.editRows.map((r) => ({
+        team: r.name,
+        bib: r.bib,
+        start: r.startTime,
+        finish: r.finishTime,
+        race: r.raceTime,
+        total: r.totalTime,
+        penaltyTime: r.penaltyTime,
+        penaltySum: r.penaltyTotal,
+        winLose: r.winLose || null,
+        heat: r.heat,
+        penalties: {
+          s: r.s,
+          cl: r.cl,
+          r1: r.r1,
+          r2: r.r2,
+          l1: r.l1,
+          l2: r.l2,
+          pb: r.pb,
+          f: r.f,
+          o: r.o,
+        },
+      }));
+
+      this.savingRound = true;
+      try {
+        await new Promise((resolve) => {
+          ipcRenderer.once("h2h:round:save-reply", (_e, res) => {
+            if (res && res.ok) {
+              this.$bvToast &&
+                this.$bvToast.toast("Round tersimpan.", {
+                  variant: "success",
+                  title: "Saved",
+                  autoHideDelay: 2000,
+                });
+            } else {
+              this.$bvToast &&
+                this.$bvToast.toast((res && res.error) || "Gagal menyimpan.", {
+                  variant: "danger",
+                  title: "Failed",
+                });
+            }
+            resolve();
+          });
+          ipcRenderer.send("h2h:round:save", {
+            bucket,
+            roundId: round.id,
+            roundName: round.bronze ? "Final B" : round.name,
+            rows,
+          });
+        });
+        await this.loadBracketAndRoundResults();
+        this.buildEditRowsForRound(this.activeTab);
+      } finally {
+        this.savingRound = false;
+      }
     },
 
     fetchEventResultsAggregate() {
@@ -728,15 +1310,53 @@ export default {
     onBeforeDownload() {},
 
     downloadExcel() {
-      const rows = (this.results || []).map((r, idx) => ({
+      // BUG FIX: dulu cuma sheet Overall (No/Team/BIB/Ranked/Score) — sama
+      // seperti PDF sebelum diperbaiki, Penalties Group (PS/CL/R1/R2/L1/
+      // L2/PB/PF/PO) tidak pernah ikut ter-export sama sekali. Sekarang
+      // multi-sheet: "Overall" + satu sheet per babak dgn breakdown lengkap
+      // (sumber data sama persis dgn yg dipakai PDF "allround" —
+      // pdfRoundsForExport).
+      const overallRows = (this.results || []).map((r, idx) => ({
         No: idx + 1,
         "Team Name": r.name || "-",
         BIB: r.bib || "-",
         Ranked: r.ranked || "-",
         Score: r.score || 0,
       }));
+
+      const sheets = [{ name: "Overall", rows: overallRows }];
+
+      (this.pdfRoundsForExport || []).forEach((R) => {
+        const rows = (R.rows || []).map((row) => {
+          const pen = row.penalties || {};
+          return {
+            No: row.no,
+            "Team Name": row.team || "-",
+            BIB: row.bib || "-",
+            Heat: row.heat != null ? row.heat : "-",
+            "Start Time": row.start || "",
+            "Finish Time": row.finish || "",
+            "Race Time": row.race || "",
+            PS: pen.s !== undefined && pen.s !== null && pen.s !== "" ? pen.s : "—",
+            CL: pen.cl !== undefined && pen.cl !== null && pen.cl !== "" ? pen.cl : "—",
+            R1: pen.r1 || "—",
+            R2: pen.r2 || "—",
+            L1: pen.l1 || "—",
+            L2: pen.l2 || "—",
+            PB: pen.pb !== undefined && pen.pb !== null && pen.pb !== "" ? pen.pb : "—",
+            PF: pen.f !== undefined && pen.f !== null && pen.f !== "" ? pen.f : "—",
+            PO: pen.o !== undefined && pen.o !== null && pen.o !== "" ? pen.o : "—",
+            "Penalty Time": row.penaltyTime || "00:00:00.000",
+            "Penalty Sum": row.penaltySum || 0,
+            "Total Time": row.total || "",
+            "Win/Lose": row.winLose || "",
+          };
+        });
+        sheets.push({ name: R.roundName || "Round", rows });
+      });
+
       const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
-      exportRowsToExcel(`Head to Head Result - ${eventName}`, rows, "H2H Result");
+      exportSheetsToExcel(`Head to Head Result - ${eventName}`, sheets);
     },
     onPdfGenerated() {
       this.showPdf = false;
@@ -784,6 +1404,87 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 .card {
   background: #fff;
@@ -982,4 +1683,48 @@ export default {
   color: #fff;
 }
 /* ---- End styling utk Switch Head to Head Category ---- */
+
+/* ---- Round tabs (ganti tampilan antar babak / Overall) ---- */
+.round-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 12px;
+  width: fit-content;
+}
+.round-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  transition: all 0.2s ease;
+}
+.round-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+.round-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+}
+
+/* ---- Tabel per-babak (editable) ---- */
+.round-result-table .pen-col {
+  min-width: 64px;
+}
+.win-text {
+  color: #1a7f4f;
+}
+.lose-text {
+  color: #c0392b;
+}
+.text-monospace {
+  font-variant-numeric: tabular-nums;
+}
 </style>

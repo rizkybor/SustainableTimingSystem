@@ -4945,11 +4945,33 @@ export default {
       this.ensurePenaltiesObject(target.result);
       const p = target.result.penalties;
 
+      // BUG FIX: dulu Start/Finish langsung diterima berapa pun nilainya
+      // dari socket, tanpa dicek dulu terhadap daftar Pilihan Pen. Start/
+      // Finish yang benar-benar dikonfigurasi lewat Race Settings — beda
+      // dari Sprint/Slalom/DRR/RX yg semua sudah memvalidasi msg.value
+      // terhadap daftar ALLOWED sebelum menerimanya. Cut Line (CL) malah
+      // SAMA SEKALI belum py cabang sendiri di sini — walau CL sudah bisa
+      // dikustomisasi penuh lewat Race Settings & sudah py dropdown
+      // editable manual (clChoices), operator tidak bisa mengisinya lewat
+      // device/socket sama sekali. Sekarang ketiganya (S/CL/F) dicek dulu
+      // terhadap sChoices/clChoices/fChoices sebelum diterima, sama pola
+      // dgn kategori lain.
       const kind = String(msg.type || "");
       if (kind === "PenaltyStart") {
-        this.$set(p, "s", Number(msg.value) || 0);
+        const v = Number(msg.value);
+        const allowed = (this.sChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "s", v);
+      } else if (kind === "PenaltyCutLine") {
+        const v = Number(msg.value);
+        const allowed = (this.clChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "cl", v);
       } else if (kind === "PenaltyFinish") {
-        this.$set(p, "f", Number(msg.value) || 0);
+        const v = Number(msg.value);
+        const allowed = (this.fChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "f", v);
       } else if (kind === "PenaltyOther") {
         this.$set(p, "o", Number(msg.value) || 0);
       } else if (kind === "BooyanCorner") {

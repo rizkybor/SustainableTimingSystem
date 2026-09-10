@@ -156,6 +156,21 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
     { label: "50", value: 50 },
   ];
 
+  // Default Pilihan Pen. Gate 1 (G1) / Pen. Gate 2 (G2) Rafting Cross —
+  // sebelumnya kedua gate berbagi SATU daftar optionPenalties GLOBAL yang
+  // sama (tidak bisa dikustomisasi per-event). Sekarang masing2 independen
+  // per-event, pola sama dgn DEFAULT_SLALOM_*_PENALTIES.
+  const DEFAULT_RX_GATE1_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+  const DEFAULT_RX_GATE2_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+
   // Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
   // "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
   // dikustomisasi per-event lewat Race Settings (pola sama dgn Sprint).
@@ -403,6 +418,14 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
         qualifiersPerHeat,
         gate1: { enabled: gate1Enabled },
         gate2: { enabled: gate2Enabled },
+        gate1Penalties: cleanPenaltyList(
+          incoming.rx && incoming.rx.gate1Penalties,
+          DEFAULT_RX_GATE1_PENALTIES
+        ),
+        gate2Penalties: cleanPenaltyList(
+          incoming.rx && incoming.rx.gate2Penalties,
+          DEFAULT_RX_GATE2_PENALTIES
+        ),
         scoreByRank: cleanScoreByRank(
           incoming.rx && incoming.rx.scoreByRank,
           DEFAULT_RX_SCORE_BY_RANK

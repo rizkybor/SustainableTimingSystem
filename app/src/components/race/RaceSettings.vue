@@ -1007,6 +1007,72 @@
 
             <hr class="rs-divider" />
 
+            <!-- PILIHAN PEN. GATE 1/GATE 2 -->
+            <!-- Independen per gate (dulu Gate 1 & Gate 2 berbagi 1 daftar
+                 global yg sama, tidak bisa dikustomisasi per-event sama
+                 sekali) — daftar ini cuma pilihan NILAI penalty, bukan
+                 on/off gate-nya sendiri (diatur di toggle Gate 1/Gate 2 di
+                 atas). -->
+            <div v-for="grp in rxPenaltyGroups" :key="grp.key" class="mb-4">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <div class="font-weight-bold">{{ grp.title }}</div>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.rx[grp.key].length >= maxSprintPenalties"
+                  @click="addPenaltyRow('rx', grp.key)"
+                >
+                  + Tambah
+                </b-button>
+              </div>
+              <div
+                v-if="draft.rx[grp.key].length"
+                class="d-flex mb-1"
+                style="gap: 10px"
+              >
+                <small class="text-muted flex-grow-1">Label</small>
+                <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                  >Detik</small
+                >
+                <span style="width: 32px; flex: 0 0 32px"></span>
+              </div>
+              <div
+                v-for="(p, idx) in draft.rx[grp.key]"
+                :key="grp.key + '-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  v-model="p.label"
+                  placeholder="Label"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-form-input
+                  v-model.number="p.value"
+                  type="number"
+                  min="0"
+                  max="600"
+                  placeholder="Detik"
+                  style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.rx[grp.key].length <= 1"
+                  @click="removePenaltyRow('rx', grp.key, idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+
+            <hr class="rs-divider" />
+
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div class="font-weight-bold">Score by Rank</div>
@@ -1262,6 +1328,21 @@ const DEFAULT_DRR_SECTION_PENALTIES = [
   { label: "50", value: 50 },
 ];
 
+// Default Pilihan Pen. Gate 1 (G1) / Pen. Gate 2 (G2) Rafting Cross —
+// sebelumnya kedua gate berbagi SATU daftar optionPenalties GLOBAL yang
+// sama (tidak bisa dikustomisasi per-event sama sekali). Sekarang masing2
+// independen per-event, pola sama dgn DEFAULT_SLALOM_*_PENALTIES.
+const DEFAULT_RX_GATE1_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_RX_GATE2_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+
 // Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
 // "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
 // dikustomisasi per-event (pola sama dgn DEFAULT_SPRINT_SCORE_BY_RANK).
@@ -1403,6 +1484,8 @@ const DEFAULT_SETTINGS = {
     qualifiersPerHeat: 2,
     gate1: { enabled: true },
     gate2: { enabled: true },
+    gate1Penalties: DEFAULT_RX_GATE1_PENALTIES.map((p) => ({ ...p })),
+    gate2Penalties: DEFAULT_RX_GATE2_PENALTIES.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_RX_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
     ...DEFAULT_PDF_SIGNATURE_TOGGLES,
@@ -1494,6 +1577,12 @@ export default {
         { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
         { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
         { key: "sectionPenalties", title: "Pilihan Pen. Section" },
+      ];
+    },
+    rxPenaltyGroups() {
+      return [
+        { key: "gate1Penalties", title: "Pilihan Pen. Gate 1 (G1)" },
+        { key: "gate2Penalties", title: "Pilihan Pen. Gate 2 (G2)" },
       ];
     },
   },
@@ -1732,6 +1821,14 @@ export default {
             qualifiersPerHeat,
             gate1: { enabled: gate1Enabled },
             gate2: { enabled: gate2Enabled },
+            gate1Penalties: cleanList(
+              src.rx && src.rx.gate1Penalties,
+              DEFAULT_RX_GATE1_PENALTIES
+            ),
+            gate2Penalties: cleanList(
+              src.rx && src.rx.gate2Penalties,
+              DEFAULT_RX_GATE2_PENALTIES
+            ),
             scoreByRank: cleanScoreList(
               src.rx && src.rx.scoreByRank,
               DEFAULT_RX_SCORE_BY_RANK
@@ -1859,6 +1956,12 @@ export default {
       this.draft.drr.sectionPenalties = cleanPenaltyList(
         this.draft.drr.sectionPenalties,
         true
+      );
+      this.draft.rx.gate1Penalties = cleanPenaltyList(
+        this.draft.rx.gate1Penalties
+      );
+      this.draft.rx.gate2Penalties = cleanPenaltyList(
+        this.draft.rx.gate2Penalties
       );
 
       this.draft.sprint.scoreByRank = (this.draft.sprint.scoreByRank || []).map(

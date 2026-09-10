@@ -172,7 +172,24 @@
 
     <!-- SIGNATURE -->
     <footer class="sign">
-      <div class="sign-col">
+      <!-- Technical Delegate / Chief Judge / Race Director — masing2 bisa
+           di-on/off-kan per kategori lewat Race Settings (showTechnicalDelegate/
+           showChiefJudge/showRaceDirector, default tampil kalau tidak diatur);
+           nama default "—" kalau datanya belum diisi di Event Detail. -->
+      <div class="sign-col" v-if="data && data.showTechnicalDelegate !== false">
+        <div class="sign-title">Technical Delegate</div>
+        <img
+          v-if="data && data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
+          :src="data.technicalDelegateSignature.secure_url"
+          class="sign-img"
+          alt="Technical Delegate signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.technicalDelegate ? data.technicalDelegate : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showChiefJudge !== false">
         <div class="sign-title">Chief Judge</div>
         <img
           v-if="data && data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -183,6 +200,19 @@
         <div v-else class="sign-line"></div>
         <div class="sign-name">
           {{ data && data.chiefJudge ? data.chiefJudge : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showRaceDirector !== false">
+        <div class="sign-title">Race Director</div>
+        <img
+          v-if="data && data.raceDirectorSignature && data.raceDirectorSignature.secure_url"
+          :src="data.raceDirectorSignature.secure_url"
+          class="sign-img"
+          alt="Race Director signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.raceDirector ? data.raceDirector : "—" }}
         </div>
       </div>
       <div class="sign-col stamp-col">
@@ -554,7 +584,13 @@ export default {
   gap: 8mm;
 }
 .sign-col {
-  width: 30%;
+  /* dulu width:30% tetap (pas cuma 2 kolom: Chief Judge + stamp) — sekarang
+     Technical Delegate & Race Director bisa ikut tampil (on/off lewat Race
+     Settings), jadi jumlah kolom yg kebentuk bisa 2-4. flex:1 supaya
+     lebarnya selalu menyesuaikan berapa pun yg sedang tampil, drpd overflow
+     saat 4 kolom @30% (120%) sekaligus muncul. */
+  flex: 1;
+  min-width: 0;
 }
 .sign-title {
   color: #8a95a3;
@@ -702,9 +738,15 @@ header,
   padding: 3px 4px; /* lebih kecil */
   font-size: 9.5px; /* kecilkan keseluruhan */
   line-height: 1.15; /* rapat biar gak “tumpah” */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* cegah teks keluar border */
+  /* BUG FIX: dulu white-space:nowrap + overflow:hidden + text-overflow:
+     ellipsis — nama tim (atau isi kolom lain) yang lebih panjang dari
+     lebar kolom tetap (table-layout: fixed) langsung terpotong jadi "...".
+     Sekarang dibiarkan wrap ke baris berikutnya (tinggi baris menyesuaikan)
+     supaya TIDAK ADA isi kolom yang pernah hilang/terpotong dari PDF. */
+  white-space: normal;
+  overflow: visible;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* --- header (thead) lebih kecil lagi --- */
@@ -725,8 +767,9 @@ header,
 
 .score-table th:nth-child(2),
 .score-table td:nth-child(2) {
-  width: 80px;
-} /* Team */
+  width: 100px;
+} /* Team — dilebarkan sedikit drpd 80px, sisanya diselesaikan lewat wrap
+     (bukan ellipsis) di atas kalau nama tim masih lebih panjang */
 
 .score-table th:nth-child(3),
 .score-table td:nth-child(3) {
@@ -819,9 +862,9 @@ header,
   width: 55px; /* atur sesuai selera: 110–140px */
   min-width: 120px;
   max-width: 140px; /* cegah melebar berlebihan */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  word-wrap: break-word;
 }
 
 /* kalau mau sedikit lebih lega saat print */

@@ -120,6 +120,7 @@ const {
 } = require("../controllers/DELETE/resetEventData");
 const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
 const { resetSlalomDataForEvent } = require("../controllers/DELETE/resetSlalomData");
+const { resetDrrDataForEvent } = require("../controllers/DELETE/resetDrrData");
 const {
   insertChatMessage,
   listChatMessagesByEvent,
@@ -386,6 +387,21 @@ function setupIPCMainHandlers() {
       event.reply("slalom:reset-all-reply", result);
     } catch (error) {
       event.reply("slalom:reset-all-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset All" di halaman DRR Details — hapus semua waktu yang sudah
+  // bertanding di DRR (seluruh kategori/bucket) utk satu event, tanpa
+  // menyentuh Sprint/H2H/Slalom/RX di event yang sama.
+  ipcMain.on("drr:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetDrrDataForEvent(eventId);
+      event.reply("drr:reset-all-reply", result);
+    } catch (error) {
+      event.reply("drr:reset-all-reply", {
         ok: false,
         error: error && error.message ? error.message : String(error),
       });
@@ -867,8 +883,14 @@ function setupIPCMainHandlers() {
 
   // GET: satu user by email (jika perlu prefill individual)
   ipcMain.on("teams-registered:find", async (event, filters) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+    // mencocokkan balasan ke request-nya sendiri (mis. fetchBucketTeamsByKey()
+    // di DownRiverRace.vue) bisa pakai ipcRenderer.on()+cek __reqId alih2
+    // .once() polos — pemanggil lama yang tidak kirim __reqId tidak
+    // terpengaruh (field cuma echo, diabaikan getRegistered()).
+    const reqId = filters && filters.__reqId;
     const res = await getRegistered(filters || {});
-    event.sender.send("teams-registered:find-reply", res);
+    event.sender.send("teams-registered:find-reply", { ...res, __reqId: reqId });
   });
 
   ipcMain.on("teams-h2h-registered:find", async (event, filters) => {

@@ -92,7 +92,7 @@
       <div class="sign-left">
         <div
           class="sig-card"
-          v-if="data.signature && data.signature.technicalDelegate"
+          v-if="data.showTechnicalDelegate !== false"
         >
           <div class="sign-title">Technical Delegate</div>
           <img
@@ -105,7 +105,7 @@
           <div class="sign-name">{{ data.technicalDelegate || "—" }}</div>
         </div>
 
-        <div class="sig-card" v-if="data.signature && data.signature.chiefJudge">
+        <div class="sig-card" v-if="data.showChiefJudge !== false">
           <div class="sign-title">Chief Judge</div>
           <img
             v-if="data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -119,7 +119,7 @@
 
         <div
           class="sig-card"
-          v-if="data.signature && data.signature.raceDirector"
+          v-if="data.showRaceDirector !== false"
         >
           <div class="sign-title">Race Director</div>
           <img

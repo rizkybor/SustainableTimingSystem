@@ -205,7 +205,25 @@
 
       <!-- FOOTER -->
       <footer class="sign">
-        <div class="sign-col">
+        <!-- Technical Delegate / Chief Judge / Race Director — masing2 bisa
+             di-on/off-kan per kategori lewat Race Settings
+             (showTechnicalDelegate/showChiefJudge/showRaceDirector, default
+             tampil kalau tidak diatur); nama default "—" kalau data belum
+             diisi di Event Detail. -->
+        <div class="sign-col" v-if="eventData && eventData.showTechnicalDelegate !== false">
+          <div class="sign-title">Technical Delegate</div>
+          <img
+            v-if="eventData && eventData.technicalDelegateSignature && eventData.technicalDelegateSignature.secure_url"
+            :src="eventData.technicalDelegateSignature.secure_url"
+            class="sign-img"
+            alt="Technical Delegate signature"
+          />
+          <div v-else class="sign-line"></div>
+          <div class="sign-name">
+            {{ eventData && eventData.technicalDelegate ? eventData.technicalDelegate : "—" }}
+          </div>
+        </div>
+        <div class="sign-col" v-if="eventData && eventData.showChiefJudge !== false">
           <div class="sign-title">Chief Judge</div>
           <img
             v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
@@ -216,6 +234,19 @@
           <div v-else class="sign-line"></div>
           <div class="sign-name">
             {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
+          </div>
+        </div>
+        <div class="sign-col" v-if="eventData && eventData.showRaceDirector !== false">
+          <div class="sign-title">Race Director</div>
+          <img
+            v-if="eventData && eventData.raceDirectorSignature && eventData.raceDirectorSignature.secure_url"
+            :src="eventData.raceDirectorSignature.secure_url"
+            class="sign-img"
+            alt="Race Director signature"
+          />
+          <div v-else class="sign-line"></div>
+          <div class="sign-name">
+            {{ eventData && eventData.raceDirector ? eventData.raceDirector : "—" }}
           </div>
         </div>
         <div class="sign-col stamp-col">
@@ -383,7 +414,20 @@
         </section>
 
         <footer class="sign">
-          <div class="sign-col">
+          <div class="sign-col" v-if="eventData && eventData.showTechnicalDelegate !== false">
+            <div class="sign-title">Technical Delegate</div>
+            <img
+              v-if="eventData && eventData.technicalDelegateSignature && eventData.technicalDelegateSignature.secure_url"
+              :src="eventData.technicalDelegateSignature.secure_url"
+              class="sign-img"
+              alt="Technical Delegate signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">
+              {{ eventData && eventData.technicalDelegate ? eventData.technicalDelegate : "—" }}
+            </div>
+          </div>
+          <div class="sign-col" v-if="eventData && eventData.showChiefJudge !== false">
             <div class="sign-title">Chief Judge</div>
             <img
               v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
@@ -394,6 +438,19 @@
             <div v-else class="sign-line"></div>
             <div class="sign-name">
               {{ eventData && eventData.chiefJudge ? eventData.chiefJudge : "—" }}
+            </div>
+          </div>
+          <div class="sign-col" v-if="eventData && eventData.showRaceDirector !== false">
+            <div class="sign-title">Race Director</div>
+            <img
+              v-if="eventData && eventData.raceDirectorSignature && eventData.raceDirectorSignature.secure_url"
+              :src="eventData.raceDirectorSignature.secure_url"
+              class="sign-img"
+              alt="Race Director signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">
+              {{ eventData && eventData.raceDirector ? eventData.raceDirector : "—" }}
             </div>
           </div>
           <div class="sign-col stamp-col">
@@ -590,7 +647,22 @@
 
         <!-- FOOTER -->
         <footer class="sign">
-          <div class="sign-col">
+          <div class="sign-col" v-if="eventData && eventData.showTechnicalDelegate !== false">
+            <div class="sign-title">Technical Delegate</div>
+            <img
+              v-if="eventData && eventData.technicalDelegateSignature && eventData.technicalDelegateSignature.secure_url"
+              :src="eventData.technicalDelegateSignature.secure_url"
+              class="sign-img"
+              alt="Technical Delegate signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">
+              {{
+                eventData && eventData.technicalDelegate ? eventData.technicalDelegate : "—"
+              }}
+            </div>
+          </div>
+          <div class="sign-col" v-if="eventData && eventData.showChiefJudge !== false">
             <div class="sign-title">Chief Judge</div>
             <img
               v-if="eventData && eventData.chiefJudgeSignature && eventData.chiefJudgeSignature.secure_url"
@@ -602,6 +674,21 @@
             <div class="sign-name">
               {{
                 eventData && eventData.chiefJudge ? eventData.chiefJudge : "—"
+              }}
+            </div>
+          </div>
+          <div class="sign-col" v-if="eventData && eventData.showRaceDirector !== false">
+            <div class="sign-title">Race Director</div>
+            <img
+              v-if="eventData && eventData.raceDirectorSignature && eventData.raceDirectorSignature.secure_url"
+              :src="eventData.raceDirectorSignature.secure_url"
+              class="sign-img"
+              alt="Race Director signature"
+            />
+            <div v-else class="sign-line"></div>
+            <div class="sign-name">
+              {{
+                eventData && eventData.raceDirector ? eventData.raceDirector : "—"
               }}
             </div>
           </div>
@@ -892,7 +979,13 @@ export default {
   gap: 8mm;
 }
 .sign-col {
-  width: 30%;
+  /* dulu width:30% tetap (pas cuma 2 kolom: Chief Judge + stamp) — sekarang
+     Technical Delegate & Race Director bisa ikut tampil (on/off lewat Race
+     Settings), jadi jumlah kolom yg kebentuk bisa 2-4. flex:1 supaya
+     lebarnya selalu menyesuaikan berapa pun yg sedang tampil, drpd overflow
+     saat 4 kolom @30% (120%) sekaligus muncul. */
+  flex: 1;
+  min-width: 0;
 }
 .sign-title {
   color: #8a95a3;

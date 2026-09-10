@@ -77,16 +77,33 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
     return clean.length > 0 ? clean : fallback;
   };
 
-  const cleanPenaltyList = (raw, fallback, max) => {
+  // allowNegative: KHUSUS Pilihan Pen. Section DRR — section boleh punya
+  // nilai minus (mis. -10) sbg bonus/pengurang waktu, beda dari penalty
+  // kategori/bagian lain yg selalu >= 0.
+  const cleanPenaltyList = (raw, fallback, max, allowNegative) => {
     const arr = Array.isArray(raw) ? raw : fallback;
+    const min = allowNegative ? -600 : 0;
     const clean = arr.slice(0, max || MAX_SPRINT_PENALTIES).map((p) => {
-      const value = Math.max(0, Math.min(600, parseInt(p && p.value, 10) || 0));
+      const value = Math.max(min, Math.min(600, parseInt(p && p.value, 10) || 0));
       const label =
         String((p && p.label) || "").trim().slice(0, 40) || String(value);
       return { label, value };
     });
     return clean.length > 0 ? clean : fallback;
   };
+
+  // Default TAMPIL (true) kalau field belum pernah diatur — dibedakan dari
+  // "eksplisit dimatikan" (false) via cek undefined/null, BUKAN `!!raw`.
+  const boolOrDefault = (raw, fallback) =>
+    raw === undefined || raw === null ? fallback : !!raw;
+  const signatureToggles = (catSrc) => ({
+    showTechnicalDelegate: boolOrDefault(
+      catSrc && catSrc.showTechnicalDelegate,
+      true
+    ),
+    showChiefJudge: boolOrDefault(catSrc && catSrc.showChiefJudge, true),
+    showRaceDirector: boolOrDefault(catSrc && catSrc.showRaceDirector, true),
+  });
 
   // Default H2H PS/CL/PF sesuai nilai yang sebelumnya dipakai bersama
   // (0/5/10/50 detik) — sekarang masing-masing bisa diatur independen.
@@ -114,6 +131,28 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   const DEFAULT_SLALOM_GATE_PENALTIES = [
     { label: "0", value: 0 },
     { label: "5", value: 5 },
+    { label: "50", value: 50 },
+  ];
+
+  // Default Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Section DRR —
+  // sebelumnya hardcoded & tidak bisa dikustomisasi (PS/PF whitelist
+  // {0,10,50}, Section pakai daftar optionPenalties global tanpa filter)
+  // langsung di kode DownRiverRace.vue. Sekarang masing-masing independen
+  // per-event, pola sama dgn DEFAULT_SLALOM_*_PENALTIES.
+  const DEFAULT_DRR_START_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+  const DEFAULT_DRR_FINISH_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+  const DEFAULT_DRR_SECTION_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "5", value: 5 },
+    { label: "10", value: 10 },
     { label: "50", value: 50 },
   ];
 
@@ -228,6 +267,7 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
           ) || 0
         )
       ),
+      ...signatureToggles(incoming.sprint),
     },
     h2h: {
       R1: !!(incoming.h2h && incoming.h2h.R1),
@@ -265,6 +305,7 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
           ) || 0
         )
       ),
+      ...signatureToggles(incoming.h2h),
     },
     slalom: {
       totalGate: Math.max(
@@ -297,11 +338,29 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
           ) || 0
         )
       ),
+      ...signatureToggles(incoming.slalom),
     },
     drr: {
+      // Minimal 2 Section — konsep "per-section" cuma berarti kalau ada
+      // minimal 2 section (Race Settings UI juga mengunci spinbutton Total
+      // Section ke minimum yg sama sebelum Pilihan Pen. Section bisa diisi).
       totalSection: Math.max(
-        1,
+        2,
         Math.min(6, parseInt(incoming.drr && incoming.drr.totalSection, 10) || 5)
+      ),
+      startPenalties: cleanPenaltyList(
+        incoming.drr && incoming.drr.startPenalties,
+        DEFAULT_DRR_START_PENALTIES
+      ),
+      finishPenalties: cleanPenaltyList(
+        incoming.drr && incoming.drr.finishPenalties,
+        DEFAULT_DRR_FINISH_PENALTIES
+      ),
+      sectionPenalties: cleanPenaltyList(
+        incoming.drr && incoming.drr.sectionPenalties,
+        DEFAULT_DRR_SECTION_PENALTIES,
+        MAX_SPRINT_PENALTIES,
+        true
       ),
       scoreByRank: cleanScoreByRank(
         incoming.drr && incoming.drr.scoreByRank,
@@ -317,6 +376,7 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
           ) || 0
         )
       ),
+      ...signatureToggles(incoming.drr),
     },
     rx: (() => {
       const teamsPerHeat = Math.max(
@@ -357,6 +417,7 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
             ) || 0
           )
         ),
+        ...signatureToggles(incoming.rx),
       };
     })(),
   };

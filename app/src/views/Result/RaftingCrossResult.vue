@@ -405,6 +405,11 @@ export default {
       // Race Category yang benar-benar dipilih utk event ini — null =
       // fail-open (tampilkan semua kolom kategori)
       enabledCategoryKeys: null,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
       rows: [],
       podium: [],
       showPdf: false,
@@ -492,7 +497,13 @@ export default {
       return parts.join(" - ");
     },
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     bracketPdfFilename() {
       const parts = [];
@@ -542,10 +553,44 @@ export default {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
     await this.loadRxResult();
   },
   methods: {
+    // On/off kolom Technical Delegate/Chief Judge/Race Director di PDF
+    // Result RX — diatur per kategori lewat Race Settings, default TAMPIL
+    // (true) kalau belum pernah diatur. Sama pola dgn loadRaceSettings() di
+    // SprintResult.vue/DrrResult.vue.
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const rxSettings = res && res.ok && res.settings && res.settings.rx;
+            const boolOrDefault = (v, d) =>
+              v === undefined || v === null ? d : !!v;
+            this.showTechnicalDelegate = boolOrDefault(
+              rxSettings && rxSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              rxSettings && rxSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              rxSettings && rxSettings.showRaceDirector,
+              true
+            );
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan default (true) kalau gagal memuat override
+      }
+    },
+
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },

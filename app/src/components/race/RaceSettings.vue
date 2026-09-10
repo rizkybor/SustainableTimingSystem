@@ -26,18 +26,21 @@
         <div class="rs-card mb-3" v-if="showSprint">
           <div class="px-3 py-3">
             <div
-              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
               @click="toggleSection('sprint')"
             >
-              <Icon
-                :icon="
-                  collapsedSections.sprint
-                    ? 'mdi:chevron-right'
-                    : 'mdi:chevron-down'
-                "
-                class="mr-1"
-              />
-              Sprint
+              <span class="rs-header-text">
+                <Icon
+                  :icon="
+                    collapsedSections.sprint
+                      ? 'mdi:chevron-right'
+                      : 'mdi:chevron-down'
+                  "
+                  class="mr-1"
+                />
+                Sprint
+              </span>
+              <img class="rs-section-banner" :src="sprintBannerImg" alt="" />
             </div>
 
             <div v-show="!collapsedSections.sprint">
@@ -241,6 +244,33 @@
               (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
               kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
+
+            <hr class="rs-divider" />
+
+            <!-- PDF RESULT: on/off kolom tanda tangan -->
+            <div class="font-weight-bold mb-2">PDF Result</div>
+            <small class="text-muted d-block mb-2">
+              Nama & tanda tangan diatur di Event Detail — di sini cuma
+              mengatur tampil/tidaknya kolomnya di PDF Result Sprint.
+            </small>
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.sprint.showTechnicalDelegate"
+              >Tampilkan Technical Delegate</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.sprint.showChiefJudge"
+              >Tampilkan Chief Judge</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.sprint.showRaceDirector"
+              >Tampilkan Race Director</b-form-checkbox
+            >
             </div>
           </div>
         </div>
@@ -249,16 +279,19 @@
         <div class="rs-card mb-3" v-if="showH2H">
           <div class="px-3 py-3">
             <div
-              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
               @click="toggleSection('h2h')"
             >
-              <Icon
-                :icon="
-                  collapsedSections.h2h ? 'mdi:chevron-right' : 'mdi:chevron-down'
-                "
-                class="mr-1"
-              />
-              Head to Head
+              <span class="rs-header-text">
+                <Icon
+                  :icon="
+                    collapsedSections.h2h ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                  "
+                  class="mr-1"
+                />
+                Head to Head
+              </span>
+              <img class="rs-section-banner" :src="h2hBannerImg" alt="" />
             </div>
 
             <div v-show="!collapsedSections.h2h">
@@ -428,6 +461,33 @@
               kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
 
+            <hr class="rs-divider" />
+
+            <!-- PDF RESULT: on/off kolom tanda tangan -->
+            <div class="font-weight-bold mb-2">PDF Result</div>
+            <small class="text-muted d-block mb-2">
+              Nama & tanda tangan diatur di Event Detail — di sini cuma
+              mengatur tampil/tidaknya kolomnya di PDF Result Head to Head.
+            </small>
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.h2h.showTechnicalDelegate"
+              >Tampilkan Technical Delegate</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.h2h.showChiefJudge"
+              >Tampilkan Chief Judge</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.h2h.showRaceDirector"
+              >Tampilkan Race Director</b-form-checkbox
+            >
+
             </div>
           </div>
         </div>
@@ -436,18 +496,21 @@
         <div class="rs-card mb-3" v-if="showSlalom">
           <div class="px-3 py-3">
             <div
-              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
               @click="toggleSection('slalom')"
             >
-              <Icon
-                :icon="
-                  collapsedSections.slalom
-                    ? 'mdi:chevron-right'
-                    : 'mdi:chevron-down'
-                "
-                class="mr-1"
-              />
-              Slalom
+              <span class="rs-header-text">
+                <Icon
+                  :icon="
+                    collapsedSections.slalom
+                      ? 'mdi:chevron-right'
+                      : 'mdi:chevron-down'
+                  "
+                  class="mr-1"
+                />
+                Slalom
+              </span>
+              <img class="rs-section-banner" :src="slalomBannerImg" alt="" />
             </div>
             <div v-show="!collapsedSections.slalom">
             <div class="font-weight-bold mb-2">Gates Setting</div>
@@ -619,6 +682,33 @@
               (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
               kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
+
+            <hr class="rs-divider" />
+
+            <!-- PDF RESULT: on/off kolom tanda tangan -->
+            <div class="font-weight-bold mb-2">PDF Result</div>
+            <small class="text-muted d-block mb-2">
+              Nama & tanda tangan diatur di Event Detail — di sini cuma
+              mengatur tampil/tidaknya kolomnya di PDF Result Slalom.
+            </small>
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.slalom.showTechnicalDelegate"
+              >Tampilkan Technical Delegate</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.slalom.showChiefJudge"
+              >Tampilkan Chief Judge</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.slalom.showRaceDirector"
+              >Tampilkan Race Director</b-form-checkbox
+            >
             </div>
           </div>
         </div>
@@ -627,16 +717,19 @@
         <div class="rs-card mb-3" v-if="showDrr">
           <div class="px-3 py-3">
             <div
-              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
               @click="toggleSection('drr')"
             >
-              <Icon
-                :icon="
-                  collapsedSections.drr ? 'mdi:chevron-right' : 'mdi:chevron-down'
-                "
-                class="mr-1"
-              />
-              Down River Race
+              <span class="rs-header-text">
+                <Icon
+                  :icon="
+                    collapsedSections.drr ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                  "
+                  class="mr-1"
+                />
+                Down River Race
+              </span>
+              <img class="rs-section-banner" :src="drrBannerImg" alt="" />
             </div>
             <div v-show="!collapsedSections.drr">
             <div class="font-weight-bold mb-2">Section Setting</div>
@@ -654,6 +747,80 @@
             <div class="d-flex justify-content-between">
               <small class="text-danger">Min {{ minSection }} Section</small>
               <small class="text-danger">Max {{ maxSection }} Section</small>
+            </div>
+
+            <hr class="rs-divider" />
+
+            <!-- PILIHAN PEN. START/FINISH/SECTION -->
+            <!-- Tentukan dulu Total Section di atas (min 2), baru atur
+                 daftar nilai penalty yg bisa dipilih di sini — daftar ini
+                 CUMA pilihan nilai per Start/Finish/tiap Section, bukan
+                 jumlah section itu sendiri. -->
+            <div
+              v-for="grp in drrPenaltyGroups"
+              :key="grp.key"
+              class="mb-4"
+            >
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <div class="font-weight-bold">{{ grp.title }}</div>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.drr[grp.key].length >= maxSprintPenalties"
+                  @click="addPenaltyRow('drr', grp.key)"
+                >
+                  + Tambah
+                </b-button>
+              </div>
+              <div
+                v-if="draft.drr[grp.key].length"
+                class="d-flex mb-1"
+                style="gap: 10px"
+              >
+                <small class="text-muted flex-grow-1">Label</small>
+                <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                  >Detik</small
+                >
+                <span style="width: 32px; flex: 0 0 32px"></span>
+              </div>
+              <div
+                v-for="(p, idx) in draft.drr[grp.key]"
+                :key="grp.key + '-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  v-model="p.label"
+                  placeholder="Label"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-form-input
+                  v-model.number="p.value"
+                  type="number"
+                  :min="grp.key === 'sectionPenalties' ? -600 : 0"
+                  max="600"
+                  :placeholder="
+                    grp.key === 'sectionPenalties' ? 'Detik (boleh minus)' : 'Detik'
+                  "
+                  style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.drr[grp.key].length <= 1"
+                  @click="removePenaltyRow('drr', grp.key, idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+              <small v-if="grp.key === 'sectionPenalties'" class="text-muted d-block mt-1">
+                Nilai minus (mis. -10) berlaku sbg bonus/pengurang waktu penalty.
+              </small>
             </div>
 
             <hr class="rs-divider" />
@@ -740,6 +907,33 @@
               (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
               kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
+
+            <hr class="rs-divider" />
+
+            <!-- PDF RESULT: on/off kolom tanda tangan -->
+            <div class="font-weight-bold mb-2">PDF Result</div>
+            <small class="text-muted d-block mb-2">
+              Nama & tanda tangan diatur di Event Detail — di sini cuma
+              mengatur tampil/tidaknya kolomnya di PDF Result DRR.
+            </small>
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.drr.showTechnicalDelegate"
+              >Tampilkan Technical Delegate</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.drr.showChiefJudge"
+              >Tampilkan Chief Judge</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.drr.showRaceDirector"
+              >Tampilkan Race Director</b-form-checkbox
+            >
             </div>
           </div>
         </div>
@@ -748,16 +942,19 @@
         <div class="rs-card mb-3" v-if="showRx">
           <div class="px-3 py-3">
             <div
-              class="h4 font-weight-bold mb-3 rs-section-toggle"
+              class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
               @click="toggleSection('rx')"
             >
-              <Icon
-                :icon="
-                  collapsedSections.rx ? 'mdi:chevron-right' : 'mdi:chevron-down'
-                "
-                class="mr-1"
-              />
-              Rafting Cross
+              <span class="rs-header-text">
+                <Icon
+                  :icon="
+                    collapsedSections.rx ? 'mdi:chevron-right' : 'mdi:chevron-down'
+                  "
+                  class="mr-1"
+                />
+                Rafting Cross
+              </span>
+              <img class="rs-section-banner" :src="rxBannerImg" alt="" />
             </div>
             <div v-show="!collapsedSections.rx">
             <div class="font-weight-bold mb-2">Heat Setting</div>
@@ -892,6 +1089,33 @@
               (mis. isi list Rank 1–5, lalu isi di sini utk Rank 6+). Isi 0
               kalau tim di luar daftar tidak mendapat score sama sekali.
             </small>
+
+            <hr class="rs-divider" />
+
+            <!-- PDF RESULT: on/off kolom tanda tangan -->
+            <div class="font-weight-bold mb-2">PDF Result</div>
+            <small class="text-muted d-block mb-2">
+              Nama & tanda tangan diatur di Event Detail — di sini cuma
+              mengatur tampil/tidaknya kolomnya di PDF Result Rafting Cross.
+            </small>
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.rx.showTechnicalDelegate"
+              >Tampilkan Technical Delegate</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.rx.showChiefJudge"
+              >Tampilkan Chief Judge</b-form-checkbox
+            >
+            <b-form-checkbox
+              class="rs-switch mb-2"
+              switch
+              v-model="draft.rx.showRaceDirector"
+              >Tampilkan Race Director</b-form-checkbox
+            >
             </div>
           </div>
         </div>
@@ -931,6 +1155,13 @@
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+// Gambar dekoratif di pojok kanan header tiap panel kategori (immersive) —
+// satu gambar khas per kategori, murni visual (tidak ada makna fungsional).
+import sprintBannerImg from "@/assets/images/Rectangle-3.png";
+import h2hBannerImg from "@/assets/images/Rectangle-4.png";
+import slalomBannerImg from "@/assets/images/Rectangle-4-1.png";
+import drrBannerImg from "@/assets/images/Rectangle-4-2.png";
+import rxBannerImg from "@/assets/images/Rectangle-5.png";
 
 // Default sesuai Pasal 37 & 43 FAJI: PS (Pen. Start) = 0/50 detik,
 // PF (Pen. Finish) = 0/10 detik. PS dan PF diatur independen.
@@ -1006,6 +1237,28 @@ const DEFAULT_SLALOM_FINISH_PENALTIES = [
 const DEFAULT_SLALOM_GATE_PENALTIES = [
   { label: "0", value: 0 },
   { label: "5", value: 5 },
+  { label: "50", value: 50 },
+];
+
+// Default Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Section DRR —
+// sebelumnya hardcoded & TIDAK bisa dikustomisasi sama sekali (PS/PF
+// berbagi whitelist {0,10,50} langsung di kode DownRiverRace.vue, Section
+// selalu pakai daftar optionPenalties global tanpa filter). Sekarang
+// independen per-event, pola sama dgn DEFAULT_SLALOM_*_PENALTIES.
+const DEFAULT_DRR_START_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_DRR_FINISH_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_DRR_SECTION_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
   { label: "50", value: 50 },
 ];
 
@@ -1094,6 +1347,16 @@ const DEFAULT_RX_SCORE_BY_RANK = DEFAULT_SPRINT_SCORE_BY_RANK.map((p) => ({
   ...p,
 }));
 
+// Default on/off kolom Technical Delegate/Chief Judge/Race Director di PDF
+// Result per kategori — default TAMPIL (true) di kelimanya, event manager
+// bisa matikan per kategori lewat toggle di bawah kalau tidak relevan utk
+// kategori itu (mis. Chief Judge cuma ada di Sprint, TD tidak dipakai di RX).
+const DEFAULT_PDF_SIGNATURE_TOGGLES = {
+  showTechnicalDelegate: true,
+  showChiefJudge: true,
+  showRaceDirector: true,
+};
+
 const DEFAULT_SETTINGS = {
   sprint: {
     startPenalties: DEFAULT_START_PENALTIES.map((p) => ({ ...p })),
@@ -1103,6 +1366,7 @@ const DEFAULT_SETTINGS = {
     // diisi Rank 1-5, sisanya 6+ semua dapat score ini). 0 = tidak dapat
     // score.
     defaultScoreBeyondRank: 0,
+    ...DEFAULT_PDF_SIGNATURE_TOGGLES,
   },
   h2h: {
     R1: true,
@@ -1114,6 +1378,7 @@ const DEFAULT_SETTINGS = {
     finishPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_H2H_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
+    ...DEFAULT_PDF_SIGNATURE_TOGGLES,
   },
   slalom: {
     totalGate: 14,
@@ -1122,11 +1387,16 @@ const DEFAULT_SETTINGS = {
     gatePenalties: DEFAULT_SLALOM_GATE_PENALTIES.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_SLALOM_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
+    ...DEFAULT_PDF_SIGNATURE_TOGGLES,
   },
   drr: {
     totalSection: 5,
+    startPenalties: DEFAULT_DRR_START_PENALTIES.map((p) => ({ ...p })),
+    finishPenalties: DEFAULT_DRR_FINISH_PENALTIES.map((p) => ({ ...p })),
+    sectionPenalties: DEFAULT_DRR_SECTION_PENALTIES.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_DRR_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
+    ...DEFAULT_PDF_SIGNATURE_TOGGLES,
   },
   rx: {
     teamsPerHeat: 4,
@@ -1135,6 +1405,7 @@ const DEFAULT_SETTINGS = {
     gate2: { enabled: true },
     scoreByRank: DEFAULT_RX_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
+    ...DEFAULT_PDF_SIGNATURE_TOGGLES,
   },
 };
 
@@ -1147,7 +1418,10 @@ export default {
     settings: { type: Object, default: () => ({ ...DEFAULT_SETTINGS }) },
     minGate: { type: Number, default: 8 },
     maxGate: { type: Number, default: 14 },
-    minSection: { type: Number, default: 3 },
+    // Minimal 2 Section — Total Section HARUS ditentukan dulu di sini
+    // sebelum daftar Pilihan Pen. Section di bawahnya bisa diisi dgn benar
+    // (tim butuh minimal 2 section supaya konsep "per-section" berarti apa2).
+    minSection: { type: Number, default: 2 },
     maxSection: { type: Number, default: 6 },
     minTeamsPerHeat: { type: Number, default: 3 },
     maxTeamsPerHeat: { type: Number, default: 8 },
@@ -1161,6 +1435,12 @@ export default {
       localShow: this.value,
       loading: false,
       saving: false, // <-- untuk disable tombol Update
+      // gambar dekoratif header panel (lihat komentar di import-nya)
+      sprintBannerImg,
+      h2hBannerImg,
+      slalomBannerImg,
+      drrBannerImg,
+      rxBannerImg,
       draft: this.mergeWithDefaults(this.settings),
       // null = belum dimuat/gagal dimuat -> fail-open (tampilkan semua
       // kategori) supaya kegagalan fetch tidak diam-diam menyembunyikan
@@ -1207,6 +1487,13 @@ export default {
         { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
         { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
         { key: "gatePenalties", title: "Pilihan Pen. Gates (PG)" },
+      ];
+    },
+    drrPenaltyGroups() {
+      return [
+        { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
+        { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
+        { key: "sectionPenalties", title: "Pilihan Pen. Section" },
       ];
     },
   },
@@ -1267,11 +1554,15 @@ export default {
         const n = parseInt(v, 10);
         return Number.isFinite(n) ? n : fb;
       };
-      const cleanList = (raw, fallback) => {
+      // allowNegative: KHUSUS Pilihan Pen. Section DRR — section boleh
+      // punya nilai minus (mis. -10) sbg bonus/pengurang waktu, beda dari
+      // penalty kategori lain yg selalu >= 0.
+      const cleanList = (raw, fallback, allowNegative) => {
         const arr = Array.isArray(raw) ? raw : fallback;
+        const min = allowNegative ? -600 : 0;
         const clean = arr.slice(0, this.maxSprintPenalties).map((p) => ({
           label: String((p && p.label) || "").slice(0, 40) || "0",
-          value: Math.max(0, Math.min(600, toInt(p && p.value, 0))),
+          value: Math.max(min, Math.min(600, toInt(p && p.value, 0))),
         }));
         return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
       };
@@ -1287,6 +1578,23 @@ export default {
           }));
         return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
       };
+
+      // Default TAMPIL (true) kalau belum pernah diatur sama sekali —
+      // dibedakan dari "eksplisit dimatikan" (false) via `undefined` check,
+      // BUKAN `!!raw` (yg bakal salah paksa jadi false pas raw belum ada).
+      const boolOrDefault = (raw, fallback) =>
+        raw === undefined || raw === null ? fallback : !!raw;
+      const signatureToggles = (catSrc) => ({
+        showTechnicalDelegate: boolOrDefault(
+          catSrc && catSrc.showTechnicalDelegate,
+          true
+        ),
+        showChiefJudge: boolOrDefault(catSrc && catSrc.showChiefJudge, true),
+        showRaceDirector: boolOrDefault(
+          catSrc && catSrc.showRaceDirector,
+          true
+        ),
+      });
 
       return {
         sprint: {
@@ -1309,6 +1617,7 @@ export default {
               toInt(src.sprint && src.sprint.defaultScoreBeyondRank, 0)
             )
           ),
+          ...signatureToggles(src.sprint),
         },
         h2h: {
           R1: !!(src.h2h && src.h2h.R1),
@@ -1338,6 +1647,7 @@ export default {
               toInt(src.h2h && src.h2h.defaultScoreBeyondRank, 0)
             )
           ),
+          ...signatureToggles(src.h2h),
         },
         slalom: {
           totalGate: toInt(src.slalom && src.slalom.totalGate, 14),
@@ -1364,9 +1674,23 @@ export default {
               toInt(src.slalom && src.slalom.defaultScoreBeyondRank, 0)
             )
           ),
+          ...signatureToggles(src.slalom),
         },
         drr: {
           totalSection: toInt(src.drr && src.drr.totalSection, 5),
+          startPenalties: cleanList(
+            src.drr && src.drr.startPenalties,
+            DEFAULT_DRR_START_PENALTIES
+          ),
+          finishPenalties: cleanList(
+            src.drr && src.drr.finishPenalties,
+            DEFAULT_DRR_FINISH_PENALTIES
+          ),
+          sectionPenalties: cleanList(
+            src.drr && src.drr.sectionPenalties,
+            DEFAULT_DRR_SECTION_PENALTIES,
+            true
+          ),
           scoreByRank: cleanScoreList(
             src.drr && src.drr.scoreByRank,
             DEFAULT_DRR_SCORE_BY_RANK
@@ -1378,6 +1702,7 @@ export default {
               toInt(src.drr && src.drr.defaultScoreBeyondRank, 0)
             )
           ),
+          ...signatureToggles(src.drr),
         },
         rx: (() => {
           const teamsPerHeat = Math.max(
@@ -1418,6 +1743,7 @@ export default {
                 toInt(src.rx && src.rx.defaultScoreBeyondRank, 0)
               )
             ),
+            ...signatureToggles(src.rx),
           };
         })(),
       };
@@ -1491,9 +1817,12 @@ export default {
       }
 
       // 1) Clamp nilai lokal
-      const cleanPenaltyList = (list) =>
+      // allowNegative: KHUSUS Pilihan Pen. Section DRR (lihat cleanList() di
+      // mergeWithDefaults() utk alasan yg sama).
+      const cleanPenaltyList = (list, allowNegative) =>
         (list || []).map((p) => {
-          const value = Math.max(0, Math.min(600, parseInt(p.value, 10) || 0));
+          const min = allowNegative ? -600 : 0;
+          const value = Math.max(min, Math.min(600, parseInt(p.value, 10) || 0));
           const label = String(p.label || "").trim() || String(value);
           return { label, value };
         });
@@ -1520,6 +1849,16 @@ export default {
       );
       this.draft.slalom.gatePenalties = cleanPenaltyList(
         this.draft.slalom.gatePenalties
+      );
+      this.draft.drr.startPenalties = cleanPenaltyList(
+        this.draft.drr.startPenalties
+      );
+      this.draft.drr.finishPenalties = cleanPenaltyList(
+        this.draft.drr.finishPenalties
+      );
+      this.draft.drr.sectionPenalties = cleanPenaltyList(
+        this.draft.drr.sectionPenalties,
+        true
       );
 
       this.draft.sprint.scoreByRank = (this.draft.sprint.scoreByRank || []).map(
@@ -1700,15 +2039,44 @@ export default {
   overflow: auto;
 }
 
-/* Header tiap card kategori — klik utk expand/collapse config-nya */
-.rs-section-toggle {
-  cursor: pointer;
-  user-select: none;
+/* Header tiap card kategori — klik utk expand/collapse config-nya. Teks di
+   kiri (rs-header-text), gambar dekoratif khas kategori di kanan
+   (rs-section-banner) supaya lebih immersive.
+   BUG FIX: dulu pakai nama class .rs-section-title/.rs-section-toggle yg
+   SAMA PERSIS dgn class GLOBAL (unscoped) yg sudah didefinisikan di
+   JudgesSettings.vue (<style> tanpa `scoped`, jadi bocor ke seluruh app) —
+   .rs-section-title global itu utk heading terpisah (font-size:20px,
+   margin-bottom:12px), beda tujuan sama sekali dgn flex-wrapper icon+teks
+   yg dimaksud di sini, jadi tabrakan gaya. .rs-header-row (bukan menimpa
+   .rs-section-toggle) dipakai khusus utk layout kiri-kanan baru ini supaya
+   tidak ikut collision itu. Gambarnya juga dulu pakai background-image +
+   background-size:cover di kotak pendek-lebar (220x44, rasio 5:1) — PNG-nya
+   sendiri hampir persegi (111x110 dst), jadi cover men-crop habis sebagian
+   besar ilustrasinya (nyaris tak kelihatan). Sekarang pakai <img> +
+   object-fit:contain supaya proporsi asli gambar tetap utuh, tidak
+   ke-crop, tinggal discale ke tinggi header. */
+.rs-header-row {
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.rs-header-row:hover .rs-header-text {
+  color: #1c4c7a;
+}
+.rs-header-text {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  margin-bottom: 0;
 }
-.rs-section-toggle:hover {
-  color: #1c4c7a;
+.rs-section-banner {
+  flex: 0 0 auto;
+  height: 48px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  object-position: right center;
 }
 
 /* Tombol close bulat merah */

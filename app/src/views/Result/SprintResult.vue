@@ -477,6 +477,11 @@ export default {
       // score fallback utk rank di luar daftar dataScore (Race Settings ->
       // Sprint -> "Score utk Rank N+ dan seterusnya")
       sprintDefaultScoreBeyondRank: 0,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
       // Daftar pilihan Pen. Start (PS) / Pen. Finish (PF) — {label,value,
       // timePen}[], sama pola dgn SprintRace.vue: default dari optionPenalties
       // (global), di-override per-event lewat Race Settings kalau ada.
@@ -632,7 +637,13 @@ export default {
 
     // Data untuk komponen PDF
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     pdfParticipants() {
       return (this.results || []).map((r) => ({
@@ -1012,6 +1023,23 @@ export default {
             const finishList = sprintSettings && toList(sprintSettings.finishPenalties);
             if (startList) this.dataPenaltiesStart = startList;
             if (finishList) this.dataPenaltiesFinish = finishList;
+
+            // On/off kolom Technical Delegate/Chief Judge/Race Director di
+            // PDF Result Sprint — diatur per kategori lewat Race Settings,
+            // default TAMPIL (true) kalau belum pernah diatur.
+            const boolOrDefault = (v, d) => (v === undefined || v === null ? d : !!v);
+            this.showTechnicalDelegate = boolOrDefault(
+              sprintSettings && sprintSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              sprintSettings && sprintSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              sprintSettings && sprintSettings.showRaceDirector,
+              true
+            );
 
             resolve();
           });

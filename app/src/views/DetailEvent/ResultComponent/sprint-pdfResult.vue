@@ -149,7 +149,7 @@
    <div class="sign sign-two">
   <!-- Kolom kiri: tiga tanda tangan -->
   <div class="sign-left">
-    <div class="sig-card" v-if="data.signature && data.signature.technicalDelegate">
+    <div class="sig-card" v-if="data.showTechnicalDelegate !== false">
       <div class="sign-title">Technical Delegate</div>
       <img
         v-if="data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
@@ -161,7 +161,7 @@
       <div class="sign-name">{{ data.technicalDelegate || "—" }}</div>
     </div>
 
-    <div class="sig-card" v-if="data.signature && data.signature.chiefJudge">
+    <div class="sig-card" v-if="data.showChiefJudge !== false">
       <div class="sign-title">Chief Judge</div>
       <img
         v-if="data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -173,7 +173,7 @@
       <div class="sign-name">{{ data.chiefJudge || "—" }}</div>
     </div>
 
-    <div class="sig-card" v-if="data.signature && data.signature.raceDirector">
+    <div class="sig-card" v-if="data.showRaceDirector !== false">
       <div class="sign-title">Race Director</div>
       <img
         v-if="data.raceDirectorSignature && data.raceDirectorSignature.secure_url"

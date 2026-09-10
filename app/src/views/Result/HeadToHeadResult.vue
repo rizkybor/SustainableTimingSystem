@@ -514,6 +514,11 @@ export default {
       podium: [],
       showPdf: false,
       eventInfo: {},
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
       showOverallModal: false,
       dataAggregate: null,
       selectedInitialName: "",
@@ -637,7 +642,13 @@ export default {
       return parts.join(" - ");
     },
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     pdfOverallPkg() {
       return {
@@ -715,6 +726,7 @@ export default {
       await this.loadEventById(q.eventId);
       this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
     this.selectedInitialName = String(q.initialName || "").toUpperCase();
     await this.loadH2HResult();
@@ -722,6 +734,39 @@ export default {
   },
 
   methods: {
+    // On/off kolom Technical Delegate/Chief Judge/Race Director di PDF
+    // Result H2H — diatur per kategori lewat Race Settings, default TAMPIL
+    // (true) kalau belum pernah diatur. Sama pola dgn loadRaceSettings() di
+    // SprintResult.vue/DrrResult.vue.
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const h2hSettings = res && res.ok && res.settings && res.settings.h2h;
+            const boolOrDefault = (v, d) =>
+              v === undefined || v === null ? d : !!v;
+            this.showTechnicalDelegate = boolOrDefault(
+              h2hSettings && h2hSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              h2hSettings && h2hSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              h2hSettings && h2hSettings.showRaceDirector,
+              true
+            );
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan default (true) kalau gagal memuat override
+      }
+    },
+
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },

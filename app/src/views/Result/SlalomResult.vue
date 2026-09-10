@@ -595,6 +595,11 @@ export default {
         { ranking: 32, score: 42 },
       ],
       slalomDefaultScoreBeyondRank: 0,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
       // Daftar pilihan Start/Finish/Gate Penalty (global optionPenalties
       // "SLALOM") — sama sumber & filter value yg dipakai SlalomRace.vue
       // (filteredPenalties()), dipakai dropdown editable di tabel ini.
@@ -631,7 +636,7 @@ export default {
     },
     hasEventLogo() {
       const ev = this.eventInfo || {};
-      const logos = ev.event_logo;
+      const logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         const first = logos[0];
         if (typeof first === "string" && first) return true;
@@ -647,7 +652,7 @@ export default {
     },
     eventLogoUrl() {
       const ev = this.eventInfo || {};
-      const logos = ev.event_logo;
+      const logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         const first = logos[0];
         if (typeof first === "string") return first;
@@ -688,7 +693,13 @@ export default {
 
     // data buat PDF
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     pdfParticipants() {
       const items = Array.isArray(this.rawResultItems)
@@ -946,6 +957,21 @@ export default {
                 this.dataPenaltiesGate = sl.gatePenalties;
               }
             }
+
+            // On/off kolom Technical Delegate/Chief Judge/Race Director di
+            // PDF Result Slalom — diatur per kategori lewat Race Settings,
+            // default TAMPIL (true) kalau belum pernah diatur.
+            const boolOrDefault = (v, d) => (v === undefined || v === null ? d : !!v);
+            this.showTechnicalDelegate = boolOrDefault(
+              sl && sl.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(sl && sl.showChiefJudge, true);
+            this.showRaceDirector = boolOrDefault(
+              sl && sl.showRaceDirector,
+              true
+            );
+
             resolve();
           });
           ipcRenderer.send("race-settings:get", eventId);

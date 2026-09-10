@@ -126,9 +126,23 @@
           >Cancel</b-button
         >
         <div>
-          <b-dropdown variant="outline-primary" class="mr-2" text="Download Result">
-            <b-dropdown-item @click="generatePdfOverall">PDF</b-dropdown-item>
-            <b-dropdown-item @click="downloadExcel">Excel (.xlsx)</b-dropdown-item>
+          <b-dropdown
+            variant="link"
+            toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+            menu-class="dropdown-menu--pill"
+            no-caret
+          >
+            <template #button-content>
+              <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+              Download Result
+              <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+            </template>
+            <b-dropdown-item @click="generatePdfOverall">
+              <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+            </b-dropdown-item>
+            <b-dropdown-item @click="downloadExcel">
+              <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+            </b-dropdown-item>
           </b-dropdown>
         </div>
       </div>
@@ -169,6 +183,7 @@
 import VueHtml2pdf from "vue-html2pdf";
 import OverallPdf from "../../views/DetailEvent/ResultComponent/Overall/by-alltime.vue";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { Icon } from "@iconify/vue2";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 
@@ -178,6 +193,7 @@ export default {
     VueHtml2pdf,
     OverallPdf,
     CountryFlag,
+    Icon,
   },
   data() {
     return {
@@ -450,6 +466,57 @@ export default {
   border-radius: 8px;
   font-weight: 700;
   padding: 6px 14px;
+}
+
+/* Download Result — sama pola pill+icon dgn Result pages (Sprint/H2H/
+   Slalom/DRR/RX), dulu cuma <b-dropdown variant="outline-primary"> polos
+   tanpa styling sama sekali. toggle-class/menu-class dirender oleh
+   <b-dropdown> (komponen anak), jadi butuh deep selector (>>>) supaya
+   scoped CSS di sini bisa menjangkaunya. */
+.btn-row >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.btn-row >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.btn-row >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.btn-row >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.btn-row >>> .btn-pill--solid:hover,
+.btn-row >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.btn-row >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.btn-row >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
 }
 
 /* --- Batasi tampilan maksimal 10 baris tanpa ubah lebar kolom --- */

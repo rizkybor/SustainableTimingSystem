@@ -469,6 +469,74 @@
 
             <hr class="rs-divider" />
 
+            <!-- PILIHAN PEN. START/FINISH/GATES -->
+            <!-- Totalnya (jumlah gate) tetap ikut "Total Gate" di atas —
+                 konfigurasi ini cuma daftar NILAI penalty yg bisa dipilih
+                 operator per Start/Finish/tiap Gate, bukan jumlah gate. -->
+            <div
+              v-for="grp in slalomPenaltyGroups"
+              :key="grp.key"
+              class="mb-4"
+            >
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <div class="font-weight-bold">{{ grp.title }}</div>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.slalom[grp.key].length >= maxSprintPenalties"
+                  @click="addPenaltyRow('slalom', grp.key)"
+                >
+                  + Tambah
+                </b-button>
+              </div>
+              <div
+                v-if="draft.slalom[grp.key].length"
+                class="d-flex mb-1"
+                style="gap: 10px"
+              >
+                <small class="text-muted flex-grow-1">Label</small>
+                <small class="text-muted" style="width: 100px; flex: 0 0 100px"
+                  >Detik</small
+                >
+                <span style="width: 32px; flex: 0 0 32px"></span>
+              </div>
+              <div
+                v-for="(p, idx) in draft.slalom[grp.key]"
+                :key="grp.key + '-' + idx"
+                class="d-flex align-items-center mb-2"
+                style="gap: 10px"
+              >
+                <b-form-input
+                  v-model="p.label"
+                  placeholder="Label"
+                  style="border-radius: 10px"
+                  class="flex-grow-1"
+                />
+                <b-form-input
+                  v-model.number="p.value"
+                  type="number"
+                  min="0"
+                  max="600"
+                  placeholder="Detik"
+                  style="border-radius: 10px; width: 100px; flex: 0 0 100px"
+                />
+                <b-button
+                  size="sm"
+                  variant="outline-danger"
+                  style="border-radius: 8px"
+                  :disabled="draft.slalom[grp.key].length <= 1"
+                  @click="removePenaltyRow('slalom', grp.key, idx)"
+                >
+                  ✕
+                </b-button>
+              </div>
+            </div>
+
+            <hr class="rs-divider" />
+
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div class="font-weight-bold">Score by Rank</div>
@@ -921,6 +989,26 @@ const DEFAULT_H2H_PENALTIES = [
   { label: "50", value: 50 },
 ];
 
+// Default Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Gates (PG)
+// Slalom — sebelumnya hardcoded & TIDAK bisa dikustomisasi sama sekali
+// (PS/PF berbagi {0,10,50}, Gate {0,5,50} tetap di kode SlalomRace.vue).
+// Sekarang independen per-event, pola sama dgn DEFAULT_H2H_PENALTIES.
+const DEFAULT_SLALOM_START_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_SLALOM_FINISH_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "10", value: 10 },
+  { label: "50", value: 50 },
+];
+const DEFAULT_SLALOM_GATE_PENALTIES = [
+  { label: "0", value: 0 },
+  { label: "5", value: 5 },
+  { label: "50", value: 50 },
+];
+
 // Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
 // "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
 // dikustomisasi per-event (pola sama dgn DEFAULT_SPRINT_SCORE_BY_RANK).
@@ -1029,6 +1117,9 @@ const DEFAULT_SETTINGS = {
   },
   slalom: {
     totalGate: 14,
+    startPenalties: DEFAULT_SLALOM_START_PENALTIES.map((p) => ({ ...p })),
+    finishPenalties: DEFAULT_SLALOM_FINISH_PENALTIES.map((p) => ({ ...p })),
+    gatePenalties: DEFAULT_SLALOM_GATE_PENALTIES.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_SLALOM_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
   },
@@ -1109,6 +1200,13 @@ export default {
         { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
         { key: "cutLinePenalties", title: "Pilihan Cut Line (CL)" },
         { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
+      ];
+    },
+    slalomPenaltyGroups() {
+      return [
+        { key: "startPenalties", title: "Pilihan Pen. Start (PS)" },
+        { key: "finishPenalties", title: "Pilihan Pen. Finish (PF)" },
+        { key: "gatePenalties", title: "Pilihan Pen. Gates (PG)" },
       ];
     },
   },
@@ -1243,6 +1341,18 @@ export default {
         },
         slalom: {
           totalGate: toInt(src.slalom && src.slalom.totalGate, 14),
+          startPenalties: cleanList(
+            src.slalom && src.slalom.startPenalties,
+            DEFAULT_SLALOM_START_PENALTIES
+          ),
+          finishPenalties: cleanList(
+            src.slalom && src.slalom.finishPenalties,
+            DEFAULT_SLALOM_FINISH_PENALTIES
+          ),
+          gatePenalties: cleanList(
+            src.slalom && src.slalom.gatePenalties,
+            DEFAULT_SLALOM_GATE_PENALTIES
+          ),
           scoreByRank: cleanScoreList(
             src.slalom && src.slalom.scoreByRank,
             DEFAULT_SLALOM_SCORE_BY_RANK
@@ -1401,6 +1511,15 @@ export default {
       );
       this.draft.h2h.finishPenalties = cleanPenaltyList(
         this.draft.h2h.finishPenalties
+      );
+      this.draft.slalom.startPenalties = cleanPenaltyList(
+        this.draft.slalom.startPenalties
+      );
+      this.draft.slalom.finishPenalties = cleanPenaltyList(
+        this.draft.slalom.finishPenalties
+      );
+      this.draft.slalom.gatePenalties = cleanPenaltyList(
+        this.draft.slalom.gatePenalties
       );
 
       this.draft.sprint.scoreByRank = (this.draft.sprint.scoreByRank || []).map(

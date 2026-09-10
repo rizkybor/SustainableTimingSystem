@@ -152,6 +152,36 @@
                   Belum Bertanding
                 </span>
               </template>
+              <template v-else-if="slalomStatusMap">
+                <span
+                  v-if="slalomStatusForRow(r).run1 && slalomStatusForRow(r).run2"
+                  class="status-badge status-competed"
+                  title="Run 1 & Run 2 tim ini sudah punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Bertanding di Run 1 & 2
+                </span>
+                <span
+                  v-else-if="slalomStatusForRow(r).run1"
+                  class="status-badge status-in-round"
+                  title="Run 1 sudah, Run 2 tim ini belum punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Belum Bertanding di Run 2
+                </span>
+                <span
+                  v-else-if="slalomStatusForRow(r).run2"
+                  class="status-badge status-in-round"
+                  title="Run 2 sudah, Run 1 tim ini belum punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Belum Bertanding di Run 1
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding di Run 1 & 2
+                </span>
+              </template>
               <template v-else>
                 <span
                   v-if="hasCompeted(r)"
@@ -224,6 +254,12 @@ export default {
     // Round X / Sudah Selesai Bertanding) alih2 flag biner competedSet.
     // null/undefined = kategori lain, pakai competedSet seperti biasa.
     h2hStatusMap: { type: Object, default: null },
+    // KHUSUS SLALOM: Object (key = bibTeam, atau nama tim uppercased kalau
+    // bib kosong) -> { run1: bool, run2: bool } — kalau diisi (non-null),
+    // kolom Status menampilkan 3 tingkat (Belum Bertanding di Run 1 & 2 /
+    // Belum Bertanding di Run 2 / Sudah Bertanding di Run 1 & 2) alih2 flag
+    // biner competedSet. null/undefined = kategori lain, pakai competedSet.
+    slalomStatusMap: { type: Object, default: null },
     draft: { type: Object, default: null },
     loading: { type: Boolean, default: false },
     // panel paling atas per kategori (comboIdx === 0 di parent) default
@@ -278,6 +314,18 @@ export default {
         .toUpperCase();
       const found = nm && this.h2hStatusMap ? this.h2hStatusMap[nm] : null;
       return found || { status: "pending", roundName: "" };
+    },
+    // KHUSUS SLALOM — cocokkan by bibTeam dulu, fallback ke nama (uppercased)
+    // kalau bib kosong, sesuai kunci yg dipakai loadSlalomStatusForPanel() di
+    // Details/index.vue (dibangun dari dokumen temporarySlalomResult).
+    slalomStatusForRow(row) {
+      const bib = String((row && row.bibTeam) || "").trim();
+      const nm = String((row && (row.nameTeam || row.teamName)) || "")
+        .trim()
+        .toUpperCase();
+      const key = bib || nm;
+      const found = key && this.slalomStatusMap ? this.slalomStatusMap[key] : null;
+      return found || { run1: false, run2: false };
     },
     onPickTeam(val) {
       this.$emit("draft-change", {

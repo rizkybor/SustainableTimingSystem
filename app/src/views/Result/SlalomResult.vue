@@ -258,7 +258,7 @@
                   size="sm"
                   class="small-select"
                   :value="r.startPenalty"
-                  :options="filteredPenalties('SF')"
+                  :options="filteredPenalties('START')"
                   text-field="label"
                   value-field="value"
                   @change="
@@ -274,7 +274,7 @@
                   size="sm"
                   class="small-select"
                   :value="r.finishPenalty"
-                  :options="filteredPenalties('SF')"
+                  :options="filteredPenalties('FINISH')"
                   text-field="label"
                   value-field="value"
                   @change="
@@ -599,6 +599,11 @@ export default {
       // "SLALOM") — sama sumber & filter value yg dipakai SlalomRace.vue
       // (filteredPenalties()), dipakai dropdown editable di tabel ini.
       dataPenalties: [],
+      // Override per-event dari Race Settings (Pilihan Pen. Start/Finish/
+      // Gates), diisi di loadRaceSettings(); kosong = pakai default global.
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
+      dataPenaltiesGate: [],
     };
   },
 
@@ -923,6 +928,24 @@ export default {
                   res.settings.slalom &&
                   res.settings.slalom.defaultScoreBeyondRank
               ) || 0;
+            // Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Gates (PG) —
+            // sinkron dgn override di SlalomRace.vue supaya dropdown editable
+            // di halaman Result ini identik dgn Race Detail.
+            const sl = res && res.ok && res.settings && res.settings.slalom;
+            if (sl) {
+              if (Array.isArray(sl.startPenalties) && sl.startPenalties.length) {
+                this.dataPenaltiesStart = sl.startPenalties;
+              }
+              if (
+                Array.isArray(sl.finishPenalties) &&
+                sl.finishPenalties.length
+              ) {
+                this.dataPenaltiesFinish = sl.finishPenalties;
+              }
+              if (Array.isArray(sl.gatePenalties) && sl.gatePenalties.length) {
+                this.dataPenaltiesGate = sl.gatePenalties;
+              }
+            }
             resolve();
           });
           ipcRenderer.send("race-settings:get", eventId);
@@ -1554,17 +1577,30 @@ export default {
       }
     },
 
-    // context: 'SF' (Start/Finish) atau 'GATE' — sama persis dgn
-    // filteredPenalties() di SlalomRace.vue supaya daftar pilihannya identik.
+    // context: 'START' / 'FINISH' / 'GATE' — sama persis dgn
+    // filteredPenalties() di SlalomRace.vue supaya daftar pilihannya identik,
+    // termasuk override per-event dari Race Settings kalau ada.
     filteredPenalties(context) {
-      if (context === "SF") {
-        return this.dataPenalties.filter(
-          (p) => p.value === 0 || p.value === 10 || p.value === 50
-        );
+      const ctx = String(context || "").toUpperCase();
+      if (ctx === "START") {
+        return this.dataPenaltiesStart.length
+          ? this.dataPenaltiesStart
+          : this.dataPenalties.filter(
+              (p) => p.value === 0 || p.value === 10 || p.value === 50
+            );
       }
-      return this.dataPenalties.filter(
-        (p) => p.value === 0 || p.value === 5 || p.value === 50
-      );
+      if (ctx === "FINISH") {
+        return this.dataPenaltiesFinish.length
+          ? this.dataPenaltiesFinish
+          : this.dataPenalties.filter(
+              (p) => p.value === 0 || p.value === 10 || p.value === 50
+            );
+      }
+      return this.dataPenaltiesGate.length
+        ? this.dataPenaltiesGate
+        : this.dataPenalties.filter(
+            (p) => p.value === 0 || p.value === 5 || p.value === 50
+          );
     },
 
     _parseHmsToMs(str) {

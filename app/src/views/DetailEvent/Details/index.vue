@@ -160,6 +160,7 @@
         :teams-available="availableFor(combo.division, combo.race)"
         :competed-set="competedSetFor(combo.panelKey)"
         :h2h-status-map="h2hStatusFor(combo.panelKey)"
+        :slalom-status-map="slalomStatusFor(combo.panelKey)"
         :draft="draftMap[combo.panelKey]"
         :loading="loadingByPanel[combo.panelKey]"
         @add-draft="addDraft(combo.division, combo.race)"
@@ -376,6 +377,14 @@ export default {
       // (h2h_results) — bukan cuma flag "sudah/belum" seperti kategori lain.
       h2hStatusByPanel: {},
       lastH2HStatusTokenByPanel: {},
+      // per-panel: Map (key by bib/nama team, uppercased) -> { run1: bool,
+      // run2: bool } — KHUSUS kategori SLALOM, dipakai TeamPanel utk
+      // menampilkan status 3-tingkat (Belum Bertanding di Run 1 & 2 / Belum
+      // Bertanding di Run 2 / Sudah Bertanding di Run 1 & 2), dibangun dari
+      // dokumen temporarySlalomResult (result[0]/result[1].totalTime) —
+      // beda dari kategori lain yang cuma flag "sudah/belum" biner.
+      slalomStatusByPanel: {},
+      lastSlalomStatusTokenByPanel: {},
       loadingByPanel: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -1620,6 +1629,65 @@ export default {
       return this.h2hStatusByPanel[panelKey] || null;
     },
 
+    // KHUSUS SLALOM: bangun status per-run per tim dari temporarySlalomResult
+    // (result[0] = Run 1, result[1] = Run 2; totalTime terisi = run sudah
+    // dikerjakan) — dipakai TeamPanel utk kolom Status 3-tingkat, beda dari
+    // kategori lain yang cuma flag "sudah/belum" biner (loadEventResultsForPanel()).
+    async loadSlalomStatusForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastSlalomStatusTokenByPanel[panelKey] = token;
+
+      const query = {
+        eventId: identity.eventId,
+        initialId: identity.initialId,
+        raceId: identity.raceId,
+        divisionId: identity.divisionId,
+      };
+      const reqId = "slalomstatus|" + panelKey + "|" + token;
+
+      const res = await this._fetchOnce("get-slalom-result", query, reqId);
+
+      if (this.lastSlalomStatusTokenByPanel[panelKey] !== token) return;
+
+      const docs = res && res.ok && Array.isArray(res.items) ? res.items : [];
+      const statusMap = {};
+      docs.forEach((doc) => {
+        const teams = Array.isArray(doc && doc.teams) ? doc.teams : [];
+        teams.forEach((t) => {
+          const key =
+            String((t && t.bibTeam) || "").trim() ||
+            String((t && t.nameTeam) || "").trim().toUpperCase();
+          if (!key) return;
+          const runs = Array.isArray(t.result) ? t.result : [];
+          const run1 = !!(runs[0] && String(runs[0].totalTime || "").trim());
+          const run2 = !!(runs[1] && String(runs[1].totalTime || "").trim());
+          statusMap[key] = { run1, run2 };
+        });
+      });
+
+      this.$set(this.slalomStatusByPanel, panelKey, statusMap);
+    },
+
+    // Status detail per tim (KHUSUS SLALOM) utk panel ini — dipakai template
+    // lewat prop slalom-status-map di <team-panel>. null kalau kategori
+    // aktif BUKAN SLALOM, dgn alasan sama seperti h2hStatusFor() di atas:
+    // panelKey dipakai bersama lintas kategori, jadi guard WAJIB di sini.
+    slalomStatusFor(panelKey) {
+      if (this._safeSelectedName(this.raceActive) !== "SLALOM") return null;
+      return this.slalomStatusByPanel[panelKey] || null;
+    },
+
     // Fetch satu kali (reqId-safe, aman dipanggil bersamaan dgn request lain
     // di channel yang sama) — dipakai autoFillFromPreviousCategory() utk
     // mengintip bucket/hasil kategori LAIN (bukan yg sedang ditampilkan di
@@ -1799,6 +1867,9 @@ export default {
         jobs.push(this.loadEventResultsForPanel(div, race));
         if (this._safeSelectedName(this.raceActive) === "HEAD2HEAD") {
           jobs.push(this.loadH2HStatusForPanel(div, race));
+        }
+        if (this._safeSelectedName(this.raceActive) === "SLALOM") {
+          jobs.push(this.loadSlalomStatusForPanel(div, race));
         }
       });
       await Promise.all(jobs);

@@ -96,19 +96,33 @@
               </div>
 
               <div class="meta-row">
-                <!-- Select category -->
-                <b-form-group
-                  label="Switch Slalom Category:"
-                  label-for="sprintBucketSelect"
-                  class="mb-0 slalom-actionbar__select"
-                >
-                  <b-form-select
-                    id="slalomBucketSelect"
-                    :options="slalomBucketOptions"
-                    v-model="selectedSlalomKey"
-                    @change="onSelectSlalomBucket"
-                  />
-                </b-form-group>
+                <!-- Select category: pilih Initial dulu, baru Divisi/Race —
+                     sama pola dgn Switch Sprint/H2H Category -->
+                <div class="slalom-actionbar__select">
+                  <div class="switch-label mb-1">Switch Slalom Category:</div>
+
+                  <div class="init-tabs mb-2" v-if="slalomInitials.length">
+                    <button
+                      v-for="i in slalomInitials"
+                      :key="i.id"
+                      type="button"
+                      class="init-tab"
+                      :class="{ active: selectedInitialName === i.name }"
+                      @click="selectInitialTab(i)"
+                    >
+                      {{ i.name }}
+                    </button>
+                  </div>
+
+                  <b-form-group label-for="slalomBucketSelect" class="mb-0">
+                    <b-form-select
+                      id="slalomBucketSelect"
+                      :options="slalomOptionsForSelectedInitial"
+                      v-model="selectedSlalomKey"
+                      @change="onSelectSlalomBucket"
+                    />
+                  </b-form-group>
+                </div>
               </div>
             </div>
           </b-col>
@@ -217,25 +231,19 @@
             class="d-flex justify-content-start mb-2"
             v-if="visibleTeams && visibleTeams.length"
           >
-            <div class="btn-group" role="group" aria-label="Run Switch">
+            <div class="session-tabs" role="group" aria-label="Run Switch">
               <button
                 type="button"
-                class="mr-2 btn"
-                :class="{
-                  'btn-action-active': activeRun === 0,
-                  'btn-action': activeRun !== 0,
-                }"
+                class="session-tab"
+                :class="{ active: activeRun === 0 }"
                 @click="setRun(0)"
               >
                 Run Session #1
               </button>
               <button
                 type="button"
-                class="btn"
-                :class="{
-                  'btn-action-active': activeRun === 1,
-                  'btn-action': activeRun !== 1,
-                }"
+                class="session-tab"
+                :class="{ active: activeRun === 1 }"
                 @click="setRun(1)"
               >
                 Run Session #2
@@ -259,7 +267,7 @@
                 <!-- SAVE ONLY SESSION 1 -->
                 <button
                   type="button"
-                  class="btn-action btn-success"
+                  class="action-pill action-pill--save"
                   @click="saveSession1"
                   :disabled="!teams.length"
                   title="Simpan hanya run/session #1"
@@ -271,7 +279,7 @@
                 <!-- SHOW RESULT SESSION 1 (MODAL) -->
                 <button
                   type="button"
-                  class="btn-action btn-primary"
+                  class="action-pill action-pill--view"
                   @click="openSession1Modal"
                   title="Tampilkan Result Session 1 dari database"
                 >
@@ -282,7 +290,7 @@
                 <!-- PRINT PDF SESSION 1 -->
                 <button
                   type="button"
-                  class="btn-action btn-warning"
+                  class="action-pill action-pill--pdf"
                   @click="printPdfSession1"
                   title="Download PDF khusus Session 1"
                 >
@@ -292,7 +300,7 @@
 
                 <button
                   type="button"
-                  class="btn-action btn-secondary"
+                  class="action-pill action-pill--primary"
                   @click="saveResult"
                   :disabled="!teams.length"
                   title="Simpan hasil Slalom (semua tim & semua run)"
@@ -302,7 +310,8 @@
 
                 <button
                   type="button"
-                  class="btn-action btn-info"
+                  class="action-pill action-pill--sort"
+                  :class="{ 'is-active': sortBest.enabled }"
                   @click="toggleSortRanked"
                   :disabled="!teams.length"
                   :title="
@@ -318,6 +327,18 @@
                   <small v-if="sortBest.enabled" class="ml-1">
                     ({{ sortBest.desc ? "DESC" : "ASC" }})
                   </small>
+                </button>
+
+                <!-- RESET ALL — destruktif, hapus SEMUA waktu Slalom yang
+                     sudah bertanding pada event ini (semua divisi/race) -->
+                <button
+                  type="button"
+                  class="action-pill action-pill--danger"
+                  @click="openResetAllModal"
+                  title="Hapus semua waktu yang sudah bertanding di Slalom (semua kategori) pada event ini"
+                >
+                  <Icon icon="mdi:restore-alert" />
+                  Reset All
                 </button>
               </div>
             </div>
@@ -412,7 +433,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).startPenalty"
-                        :options="filteredPenalties('SF')"
+                        :options="filteredPenalties('START')"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -446,7 +467,7 @@
                       <b-form-select
                         class="small-select"
                         v-model="currentSession(team).finishPenalty"
-                        :options="filteredPenalties('SF')"
+                        :options="filteredPenalties('FINISH')"
                         text-field="label"
                         value-field="value"
                         size="sm"
@@ -465,7 +486,7 @@
                       style="min-width: 70px; border-radius: 12px"
                       class="small-select"
                       v-model="currentSession(team).startPenalty"
-                      :options="filteredPenalties('SF')"
+                      :options="filteredPenalties('START')"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -496,7 +517,7 @@
                       class="small-select"
                       style="min-width: 70px; border-radius: 12px"
                       v-model="currentSession(team).finishPenalty"
-                      :options="filteredPenalties('SF')"
+                      :options="filteredPenalties('FINISH')"
                       text-field="label"
                       value-field="value"
                       size="sm"
@@ -656,6 +677,67 @@
             </div>
           </b-modal>
 
+          <!-- MODAL: konfirmasi Reset All (seluruh kategori Slalom di event ini) -->
+          <b-modal
+            v-model="showResetAllModal"
+            title="Reset All - Slalom"
+            centered
+            no-close-on-backdrop
+            :no-close-on-esc="resetAllInProgress"
+            hide-footer
+            @hidden="onResetAllModalHidden"
+          >
+            <p class="mb-2">
+              Tindakan ini akan <strong>menghapus semua waktu yang sudah
+              bertanding di Slalom</strong> — Run 1, Run 2, penalty, dan skor
+              overall Slalom — utk <strong>SELURUH kategori Slalom</strong>
+              (semua kombinasi divisi/race/initial) pada event ini.
+            </p>
+            <p class="mb-2">
+              Semua tim akan kembali ke kondisi belum bertanding, seperti
+              sebelum ada hasil sama sekali. Kategori lain (Sprint/Head to
+              Head/DRR/Rafting Cross) <strong>tidak</strong> ikut terhapus.
+            </p>
+            <p class="mb-3">
+              Tindakan ini <strong>tidak dapat dibatalkan</strong>.
+            </p>
+
+            <b-form-group v-if="!resetAllInProgress">
+              <label class="small text-muted mb-1">
+                Ketik <strong>{{ RESET_ALL_CONFIRM_PHRASE }}</strong> untuk konfirmasi:
+              </label>
+              <b-form-input
+                v-model="resetAllConfirmText"
+                :placeholder="RESET_ALL_CONFIRM_PHRASE"
+                autocomplete="off"
+                @keyup.enter="confirmResetAll"
+              />
+            </b-form-group>
+            <div v-else class="text-center text-muted py-3">
+              <b-spinner small class="mr-2" />
+              Mereset semua kategori Slalom...
+            </div>
+
+            <div class="d-flex justify-content-end" style="gap: 8px">
+              <b-button
+                variant="outline-secondary"
+                :disabled="resetAllInProgress"
+                @click="showResetAllModal = false"
+              >
+                Batal
+              </b-button>
+              <b-button
+                variant="danger"
+                :disabled="
+                  resetAllConfirmText !== RESET_ALL_CONFIRM_PHRASE || resetAllInProgress
+                "
+                @click="confirmResetAll"
+              >
+                Reset All
+              </b-button>
+            </div>
+          </b-modal>
+
           <vue-html2pdf
             v-show="true"
             ref="html2PdfS1"
@@ -766,7 +848,16 @@ function buildGates(n) {
     return i + 1;
   });
 }
-const PENALTY_VALUE_TO_MS = { 0: 0, 5: 5000, 50: 50000 };
+// BUG FIX: dulu lookup table TETAP {0,5,50} — nilai penalty custom apa pun
+// dari konfigurasi Pilihan Pen. Start/Finish/Gates di Race Settings akan
+// selalu ke-konversi jadi 0ms krn tidak ada di tabel ini. `value` penalty di
+// seluruh app ini SELALU berarti detik (sama konvensi dgn Sprint/H2H —
+// lihat DEFAULT_START_PENALTIES di editRaceSettings.js), jadi konversi ke
+// ms cukup dikali 1000 langsung, tidak perlu tabel lookup sama sekali.
+function penaltyValueToMs(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n * 1000 : 0;
+}
 
 /** ===== Payload baru: ambil bucket & teams (seperti Sprint Result) ===== */
 function normalizeTeamFromBucketForSlalom(t) {
@@ -860,10 +951,16 @@ function getBucket() {
   return obj.bucket || {};
 }
 
+// BUG FIX: dulu whitelist KETAT {0,5,50} — nilai penalty apa pun di luar 3
+// angka itu (termasuk custom value hasil konfigurasi Pilihan Pen. Start/
+// Finish/Gates di Race Settings) langsung dipaksa jadi 0, seolah-olah tidak
+// pernah diisi. Ganti jadi clamp umum (0-600 detik, sama batas dgn
+// cleanPenaltyList() di editRaceSettings.js) — tetap menolak sampah
+// (negatif/NaN/di luar wajar) tanpa membatasi ke 3 nilai tertentu.
 function clampPenalty(v) {
-  var n = Number(v);
-  if (n === 0 || n === 5 || n === 50) return n;
-  return 0; // selain 0/5/50 dibersihkan ke 0 (contoh 10 -> 0)
+  var n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(600, n);
 }
 
 function fitGates(arr, need) {
@@ -880,9 +977,7 @@ function fitGates(arr, need) {
 }
 
 function penaltyMsFromValues(start, gates, finish) {
-  const toMs = function (v) {
-    return PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
-  };
+  const toMs = penaltyValueToMs;
   const core = Array.isArray(gates)
     ? gates.reduce(function (a, v) {
         return a + toMs(v);
@@ -948,11 +1043,21 @@ export default {
       showSession1Modal: false,
       loadingSession1: false,
       session1Rows: [],
+      // Reset All (destruktif) — hapus semua waktu Slalom yg sudah
+      // bertanding utk SELURUH kategori Slalom event ini, sama pola dgn
+      // Reset All di HeadToHead.vue.
+      showResetAllModal: false,
+      resetAllConfirmText: "",
+      resetAllInProgress: false,
+      RESET_ALL_CONFIRM_PHRASE: "RESET SLALOM",
       isLoading: false,
       defaultImg,
       slalomBucketOptions: [],
       slalomBucketMap: Object.create(null),
       selectedSlalomKey: "",
+      // Switch Slalom Category (sama pola dgn SprintRace.vue): tab Initial
+      // yg sedang dipilih di switcher.
+      selectedInitialName: "",
       endGame: false,
       activeRun: 0,
       sortBest: { enabled: false, desc: false },
@@ -962,6 +1067,11 @@ export default {
       teams: [],
       selectedSession: {},
       dataPenalties: [],
+      // Diisi dari Race Settings (slalom.startPenalties/finishPenalties/
+      // gatePenalties) di loadRaceSettings() kalau event sudah dikustomisasi.
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
+      dataPenaltiesGate: [],
       dataScore: [],
       slalomDefaultScoreBeyondRank: 0,
       penaltiesWrapped: false,
@@ -1034,6 +1144,25 @@ export default {
         });
       }
       return [];
+    },
+
+    // Kombinasi Divisi/Race (mis. "R4 MEN") milik Initial yang sedang aktif
+    // saja — sama pola dgn sprintOptionsForSelectedInitial() di
+    // SprintRace.vue; labelnya tidak perlu menyertakan nama Initial lagi
+    // krn sudah dipilih lewat tab di atasnya.
+    slalomOptionsForSelectedInitial() {
+      const opts = this.slalomBucketOptions || [];
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.slalomBucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.slalomBucketMap[o.value];
+          return { value: o.value, text: `${b.divisionName} ${b.raceName}` };
+        });
     },
     currentDateTime() {
       const d = new Date();
@@ -1364,16 +1493,29 @@ export default {
 
   methods: {
     filteredPenalties(context) {
-      // context bisa: 'SF' (untuk Start/Finish) atau 'Gate'
-      if (context === "SF") {
-        return this.dataPenalties.filter(
-          (p) => p.value === 0 || p.value === 10 || p.value === 50
-        );
+      // context: 'START' / 'FINISH' / 'GATE' — masing2 sekarang independen,
+      // dikonfigurasi lewat Race Settings (Pilihan Pen. Start/Finish/Gates).
+      // Fallback ke default {0,10,50}/{0,5,50} kalau list belum ke-load.
+      const ctx = String(context || "").toUpperCase();
+      if (ctx === "START") {
+        return this.dataPenaltiesStart.length
+          ? this.dataPenaltiesStart
+          : this.dataPenalties.filter(
+              (p) => p.value === 0 || p.value === 10 || p.value === 50
+            );
+      } else if (ctx === "FINISH") {
+        return this.dataPenaltiesFinish.length
+          ? this.dataPenaltiesFinish
+          : this.dataPenalties.filter(
+              (p) => p.value === 0 || p.value === 10 || p.value === 50
+            );
       } else {
         // default untuk Gate
-        return this.dataPenalties.filter(
-          (p) => p.value === 0 || p.value === 5 || p.value === 50
-        );
+        return this.dataPenaltiesGate.length
+          ? this.dataPenaltiesGate
+          : this.dataPenalties.filter(
+              (p) => p.value === 0 || p.value === 5 || p.value === 50
+            );
       }
     },
     // helper kecil untuk memastikan panjang array penalties = jumlah gate
@@ -1465,8 +1607,9 @@ export default {
             : 0;
 
         // izinkan hanya nilai yang benar-benar ditawarkan UI untuk konteks ini
+        // (PS/PF sekarang independen, jadi harus dibedakan, bukan sama2 "SF")
         const allowedList = this.filteredPenalties(
-          kind === "gate" ? "Gate" : "SF"
+          kind === "gate" ? "GATE" : kind === "start" ? "START" : "FINISH"
         ).map((p) => Number(p.value));
         const np = Number(raw);
         const value = allowedList.includes(np) ? np : 0;
@@ -1684,10 +1827,13 @@ export default {
     },
 
     // ================= EXISTING LOGIC =================
+    // BUG FIX: sama seperti clampPenalty() top-level — dulu whitelist ketat
+    // {0,5,50}, sekarang clamp umum supaya custom value dari konfigurasi
+    // Pilihan Pen. Start/Finish/Gates (Race Settings) tidak ke-reset ke 0.
     sanitizePenaltyValue(v) {
-      var n = Number(v);
-      if (n === 0 || n === 5 || n === 50) return n;
-      return 0; // nilai lain (mis. 10) dipaksa 0
+      var n = parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 0) return 0;
+      return Math.min(600, n);
     },
     sanitizeGates(arr, need) {
       var out = [];
@@ -2000,6 +2146,21 @@ export default {
       }
       await this.fetchSlalomTeamsByKey(key);
     },
+    // Klik tab Initial (Youth/Junior/Open dll) — sama pola dgn
+    // selectInitialTab() di SprintRace.vue.
+    async selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+
+      const target = String(i.name).toUpperCase();
+      const match = (this.slalomBucketOptions || []).find((o) => {
+        const b = this.slalomBucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+
+      if (match) {
+        await this.onSelectSlalomBucket(match.value);
+      }
+    },
     async fetchSlalomTeamsByKey(key) {
       try {
         this.isLoading = true;
@@ -2021,13 +2182,48 @@ export default {
         this.selectedSlalomKey = key;
         localStorage.setItem("currentSlalomBucketKey", key);
 
+        // reqId-safe: dulu pakai ipcRenderer.once() polos, yang menyalakan
+        // SEMUA once-listener yg masih menunggu di channel yang sama begitu
+        // balasan PERTAMA datang — jadi 2 klik pindah bucket yang tumpang
+        // tindih (mis. R4 MEN lalu cepat ke R4 WOMEN) bisa sama2 ke-resolve
+        // dgn payload yang SAMA, membuat tabel kedua kategori terlihat
+        // identik. Sekarang dicocokkan lewat __reqId + token per-instance
+        // supaya balasan yang sudah usang (key sudah ganti lagi) dibuang.
+        const token = Date.now() + "|" + Math.random();
+        this._lastSlalomTeamsToken = token;
+        const reqId = "slalomteams|" + key + "|" + token;
+
         const res = await new Promise((resolve) => {
-          ipcRenderer.once(
-            "teams-slalom-registered:find-reply",
-            (_e, payload) => resolve(payload)
-          );
-          ipcRenderer.send("teams-slalom-registered:find", filters);
+          let settled = false;
+          const onReply = (_e, payload) => {
+            if (!payload || payload.__reqId !== reqId) return;
+            ipcRenderer.removeListener(
+              "teams-slalom-registered:find-reply",
+              onReply
+            );
+            if (settled) return;
+            settled = true;
+            resolve(payload);
+          };
+          ipcRenderer.on("teams-slalom-registered:find-reply", onReply);
+          ipcRenderer.send("teams-slalom-registered:find", {
+            ...filters,
+            __reqId: reqId,
+          });
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener(
+              "teams-slalom-registered:find-reply",
+              onReply
+            );
+            resolve(null);
+          }, 8000);
         });
+
+        // permintaan sudah usang (user sudah pindah key lain sebelum
+        // balasan ini datang) -> buang, jangan timpa tabel yang aktif
+        if (this._lastSlalomTeamsToken !== token) return;
 
         if (!res || !res.ok) {
           this.teams = [];
@@ -2057,6 +2253,11 @@ export default {
     async _useSlalomBucket(key) {
       var b = this.slalomBucketMap[key];
       if (!b) return;
+
+      // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat —
+      // mencakup semua jalur (klik tab, restore dari localStorage, refresh)
+      // — sama pola dgn _useSprintBucket() di SprintRace.vue.
+      this.selectedInitialName = b.initialName || this.selectedInitialName;
 
       var freshTeams = Array.isArray(b.teams)
         ? b.teams.map(function (t) {
@@ -2231,6 +2432,31 @@ export default {
               this.slalomDefaultScoreBeyondRank =
                 Number(res.settings.slalom.defaultScoreBeyondRank) || 0;
             }
+            // Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Gates (PG) —
+            // override daftar pilihan penalty per-event kalau dikustomisasi
+            // lewat Race Settings; kalau tidak ada, filteredPenalties() akan
+            // fallback ke default hardcoded lama.
+            if (res && res.ok && res.settings && res.settings.slalom) {
+              var sl = res.settings.slalom;
+              if (
+                Array.isArray(sl.startPenalties) &&
+                sl.startPenalties.length
+              ) {
+                this.dataPenaltiesStart = sl.startPenalties;
+              }
+              if (
+                Array.isArray(sl.finishPenalties) &&
+                sl.finishPenalties.length
+              ) {
+                this.dataPenaltiesFinish = sl.finishPenalties;
+              }
+              if (
+                Array.isArray(sl.gatePenalties) &&
+                sl.gatePenalties.length
+              ) {
+                this.dataPenaltiesGate = sl.gatePenalties;
+              }
+            }
             this.SLALOM_GATES = buildGates(n);
             this.syncAllTeamsPenaltiesLength();
             resolve(this.SLALOM_GATES);
@@ -2303,9 +2529,7 @@ export default {
       const fVal = Number(s.finishPenalty) || 0;
       s.totalPenalty = sVal + core + fVal;
 
-      const toMs = function (v) {
-        return PENALTY_VALUE_TO_MS[Number(v) || 0] || 0;
-      };
+      const toMs = penaltyValueToMs;
       const penMs =
         toMs(sVal) +
         (s.penalties || []).reduce(function (sum, v) {
@@ -3122,6 +3346,80 @@ export default {
         });
       }
     },
+
+    openResetAllModal() {
+      this.resetAllConfirmText = "";
+      this.showResetAllModal = true;
+    },
+
+    onResetAllModalHidden() {
+      if (!this.resetAllInProgress) this.resetAllConfirmText = "";
+    },
+
+    // Bersihkan SEMUA cache localStorage slalomLocal:<eventId>|... — lintas
+    // SELURUH bucket Slalom event ini (bukan cuma bucket yg sedang dibuka).
+    // WAJIB dipanggil sebelum reload di confirmResetAll(): slalomBucketCache
+    // (dipakai fetchSlalomTeamsByKey() via slalomBucketCache.merge()) meng-
+    // overlay waktu tersimpan lokal di atas data DB yang baru di-fetch,
+    // lebih tinggi prioritasnya drpd nilai kosong hasil reset — tanpa ini,
+    // waktu lama tetap muncul lagi setelah reload krn cache tsb tidak ikut
+    // terhapus oleh Reset All di backend (yang cuma menghapus DB).
+    _clearAllSlalomLocalCachesForEvent(eventId) {
+      try {
+        const prefix = "slalomLocal:" + String(eventId) + "|";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        /* noop */
+      }
+    },
+
+    async confirmResetAll() {
+      if (this.resetAllConfirmText !== this.RESET_ALL_CONFIRM_PHRASE) return;
+      const eventId = this.currentSlalomEventId
+        ? String(this.currentSlalomEventId)
+        : "";
+      if (!eventId) return;
+
+      this.resetAllInProgress = true;
+      try {
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("slalom:reset-all-reply", (_e, r) => resolve(r));
+          ipcRenderer.send("slalom:reset-all", eventId);
+        });
+
+        if (res && res.ok) {
+          this._clearAllSlalomLocalCachesForEvent(eventId);
+          ipcRenderer.send("get-alert-saved", {
+            type: "question",
+            detail: "Semua waktu Slalom pada event ini sudah dikosongkan.",
+            message: "Reset All berhasil",
+          });
+          // reload penuh supaya seluruh state (teams, session, socket
+          // listeners, dll.) dibangun ulang dari kondisi bersih — lebih
+          // aman drpd re-invoke manual banyak method async berurutan.
+          window.location.reload();
+        } else {
+          this.resetAllInProgress = false;
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: (res && res.error) || "Unknown error",
+            message: "Reset All gagal",
+          });
+        }
+      } catch (err) {
+        this.resetAllInProgress = false;
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: err && err.message ? err.message : String(err),
+          message: "Reset All gagal",
+        });
+      }
+    },
   },
 };
 </script>
@@ -3163,6 +3461,46 @@ export default {
 
 #slalomBucketSelect:hover {
   border-color: rgb(0, 180, 255);
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
+
+.switch-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b3445;
+}
+
+/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn Switch Sprint/
+   H2H Category */
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+}
+
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 /* ---- End styling utk Switch Slalom Category select ---- */
@@ -3623,5 +3961,111 @@ td {
     width: 100%;
     justify-content: flex-end; /* tombol tetap rapi saat wrap */
   }
+}
+
+/* ---- Redesign: Run Session #1/#2 toggle ---- */
+.session-tabs {
+  display: inline-flex;
+  gap: 6px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 999px;
+}
+.session-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+.session-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+.session-tab.active {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+/* ---- Redesign: Save Session/Result Session/Save Result/Sort Ranked ---- */
+.action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1.5px solid transparent;
+  color: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, opacity 0.15s ease;
+}
+.action-pill:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.action-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.action-pill--save {
+  background: linear-gradient(135deg, #22b165, #148a3b);
+  box-shadow: 0 4px 12px rgba(20, 138, 59, 0.3);
+}
+.action-pill--save:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(20, 138, 59, 0.4);
+}
+.action-pill--view {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  box-shadow: 0 4px 12px rgba(28, 111, 176, 0.3);
+}
+.action-pill--view:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.4);
+}
+.action-pill--pdf {
+  background: linear-gradient(135deg, #f5a623, #d9860f);
+  box-shadow: 0 4px 12px rgba(217, 134, 15, 0.3);
+}
+.action-pill--pdf:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(217, 134, 15, 0.4);
+}
+.action-pill--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+.action-pill--primary:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+}
+.action-pill--sort {
+  background: #fff;
+  color: #37475a;
+  border-color: #dbe0e8;
+}
+.action-pill--sort:hover:not(:disabled) {
+  border-color: #1c6fb0;
+  color: #1c6fb0;
+  background: #f2f9fd;
+}
+.action-pill--sort.is-active {
+  background: linear-gradient(135deg, #6c5ce7, #4834d4);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(72, 52, 212, 0.35);
+}
+.action-pill--danger {
+  background: #fff;
+  color: #d9364f;
+  border-color: #f0c4cc;
+}
+.action-pill--danger:hover:not(:disabled) {
+  background: #fdecef;
+  border-color: #d9364f;
+  box-shadow: 0 4px 12px rgba(217, 54, 79, 0.2);
 }
 </style>

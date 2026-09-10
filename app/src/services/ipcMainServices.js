@@ -119,6 +119,7 @@ const {
   RESET_COLLECTIONS,
 } = require("../controllers/DELETE/resetEventData");
 const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
+const { resetSlalomDataForEvent } = require("../controllers/DELETE/resetSlalomData");
 const {
   insertChatMessage,
   listChatMessagesByEvent,
@@ -376,6 +377,21 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // "Reset All" di halaman Slalom Details — hapus semua waktu yang sudah
+  // bertanding di Slalom (seluruh kategori/bucket) utk satu event, tanpa
+  // menyentuh Sprint/H2H/DRR/RX di event yang sama.
+  ipcMain.on("slalom:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetSlalomDataForEvent(eventId);
+      event.reply("slalom:reset-all-reply", result);
+    } catch (error) {
+      event.reply("slalom:reset-all-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
   // OPTION DB
   ipcMain.on("option-level", async (event) => {
     try {
@@ -549,14 +565,24 @@ function setupIPCMainHandlers() {
 
   // LOAD SLALOM RESULT
   ipcMain.on("get-slalom-result", async (event, query = {}) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+    // mencocokkan balasan ke request-nya sendiri (mis. loadSlalomStatusForPanel()
+    // di Details/index.vue) bisa pakai ipcRenderer.on()+cek __reqId — pemanggil
+    // lama yang tidak mengirim __reqId tidak terpengaruh (field cuma echo).
+    const reqId = query && query.__reqId;
     try {
       const data = await getSlalomResult(query);
-      event.reply("get-slalom-result-reply", { ok: true, items: data });
+      event.reply("get-slalom-result-reply", {
+        ok: true,
+        items: data,
+        __reqId: reqId,
+      });
     } catch (error) {
       event.reply("get-slalom-result-reply", {
         ok: false,
         items: [],
         error: error.message,
+        __reqId: reqId,
       });
     }
   });
@@ -856,8 +882,20 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-slalom-registered:find", async (event, filters) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil bisa
+    // mencocokkan balasan ke request-nya sendiri lewat ipcRenderer.on()+cek
+    // __reqId, bukan .once() polos — dulu .once() menyalakan SEMUA listener
+    // yg masih menunggu di channel ini begitu balasan PERTAMA datang, jadi
+    // 2 klik pindah bucket (mis. R4 MEN lalu cepat ke R4 WOMEN) yang
+    // permintaannya tumpang-tindih bisa sama2 ke-resolve dgn payload yang
+    // SAMA, membuat tabel kedua kategori terlihat identik. Pemanggil lama
+    // yang tidak kirim __reqId tidak terpengaruh (field cuma echo).
+    const reqId = filters && filters.__reqId;
     const res = await getRegisteredSlalom(filters || {});
-    event.sender.send("teams-slalom-registered:find-reply", res);
+    event.sender.send("teams-slalom-registered:find-reply", {
+      ...res,
+      __reqId: reqId,
+    });
   });
 
   ipcMain.on("teams-rx-registered:find", async (event, filters) => {

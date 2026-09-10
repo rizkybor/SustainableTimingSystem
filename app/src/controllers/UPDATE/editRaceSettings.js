@@ -97,6 +97,26 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
     { label: "50", value: 50 },
   ];
 
+  // Default Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Gates (PG)
+  // Slalom — sebelumnya hardcoded & tidak bisa dikustomisasi (PS/PF berbagi
+  // {0,10,50}, Gate {0,5,50}) langsung di kode SlalomRace.vue. Sekarang
+  // masing-masing independen per-event, pola sama dgn DEFAULT_H2H_PENALTIES.
+  const DEFAULT_SLALOM_START_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+  const DEFAULT_SLALOM_FINISH_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "10", value: 10 },
+    { label: "50", value: 50 },
+  ];
+  const DEFAULT_SLALOM_GATE_PENALTIES = [
+    { label: "0", value: 0 },
+    { label: "5", value: 5 },
+    { label: "50", value: 50 },
+  ];
+
   // Default tabel Rank -> Score H2H, sama persis dgn optionRanked type
   // "HEADTOHEAD" yang sebelumnya hardcoded/global — sekarang bisa
   // dikustomisasi per-event lewat Race Settings (pola sama dgn Sprint).
@@ -250,6 +270,18 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
       totalGate: Math.max(
         1,
         Math.min(14, parseInt(incoming.slalom && incoming.slalom.totalGate, 10) || 14)
+      ),
+      startPenalties: cleanPenaltyList(
+        incoming.slalom && incoming.slalom.startPenalties,
+        DEFAULT_SLALOM_START_PENALTIES
+      ),
+      finishPenalties: cleanPenaltyList(
+        incoming.slalom && incoming.slalom.finishPenalties,
+        DEFAULT_SLALOM_FINISH_PENALTIES
+      ),
+      gatePenalties: cleanPenaltyList(
+        incoming.slalom && incoming.slalom.gatePenalties,
+        DEFAULT_SLALOM_GATE_PENALTIES
       ),
       scoreByRank: cleanScoreByRank(
         incoming.slalom && incoming.slalom.scoreByRank,

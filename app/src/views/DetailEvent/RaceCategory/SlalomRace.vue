@@ -1055,6 +1055,16 @@ export default {
       slalomBucketOptions: [],
       slalomBucketMap: Object.create(null),
       selectedSlalomKey: "",
+      // Key bucket yang datanya BENAR-BENAR sedang termuat di this.teams —
+      // beda dari selectedSlalomKey (di-bind ke <b-form-select> v-model,
+      // jadi sudah berubah ke key BARU begitu user pilih opsi lain, SEBELUM
+      // onSelectSlalomBucket() sempat menyimpan data lama). Dipakai supaya
+      // save-before-switch selalu menyimpan ke slot cache milik bucket yang
+      // SEDANG DITINGGALKAN, bukan tertimpa ke slot bucket tujuan — dulu
+      // pakai selectedSlalomKey utk ini, menyebabkan data bucket lama
+      // (mis. R4 MEN) ke-save ke slot cache bucket baru (R4 WOMEN) lalu
+      // langsung ter-merge balik, membuat kedua kategori terlihat sama.
+      activeSlalomBucketKey: "",
       // Switch Slalom Category (sama pola dgn SprintRace.vue): tab Initial
       // yg sedang dipilih di switcher.
       selectedInitialName: "",
@@ -2141,8 +2151,16 @@ export default {
       this.slalomBucketMap = map;
     },
     async onSelectSlalomBucket(key) {
-      if (this.selectedSlalomKey) {
-        slalomBucketCache.save(this.selectedSlalomKey, this.teams);
+      // BUG FIX: dulu pakai this.selectedSlalomKey di sini — tapi itu prop
+      // yg di-bind ke v-model <b-form-select>, jadi SUDAH berubah jadi key
+      // BARU (sama dgn param `key`) sebelum baris ini sempat jalan. Akibatnya
+      // this.teams (masih data bucket LAMA) ke-save ke slot cache bucket
+      // BARU, lalu langsung ter-merge balik ke bucket baru itu -> kedua
+      // kategori (mis. R4 MEN & R4 WOMEN) terlihat memakai data yang sama.
+      // activeSlalomBucketKey baru di-update SETELAH bucket selesai dimuat
+      // (lihat _useSlalomBucket), jadi di sini masih menunjuk bucket lama.
+      if (this.activeSlalomBucketKey && this.activeSlalomBucketKey !== key) {
+        slalomBucketCache.save(this.activeSlalomBucketKey, this.teams);
       }
       await this.fetchSlalomTeamsByKey(key);
     },
@@ -2265,6 +2283,7 @@ export default {
           })
         : [];
       this.teams = slalomBucketCache.merge(freshTeams, slalomBucketCache.load(key));
+      this.activeSlalomBucketKey = key;
       this.titleCategories = this._slalomBucketLabel(b);
       localStorage.setItem("currentSlalomBucketKey", key);
 

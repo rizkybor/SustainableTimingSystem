@@ -1017,6 +1017,14 @@ export default {
           drr.finish = true;
       }
 
+      // rx.gate1/gate2 tetap disimpan untuk kompatibilitas dengan draft lama
+      // di komponen ini, tapi konsumen di sts-jurysystem (app/judges/page.jsx
+      // & app/judges/raftingcross/page.jsx) HANYA membaca `rx.gates` sebagai
+      // array angka gate (persis pola slalom.gates / drr.sections di atas) —
+      // tanpa `gates`, tombol Rafting Cross judge selalu abu-abu walau sudah
+      // di-assign.
+      var rxGateKeyToNumber = { gate1: 1, gate2: 2 };
+      var rxGates = [];
       var rx = { start: false, finish: false, gate1: false, gate2: false };
       if (this.draft && this.draft.rx) {
         if (this.equalsEmail(this.draft.rx.juryStart, email)) rx.start = true;
@@ -1031,9 +1039,15 @@ export default {
       ) {
         for (var ri2 = 0; ri2 < this.enabledRxGateKeys.length; ri2++) {
           var rk2 = this.enabledRxGateKeys[ri2];
-          if (this.equalsEmail(this.draft.rxValues[rk2], email)) rx[rk2] = true;
+          if (this.equalsEmail(this.draft.rxValues[rk2], email)) {
+            rx[rk2] = true;
+            if (rxGateKeyToNumber[rk2]) rxGates.push(rxGateKeyToNumber[rk2]);
+          }
         }
       }
+      rx.gates = Array.from(new Set(rxGates)).sort(function (a, b) {
+        return a - b;
+      });
 
       return {
         eventId: String(this.eventId),
@@ -1377,14 +1391,23 @@ export default {
                       userId: email2,
                       name: "",
                     });
-                  if (rx.gate1 === true)
+                  // Format baru: rx.gates = [1, 2, ...] (lihat
+                  // buildJudgeObjectForEmail). Tetap fallback ke gate1/gate2
+                  // boolean supaya assignment lama (sebelum fix ini) masih
+                  // ter-prefill dengan benar saat modal dibuka ulang.
+                  var rxGatesArr = Array.isArray(rx.gates) ? rx.gates : [];
+                  var hasGate1 =
+                    rxGatesArr.indexOf(1) !== -1 || rx.gate1 === true;
+                  var hasGate2 =
+                    rxGatesArr.indexOf(2) !== -1 || rx.gate2 === true;
+                  if (hasGate1)
                     list.push({
                       discipline: "rx",
                       position: "gate1",
                       userId: email2,
                       name: "",
                     });
-                  if (rx.gate2 === true)
+                  if (hasGate2)
                     list.push({
                       discipline: "rx",
                       position: "gate2",

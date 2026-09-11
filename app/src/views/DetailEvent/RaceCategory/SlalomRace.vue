@@ -264,6 +264,13 @@
             </div>
             <div class="slalom-actionbar">
               <div class="slalom-actionbar__buttons">
+                <JudgeActionHistoryModal
+                  v-if="currentSlalomEventId"
+                  :event-id="String(currentSlalomEventId)"
+                  race-category="slalom"
+                  category-label="Slalom"
+                />
+
                 <!-- SAVE ONLY SESSION 1 -->
                 <button
                   type="button"
@@ -802,6 +809,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 
 const slalomBucketCache = createBucketCache("slalomLocal");
 
@@ -1033,6 +1041,7 @@ export default {
     SlalomSession1PdfResult,
     Icon,
     CountryFlag,
+    JudgeActionHistoryModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
 
@@ -1679,6 +1688,23 @@ export default {
         // hitung ulang + status
         this.recalcSession(s);
         this.checkEndGameStatus();
+
+        // audit trail — catat tindakan judge ini, tidak menunggu balasan
+        if (typeof ipcRenderer !== "undefined" && this.currentSlalomEventId) {
+          ipcRenderer.send("judgeLog:send", {
+            eventId: this.currentSlalomEventId,
+            raceCategory: "slalom",
+            type: msg.type,
+            text: msg.text,
+            teamId: f.team.teamId || f.team._id,
+            teamName: f.team.nameTeam,
+            bibTeam: f.team.bibTeam,
+            value: value,
+            from: msg.from,
+            sourceTs: msg.ts,
+            raw: msg,
+          });
+        }
 
         // feedback (opsional)
         if (ipcRenderer) {

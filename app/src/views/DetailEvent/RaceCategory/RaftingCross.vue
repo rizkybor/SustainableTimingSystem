@@ -262,14 +262,24 @@
           style="max-width: 320px"
         />
 
-        <button
-          type="button"
-          class="btn-action btn-secondary"
-          :disabled="currentRoundIndex >= rounds.length - 1"
-          @click="currentRoundIndex++"
-        >
-          Next <Icon icon="mdi:chevron-right" />
-        </button>
+        <div class="d-flex align-items-center">
+          <JudgeActionHistoryModal
+            v-if="currentEventId"
+            class="mr-2"
+            :event-id="String(currentEventId)"
+            race-category="rx"
+            category-label="Rafting Cross"
+          />
+
+          <button
+            type="button"
+            class="btn-action btn-secondary"
+            :disabled="currentRoundIndex >= rounds.length - 1"
+            @click="currentRoundIndex++"
+          >
+            Next <Icon icon="mdi:chevron-right" />
+          </button>
+        </div>
       </div>
 
       <!-- HEATS -->
@@ -468,6 +478,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 
 const rxBucketCache = createBucketCache("rxLocal");
 
@@ -475,7 +486,13 @@ const RACE_PAYLOAD_KEY = "raceStartPayload";
 
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
-  components: { Icon, EmptyCard, OperationTimePanel, CountryFlag },
+  components: {
+    Icon,
+    EmptyCard,
+    OperationTimePanel,
+    CountryFlag,
+    JudgeActionHistoryModal,
+  },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
@@ -1056,6 +1073,23 @@ export default {
 
       if (this.selectedRxKey) {
         rxBucketCache.save(this.selectedRxKey, this.rounds);
+      }
+
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan
+      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        ipcRenderer.send("judgeLog:send", {
+          eventId: this.currentEventId,
+          raceCategory: "rx",
+          type: msg.type,
+          text: msg.text,
+          teamId: visItem.id,
+          teamName: visItem.name,
+          bibTeam: visItem.bibTeam,
+          value: Number(msg.value),
+          from: msg.from,
+          sourceTs: msg.ts,
+          raw: msg,
+        });
       }
     },
 

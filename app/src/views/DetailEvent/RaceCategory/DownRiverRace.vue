@@ -238,6 +238,13 @@
           </b-col>
           <b-col cols="6" md="6">
             <div class="drr-actionbar__buttons">
+              <JudgeActionHistoryModal
+                v-if="currentEventId"
+                :event-id="String(currentEventId)"
+                race-category="drr"
+                category-label="Down River Race"
+              />
+
               <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
               <!-- <button
                   type="button"
@@ -635,6 +642,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 
 const drrBucketCache = createBucketCache("drrLocal");
 
@@ -846,7 +854,13 @@ function readEventDetailsFromLS() {
 
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
+  components: {
+    OperationTimePanel,
+    EmptyCard,
+    Icon,
+    CountryFlag,
+    JudgeActionHistoryModal,
+  },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
@@ -1498,6 +1512,23 @@ export default {
         if (typeof this.checkEndGameStatus === "function")
           this.checkEndGameStatus();
         if (typeof this.$forceUpdate === "function") this.$forceUpdate();
+
+        // audit trail — catat tindakan judge ini, tidak menunggu balasan
+        if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+          ipcRenderer.send("judgeLog:send", {
+            eventId: this.currentEventId,
+            raceCategory: "drr",
+            type: msg.type,
+            text: msg.text,
+            teamId: team.teamId || team._id,
+            teamName: team.nameTeam,
+            bibTeam: team.bibTeam,
+            value: numericValue,
+            from: msg.from,
+            sourceTs: msg.ts,
+            raw: msg,
+          });
+        }
 
         return true;
       } catch (err) {

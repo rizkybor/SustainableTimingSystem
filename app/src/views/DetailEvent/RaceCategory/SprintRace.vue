@@ -251,6 +251,14 @@
               <Icon icon="icon-park-outline:save" /> Preview JSON
             </button> -->
 
+            <JudgeActionHistoryModal
+              v-if="currentEventId"
+              class="mr-2"
+              :event-id="String(currentEventId)"
+              race-category="sprint"
+              category-label="Sprint"
+            />
+
             <button
               type="button"
               class="btn-action btn-info mr-2"
@@ -462,6 +470,7 @@ import {
 } from "@/utils/localStoreSprint";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 
@@ -630,7 +639,13 @@ function loadRaceStartPayloadForSprint() {
 
 export default {
   name: "SustainableTimingSystemSprintRace",
-  components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
+  components: {
+    OperationTimePanel,
+    EmptyCard,
+    Icon,
+    CountryFlag,
+    JudgeActionHistoryModal,
+  },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
@@ -968,6 +983,23 @@ export default {
 
       // refresh ranking bila totalTime berubah
       await this.assignRanks(this.participantArr);
+
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan
+      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        ipcRenderer.send("judgeLog:send", {
+          eventId: this.currentEventId,
+          raceCategory: "sprint",
+          type: payload.type,
+          text: payload.text,
+          teamId: local.teamId,
+          teamName: local.nameTeam,
+          bibTeam: local.bibTeam,
+          value: payload.value,
+          from: payload.from,
+          sourceTs: payload.ts,
+          raw: payload,
+        });
+      }
     },
     /* =========================================================*/
 

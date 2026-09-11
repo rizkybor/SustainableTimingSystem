@@ -259,6 +259,14 @@
                 Lihat Heat
               </button>
 
+              <JudgeActionHistoryModal
+                v-if="currentEventId"
+                class="ml-2"
+                :event-id="String(currentEventId)"
+                race-category="h2h"
+                category-label="Head to Head"
+              />
+
               <button
                 type="button"
                 class="btn-action btn-outline-secondary ml-2"
@@ -1440,6 +1448,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import Bracket from "vue-tournament-bracket";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 // html2canvas + jspdf: sudah pasti ada di node_modules krn jadi dependency
 // transitif vue-html2pdf (lewat html2pdf.js) yang sudah dipakai project ini —
 // dipakai langsung (bukan lewat vue-html2pdf) krn kita mau capture bagan
@@ -1584,6 +1593,7 @@ export default {
     Icon,
     CountryFlag,
     Bracket,
+    JudgeActionHistoryModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
@@ -4983,6 +4993,28 @@ export default {
         }
       } else {
         return;
+      }
+
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan
+      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        ipcRenderer.send("judgeLog:send", {
+          eventId: this.currentEventId,
+          raceCategory: "h2h",
+          type: msg.type,
+          text: msg.text,
+          teamId: target.teamId,
+          teamName: target.nameTeam || target.teamName,
+          bibTeam: target.bibTeam,
+          value:
+            kind === "BooyanCorner"
+              ? msg.touched
+                ? 1
+                : 0
+              : Number(msg.value),
+          from: msg.from,
+          sourceTs: msg.ts,
+          raw: msg,
+        });
       }
 
       await this.onPenaltyChange(target);

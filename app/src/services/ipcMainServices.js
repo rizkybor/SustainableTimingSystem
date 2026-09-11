@@ -126,6 +126,10 @@ const {
   listChatMessagesByEvent,
   deleteChatMessage,
 } = require("../controllers/INSERT/insertChatMessage");
+const {
+  insertJudgeActionLog,
+  listJudgeActionLogsByEvent,
+} = require("../controllers/INSERT/insertJudgeActionLog");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -250,6 +254,34 @@ function setupIPCMainHandlers() {
       event.reply("chat:get-event-reply", data);
     } catch (err) {
       event.reply("chat:get-event-reply", null);
+    }
+  });
+
+  // Judge action log: audit trail dari penalty/tindakan judge yang diterima
+  // via socket "custom:event" dari sts-jurysystem dan berhasil diterapkan
+  // di masing-masing Race Category view (Sprint/Slalom/DRR/H2H/RX).
+  ipcMain.on("judgeLog:send", async (event, payload) => {
+    try {
+      const log = await insertJudgeActionLog(payload);
+      event.reply("judgeLog:send:reply", { ok: true, log });
+    } catch (err) {
+      event.reply("judgeLog:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  ipcMain.on("judgeLog:listByEvent", async (event, payload) => {
+    try {
+      const { eventId, raceCategory, limit } = payload || {};
+      const items = await listJudgeActionLogsByEvent(eventId, raceCategory, {
+        limit,
+      });
+      event.reply("judgeLog:listByEvent:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("judgeLog:listByEvent:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
     }
   });
 

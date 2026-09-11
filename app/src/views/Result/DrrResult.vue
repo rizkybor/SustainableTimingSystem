@@ -61,23 +61,58 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
+
+        <b-dropdown
+          variant="link"
+          class="action-btn"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
+          no-caret
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch DRR Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <div class="switch-category-panel px-3 py-2">
+            <b-form-select
+              :options="bucketData.bucketOptions"
+              :value="currentBucketKey"
+              size="sm"
+              @change="goToBucket"
+            />
+          </div>
+        </b-dropdown>
       </div>
     </div>
 
@@ -147,7 +182,6 @@
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
               <th class="text-center">Score</th>
-              <th class="text-center" v-if="!isOfficial">Action</th>
             </tr>
           </thead>
 
@@ -162,26 +196,49 @@
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
               <td class="text-center" style="color: red">
-                {{ r.startPenalty || "-" }}
+                <b-form-select
+                  v-if="!isOfficial"
+                  size="sm"
+                  class="small-select"
+                  :value="r.startPenalty"
+                  :options="optionsWithCurrent('START', r.startPenalty)"
+                  text-field="label"
+                  value-field="value"
+                  @change="
+                    r.startPenalty = Number($event);
+                    onDrrFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.startPenalty || 0 }}</span>
               </td>
               <td class="text-center">
                 <span
                   class="section-modal-trigger"
+                  style="color: red"
                   role="button"
                   tabindex="0"
                   @click="openSectionModal(r)"
                   @keyup.enter="openSectionModal(r)"
-                  title="Lihat detail Section Penalty Time"
+                  title="Lihat/edit detail Section Penalty"
                 >
-                  {{
-                    Array.isArray(r.sectionPenaltyTime)
-                      ? r.sectionPenaltyTime.length
-                      : 0
-                  }}
+                  {{ r.sectionPenalty || 0 }}
                 </span>
               </td>
               <td class="text-center" style="color: red">
-                {{ r.finishPenalty || "-" }}
+                <b-form-select
+                  v-if="!isOfficial"
+                  size="sm"
+                  class="small-select"
+                  :value="r.finishPenalty"
+                  :options="optionsWithCurrent('FINISH', r.finishPenalty)"
+                  text-field="label"
+                  value-field="value"
+                  @change="
+                    r.finishPenalty = Number($event);
+                    onDrrFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.finishPenalty || 0 }}</span>
               </td>
               <td class="text-center" style="color: red">
                 {{ r.totalPenalty || "0" }}
@@ -189,8 +246,34 @@
               <td class="text-center" style="color: red">
                 {{ r.penaltyTime || "00:00:00.000" }}
               </td>
-              <td class="text-center">{{ r.startTime || "00:00:00.000" }}</td>
-              <td class="text-center">{{ r.finishTime || "00:00:00.000" }}</td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.startTime"
+                  @change="
+                    r.startTime = $event.target.value.trim();
+                    onDrrFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.startTime || "00:00:00.000" }}</span>
+              </td>
+              <td class="text-center">
+                <input
+                  v-if="!isOfficial"
+                  type="text"
+                  class="cell-input"
+                  placeholder="00:00:00.000"
+                  :value="r.finishTime"
+                  @change="
+                    r.finishTime = $event.target.value.trim();
+                    onDrrFieldChange(r);
+                  "
+                />
+                <span v-else>{{ r.finishTime || "00:00:00.000" }}</span>
+              </td>
               <td class="bold text-center">
                 {{ r.raceTime || "00:00:00.000" }}
               </td>
@@ -204,16 +287,6 @@
                     ? r.score
                     : getScoreByRanked(r.ranked) || 0
                 }}
-              </td>
-              <td class="text-center" v-if="!isOfficial">
-                <b-button
-                  size="sm"
-                  variant="warning"
-                  class="icon-btn"
-                  @click="openEdit(r)"
-                >
-                  <Icon icon="mdi:pencil" />
-                </b-button>
               </td>
             </tr>
           </tbody>
@@ -238,20 +311,32 @@
       <div class="section-time-list">
         <div class="section-time-row section-time-head">
           <div class="text-center">Section</div>
-          <div class="text-start">Penalty Section Time</div>
+          <div class="text-start">Penalty</div>
         </div>
 
         <div
-          v-for="(t, i) in sectionModal.times"
+          v-for="(val, i) in sectionModal.values"
           :key="i"
           class="section-time-row"
         >
           <div class="text-center">{{ i + 1 }}</div>
-          <div class="mono" style="color: red">{{ t }}</div>
+          <div class="mono" style="color: red">
+            <b-form-select
+              v-if="!isOfficial"
+              size="sm"
+              class="small-select"
+              :value="val"
+              :options="optionsWithCurrent('SECTION', val)"
+              text-field="label"
+              value-field="value"
+              @change="$set(sectionModal.values, i, Number($event))"
+            />
+            <span v-else>{{ val }}</span>
+          </div>
         </div>
 
         <div
-          v-if="!sectionModal.times || sectionModal.times.length === 0"
+          v-if="!sectionModal.values || sectionModal.values.length === 0"
           class="empty-section-times"
         >
           No section penalty time
@@ -259,6 +344,13 @@
       </div>
 
       <div class="modal-actions">
+        <b-button
+          v-if="!isOfficial"
+          variant="success"
+          class="mr-2"
+          @click="saveSectionModal"
+          >Save</b-button
+        >
         <b-button variant="secondary" @click="closeSectionModal"
           >Close</b-button
         >
@@ -307,6 +399,7 @@
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
       :raceCats="drrCats"
+      :categories="visibleCategories"
       @close="showOverallModal = false"
     />
   </div>
@@ -321,6 +414,14 @@ import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 
 /* ========= Helpers localStorage ========= */
@@ -396,12 +497,32 @@ export default {
 
   data() {
     return {
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check di buildAggregateFromDoc() (modal Print Result
+      // Overall) — lihat src/utils/registeredTeamsFilter.js
+      registeredBuckets: [],
+      // Race Category yang benar-benar dipilih utk event ini — null =
+      // fail-open (tampilkan semua kolom kategori)
+      enabledCategoryKeys: null,
       showSectionModal: false,
       sectionModal: {
         team: "",
         bib: "",
-        times: [],
+        values: [],
+        row: null,
       },
+      // Override per-event dari Race Settings (Pilihan Pen. Start/Finish/
+      // Section) — diisi di loadRaceSettings(); kosong = pakai dataPenalties
+      // (daftar global optionPenalties "DRR").
+      dataPenalties: [],
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
+      dataPenaltiesSection: [],
+      // Dokumen mentah temporaryDrrResult (get-drr-result) — dipakai
+      // onDrrFieldChange()/saveRawResultsToDbDrr() supaya edit inline
+      // ditulis balik & disimpan lewat channel yg sama dgn Race Detail
+      // (insert-drr-result), sama pola dgn rawResultItems di SlalomResult.vue.
+      rawResultDocs: [],
       defaultImg,
       isOfficial: false,
       loading: false,
@@ -447,13 +568,46 @@ export default {
         { ranking: 31, score: 49 },
         { ranking: 32, score: 42 },
       ],
+      drrDefaultScoreBeyondRank: 0,
+      // Jumlah Section per Race Settings (drr.totalSection) — dipakai
+      // openSectionModal() utk memastikan modal selalu punya N slot Section
+      // yg bisa diisi, bahkan utk tim yg BELUM PERNAH diberi nilai Section
+      // sama sekali (sectionPenaltyTime tersimpan []) — tanpa ini, modal
+      // permanen kosong ("No section penalty time") dan operator tidak
+      // pernah bisa mengisi Section utk tim itu dari halaman Result ini.
+      drrSectionsCount: 3,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
     };
   },
 
   computed: {
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    // Kombinasi statis Divisi x Race x Initial (dari config event, sama
+    // seperti buildDrrOptions() di DownRiverRace.vue) — dipakai switcher
+    // "Switch DRR Category" (flat select, sama seperti Race Detail-nya).
+    bucketData() {
+      const q = this.$route.query || {};
+      const eventId = String(q.eventId || this.$route.params.id || "");
+      return buildStaticBucketOptions(this.eventInfo, eventId);
+    },
+    currentBucketKey() {
+      const q = this.$route.query || {};
+      return [
+        String(q.eventId || ""),
+        String(q.initialId || ""),
+        String(q.raceId || ""),
+        String(q.divisionId || ""),
+      ].join("|");
+    },
     hasEventLogo() {
       const ev = this.eventInfo || {};
-      const logos = ev.event_logo;
+      const logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         const first = logos[0];
         if (typeof first === "string" && first) return true;
@@ -469,7 +623,7 @@ export default {
     },
     eventLogoUrl() {
       const ev = this.eventInfo || {};
-      const logos = ev.event_logo;
+      const logos = ev.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
         const first = logos[0];
         if (typeof first === "string") return first;
@@ -494,49 +648,41 @@ export default {
       return parts.join(" - ");
     },
     drrCats() {
+      // BUG FIX: query dulu, localStorage cuma fallback — lihat catatan
+      // di h2hCats() (HeadToHeadResult.vue)/sprintCats() (SprintResult.vue)
+      // soal kenapa localStorage-first bikin judul basi setelah "Switch
+      // DRR Category" (yg cuma ganti $route.query, tidak menyentuh
+      // localStorage).
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
 
     // Data untuk komponen PDF
+    // BUG FIX: dulu whitelist manual field yg dikirim ke drr-pdfResult.vue,
+    // dan salah nama field logo ("event_logo", padahal field asli & yg
+    // dibaca komponen PDF adalah "eventFiles" — sama typo dgn hasEventLogo/
+    // eventLogoUrl di atas) SEKALIGUS lupa masukkan "sponsorFiles" ke
+    // daftar — akibatnya logo Event & Sponsor di PDF DRR selalu kosong.
+    // Sama pola dgn pdfEventData() di SprintResult.vue: spread langsung
+    // this.eventInfo supaya field apa pun yg dibutuhkan komponen PDF (mis.
+    // eventFiles/sponsorFiles) otomatis ikut tanpa perlu whitelist manual.
     pdfEventData() {
-      const out = {};
-      const src = this.eventInfo || {};
-      const keys = [
-        "eventName",
-        "addressCity",
-        "riverName",
-        "levelName",
-        "startDateEvent",
-        "endDateEvent",
-        "addressVillage",
-        "addressDistrict",
-        "addressSubDistrict",
-        "addressProvince",
-        "addressState",
-        "addressZipCode",
-        "raceDirector",
-        "chiefJudge",
-        "chiefJudgeSignature",
-        "event_logo",
-      ];
-      let i = 0;
-      while (i < keys.length) {
-        const k = keys[i];
-        out[k] = src[k] != null ? src[k] : k === "event_logo" ? [] : "";
-        i++;
-      }
-      if (!out.levelName) out.levelName = "-";
-      return out;
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
 
     // ambil dari this.results penuh → bentuk yang dipakai PDF
@@ -637,6 +783,10 @@ export default {
     const q = this.$route.query || {};
     if (q.eventId) {
       await this.loadEventById(q.eventId);
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadDataPenalties("DRR");
+      await this.loadRaceSettings(q.eventId);
     } else {
       const ev = pickEventFromStore();
       this.eventInfo = {
@@ -665,50 +815,415 @@ export default {
   mounted() {},
 
   methods: {
-    // Validasi sederhana HH:MM:SS.mmm → return true/false
-    isValidHMSms(str) {
-      if (!str || typeof str !== "string") return false;
-      // HH:MM:SS.mmm, HH 0-99, MM 0-59, SS 0-59, mmm 0-999
-      const m = str.match(/^(\d{1,2}):([0-5]?\d):([0-5]?\d)\.(\d{1,3})$/);
-      if (!m) return false;
-      // Normalisasi angka agar tidak lewat batas (MM/SS < 60, mmm < 1000 sudah di-regex)
-      const hh = parseInt(m[1], 10);
-      const mm = parseInt(m[2], 10);
-      const ss = parseInt(m[3], 10);
-      const ms = parseInt(m[4], 10);
-      return Number.isFinite(hh) && mm < 60 && ss < 60 && ms < 1000;
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const drrSettings = res && res.ok && res.settings && res.settings.drr;
+            const scoreByRank =
+              drrSettings && Array.isArray(drrSettings.scoreByRank)
+                ? drrSettings.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.drrDefaultScoreBeyondRank =
+              Number(drrSettings && drrSettings.defaultScoreBeyondRank) || 0;
+
+            const totalSection = parseInt(
+              drrSettings && drrSettings.totalSection,
+              10
+            );
+            if (Number.isFinite(totalSection) && totalSection > 0) {
+              this.drrSectionsCount = totalSection;
+            }
+
+            // Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Section —
+            // override per-event dari Race Settings, sinkron dgn
+            // fetchDrrSectionCountFromSettings() di DownRiverRace.vue supaya
+            // dropdown editable di halaman Result ini identik dgn Race Detail.
+            if (drrSettings) {
+              const toList = (arr) =>
+                Array.isArray(arr) && arr.length > 0
+                  ? arr.map((p) => ({
+                      label: String(p.label || p.value),
+                      value: Number(p.value) || 0,
+                    }))
+                  : null;
+              const startList = toList(drrSettings.startPenalties);
+              const finishList = toList(drrSettings.finishPenalties);
+              const sectionList = toList(drrSettings.sectionPenalties);
+              if (startList) this.dataPenaltiesStart = startList;
+              if (finishList) this.dataPenaltiesFinish = finishList;
+              if (sectionList) this.dataPenaltiesSection = sectionList;
+            }
+
+            // On/off kolom Technical Delegate/Chief Judge/Race Director di
+            // PDF Result DRR — diatur per kategori lewat Race Settings,
+            // default TAMPIL (true) kalau belum pernah diatur.
+            const boolOrDefault = (v, d) => (v === undefined || v === null ? d : !!v);
+            this.showTechnicalDelegate = boolOrDefault(
+              drrSettings && drrSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              drrSettings && drrSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              drrSettings && drrSettings.showRaceDirector,
+              true
+            );
+
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan dataScore/dataPenalties* default kalau gagal memuat override
+      }
     },
 
-    // Normalisasi → selalu "HH:MM:SS.mmm" dengan zero-padding
-    normalizeHMSms(str) {
-      const pad2 = (n) => String(n).padStart(2, "0");
-      const pad3 = (n) => String(n).padStart(3, "0");
-      if (!this.isValidHMSms(str)) return "00:00:00.000";
-      const [hh, mm, ssms] = str.split(":");
-      const [ss, ms] = ssms.split(".");
-      return `${pad2(parseInt(hh, 10) || 0)}:${pad2(
-        parseInt(mm, 10) || 0
-      )}:${pad2(parseInt(ss, 10) || 0)}.${pad3(parseInt(ms, 10) || 0)}`;
+    async loadDataPenalties(type) {
+      try {
+        await new Promise((resolve) => {
+          ipcRenderer.send("option-penalties", type);
+          ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+            const data =
+              payload && payload[0] && Array.isArray(payload[0].data)
+                ? payload[0].data
+                : [];
+            this.dataPenalties = data;
+            // dipakai sebagai fallback sebelum race-settings per-event dimuat
+            this.dataPenaltiesStart = data;
+            this.dataPenaltiesFinish = data;
+            this.dataPenaltiesSection = data;
+            resolve();
+          });
+        });
+      } catch (error) {
+        this.dataPenalties = [];
+      }
     },
 
+    // context: 'START' / 'FINISH' / 'SECTION' — sama pola dgn
+    // filteredPenalties() di SlalomResult.vue, sinkron dgn override per-event
+    // dari Race Settings (Pilihan Pen. Start/Finish/Section).
+    filteredPenalties(context) {
+      const ctx = String(context || "").toUpperCase();
+      const src =
+        ctx === "START"
+          ? this.dataPenaltiesStart
+          : ctx === "FINISH"
+          ? this.dataPenaltiesFinish
+          : this.dataPenaltiesSection;
+      return Array.isArray(src) && src.length ? src : this.dataPenalties || [];
+    },
+
+    // BUG FIX: kalau nilai penalty yg TERSIMPAN (mis. dari sebelum Race
+    // Settings dikustomisasi, atau lewat jalur lain) TIDAK ada di daftar
+    // preset filteredPenalties(), <select> native tampil KOSONG/blank total
+    // (tidak match opsi manapun) walau datanya sebenarnya ADA — operator
+    // bisa salah kira field itu belum diisi & menimpanya tanpa sadar (mis.
+    // Section 5 blank di modal Section Penalty Time Detail padahal ada
+    // nilai valid tersimpan). Selipkan opsi sintetis utk value saat ini
+    // kalau belum ada di daftar preset, supaya select SELALU menampilkan
+    // apa yg sebenarnya tersimpan.
+    optionsWithCurrent(context, val) {
+      const opts = (this.filteredPenalties(context) || []).slice();
+      const n = Number(val);
+      if (Number.isFinite(n) && !opts.some((o) => Number(o.value) === n)) {
+        opts.push({ label: String(n), value: n });
+      }
+      return opts;
+    },
+
+    // sekunder BERTANDA (boleh minus, bonus dari Pilihan Pen. Section) →
+    // string "±HH:MM:SS.000" — sama pola dgn secondsToTimeString() di
+    // DownRiverRace.vue.
+    secondsToTimeString(totalSec) {
+      const raw = Number(totalSec) || 0;
+      const neg = raw < 0;
+      const t = Math.abs(raw);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${neg ? "-" : ""}${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+
+    // Kebalikan secondsToTimeString() — parse "±HH:MM:SS.mmm" jadi detik
+    // bertanda. Tanpa lookup tabel (value SELALU berarti detik langsung —
+    // sama fix pattern dgn timeToPenaltyValue() di DownRiverRace.vue).
+    timeToPenaltyValue(timeStr) {
+      const p = String(timeStr || "");
+      const neg = p.startsWith("-");
+      const t = p.replace("-", "");
+      const [hh = "0", mm = "0", ssms = "0"] = t.split(":");
+      const ss = parseFloat(ssms) || 0;
+      const hhNum = parseFloat(hh) || 0;
+      const mmNum = parseFloat(mm) || 0;
+      const val = hhNum * 3600 + mmNum * 60 + ss;
+      // safety net: data lama/tidak standar (bukan "-"? "HH:MM:SS.mmm")
+      // seharusnya sudah ternormalisasi jadi 0 lewat fallback `|| 0` di
+      // atas, tapi kalau tetap lolos jadi NaN, Math.round(NaN) tetap NaN —
+      // dan NaN bikin optionsWithCurrent() gagal menyisipkan opsi sintetis
+      // (Number.isFinite(NaN) === false), jadi select tetap blank walau
+      // sudah diberi fallback. Floor terakhir ke 0 supaya select SELALU
+      // punya nilai valid yg bisa direpresentasikan.
+      const rounded = Math.round(val);
+      return Number.isFinite(rounded) ? (neg ? -1 : 1) * rounded : 0;
+    },
+
+    // Buka modal Section — KHUSUS Unofficial: tiap section jadi select
+    // editable (nilai numerik, boleh minus/bonus), sama pola dgn Gate
+    // Penalty Detail di SlalomResult.vue. Saat Official, tetap read-only.
     openSectionModal(row) {
       this.sectionModal.team = row && row.nameTeam ? row.nameTeam : "";
       this.sectionModal.bib = row && row.bibTeam ? row.bibTeam : "";
       const raw = Array.isArray(row && row.sectionPenaltyTime)
         ? row.sectionPenaltyTime
         : [];
-      // validasi + normalisasi setiap entri
-      this.sectionModal.times = raw
-        .map((v) => this.normalizeHMSms(String(v || "")))
-        .filter((v) => v); // hasil selalu valid string
+      // BUG FIX: dulu ditampilkan sbg string waktu tervalidasi via
+      // normalizeHMSms()/isValidHMSms() — keduanya menolak prefix "-",
+      // jadi section dgn bonus (mis. "-00:00:10.000") ke-flatten jadi
+      // "00:00:00.000" (data section HILANG dari modal, padahal penalty
+      // total sudah benar terhitung). Sekarang dikonversi ke angka
+      // (timeToPenaltyValue(), support minus) supaya nilai section apa pun
+      // — termasuk bonus — tampil apa adanya di modal.
+      const values = raw.map((v) => this.timeToPenaltyValue(v));
+      // BUG FIX: kalau tim ini BELUM PERNAH diberi nilai Section sama
+      // sekali, sectionPenaltyTime tersimpan [] — tanpa padding ke
+      // drrSectionsCount, modal permanen kosong ("No section penalty
+      // time") & operator tidak pernah bisa mulai mengisi Section utk tim
+      // itu dari halaman Result ini sama sekali (beda dgn Race Detail yg
+      // selalu punya N slot select dari awal).
+      const n =
+        Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+          ? this.drrSectionsCount
+          : 3;
+      // pad ke minimal n slot; kalau data lama justru punya LEBIH banyak
+      // section (mis. Total Section pernah diperbesar lalu dikecilkan lagi),
+      // tetap dipertahankan semua — bukan dipotong — supaya tidak ada data
+      // yg diam2 hilang.
+      while (values.length < n) values.push(0);
+      this.sectionModal.values = values;
+      this.sectionModal.row = row || null;
       this.showSectionModal = true;
     },
 
     closeSectionModal() {
       this.showSectionModal = false;
+      this.sectionModal.row = null;
     },
+
+    // Simpan perubahan Section dari modal — KHUSUS Unofficial. Hitung ulang
+    // sectionPenalty (sum) & sectionPenaltyTime (array string, utk
+    // konsistensi format penyimpanan dgn Race Detail), lalu recompute+save
+    // lewat onDrrFieldChange() spt field lainnya.
+    async saveSectionModal() {
+      if (this.isOfficial || !this.sectionModal.row) {
+        this.showSectionModal = false;
+        return;
+      }
+      const row = this.sectionModal.row;
+      const values = (this.sectionModal.values || []).map(
+        (v) => Number(v) || 0
+      );
+      row.sectionPenaltyTime = values.map((v) => this.secondsToTimeString(v));
+      row.sectionPenalty = values.reduce((a, b) => a + b, 0);
+      this.showSectionModal = false;
+      this.sectionModal.row = null;
+      await this.onDrrFieldChange(row);
+    },
+
+    // "HH:MM:SS.mmm" (non-negatif) -> ms; NaN kalau tidak valid.
+    _parseHmsToMs(str) {
+      const s = String(str || "").trim();
+      const m = s.match(/^(\d{1,2}):([0-5]?\d):([0-5]?\d)(?:\.(\d{1,3}))?$/);
+      if (!m) return NaN;
+      const h = parseInt(m[1], 10) || 0;
+      const mi = parseInt(m[2], 10) || 0;
+      const se = parseInt(m[3], 10) || 0;
+      const ms = parseInt((m[4] || "0").padEnd(3, "0"), 10) || 0;
+      return h * 3600000 + mi * 60000 + se * 1000 + ms;
+    },
+    // ms (non-negatif) -> "HH:MM:SS.mmm"
+    _msToHms(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return "";
+      const pad = (n, w = 2) => String(Math.trunc(n)).padStart(w, "0");
+      const hh = Math.floor(ms / 3600000);
+      const mm = Math.floor((ms % 3600000) / 60000);
+      const ss = Math.floor((ms % 60000) / 1000);
+      const mss = Math.round(ms % 1000);
+      return `${pad(hh, 2)}:${pad(mm, 2)}:${pad(ss, 2)}.${pad(mss, 3)}`;
+    },
+
+    // Hitung ulang Race Time, Penalty Total/Time, dan Total/Result Time satu
+    // baris — dipanggil tiap kali Start/Finish Time, Start/Finish Penalty,
+    // atau Section Penalty (via saveSectionModal) diedit. penaltyTime BOLEH
+    // minus (bonus dari Pilihan Pen. Section) — beda dgn raceTime/totalTime
+    // yg tetap non-negatif (di-floor 0 kalau bonus lebih besar drpd raceTime).
+    recomputeDrrRow(row) {
+      const startMs = this._parseHmsToMs(row.startTime);
+      const finishMs = this._parseHmsToMs(row.finishTime);
+      row.raceTime =
+        Number.isFinite(startMs) &&
+        Number.isFinite(finishMs) &&
+        finishMs >= startMs
+          ? this._msToHms(finishMs - startMs)
+          : row.raceTime || "";
+
+      row.totalPenalty =
+        (Number(row.startPenalty) || 0) +
+        (Number(row.finishPenalty) || 0) +
+        (Number(row.sectionPenalty) || 0);
+
+      const penMs = row.totalPenalty * 1000;
+      row.penaltyTime = this.secondsToTimeString(row.totalPenalty);
+      row.totalPenaltyTime = row.penaltyTime;
+
+      const raceMs = this._parseHmsToMs(row.raceTime);
+      row.totalTime = Number.isFinite(raceMs)
+        ? this._msToHms(Math.max(0, raceMs + penMs))
+        : "";
+      row.resultTime =
+        row.totalPenalty === 0 ? row.raceTime : row.totalTime || row.raceTime;
+    },
+
+    // Cari tim asli (di this.rawResultDocs, dokumen persis spt yg dikirim
+    // DownRiverRace.vue via insert-drr-result) yg cocok dgn baris tampilan
+    // `row` — dicocokkan lewat nama+bib, sama pola dgn _findRawRun() di
+    // SlalomResult.vue (DRR single-run, jadi tidak perlu cocokkan session).
+    _findRawTeam(row) {
+      const docs = this.rawResultDocs || [];
+      const wantName = String((row && row.nameTeam) || "").trim().toUpperCase();
+      const wantBib = String((row && row.bibTeam) || "").trim();
+      for (const doc of docs) {
+        const teams = Array.isArray(doc && doc.result) ? doc.result : [];
+        for (const team of teams) {
+          const tName = String(team.nameTeam || "").trim().toUpperCase();
+          const tBib = String(team.bibTeam || "").trim();
+          if (tName === wantName && (!wantBib || tBib === wantBib)) {
+            return { doc, team };
+          }
+        }
+      }
+      return null;
+    },
+
+    // Simpan SEMUA dokumen (this.rawResultDocs, sudah termasuk edit
+    // terbaru) — insert-drr-result menerima ARRAY DATAR per-tim (bukan
+    // dibungkus per-bucket spt temporaryDrrResult), persis spt buildResultDocs()
+    // di DownRiverRace.vue, jadi di-flatten dulu di sini.
+    async saveRawResultsToDbDrr() {
+      if (typeof ipcRenderer === "undefined") return;
+      const flat = [];
+      (this.rawResultDocs || []).forEach((doc) => {
+        const teams = Array.isArray(doc && doc.result) ? doc.result : [];
+        teams.forEach((team) => {
+          flat.push({
+            eventId: doc.eventId,
+            initialId: doc.initialId,
+            raceId: doc.raceId,
+            divisionId: doc.divisionId,
+            eventName: doc.eventName || "DRR",
+            initialName: doc.initialName,
+            raceName: doc.raceName,
+            divisionName: doc.divisionName,
+            nameTeam: team.nameTeam,
+            bibTeam: team.bibTeam,
+            startOrder: team.startOrder,
+            praStart: team.praStart,
+            intervalRace: team.intervalRace,
+            statusId: team.statusId,
+            result: team.result,
+            otr: team.otr,
+          });
+        });
+      });
+      if (!flat.length) return;
+      await new Promise((resolve) => {
+        ipcRenderer.once("insert-drr-result-reply", (_e, res) => {
+          if (!res || !res.ok) {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              message: "Gagal menyimpan",
+              detail: (res && res.error) || "",
+            });
+          }
+          resolve();
+        });
+        ipcRenderer.send("insert-drr-result", flat);
+      });
+    },
+
+    // Dipanggil tiap kali Start/Finish Time, Start/Finish Penalty, atau
+    // Section Penalty (via saveSectionModal) diedit di tabel: hitung ulang
+    // baris ini, tulis balik ke rawResultDocs, refresh tampilan (rank/score
+    // ditentukan ulang oleh rankAndScoreFullRows() di dalam
+    // _buildResultsFromDocs(), yg juga dipakai loadDrrResult() — jadi TIDAK
+    // perlu recompute rank/score terpisah di sini, itu cuma bikin dua sumber
+    // kebenaran yg saling menimpa tanpa efek nyata), lalu simpan ke DB —
+    // backend insertDrrResult() tetap menghitung ulang ranked/score final
+    // secara otoritatif dari data tersimpan, terlepas dari apa yg dikirim.
+    async onDrrFieldChange(row) {
+      if (this.isOfficial) return;
+      this.recomputeDrrRow(row);
+
+      const found = this._findRawTeam(row);
+      if (found) {
+        const r =
+          found.team.result && typeof found.team.result === "object"
+            ? found.team.result
+            : {};
+        r.startTime = row.startTime || "";
+        r.finishTime = row.finishTime || "";
+        r.raceTime = row.raceTime || "";
+        r.startPenalty = Number(row.startPenalty) || 0;
+        r.finishPenalty = Number(row.finishPenalty) || 0;
+        r.sectionPenalty = Number(row.sectionPenalty) || 0;
+        r.totalPenalty = Number(row.totalPenalty) || 0;
+        r.sectionPenaltyTime = Array.isArray(row.sectionPenaltyTime)
+          ? row.sectionPenaltyTime.slice()
+          : [];
+        r.penaltyTime = row.penaltyTime || "00:00:00.000";
+        r.totalPenaltyTime = row.penaltyTime || "00:00:00.000";
+        r.totalTime = row.totalTime || "";
+        found.team.result = r;
+      }
+
+      // Rebuild lokal dari rawResultDocs yg BARU dimutasi di atas — BUKAN
+      // refetch (loadDrrResult()) yg akan menimpa balik edit ini dgn versi
+      // DB lama sebelum sempat tersimpan.
+      this._buildResultsFromDocs(this.rawResultDocs);
+      await this.saveRawResultsToDbDrr();
+    },
+
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
+    },
+
+    goToBucket(key) {
+      const b = this.bucketData.bucketMap[key];
+      if (!b) return;
+      this.$router.push({
+        path: this.$route.path,
+        query: {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "DRR",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        },
+      });
     },
 
     // ambil detail event dari IPC
@@ -873,13 +1388,43 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore =
-          t && t.totalScore != null
-            ? Number(t.totalScore) || 0
-            : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb saat ini — mencegah skor
+        // basi (tim sudah dihapus/dipindah dari Registered Teams) tetap
+        // muncul di Print Result Overall.
+        var initialName = doc && doc.initialName;
+        var raceName = doc && doc.raceName;
+        var divisionName = doc && doc.divisionName;
+        var teamName = t.teamName || "";
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SPRINT", initialName, raceName, divisionName, teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "HEAD2HEAD", initialName, raceName, divisionName, teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SLALOM", initialName, raceName, divisionName, teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "DRR", initialName, raceName, divisionName, teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "RX", initialName, raceName, divisionName, teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
+
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         rows.push({
           no: i + 1,
-          teamName: t.teamName || "",
+          teamName: teamName,
           bib: t.bib || "",
           countryCode: this.flagFor(t.teamName),
           sprintScore: sprintScore,
@@ -902,18 +1447,17 @@ export default {
       return { header: header, rows: rows };
     },
 
-    openEdit(row) {
-      this.$emit("edit-row", row);
-    },
-
     getScoreByRanked(ranked) {
       let i = 0;
       const r = Number(ranked);
+      let maxRank = 0;
       while (i < this.dataScore.length) {
         const row = this.dataScore[i];
+        if (row && row.ranking > maxRank) maxRank = row.ranking;
         if (row && row.ranking === r) return row.score;
         i++;
       }
+      if (r > maxRank) return this.drrDefaultScoreBeyondRank || 0;
       return 0;
     },
 
@@ -1060,15 +1604,40 @@ export default {
           try {
             if (!(res && res.ok && Array.isArray(res.items))) {
               this.results = [];
+              this.rawResultDocs = [];
               this.error = (res && res.error) || "Gagal memuat hasil.";
               this.loading = false;
               resolve();
               return;
             }
 
-            // --- helper kecil ---
-            // --- helper kecil (pakai function expression agar lolos no-inner-declarations) ---
-            const asStr = (v, d = "") => (v == null ? d : String(v));
+            // Simpan dokumen mentah (bukan cuma field datar hasil normalize)
+            // supaya edit inline (onDrrFieldChange()) bisa ditulis balik ke
+            // bentuk asli & disimpan lewat insert-drr-result — sama pola dgn
+            // rawResultItems di SlalomResult.vue.
+            this.rawResultDocs = res.items;
+            this._buildResultsFromDocs(this.rawResultDocs);
+            this.loading = false;
+          } catch (err) {
+            this.results = [];
+            this.error = "Terjadi kesalahan saat memproses data.";
+            this.loading = false;
+          } finally {
+            resolve();
+          }
+        });
+      });
+    },
+
+    // Susun this.results (field datar utk tabel) dari dokumen mentah —
+    // dipanggil dari loadDrrResult() (data baru dari DB) DAN dari
+    // onDrrFieldChange() (rebuild lokal dari rawResultDocs yg SUDAH dimutasi
+    // in-memory, TANPA fetch ulang — refetch di sini akan menimpa balik edit
+    // yg belum sempat tersimpan dgn data DB yg masih lama).
+    _buildResultsFromDocs(docs) {
+      try {
+        // --- helper kecil ---
+        const asStr = (v, d = "") => (v == null ? d : String(v));
 
             const asNum = (v, d = 0) => {
               const n = Number(v);
@@ -1095,25 +1664,17 @@ export default {
               const startPenaltyTime = timeOrZero(rIn.startPenaltyTime);
               const finishPenaltyTime = timeOrZero(rIn.finishPenaltyTime);
 
-              // ATURAN BARU: kalau sectionPenalty = 0 → sectionPenaltyTime = []
-              let sectionPenaltyTime = [];
-              if (sectionPenalty > 0) {
-                const a = rIn.sectionPenaltyTime;
-                if (Array.isArray(a) && a.length > 0) {
-                  let ii = 0;
-                  while (ii < a.length) {
-                    sectionPenaltyTime.push(timeOrZero(a[ii]));
-                    ii++;
-                  }
-                } else {
-                  // kalau penalti ada tapi array kosong → isi default 3 nol
-                  sectionPenaltyTime = [
-                    "00:00:00.000",
-                    "00:00:00.000",
-                    "00:00:00.000",
-                  ];
-                }
-              } // else tetap []
+              // BUG FIX: dulu di-gate oleh "sectionPenalty > 0" (SUM semua
+              // section) — begitu Pen. Section boleh minus (bonus), sum bisa
+              // 0 walau section-nya SENDIRI terisi (mis. +10 di Section 1 &
+              // -10 di Section 2, net 0) — aturan lama membuang array itu
+              // jadi [] sama sekali, sehingga modal "Section Penalty Time
+              // Detail" salah menampilkan "tidak ada data" padahal section
+              // sebenarnya sudah diisi. Sumber kebenaran section adalah
+              // ARRAY rIn.sectionPenaltyTime itu sendiri, bukan sum-nya.
+              const sectionPenaltyTime = Array.isArray(rIn.sectionPenaltyTime)
+                ? rIn.sectionPenaltyTime.map((v) => timeOrZero(v))
+                : [];
 
               const penaltyTimeSrc =
                 rIn.totalPenaltyTime != null
@@ -1224,42 +1785,32 @@ export default {
               };
             };
 
-            // rakit rows penuh
-            const rows = [];
-            const items = Array.isArray(res.items)
-              ? res.items
-              : res.items
-              ? [res.items]
-              : [];
-            for (const doc of items) {
-              const teams = doc && Array.isArray(doc.result) ? doc.result : [];
-              for (const team of teams) rows.push(normalizeTeamFull(team));
-            }
+        // rakit rows penuh
+        const rows = [];
+        const items = Array.isArray(docs) ? docs : docs ? [docs] : [];
+        for (const doc of items) {
+          const teams = doc && Array.isArray(doc.result) ? doc.result : [];
+          for (const team of teams) rows.push(normalizeTeamFull(team));
+        }
 
-            // ranking + score, sinkronkan ke field datar
-            this.rankAndScoreFullRows(rows);
+        // ranking + score, sinkronkan ke field datar
+        this.rankAndScoreFullRows(rows);
 
-            // bersihkan field internal
-            let ci = 0;
-            while (ci < rows.length) {
-              if (rows[ci] && rows[ci].result) {
-                delete rows[ci].result.__resultTime;
-                delete rows[ci].result.__resultMs;
-              }
-              ci++;
-            }
-
-            this.results = rows; // SIMPAN PENUH
-            this.loading = false;
-          } catch (err) {
-            this.results = [];
-            this.error = "Terjadi kesalahan saat memproses data.";
-            this.loading = false;
-          } finally {
-            resolve();
+        // bersihkan field internal
+        let ci = 0;
+        while (ci < rows.length) {
+          if (rows[ci] && rows[ci].result) {
+            delete rows[ci].result.__resultTime;
+            delete rows[ci].result.__resultMs;
           }
-        });
-      });
+          ci++;
+        }
+
+        this.results = rows; // SIMPAN PENUH
+      } catch (err) {
+        this.results = [];
+        this.error = "Terjadi kesalahan saat memproses data.";
+      }
     },
 
     // PDF
@@ -1278,6 +1829,35 @@ export default {
       } catch (e) {
         this.error = "Gagal membuat PDF";
       }
+    },
+
+    downloadExcel() {
+      const rows = (this.results || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        "Penalty Start": r.startPenalty || 0,
+        // BUG FIX: dulu isinya JUMLAH entri section (r.sectionPenaltyTime.length),
+        // bukan nilai penalty-nya — angka di Excel jadi tidak nyambung sama
+        // sekali dgn kolom "Penalty Total" (mis. 3 section terisi tampil
+        // "3" walau total penalty section-nya 50). Sekarang pakai sum yg
+        // sama dgn yg ditampilkan di tabel (r.sectionPenalty).
+        "Penalty Section": r.sectionPenalty || 0,
+        "Penalty Finish": r.finishPenalty || 0,
+        "Penalty Total": r.totalPenalty || "0",
+        "Penalty Time": r.penaltyTime || "00:00:00.000",
+        "Start Time": r.startTime || "00:00:00.000",
+        "Finish Time": r.finishTime || "00:00:00.000",
+        "Race Time": r.raceTime || "00:00:00.000",
+        Result: r.resultTime || "00:00:00.000",
+        Ranked: r.ranked || "-",
+        Score:
+          r.score !== undefined && r.score !== null && r.score !== ""
+            ? r.score
+            : this.getScoreByRanked(r.ranked) || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`DRR Result - ${eventName}`, rows, "DRR Result");
     },
 
     onBeforeDownload() {
@@ -1332,6 +1912,87 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 /* card */
 .card {
@@ -1481,6 +2142,28 @@ export default {
   text-decoration: underline dotted #8ab4f8;
 }
 
+.cell-input {
+  width: 100%;
+  min-width: 100px;
+  max-width: 130px;
+  text-align: center;
+  border: 1px solid #e0e3e8;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.cell-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: #368eb4;
+}
+
+.small-select {
+  min-width: 70px;
+  border-radius: 8px;
+}
+
 .section-time-list {
   border: 1px solid #e6e9ef;
   border-radius: 10px;
@@ -1550,4 +2233,10 @@ export default {
   align-items: center;
   font-size: 14px;
 }
+
+/* ---- Styling utk Switch DRR Category (dropdown toolbar) ---- */
+.switch-category-panel {
+  min-width: 260px;
+}
+/* ---- End styling utk Switch DRR Category ---- */
 </style>

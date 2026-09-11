@@ -2,6 +2,45 @@ const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 const { notifyResultsUpdated } = require("../socketBroadcast");
 
+// Ambil scoreByRank + defaultScoreBeyondRank per-event dari koleksi
+// raceSettings (Race Settings modal), utk kategori yg scoring-nya dihitung
+// server-side (Slalom, DRR). null = event belum kustomisasi (pakai fallback
+// global/hardcoded yang sudah ada).
+async function getEventScoreByRank(db, eventId, categoryKey) {
+  try {
+    if (!eventId) return null;
+    const doc = await db
+      .collection("raceSettings")
+      .findOne({ eventId: String(eventId) });
+    const cat = doc && doc.settings && doc.settings[categoryKey];
+    if (!cat || !Array.isArray(cat.scoreByRank) || cat.scoreByRank.length === 0) {
+      return null;
+    }
+    const cleaned = cat.scoreByRank
+      .filter(
+        (x) =>
+          x &&
+          Number.isFinite(Number(x.ranking)) &&
+          Number.isFinite(Number(x.score))
+      )
+      .map((x) => ({ ranking: Number(x.ranking), score: Number(x.score) }))
+      .sort((a, b) => a.ranking - b.ranking);
+    if (cleaned.length === 0) return null;
+
+    const maxRank = cleaned[cleaned.length - 1].ranking;
+    const table = new Array(maxRank).fill(0);
+    for (let i = 0; i < cleaned.length; i++) {
+      table[cleaned[i].ranking - 1] = cleaned[i].score;
+    }
+    const defaultScoreBeyondRank = Number(cat.defaultScoreBeyondRank) || 0;
+    return { table, defaultScoreBeyondRank };
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    console.error("[DAO] getEventScoreByRank failed (" + categoryKey + "):", msg);
+    return null;
+  }
+}
+
 async function insertSprintResult(payload) {
   try {
     const db = await getDb();
@@ -236,6 +275,11 @@ async function insertSlalomResult(payload) {
     const db = await getDb();
     const col = db.collection("temporarySlalomResult");
 
+    const rawEventId =
+      Array.isArray(payload) && payload[0]
+        ? String(payload[0].eventId || "")
+        : "";
+
     // === Ambil SCORE_TABLE dari optionRanked (SLALOM) ===
     let SCORE_TABLE = [];
     try {
@@ -305,6 +349,18 @@ async function insertSlalomResult(payload) {
       SCORE_TABLE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
     }
 
+    // === Override dgn scoreByRank per-event (Race Settings) kalau ada ===
+    let defaultScoreBeyondRank = 0;
+    const eventScoreOverride = await getEventScoreByRank(
+      db,
+      rawEventId,
+      "slalom"
+    );
+    if (eventScoreOverride) {
+      SCORE_TABLE = eventScoreOverride.table;
+      defaultScoreBeyondRank = eventScoreOverride.defaultScoreBeyondRank;
+    }
+
     // === Unique index per bucket ===
     if (!insertSlalomResult.__indexCreated) {
       try {
@@ -338,6 +394,7 @@ async function insertSlalomResult(payload) {
       if (!Array.isArray(SCORE_TABLE) || SCORE_TABLE.length === 0) return 0;
       const idx = rank - 1;
       if (idx < 0) return 0;
+      if (idx >= SCORE_TABLE.length) return defaultScoreBeyondRank || 0;
       const v = SCORE_TABLE[idx];
       return Number(v) || 0;
     }
@@ -892,13 +949,25 @@ async function insertDrrResult(payload) {
     }
 
     // --- helpers ---
-    const SCORE_TABLE = [
+    let SCORE_TABLE = [
       350, 322, 301, 287, 277, 266, 256, 245, 235, 224, 214, 203, 193, 182, 172,
       161, 151, 140, 133, 126, 119, 112, 105, 98, 91, 84, 77, 70, 63, 56, 49,
       42,
     ];
+    let defaultScoreBeyondRank = 0;
+    const rawEventId = arr[0] ? String(arr[0].eventId || "") : "";
+    const eventScoreOverride = await getEventScoreByRank(
+      db,
+      rawEventId,
+      "drr"
+    );
+    if (eventScoreOverride) {
+      SCORE_TABLE = eventScoreOverride.table;
+      defaultScoreBeyondRank = eventScoreOverride.defaultScoreBeyondRank;
+    }
     function scoreForRank(rank) {
       if (rank <= 0) return 0;
+      if (rank > SCORE_TABLE.length) return defaultScoreBeyondRank || 0;
       return SCORE_TABLE[rank - 1] || 0;
     }
     function toStr(v, d) {

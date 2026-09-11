@@ -251,11 +251,25 @@ async function getOverall(bucket) {
   return { ok: true, item };
 }
 
+// Ambil SEMUA baris hasil (semua round, semua tim) utk satu bucket — dipakai
+// Registered Teams (Details/index.vue) utk menentukan status per tim
+// (Belum Bertanding / Bertanding di Round X / Sudah Selesai Bertanding),
+// bukan cuma satu round seperti upsertRoundRows/upsertAllRounds.
+async function getAllResults(bucket) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const key = makeKey(bucket);
+  const items = await db.collection(COL_RESULTS).find({ key }).toArray();
+  return { ok: true, items };
+}
+
 module.exports = {
   upsertBracket,
   getBracket,
   upsertRoundRows,
   upsertAllRounds,
   upsertOverall,
-  getOverall
+  getOverall,
+  getAllResults
 };

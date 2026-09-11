@@ -148,6 +148,7 @@
                 </div>
               </div>
 
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -162,7 +163,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -177,20 +180,28 @@
                 }"
               ></span>
 
+              <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- path pill -->
               <div class="mb-1">
                 <span
                   class="path-pill"
                   :class="{ 'path-pill--empty': !selectPath }"
                   :title="selectPath || 'No device selected'"
                 >
-                  <Icon icon="mdi:usb-port" width="16" height="16" class="mr-1" />
+                  <Icon
+                    icon="mdi:usb-port"
+                    width="16"
+                    height="16"
+                    class="mr-1"
+                  />
                   <span class="truncate">{{
                     selectPath || "No device selected"
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>
@@ -251,14 +262,24 @@
           style="max-width: 320px"
         />
 
-        <button
-          type="button"
-          class="btn-action btn-secondary"
-          :disabled="currentRoundIndex >= rounds.length - 1"
-          @click="currentRoundIndex++"
-        >
-          Next <Icon icon="mdi:chevron-right" />
-        </button>
+        <div class="d-flex align-items-center">
+          <JudgeActionHistoryModal
+            v-if="currentEventId"
+            class="mr-2"
+            :event-id="String(currentEventId)"
+            race-category="rx"
+            category-label="Rafting Cross"
+          />
+
+          <button
+            type="button"
+            class="btn-action btn-secondary"
+            :disabled="currentRoundIndex >= rounds.length - 1"
+            @click="currentRoundIndex++"
+          >
+            Next <Icon icon="mdi:chevron-right" />
+          </button>
+        </div>
       </div>
 
       <!-- HEATS -->
@@ -348,7 +369,7 @@
                 >
                   <option :value="null">-</option>
                   <option
-                    v-for="p in dataPenalties"
+                    v-for="p in dataPenaltiesGate1"
                     :key="'g1-' + p.value"
                     :value="p.value"
                   >
@@ -366,7 +387,7 @@
                 >
                   <option :value="null">-</option>
                   <option
-                    v-for="p in dataPenalties"
+                    v-for="p in dataPenaltiesGate2"
                     :key="'g2-' + p.value"
                     :value="p.value"
                   >
@@ -457,6 +478,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 
 const rxBucketCache = createBucketCache("rxLocal");
 
@@ -464,7 +486,13 @@ const RACE_PAYLOAD_KEY = "raceStartPayload";
 
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
-  components: { Icon, EmptyCard, OperationTimePanel, CountryFlag },
+  components: {
+    Icon,
+    EmptyCard,
+    OperationTimePanel,
+    CountryFlag,
+    JudgeActionHistoryModal,
+  },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
@@ -487,7 +515,14 @@ export default {
         gate2: { enabled: true },
       },
       dataPenalties: [],
+      // Override per-event dari Race Settings (Pilihan Pen. Gate 1/Gate 2)
+      // — diisi di loadRaceSettings(); fallback ke dataPenalties (daftar
+      // global) di loadDataPenalties() sebelum race-settings dimuat, sama
+      // pola dgn dataPenaltiesStart/Finish di kategori lain.
+      dataPenaltiesGate1: [],
+      dataPenaltiesGate2: [],
       dataScore: [],
+      rxDefaultScoreBeyondRank: 0,
 
       rounds: [],
       currentRoundIndex: -1,
@@ -710,13 +745,19 @@ export default {
       try {
         ipcRenderer.send("option-penalties", type);
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          this.dataPenalties =
+          const data =
             payload && payload[0] && Array.isArray(payload[0].data)
               ? payload[0].data
               : [];
+          this.dataPenalties = data;
+          // dipakai sebagai fallback sebelum race-settings per-event dimuat
+          this.dataPenaltiesGate1 = data;
+          this.dataPenaltiesGate2 = data;
         });
       } catch (error) {
         this.dataPenalties = [];
+        this.dataPenaltiesGate1 = [];
+        this.dataPenaltiesGate2 = [];
       }
     },
     async loadRaceSettings() {
@@ -735,6 +776,27 @@ export default {
                   enabled: !!(res.settings.rx.gate2 && res.settings.rx.gate2.enabled),
                 },
               };
+              if (Array.isArray(res.settings.rx.scoreByRank) && res.settings.rx.scoreByRank.length) {
+                this.dataScore = res.settings.rx.scoreByRank;
+              }
+              this.rxDefaultScoreBeyondRank = Number(res.settings.rx.defaultScoreBeyondRank) || 0;
+
+              // Pilihan Pen. Gate 1 (G1) / Pen. Gate 2 (G2) — override
+              // daftar pilihan penalty per-event kalau dikustomisasi lewat
+              // Race Settings; kalau tidak ada, fallback ke dataPenalties
+              // (daftar global) yg di-set di loadDataPenalties().
+              if (
+                Array.isArray(res.settings.rx.gate1Penalties) &&
+                res.settings.rx.gate1Penalties.length
+              ) {
+                this.dataPenaltiesGate1 = res.settings.rx.gate1Penalties;
+              }
+              if (
+                Array.isArray(res.settings.rx.gate2Penalties) &&
+                res.settings.rx.gate2Penalties.length
+              ) {
+                this.dataPenaltiesGate2 = res.settings.rx.gate2Penalties;
+              }
             }
             resolve();
           });
@@ -921,17 +983,39 @@ export default {
       const pad = (n, w = 2) => String(n).padStart(w, "0");
       return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
     },
+    // sekunder → string "HH:MM:SS.000" — sama pola dgn secondsToTimeString()
+    // di kategori lain.
+    secondsToTimeString(totalSec) {
+      const t = Math.max(0, Number(totalSec) || 0);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+    // BUG FIX: dulu cari `val` di this.dataPenalties (daftar GLOBAL) via
+    // lookup by value — kalau `val` berasal dari Pilihan Pen. Gate 1/Gate 2
+    // hasil override Race Settings (custom, blm tentu ada di daftar
+    // global), lookup gagal & fallback ke {value:0,timePen:"00:00:00.000"},
+    // membuat penalty custom itu diam2 dihitung sbg NOL. value SELALU
+    // berarti detik, jadi konversi langsung tanpa lookup tabel (sama fix
+    // pattern dgn penaltyValueToMs()/penaltyValueToTime() di kategori lain).
     findPenalty(val) {
-      return (
-        this.dataPenalties.find((p) => Number(p.value) === Number(val)) || {
-          value: 0,
-          timePen: "00:00:00.000",
-        }
-      );
+      const n = Number(val);
+      if (!Number.isFinite(n)) return { value: 0, timePen: "00:00:00.000" };
+      return { value: n, timePen: this.secondsToTimeString(n) };
     },
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return m ? m.score : 0;
+      if (m) return m.score;
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.rxDefaultScoreBeyondRank || 0;
+      }
+      return 0;
     },
     /* =========================================================
      * SOCKET / IPC (Judges Dashboard realtime)
@@ -960,18 +1044,24 @@ export default {
       const res = heat.results[visItem._slotIdx];
       if (!res) return;
 
-      const allowed = (this.dataPenalties || []).map((p) => Number(p.value));
+      // BUG FIX: dulu Gate 1 & Gate 2 divalidasi terhadap SATU daftar yg
+      // sama (this.dataPenalties, daftar global) — begitu Gate 1/Gate 2
+      // dibuat independen lewat Race Settings, msg dari device utk salah
+      // satu gate bisa ditolak/salah divalidasi kalau kedua daftar sudah
+      // berbeda isinya. Sekarang masing2 dicek terhadap daftarnya sendiri.
       const kind = String(msg.type || "");
 
       if (kind === "RaceTime") {
         res.raceTime = String(msg.value || "");
       } else if (kind === "PenaltyGate1" || String(msg.gate || "") === "1" || msg.gate === "gate1") {
         const v = Number(msg.value);
-        if (!allowed.includes(v)) return;
+        const allowed1 = (this.dataPenaltiesGate1 || []).map((p) => Number(p.value));
+        if (!allowed1.includes(v)) return;
         res.penalties.gate1 = v;
       } else if (kind === "PenaltyGate2" || String(msg.gate || "") === "2" || msg.gate === "gate2") {
         const v = Number(msg.value);
-        if (!allowed.includes(v)) return;
+        const allowed2 = (this.dataPenaltiesGate2 || []).map((p) => Number(p.value));
+        if (!allowed2.includes(v)) return;
         res.penalties.gate2 = v;
       } else {
         return;
@@ -983,6 +1073,23 @@ export default {
 
       if (this.selectedRxKey) {
         rxBucketCache.save(this.selectedRxKey, this.rounds);
+      }
+
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan
+      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        ipcRenderer.send("judgeLog:send", {
+          eventId: this.currentEventId,
+          raceCategory: "rx",
+          type: msg.type,
+          text: msg.text,
+          teamId: visItem.id,
+          teamName: visItem.name,
+          bibTeam: visItem.bibTeam,
+          value: Number(msg.value),
+          from: msg.from,
+          sourceTs: msg.ts,
+          raw: msg,
+        });
       }
     },
 

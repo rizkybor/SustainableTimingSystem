@@ -6,10 +6,18 @@ async function upsertEventResultsDoc(payload) {
   const db = await getDb();
   const col = db.collection("temporaryOverallEventResults");
 
+  // PENTING: filter identitas dokumen HARUS sama persis dengan yang dipakai
+  // getEventResultsAggregate() (dipakai tombol "View Overall" di semua
+  // halaman Result) — yaitu raceId, BUKAN raceName. raceName adalah string
+  // tampilan (rawan beda casing/rename), sementara raceId adalah ID stabil.
+  // Kalau filter di sini beda dari filter baca, upsert bisa membuat
+  // dokumen overall baru yang terpisah alih-alih meng-update yang sudah
+  // ada, sehingga hasil per-kategori dan View Overall diam-diam tidak
+  // sinkron.
   const filter = {
     eventId: payload.eventId,
     initialId: payload.initialId,
-    raceName: payload.raceName,
+    raceId: payload.raceId,
     divisionId: payload.divisionId,
   };
 

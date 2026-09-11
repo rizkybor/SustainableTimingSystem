@@ -410,35 +410,47 @@ export default {
     // Ambil rekap ranked/score (temporaryOverallEventResults) untuk tiap
     // event unik yang diikuti tim ini, lalu di-join ke registrations lewat
     // computed `eventsGrouped` (match by raceName+divisionName+initialName).
-    loadResultsForEvents() {
+    //
+    // "event-results:get-all-by-event-reply" adalah channel yang dipakai
+    // bersama — menembak semua eventId sekaligus secara paralel (dulu pakai
+    // forEach + ipcRenderer.once per event) membuat SATU balasan pertama
+    // yang tiba memicu SEMUA listener .once yang masih terdaftar sekaligus
+    // (Node EventEmitter tidak membedakan listener mana milik request
+    // mana), sehingga balasan utk event lain hilang begitu saja (tidak ada
+    // listener tersisa) dan `pending` langsung habis dari 1 balasan itu.
+    // Hasilnya: tim yang ikut lebih dari 1 event cuma dapat rekap dari
+    // SATU event (siapa pun yang balasannya kebetulan tiba duluan), event
+    // lainnya diam-diam kosong. Diperbaiki dgn fetch satu per satu
+    // (sekuensial), sama seperti loadEventNames()/loadRawResults() di
+    // bawah.
+    async loadResultsForEvents() {
       const eventIds = Array.from(
         new Set(this.registrations.map((r) => r.eventId).filter(Boolean))
       );
       if (!eventIds.length) return;
 
       this.loadingResults = true;
-      let pending = eventIds.length;
-      const self = this;
-
-      eventIds.forEach(function (eventId) {
-        ipcRenderer.send("event-results:get-all-by-event", eventId);
-        ipcRenderer.once(
-          "event-results:get-all-by-event-reply",
-          function (_e, res) {
-            const items = res && res.ok && Array.isArray(res.items) ? res.items : [];
-            items.forEach(function (doc) {
-              const key = String((doc && doc.eventId) || "");
-              if (!key) return;
-              if (!self.resultDocsByEventId[key]) {
-                self.$set(self.resultDocsByEventId, key, []);
-              }
-              self.resultDocsByEventId[key].push(doc);
-            });
-            pending -= 1;
-            if (pending <= 0) self.loadingResults = false;
+      for (let i = 0; i < eventIds.length; i++) {
+        const eventId = eventIds[i];
+        // eslint-disable-next-line no-await-in-loop
+        const res = await new Promise((resolve) => {
+          ipcRenderer.send("event-results:get-all-by-event", eventId);
+          ipcRenderer.once(
+            "event-results:get-all-by-event-reply",
+            (_e, r) => resolve(r)
+          );
+        });
+        const items = res && res.ok && Array.isArray(res.items) ? res.items : [];
+        items.forEach((doc) => {
+          const key = String((doc && doc.eventId) || "");
+          if (!key) return;
+          if (!this.resultDocsByEventId[key]) {
+            this.$set(this.resultDocsByEventId, key, []);
           }
-        );
-      });
+          this.resultDocsByEventId[key].push(doc);
+        });
+      }
+      this.loadingResults = false;
     },
 
     // Ambil judul asli (eventsCollection.eventName) untuk tiap eventId unik.

@@ -1,5 +1,4 @@
-// Label + formatting util dipakai bareng oleh TeamDetailsModal (detail satu
-// baris tim terdaftar di panel event) dan TeamDetail (halaman global per
+// Label + formatting util dipakai oleh TeamDetail (halaman global per
 // tim) untuk menampilkan field "result" race secara generik — bentuknya
 // beda-beda per kategori (Sprint: objek tunggal, Slalom: array per-run,
 // DRR: objek dengan sectionPenaltyTime array, dst) jadi field mana saja

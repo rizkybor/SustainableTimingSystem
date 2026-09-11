@@ -30,10 +30,10 @@
       <!-- TOP LOGO(S) -->
       <div
         class="mid-image-row"
-        v-if="data && data.event_logo && data.event_logo.length > 0"
+        v-if="data && data.eventFiles && data.eventFiles.length > 0"
       >
         <div
-          v-for="(url, index) in data.event_logo"
+          v-for="(url, index) in data.eventFiles"
           :key="index"
           class="mid-image py-4"
         >
@@ -172,7 +172,24 @@
 
     <!-- SIGNATURE -->
     <footer class="sign">
-      <div class="sign-col">
+      <!-- Technical Delegate / Chief Judge / Race Director — masing2 bisa
+           di-on/off-kan per kategori lewat Race Settings (showTechnicalDelegate/
+           showChiefJudge/showRaceDirector, default tampil kalau tidak diatur);
+           nama default "—" kalau datanya belum diisi di Event Detail. -->
+      <div class="sign-col" v-if="data && data.showTechnicalDelegate !== false">
+        <div class="sign-title">Technical Delegate</div>
+        <img
+          v-if="data && data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
+          :src="data.technicalDelegateSignature.secure_url"
+          class="sign-img"
+          alt="Technical Delegate signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.technicalDelegate ? data.technicalDelegate : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showChiefJudge !== false">
         <div class="sign-title">Chief Judge</div>
         <img
           v-if="data && data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -183,6 +200,19 @@
         <div v-else class="sign-line"></div>
         <div class="sign-name">
           {{ data && data.chiefJudge ? data.chiefJudge : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showRaceDirector !== false">
+        <div class="sign-title">Race Director</div>
+        <img
+          v-if="data && data.raceDirectorSignature && data.raceDirectorSignature.secure_url"
+          :src="data.raceDirectorSignature.secure_url"
+          class="sign-img"
+          alt="Race Director signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.raceDirector ? data.raceDirector : "—" }}
         </div>
       </div>
       <div class="sign-col stamp-col">
@@ -198,10 +228,10 @@
     <!-- SPONSOR LOGO(S) -->
     <div
       class="mid-image-sponsor-row"
-      v-if="data && data.event_logo && data.event_logo.length > 0"
+      v-if="data && data.sponsorFiles && data.sponsorFiles.length > 0"
     >
       <div
-        v-for="(url, index) in data.event_logo"
+        v-for="(url, index) in data.sponsorFiles"
         :key="index"
         class="mid-image-sponsor py-4"
       >
@@ -554,7 +584,13 @@ export default {
   gap: 8mm;
 }
 .sign-col {
-  width: 30%;
+  /* dulu width:30% tetap (pas cuma 2 kolom: Chief Judge + stamp) — sekarang
+     Technical Delegate & Race Director bisa ikut tampil (on/off lewat Race
+     Settings), jadi jumlah kolom yg kebentuk bisa 2-4. flex:1 supaya
+     lebarnya selalu menyesuaikan berapa pun yg sedang tampil, drpd overflow
+     saat 4 kolom @30% (120%) sekaligus muncul. */
+  flex: 1;
+  min-width: 0;
 }
 .sign-title {
   color: #8a95a3;
@@ -611,8 +647,15 @@ export default {
   margin: 2mm 0;
 }
 .mid-image img {
-  width: 80px;
-  height: 80px;
+  /* BUG FIX: dulu width+height sama2 di-fix (80x80, kotak) — html2canvas
+     (dipakai vue-html2pdf) tidak selalu menghormati object-fit:contain,
+     jadi logo non-persegi ke-stretch paksa jadi kotak (gepeng). Samakan
+     dgn sprint-pdfResult.vue: cuma height yg di-fix, width auto ikut
+     rasio asli gambar — proporsional apapun bentuk logonya.
+  */
+  height: 70px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 .mid-image-sponsor-row {
@@ -620,8 +663,9 @@ export default {
   margin-bottom: 0;
 }
 .mid-image-sponsor img {
-  width: 40px;
-  height: 40px;
+  height: 35px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 
@@ -694,9 +738,15 @@ header,
   padding: 3px 4px; /* lebih kecil */
   font-size: 9.5px; /* kecilkan keseluruhan */
   line-height: 1.15; /* rapat biar gak “tumpah” */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* cegah teks keluar border */
+  /* BUG FIX: dulu white-space:nowrap + overflow:hidden + text-overflow:
+     ellipsis — nama tim (atau isi kolom lain) yang lebih panjang dari
+     lebar kolom tetap (table-layout: fixed) langsung terpotong jadi "...".
+     Sekarang dibiarkan wrap ke baris berikutnya (tinggi baris menyesuaikan)
+     supaya TIDAK ADA isi kolom yang pernah hilang/terpotong dari PDF. */
+  white-space: normal;
+  overflow: visible;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* --- header (thead) lebih kecil lagi --- */
@@ -717,8 +767,9 @@ header,
 
 .score-table th:nth-child(2),
 .score-table td:nth-child(2) {
-  width: 80px;
-} /* Team */
+  width: 100px;
+} /* Team — dilebarkan sedikit drpd 80px, sisanya diselesaikan lewat wrap
+     (bukan ellipsis) di atas kalau nama tim masih lebih panjang */
 
 .score-table th:nth-child(3),
 .score-table td:nth-child(3) {
@@ -811,9 +862,9 @@ header,
   width: 55px; /* atur sesuai selera: 110–140px */
   min-width: 120px;
   max-width: 140px; /* cegah melebar berlebihan */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  word-wrap: break-word;
 }
 
 /* kalau mau sedikit lebih lega saat print */

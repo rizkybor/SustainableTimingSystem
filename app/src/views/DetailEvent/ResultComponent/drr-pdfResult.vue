@@ -29,10 +29,10 @@
       <!-- TOP LOGO(S) -->
       <div
         class="mid-image-row"
-        v-if="data && data.event_logo && data.event_logo.length > 0"
+        v-if="data && data.eventFiles && data.eventFiles.length > 0"
       >
         <div
-          v-for="(url, index) in data.event_logo"
+          v-for="(url, index) in data.eventFiles"
           :key="index"
           class="mid-image py-4"
         >
@@ -71,7 +71,13 @@
             <th>Finish</th>
             <th>Race Time</th>
             <th>Pen. Start</th>
-            <th>Pen. Section</th>
+            <th
+              class="pen-head section"
+              v-for="n in maxSections"
+              :key="'sec-h-' + n"
+            >
+              S{{ n }}
+            </th>
             <th>Pen. Finish</th>
             <th>Pen. Total</th>
             <th>Penalty Time</th>
@@ -107,16 +113,12 @@
               {{ num(row && row.result ? row.result.startPenalty : 0) }}
             </td>
 
-            <td class="text-center">
-              <div v-if="sectionTimes(row).length" class="section-times">
-                <div
-                  v-for="(t, idx) in sectionTimes(row)"
-                  :key="idx"
-                  class="mono subtime"
-                >
-                  {{ time(t) }}
-                </div>
-              </div>
+            <td
+              class="text-center"
+              v-for="n in maxSections"
+              :key="'sec-' + i + '-' + n"
+            >
+              {{ sectionValueAt(row, n - 1) }}
             </td>
 
             <td class="text-center">
@@ -155,7 +157,7 @@
           </tr>
 
           <tr v-if="rows.length === 0">
-            <td class="empty" colspan="14">No data</td>
+            <td class="empty" :colspan="13 + maxSections">No data</td>
           </tr>
         </tbody>
       </table>
@@ -163,7 +165,24 @@
 
     <!-- SIGNATURE -->
     <footer class="sign">
-      <div class="sign-col">
+      <!-- Technical Delegate / Chief Judge / Race Director — masing2 bisa
+           di-on/off-kan per kategori lewat Race Settings (showTechnicalDelegate/
+           showChiefJudge/showRaceDirector, default tampil kalau tidak diatur);
+           nama default "—" kalau datanya belum diisi di Event Detail. -->
+      <div class="sign-col" v-if="data && data.showTechnicalDelegate !== false">
+        <div class="sign-title">Technical Delegate</div>
+        <img
+          v-if="data && data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
+          :src="data.technicalDelegateSignature.secure_url"
+          class="sign-img"
+          alt="Technical Delegate signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.technicalDelegate ? data.technicalDelegate : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showChiefJudge !== false">
         <div class="sign-title">Chief Judge</div>
         <img
           v-if="data && data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -174,6 +193,19 @@
         <div v-else class="sign-line"></div>
         <div class="sign-name">
           {{ data && data.chiefJudge ? data.chiefJudge : "—" }}
+        </div>
+      </div>
+      <div class="sign-col" v-if="data && data.showRaceDirector !== false">
+        <div class="sign-title">Race Director</div>
+        <img
+          v-if="data && data.raceDirectorSignature && data.raceDirectorSignature.secure_url"
+          :src="data.raceDirectorSignature.secure_url"
+          class="sign-img"
+          alt="Race Director signature"
+        />
+        <div v-else class="sign-line"></div>
+        <div class="sign-name">
+          {{ data && data.raceDirector ? data.raceDirector : "—" }}
         </div>
       </div>
       <div class="sign-col stamp-col">
@@ -189,10 +221,10 @@
     <!-- SPONSOR LOGO(S) -->
     <div
       class="mid-image-sponsor-row"
-      v-if="data && data.event_logo && data.event_logo.length > 0"
+      v-if="data && data.sponsorFiles && data.sponsorFiles.length > 0"
     >
       <div
-        v-for="(url, index) in data.event_logo"
+        v-for="(url, index) in data.sponsorFiles"
         :key="index"
         class="mid-image-sponsor py-4"
       >
@@ -218,6 +250,20 @@ export default {
   computed: {
     rows() {
       return Array.isArray(this.dataParticipant) ? this.dataParticipant : [];
+    },
+    // Jumlah kolom Section (S1..SN) — dulu semua section digepeng jadi
+    // SATU kolom "Pen. Section" berisi daftar time string bertumpuk, tidak
+    // ada rincian per-section yg jelas (beda dgn Slalom PDF yg py 1 kolom
+    // per Gate). Sekarang tiap section dapat kolom sendiri, nilainya
+    // numerik (bukan string waktu) — konsisten dgn tabel/modal di
+    // DrrResult.vue.
+    maxSections() {
+      let max = 0;
+      this.rows.forEach((row) => {
+        const a = row && row.result && row.result.sectionPenaltyTime;
+        if (Array.isArray(a) && a.length > max) max = a.length;
+      });
+      return max;
     },
     today() {
       const d = new Date();
@@ -250,18 +296,29 @@ export default {
       const n = Number(v);
       return Number.isFinite(n) && n > 0 ? n : "-";
     },
-    sectionTimes(row) {
-      const r = row && row.result ? row.result : {};
-      const a = r.sectionPenaltyTime;
-      if (!Array.isArray(a)) return [];
-      const out = [];
-      let i = 0;
-      while (i < a.length) {
-        const val = String(a[i] || "").trim();
-        if (val) out.push(val);
-        i++;
-      }
-      return out;
+    // "±HH:MM:SS.mmm" -> angka detik bertanda (boleh minus, bonus dari
+    // Pilihan Pen. Section) — sama pola dgn timeToPenaltyValue() di
+    // DrrResult.vue/DownRiverRace.vue.
+    timeToPenaltyValue(timeStr) {
+      const p = String(timeStr || "");
+      const neg = p.startsWith("-");
+      const t = p.replace("-", "");
+      const [hh = "0", mm = "0", ssms = "0"] = t.split(":");
+      const ss = parseFloat(ssms) || 0;
+      const hhNum = parseFloat(hh) || 0;
+      const mmNum = parseFloat(mm) || 0;
+      const val = hhNum * 3600 + mmNum * 60 + ss;
+      const rounded = Math.round(val);
+      return Number.isFinite(rounded) ? (neg ? -1 : 1) * rounded : 0;
+    },
+    // Nilai numerik Section ke-`idx` (0-based) utk satu baris — kosong ("")
+    // kalau section itu tidak ada sama sekali utk tim ini (Total Section
+    // event ini < maxSections), bukan "0" (biar tidak kebaca seolah tim itu
+    // memang punya penalty 0 di section yg sebenarnya tidak berlaku).
+    sectionValueAt(row, idx) {
+      const a = row && row.result && row.result.sectionPenaltyTime;
+      if (!Array.isArray(a) || idx >= a.length) return "";
+      return this.timeToPenaltyValue(a[idx]);
     },
   },
 };
@@ -379,7 +436,13 @@ export default {
   gap: 8mm;
 }
 .sign-col {
-  width: 30%;
+  /* dulu width:30% tetap (pas cuma 2 kolom: Chief Judge + stamp) — sekarang
+     Technical Delegate & Race Director bisa ikut tampil (on/off lewat Race
+     Settings), jadi jumlah kolom yg kebentuk bisa 2-4. flex:1 supaya
+     lebarnya selalu menyesuaikan berapa pun yg sedang tampil, drpd overflow
+     saat 4 kolom @30% (120%) sekaligus muncul. */
+  flex: 1;
+  min-width: 0;
 }
 .sign-title {
   color: #8a95a3;
@@ -437,8 +500,15 @@ export default {
   margin: 2mm 0;
 }
 .mid-image img {
-  width: 80px;
-  height: 80px;
+  /* BUG FIX: dulu width+height sama2 di-fix (80x80, kotak) — html2canvas
+     (dipakai vue-html2pdf) tidak selalu menghormati object-fit:contain,
+     jadi logo non-persegi ke-stretch paksa jadi kotak (gepeng). Samakan
+     dgn sprint-pdfResult.vue: cuma height yg di-fix, width auto ikut
+     rasio asli gambar — proporsional apapun bentuk logonya.
+  */
+  height: 70px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 .mid-image-sponsor-row {
@@ -446,8 +516,9 @@ export default {
   margin-bottom: 0;
 }
 .mid-image-sponsor img {
-  width: 40px;
-  height: 40px;
+  height: 35px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 
@@ -471,11 +542,7 @@ header,
   letter-spacing: 0.5px;
 }
 
-.section-times {
-  margin-top: 2px;
-}
-.subtime {
+.pen-head.section {
   font-size: 11px;
-  line-height: 1.15;
 }
 </style>

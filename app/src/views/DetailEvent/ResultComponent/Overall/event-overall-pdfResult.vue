@@ -61,26 +61,24 @@
             <th rowspan="2" class="team-col">Team Name</th>
             <th rowspan="2" class="w-60">BIB</th>
 
-            <th colspan="2" class="group sprint">Sprint</th>
-            <th colspan="2" class="group h2h">H2H</th>
-            <th colspan="2" class="group slalom">Slalom</th>
-            <th colspan="2" class="group drr">DRR</th>
-            <th colspan="2" class="group rx">Rafting Cross</th>
+            <th
+              v-for="cat in categories"
+              :key="cat.key"
+              colspan="2"
+              class="group"
+              :class="cat.cssClass"
+            >
+              {{ cat.label }}
+            </th>
 
             <th rowspan="2" class="w-80">Total Score</th>
             <th rowspan="2" class="w-80">Rank</th>
           </tr>
           <tr>
-            <th class="sub">Score</th>
-            <th class="sub">Rank</th>
-            <th class="sub">Score</th>
-            <th class="sub">Rank</th>
-            <th class="sub">Score</th>
-            <th class="sub">Rank</th>
-            <th class="sub">Score</th>
-            <th class="sub">Rank</th>
-            <th class="sub">Score</th>
-            <th class="sub">Rank</th>
+            <template v-for="cat in categories">
+              <th class="sub" :key="cat.key + '-score'">Score</th>
+              <th class="sub" :key="cat.key + '-rank'">Rank</th>
+            </template>
           </tr>
         </thead>
         <tbody>
@@ -92,22 +90,22 @@
             </td>
             <td class="text-center">{{ row.bib || "-" }}</td>
 
-            <td class="text-center">{{ row.sprintScore || 0 }}</td>
-            <td class="text-center">{{ row.sprintRank || "-" }}</td>
-            <td class="text-center">{{ row.h2hScore || 0 }}</td>
-            <td class="text-center">{{ row.h2hRank || "-" }}</td>
-            <td class="text-center">{{ row.slalomScore || 0 }}</td>
-            <td class="text-center">{{ row.slalomRank || "-" }}</td>
-            <td class="text-center">{{ row.drrScore || 0 }}</td>
-            <td class="text-center">{{ row.drrRank || "-" }}</td>
-            <td class="text-center">{{ row.rxScore || 0 }}</td>
-            <td class="text-center">{{ row.rxRank || "-" }}</td>
+            <template v-for="cat in categories">
+              <td class="text-center" :key="cat.key + '-score'">
+                {{ row[cat.scoreField] || 0 }}
+              </td>
+              <td class="text-center" :key="cat.key + '-rank'">
+                {{ row[cat.rankField] || "-" }}
+              </td>
+            </template>
 
             <td class="text-center text-strong">{{ row.totalScore || 0 }}</td>
             <td class="text-center text-strong">{{ row.rank || "-" }}</td>
           </tr>
           <tr v-if="!(b.rows || []).length">
-            <td class="empty" colspan="15">No data</td>
+            <td class="empty" :colspan="3 + categories.length * 2 + 2">
+              No data
+            </td>
           </tr>
         </tbody>
       </table>
@@ -199,6 +197,7 @@
 
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
 
 export default {
   name: "EventOverallPdfResult",
@@ -206,6 +205,7 @@ export default {
   props: {
     data: { type: Object, required: true },
     buckets: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
   },
   computed: {

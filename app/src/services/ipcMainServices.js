@@ -14,6 +14,7 @@ const {
   upsertAllRounds,
   upsertOverall,
   getOverall,
+  getAllResults,
 } = require("../controllers/INSERT/upsertHeadToHead.js");
 
 const {
@@ -80,6 +81,7 @@ const {
 
 const {
   insertNewTeam,
+  insertManyTeams,
   getAllTeams,
   deleteTeamById,
   updateTeamById,
@@ -112,10 +114,22 @@ const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
 const { deleteEventById } = require("../controllers/DELETE/deleteByIdEvent");
 const {
+  resetEventData,
+  deleteOneCollectionForEvent,
+  RESET_COLLECTIONS,
+} = require("../controllers/DELETE/resetEventData");
+const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
+const { resetSlalomDataForEvent } = require("../controllers/DELETE/resetSlalomData");
+const { resetDrrDataForEvent } = require("../controllers/DELETE/resetDrrData");
+const {
   insertChatMessage,
   listChatMessagesByEvent,
   deleteChatMessage,
 } = require("../controllers/INSERT/insertChatMessage");
+const {
+  insertJudgeActionLog,
+  listJudgeActionLogsByEvent,
+} = require("../controllers/INSERT/insertJudgeActionLog");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -243,6 +257,34 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // Judge action log: audit trail dari penalty/tindakan judge yang diterima
+  // via socket "custom:event" dari sts-jurysystem dan berhasil diterapkan
+  // di masing-masing Race Category view (Sprint/Slalom/DRR/H2H/RX).
+  ipcMain.on("judgeLog:send", async (event, payload) => {
+    try {
+      const log = await insertJudgeActionLog(payload);
+      event.reply("judgeLog:send:reply", { ok: true, log });
+    } catch (err) {
+      event.reply("judgeLog:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  ipcMain.on("judgeLog:listByEvent", async (event, payload) => {
+    try {
+      const { eventId, raceCategory, limit } = payload || {};
+      const items = await listJudgeActionLogsByEvent(eventId, raceCategory, {
+        limit,
+      });
+      event.reply("judgeLog:listByEvent:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("judgeLog:listByEvent:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
+    }
+  });
+
   // GET DB
   ipcMain.on("get-alert", async (event, options) => {
     try {
@@ -308,6 +350,90 @@ function setupIPCMainHandlers() {
       event.reply("delete-event-reply", { ok });
     } catch (error) {
       event.reply("delete-event-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset Data": hapus semua hasil/kompetisi (Sprint/H2H/Slalom/DRR/RX)
+  // milik satu event, tanpa menyentuh data tim terdaftar & pengaturan event.
+  ipcMain.on("event:reset-data", async (event, eventId) => {
+    try {
+      const result = await resetEventData(eventId);
+      event.reply("event:reset-data-reply", result);
+    } catch (error) {
+      event.reply("event:reset-data-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // daftar koleksi yang dihapus Reset Data — dipakai renderer utk
+  // menampilkan progress bar bertahap (1 request per koleksi)
+  ipcMain.on("event:reset-data:collections", (event) => {
+    event.reply(
+      "event:reset-data:collections-reply",
+      RESET_COLLECTIONS.map((c) => ({ name: c.name, label: c.label }))
+    );
+  });
+
+  // hapus SATU koleksi saja — dipanggil berkali-kali oleh renderer (satu per
+  // koleksi) supaya progress reset bisa ditampilkan bertahap
+  ipcMain.on("event:reset-data:step", async (event, { eventId, collection, __reqId } = {}) => {
+    try {
+      const result = await deleteOneCollectionForEvent(eventId, collection);
+      event.reply("event:reset-data:step-reply", { ...result, __reqId });
+    } catch (error) {
+      event.reply("event:reset-data:step-reply", {
+        ok: false,
+        collection,
+        __reqId,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset All" di halaman Head to Head — hapus semua data kompetisi H2H
+  // (seluruh kategori/bucket) utk satu event, tanpa menyentuh Sprint/
+  // Slalom/DRR/RX di event yang sama.
+  ipcMain.on("h2h:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetH2HDataForEvent(eventId);
+      event.reply("h2h:reset-all-reply", result);
+    } catch (error) {
+      event.reply("h2h:reset-all-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset All" di halaman Slalom Details — hapus semua waktu yang sudah
+  // bertanding di Slalom (seluruh kategori/bucket) utk satu event, tanpa
+  // menyentuh Sprint/H2H/DRR/RX di event yang sama.
+  ipcMain.on("slalom:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetSlalomDataForEvent(eventId);
+      event.reply("slalom:reset-all-reply", result);
+    } catch (error) {
+      event.reply("slalom:reset-all-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // "Reset All" di halaman DRR Details — hapus semua waktu yang sudah
+  // bertanding di DRR (seluruh kategori/bucket) utk satu event, tanpa
+  // menyentuh Sprint/H2H/Slalom/RX di event yang sama.
+  ipcMain.on("drr:reset-all", async (event, eventId) => {
+    try {
+      const result = await resetDrrDataForEvent(eventId);
+      event.reply("drr:reset-all-reply", result);
+    } catch (error) {
+      event.reply("drr:reset-all-reply", {
         ok: false,
         error: error && error.message ? error.message : String(error),
       });
@@ -487,14 +613,24 @@ function setupIPCMainHandlers() {
 
   // LOAD SLALOM RESULT
   ipcMain.on("get-slalom-result", async (event, query = {}) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+    // mencocokkan balasan ke request-nya sendiri (mis. loadSlalomStatusForPanel()
+    // di Details/index.vue) bisa pakai ipcRenderer.on()+cek __reqId — pemanggil
+    // lama yang tidak mengirim __reqId tidak terpengaruh (field cuma echo).
+    const reqId = query && query.__reqId;
     try {
       const data = await getSlalomResult(query);
-      event.reply("get-slalom-result-reply", { ok: true, items: data });
+      event.reply("get-slalom-result-reply", {
+        ok: true,
+        items: data,
+        __reqId: reqId,
+      });
     } catch (error) {
       event.reply("get-slalom-result-reply", {
         ok: false,
         items: [],
         error: error.message,
+        __reqId: reqId,
       });
     }
   });
@@ -645,6 +781,19 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // Bulk Insert (fitur "Import from Excel" di Create New Team)
+  ipcMain.on("teams:bulk-insert", async (event, docs) => {
+    try {
+      const result = await insertManyTeams(docs);
+      event.reply("teams:bulk-insert-reply", { ok: true, ...result });
+    } catch (e) {
+      event.reply("teams:bulk-insert-reply", {
+        ok: false,
+        error: String((e && e.message) || e),
+      });
+    }
+  });
+
   // List
   ipcMain.on("teams:get-all", async (event) => {
     try {
@@ -695,11 +844,17 @@ function setupIPCMainHandlers() {
   // ========================================================================
 
   ipcMain.on("get-teams-registered", async (event, identity) => {
+    // __reqId dipakai renderer utk mencocokkan balasan ke request pengirimnya
+    // sendiri saat beberapa request ditembak bersamaan (mis. 4 panel divisi/
+    // race sekaligus) — tanpa ini, ipcRenderer.once() di renderer bisa
+    // menangkap balasan milik request lain karena semuanya berbagi channel
+    // yang sama.
+    const reqId = identity && identity.__reqId;
     try {
       const res = await getTeamsRegistered(identity);
-      event.reply("get-teams-registered-reply", res);
+      event.reply("get-teams-registered-reply", { ...(res || {}), __reqId: reqId });
     } catch (error) {
-      event.reply("get-teams-registered-reply", null);
+      event.reply("get-teams-registered-reply", { __reqId: reqId });
     }
   });
 
@@ -716,13 +871,15 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("upsert-teams-registered", async (event, bucket) => {
+    const reqId = bucket && bucket.__reqId;
     try {
       const ok = await upsertTeamsRegistered(bucket);
-      event.reply("upsert-teams-registered-reply", { ok });
+      event.reply("upsert-teams-registered-reply", { ok, __reqId: reqId });
     } catch (error) {
       event.reply("upsert-teams-registered-reply", {
         ok: false,
         error: String(error),
+        __reqId: reqId,
       });
     }
   });
@@ -758,8 +915,14 @@ function setupIPCMainHandlers() {
 
   // GET: satu user by email (jika perlu prefill individual)
   ipcMain.on("teams-registered:find", async (event, filters) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+    // mencocokkan balasan ke request-nya sendiri (mis. fetchBucketTeamsByKey()
+    // di DownRiverRace.vue) bisa pakai ipcRenderer.on()+cek __reqId alih2
+    // .once() polos — pemanggil lama yang tidak kirim __reqId tidak
+    // terpengaruh (field cuma echo, diabaikan getRegistered()).
+    const reqId = filters && filters.__reqId;
     const res = await getRegistered(filters || {});
-    event.sender.send("teams-registered:find-reply", res);
+    event.sender.send("teams-registered:find-reply", { ...res, __reqId: reqId });
   });
 
   ipcMain.on("teams-h2h-registered:find", async (event, filters) => {
@@ -773,8 +936,20 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-slalom-registered:find", async (event, filters) => {
+    // __reqId (kalau dikirim) digemakan balik supaya pemanggil bisa
+    // mencocokkan balasan ke request-nya sendiri lewat ipcRenderer.on()+cek
+    // __reqId, bukan .once() polos — dulu .once() menyalakan SEMUA listener
+    // yg masih menunggu di channel ini begitu balasan PERTAMA datang, jadi
+    // 2 klik pindah bucket (mis. R4 MEN lalu cepat ke R4 WOMEN) yang
+    // permintaannya tumpang-tindih bisa sama2 ke-resolve dgn payload yang
+    // SAMA, membuat tabel kedua kategori terlihat identik. Pemanggil lama
+    // yang tidak kirim __reqId tidak terpengaruh (field cuma echo).
+    const reqId = filters && filters.__reqId;
     const res = await getRegisteredSlalom(filters || {});
-    event.sender.send("teams-slalom-registered:find-reply", res);
+    event.sender.send("teams-slalom-registered:find-reply", {
+      ...res,
+      __reqId: reqId,
+    });
   });
 
   ipcMain.on("teams-rx-registered:find", async (event, filters) => {
@@ -908,15 +1083,17 @@ ipcMain.on("event-results:upsert", async (event, payload) => {
 
 // GET: Event Results (overall/aggregate)
 ipcMain.on("event-results:get", async function (event, filters) {
+  var f = filters || {};
+  var reqId = f.__reqId; // lihat catatan __reqId di handler get-teams-registered
   try {
-    var f = filters || {};
     var doc = await getEventResultsAggregate(f);
-    event.reply("event-results:get-reply", { ok: true, doc: doc });
+    event.reply("event-results:get-reply", { ok: true, doc: doc, __reqId: reqId });
   } catch (error) {
     event.reply("event-results:get-reply", {
       ok: false,
       doc: null,
       error: error && error.message ? error.message : String(error),
+      __reqId: reqId,
     });
   }
 });
@@ -940,22 +1117,39 @@ ipcMain.on("event-results:get-all-by-event", async function (event, eventId) {
 
 // HEAD 2 HEAD
 ipcMain.on("h2h:bracket:get", async (e, bucket) => {
+  // __reqId (kalau dikirim) digemakan balik supaya pemanggil yang butuh
+  // mencocokkan balasan ke request-nya sendiri (mis. loadH2HStatusForPanel()
+  // di Details/index.vue, yang bisa fetch beberapa panel bersamaan) bisa
+  // pakai ipcRenderer.on()+cek __reqId alih2 once() polos yang rawan salah
+  // tangkap balasan panel lain — pemanggil lama yang tidak kirim __reqId
+  // tidak terpengaruh (field ini cuma ada kalau diminta).
+  const reqId = bucket && bucket.__reqId;
   try {
-    e.reply("h2h:bracket:get-reply", await getBracket(bucket));
+    const result = await getBracket(bucket);
+    e.reply("h2h:bracket:get-reply", { ...result, __reqId: reqId });
   } catch (err) {
-    e.reply("h2h:bracket:get-reply", { ok: false, error: String(err) });
+    e.reply("h2h:bracket:get-reply", {
+      ok: false,
+      error: String(err),
+      __reqId: reqId,
+    });
   }
 });
 
 ipcMain.on("h2h:bracket:save", async (e, payload) => {
+  // __reqId digemakan balik supaya renderer bisa mencocokkan balasan ke
+  // request pengirimnya sendiri — saveBracketToDB() di HeadToHead.vue bisa
+  // terpanggil berkali-kali cepat berurutan (tiap Heat berubah, advance
+  // round, dll.) tanpa saling menunggu; tanpa __reqId, ipcRenderer.once()
+  // di renderer akan salah menangkap balasan milik request lain karena
+  // semuanya berbagi channel "h2h:bracket:save-reply" yang sama.
+  const reqId = payload && payload.__reqId;
   try {
-    const { bucket, rounds, showBronze, settings } = payload;
-    e.reply(
-      "h2h:bracket:save-reply",
-      await upsertBracket(bucket, rounds, { showBronze, settings })
-    );
+    const { bucket, rounds, showBronze, settings } = payload || {};
+    const result = await upsertBracket(bucket, rounds, { showBronze, settings });
+    e.reply("h2h:bracket:save-reply", { ...result, __reqId: reqId });
   } catch (err) {
-    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err) });
+    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err), __reqId: reqId });
   }
 });
 
@@ -997,6 +1191,20 @@ ipcMain.on("h2h:overall:get", async (e, bucket) => {
     e.reply("h2h:overall:get-reply", await getOverall(bucket));
   } catch (err) {
     e.reply("h2h:overall:get-reply", { ok: false, error: String(err) });
+  }
+});
+
+ipcMain.on("h2h:results:getAll", async (e, bucket) => {
+  const reqId = bucket && bucket.__reqId;
+  try {
+    const result = await getAllResults(bucket);
+    e.reply("h2h:results:getAll-reply", { ...result, __reqId: reqId });
+  } catch (err) {
+    e.reply("h2h:results:getAll-reply", {
+      ok: false,
+      error: String(err),
+      __reqId: reqId,
+    });
   }
 });
 

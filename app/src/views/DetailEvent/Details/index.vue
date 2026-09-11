@@ -87,8 +87,12 @@
           Judges Settings
         </b-button>
 
-        <b-button class="btn-race-settings" @click="openRaceSettings">
+        <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
           Race Settings
+        </b-button>
+
+        <b-button variant="outline-danger" class="btn-race-reset" @click="openResetDataModal">
+          Reset Data
         </b-button>
       </div>
 
@@ -151,8 +155,12 @@
         :race="combo.race"
         :event-name="raceActive.selected.name"
         :initial-name="initialActive.selected.name"
+        :default-collapsed="comboIdx !== 0"
         :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
         :teams-available="availableFor(combo.division, combo.race)"
+        :competed-set="competedSetFor(combo.panelKey)"
+        :h2h-status-map="h2hStatusFor(combo.panelKey)"
+        :slalom-status-map="slalomStatusFor(combo.panelKey)"
         :draft="draftMap[combo.panelKey]"
         :loading="loadingByPanel[combo.panelKey]"
         @add-draft="addDraft(combo.division, combo.race)"
@@ -162,12 +170,26 @@
         @delete-row="deleteRow(combo.division, combo.race, $event)"
         @start-race="handleStartRace"
         @show-result="showResult(combo.division, combo.race)"
-        @view-details="openTeamDetails(combo.division, combo.race, $event)"
       />
 
       <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
         Belum ada konfigurasi divisi/race untuk event ini.
       </div>
+
+      <!-- Peringatan: H2H butuh minimal 3 tim terdaftar sebelum di-start -->
+      <b-alert
+        :show="showH2HMinTeamsWarning"
+        variant="danger"
+        class="mt-4 mb-0 d-flex align-items-center"
+      >
+        <Icon icon="mdi:alert-octagon-outline" width="20" height="20" class="mr-2" />
+        <span>
+          Minimal <strong>3 tim</strong> harus ter-assign di tabel Registered
+          Teams – HEAD2HEAD Category sebelum memulai race. Saat ini baru
+          <strong>{{ totalRegisteredTeamsForActiveCategory }} tim</strong>
+          terdaftar.
+        </span>
+      </b-alert>
 
       <div class="d-flex align-items-center justify-content-end mt-5 mb-2">
         <b-button
@@ -205,18 +227,83 @@
       :id="'event-settings-modal'"
       :event-id="eventId"
       :event-name="safeEventName"
+      :saving="settingsLoading.active"
       @update-settings="handleUpdateSettings"
     />
 
-    <team-details-modal
-      v-model="showTeamDetails"
-      :team="selectedTeamForDetails"
-      :race-name="raceActive.selected.name"
-      :division-name="selectedTeamDivision"
-      :race-category-name="selectedTeamRace"
-      :initial-name="initialActive.selected.name"
-      :teams-available="availableTeams"
-    />
+
+    <!-- MODAL: konfirmasi Reset Data -->
+    <b-modal
+      v-model="showResetDataModal"
+      title="Reset Data Event"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="resetInProgress"
+      hide-footer
+      @hidden="onResetModalHidden"
+    >
+      <p class="mb-2">
+        Tindakan ini akan <strong>menghapus semua hasil & data kompetisi</strong>
+        (Sprint, Head to Head, Slalom, DRR, Rafting Cross) pada event
+        <strong>{{ events.eventName || "-" }}</strong> ini — termasuk waktu,
+        penalti, bracket, dan Heat yang sudah tersimpan.
+      </p>
+      <p class="mb-2">
+        <strong>Registered Teams di SEMUA kategori</strong> (assignment tim
+        ke divisi/race/initial) juga ikut dikosongkan — tim harus di-assign
+        ulang dari awal. Profil tim itu sendiri (nama, bib, dsb.) tidak ikut
+        terhapus dan tetap tersedia untuk didaftarkan lagi.
+      </p>
+      <p class="mb-3">
+        Pengaturan event (Race/Judges/Event Settings)
+        <strong>tidak</strong> ikut terhapus. Tindakan ini
+        <strong>tidak dapat dibatalkan</strong>.
+      </p>
+
+      <b-form-group v-if="!resetInProgress">
+        <label class="small text-muted mb-1">
+          Ketik <strong>MAKOPLANET</strong> untuk konfirmasi:
+        </label>
+        <b-form-input
+          v-model="resetConfirmText"
+          placeholder="MAKOPLANET"
+          autocomplete="off"
+          @keyup.enter="confirmResetData"
+        />
+      </b-form-group>
+
+      <div v-else class="mb-3">
+        <b-progress
+          :value="resetProgressPercent"
+          :max="100"
+          show-progress
+          animated
+          variant="danger"
+          class="mb-2"
+        />
+        <div class="small text-muted">
+          {{ resetProgressLabel }} — {{ resetProgressPercent }}%
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end" style="gap: 8px">
+        <b-button
+          variant="outline-secondary"
+          :disabled="resetInProgress"
+          @click="showResetDataModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          variant="danger"
+          :disabled="resetConfirmText !== RESET_CONFIRM_PHRASE || resetInProgress"
+          @click="confirmResetData"
+        >
+          <b-spinner small v-if="resetInProgress" class="mr-1" />
+          {{ resetInProgress ? "Mereset..." : "Reset Data" }}
+        </b-button>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -237,6 +324,7 @@ const LEVEL_SCOPE_MAP = {
 var FOLDER_EVENT_LOGO = "sustainable-js/event-logo";
 var FOLDER_EVENT_SPONSOR = "sustainable-js/event-sponsorship";
 var FOLDER_COMMITTEE_SIGNATURE = "sustainable-js/committee-signature";
+var FOLDER_EVENT_POSTER = "sustainable-js/event-poster";
 
 import { uploadOne as _uploadOne, uploadMany as _uploadMany } from "@/utils/cloudinaryUpload";
 import sprintPng from "@/assets/images/Rectangle-3.png";
@@ -245,11 +333,11 @@ import drrPng from "@/assets/images/Rectangle-4-2.png";
 import h2hPng from "@/assets/images/Rectangle-4.png";
 import rxPng from "@/assets/images/Rectangle-5.png";
 import { ipcRenderer } from "electron";
+import { clearAllForEvent } from "@/utils/localStoreSprint";
 import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import EventSettingsModal from "@/components/race/EventSettings.vue";
-import TeamDetailsModal from "@/components/race/TeamDetailsModal.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
@@ -261,7 +349,6 @@ export default {
     RaceSettingsModal,
     JudgeSettingsModal,
     EventSettingsModal,
-    TeamDetailsModal,
   },
   data() {
     return {
@@ -276,6 +363,28 @@ export default {
       // per-panel (div_race) token, bukan satu field bersama — supaya refresh
       // beberapa panel yang berjalan bersamaan tidak saling menimpa token guard
       lastTokenByPanel: {},
+      // per-panel: Set berisi teamId/bib tim yang SUDAH punya hasil
+      // tersimpan (rankedByCats/scored terisi) utk kategori race yang
+      // sedang aktif (raceActive.selected.name) — dipakai buat flag
+      // "sudah bertanding" / "belum bertanding" di daftar Registered Teams.
+      competedTeamsByPanel: {},
+      lastResultsTokenByPanel: {},
+      // per-panel: Map (key by bib/nama team, uppercased) -> status detail
+      // { status: "pending"|"in-round"|"done", roundName } — KHUSUS kategori
+      // HEAD2HEAD, dipakai TeamPanel utk menampilkan status 3-tingkat
+      // (Belum Bertanding / Bertanding di Round X / Sudah Selesai
+      // Bertanding), dibangun dari bagan (h2h_brackets) + hasil per-round
+      // (h2h_results) — bukan cuma flag "sudah/belum" seperti kategori lain.
+      h2hStatusByPanel: {},
+      lastH2HStatusTokenByPanel: {},
+      // per-panel: Map (key by bib/nama team, uppercased) -> { run1: bool,
+      // run2: bool } — KHUSUS kategori SLALOM, dipakai TeamPanel utk
+      // menampilkan status 3-tingkat (Belum Bertanding di Run 1 & 2 / Belum
+      // Bertanding di Run 2 / Sudah Bertanding di Run 1 & 2), dibangun dari
+      // dokumen temporarySlalomResult (result[0]/result[1].totalTime) —
+      // beda dari kategori lain yang cuma flag "sudah/belum" biner.
+      slalomStatusByPanel: {},
+      lastSlalomStatusTokenByPanel: {},
       loadingByPanel: {
         R4_MEN: false,
         R4_WOMEN: false,
@@ -284,10 +393,12 @@ export default {
       },
       showRaceSettings: false,
       showEventSettings: false,
-      showTeamDetails: false,
-      selectedTeamForDetails: null,
-      selectedTeamDivision: "",
-      selectedTeamRace: "",
+      showResetDataModal: false,
+      resetConfirmText: "",
+      resetInProgress: false,
+      resetProgressPercent: 0,
+      resetProgressLabel: "",
+      RESET_CONFIRM_PHRASE: "MAKOPLANET",
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -420,6 +531,23 @@ export default {
     visibleDivisionRaceCombos() {
       return this.DIVISION_RACE_COMBOS.filter((c) =>
         this.showPanel(c.division, c.race)
+      );
+    },
+    // Total tim yang sudah ter-assign di SEMUA panel Registered Teams utk
+    // kategori (raceActive) yang sedang aktif — dijumlah lintas kombinasi
+    // divisi/race yang tampil, bukan cuma satu panel.
+    totalRegisteredTeamsForActiveCategory() {
+      const evName = this.raceActive.selected.name;
+      return (this.visibleDivisionRaceCombos || []).reduce((sum, combo) => {
+        return sum + this.getTeamsBy(combo.division, combo.race, evName).length;
+      }, 0);
+    },
+    // Peringatan merah: H2H butuh minimal 3 tim terdaftar sebelum operator
+    // klik "START HEAD2HEAD RACE" (bracket 1v1 tidak masuk akal dgn <3 tim).
+    showH2HMinTeamsWarning() {
+      return (
+        String(this.raceActive.selected.name).toUpperCase() === "HEAD2HEAD" &&
+        this.totalRegisteredTeamsForActiveCategory < 3
       );
     },
     hasEventLogo() {
@@ -731,6 +859,11 @@ export default {
             )
           : null;
 
+        // ===== 3.6) UPLOAD POSTER EVENT (opsional, gambar tunggal) =====
+        const newPoster = payload.posterFile
+          ? await _uploadOne(payload.posterFile, FOLDER_EVENT_POSTER)
+          : null;
+
         // ===== 4) UPDATE DB ASSETS (URL saja) =====
         this._setLoading(true, "Memperbarui aset di database…", 85);
         const assetsDoc = {
@@ -756,6 +889,12 @@ export default {
           assetsDoc.raceDirectorSignature = newRdSignature.result;
         } else if (payload.removeRaceDirectorSignature) {
           assetsDoc.raceDirectorSignature = null;
+        }
+
+        if (newPoster && newPoster.ok) {
+          assetsDoc.poster = newPoster.result;
+        } else if (payload.removePoster) {
+          assetsDoc.poster = null;
         }
 
         ipcRenderer.send("services:update:event-assets", assetsDoc);
@@ -819,6 +958,114 @@ export default {
 
     openJudgeSettings() {
       this.showJudgeSettings = true;
+    },
+
+    openResetDataModal() {
+      this.resetConfirmText = "";
+      this.showResetDataModal = true;
+    },
+
+    onResetModalHidden() {
+      if (!this.resetInProgress) this.resetConfirmText = "";
+    },
+
+    // Bersihkan cache localStorage per-event punya Sprint (`sprintLocal:`)
+    // & H2H (`h2hRoundResults:`) — satu-satunya 2 kategori yang punya cache
+    // hasil di localStorage renderer ini; Slalom/DRR/RX murni server-side.
+    _clearLocalCachesForEvent(eventId) {
+      try {
+        clearAllForEvent(eventId);
+      } catch (e) {
+        /* noop */
+      }
+      try {
+        const prefix = "h2hRoundResults:" + String(eventId) + "|";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        /* noop */
+      }
+    },
+
+    // ambil daftar koleksi yang akan dihapus dari backend (1 sumber
+    // kebenaran, sinkron dengan RESET_COLLECTIONS di resetEventData.js)
+    // supaya progress bar tahu berapa total step & label tiap step.
+    _fetchResetCollectionsList() {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:reset-data:collections-reply", (_e, list) =>
+          resolve(Array.isArray(list) ? list : [])
+        );
+        ipcRenderer.send("event:reset-data:collections");
+      });
+    },
+
+    _resetOneCollection(eventId, collection) {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:reset-data:step-reply", (_e, r) => resolve(r));
+        ipcRenderer.send("event:reset-data:step", { eventId, collection });
+      });
+    },
+
+    async confirmResetData() {
+      if (this.resetConfirmText !== this.RESET_CONFIRM_PHRASE) return;
+      const eventId = this.eventId || this.$route.params.id || "";
+      if (!eventId) return;
+
+      this.resetInProgress = true;
+      this.resetProgressPercent = 0;
+      this.resetProgressLabel = "Menyiapkan...";
+      try {
+        const collections = await this._fetchResetCollectionsList();
+        const total = collections.length || 1;
+
+        for (let i = 0; i < collections.length; i++) {
+          const { name, label } = collections[i];
+          this.resetProgressLabel = `Menghapus ${label}... (${i + 1}/${
+            collections.length
+          })`;
+          const r = await this._resetOneCollection(eventId, name);
+          if (!r || !r.ok) {
+            throw new Error(
+              (r && r.error) || `Gagal menghapus koleksi ${name}`
+            );
+          }
+          this.resetProgressPercent = Math.round(((i + 1) / total) * 100);
+        }
+
+        this.resetProgressLabel = "Membersihkan cache lokal...";
+        this._clearLocalCachesForEvent(eventId);
+        this.competedTeamsByPanel = {};
+        this.h2hStatusByPanel = {};
+        this.resultAvailMap = {
+          R4_MEN: false,
+          R4_WOMEN: false,
+          R6_MEN: false,
+          R6_WOMEN: false,
+        };
+        this.resetProgressPercent = 100;
+
+        this.showResetDataModal = false;
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Reset Data berhasil",
+          detail: "Semua hasil kompetisi event ini sudah dikosongkan.",
+        });
+        await this.refreshVisibleBuckets();
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Reset Data gagal",
+          detail: err && err.message ? err.message : String(err),
+        });
+      } finally {
+        this.resetInProgress = false;
+        this.resetProgressPercent = 0;
+        this.resetProgressLabel = "";
+      }
     },
 
     onUpdateRaceSettings(payload) {
@@ -922,9 +1169,18 @@ export default {
      * IDENTITY BUILDERS (event/initial/division/race)
      * =======================================================*/
     _buildIdentity(div, race) {
-      // pakai computed eventId; fallback ke route param
+      return this._buildIdentityForCategory(
+        div,
+        race,
+        this._safeSelectedName(this.raceActive)
+      );
+    },
+
+    // Sama seperti _buildIdentity, tapi eventName (race category) bisa
+    // ditentukan eksplisit — dipakai autoFillFromPreviousCategory() utk
+    // membangun identity kategori SEBELUMNYA (bukan yang sedang aktif).
+    _buildIdentityForCategory(div, race, categoryName) {
       const eventId = this.eventId || this.$route.params.id || "";
-      const eventName = this._safeSelectedName(this.raceActive);
       const initialName = this._safeSelectedName(this.initialActive);
 
       return {
@@ -932,7 +1188,7 @@ export default {
         initialId: this._matchId(this.events.categoriesInitial, initialName),
         raceId: this._matchId(this.events.categoriesRace, race),
         divisionId: this._matchId(this.events.categoriesDivision, div),
-        eventName: String(eventName).toUpperCase(),
+        eventName: String(categoryName || "").toUpperCase(),
         initialName: String(initialName).toUpperCase(),
         raceName: String(race).toUpperCase(),
         divisionName: String(div).toUpperCase(),
@@ -1039,13 +1295,6 @@ export default {
       });
     },
 
-    openTeamDetails(div, race, row) {
-      this.selectedTeamForDetails = row;
-      this.selectedTeamDivision = div;
-      this.selectedTeamRace = race;
-      this.showTeamDetails = true;
-    },
-
     /* =========================================================
      * BUCKET READ/WRITE (dataTeams) + VISIBILITY
      * =======================================================*/
@@ -1114,7 +1363,8 @@ export default {
         return { div, race, ok: false, reason: "identity-incomplete" };
       }
 
-      // Token untuk menangkal balasan telat (race condition)
+      // Token untuk menangkal balasan telat (race condition antar panggilan
+      // berurutan utk panel yang sama)
       const token = [
         identity.eventName,
         identity.initialName,
@@ -1126,11 +1376,27 @@ export default {
       this.lastTokenByPanel[panelKey] = token;
       this.$set(this.loadingByPanel, panelKey, true);
 
+      // reqId untuk mencocokkan balasan ke request INI secara spesifik.
+      // refreshVisibleBuckets() menembak 4 request (R4/R6 x MEN/WOMEN)
+      // BERSAMAAN lewat channel IPC yang sama ("get-teams-registered-reply")
+      // — pakai ipcRenderer.once() polos di sini akan salah menangkap
+      // balasan milik panel lain (siapa pun yang baru pertama tiba), bukan
+      // punya diri sendiri. reqId + ipcRenderer.on (bukan once) + filter
+      // manual memastikan tiap request cuma memproses balasannya sendiri.
+      const reqId = panelKey + "|" + token + "|" + Math.random();
+
       return await new Promise((resolve) => {
+        let settled = false;
+
         const onReply = (_e, bucket) => {
+          if (!bucket || bucket.__reqId !== reqId) return; // bukan balasan utk request ini
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
+
           if (this.lastTokenByPanel[panelKey] !== token) return resolve(); // abaikan balasan usang
           this.$set(this.loadingByPanel, panelKey, false);
-          if (bucket && Array.isArray(bucket.teams)) {
+          if (Array.isArray(bucket.teams)) {
             this._mergeBucketIntoState(bucket);
             resolve({ div, race, ok: true });
           } else {
@@ -1139,12 +1405,14 @@ export default {
           }
         };
 
-        ipcRenderer.send("get-teams-registered", identity);
-        ipcRenderer.once("get-teams-registered-reply", onReply);
+        ipcRenderer.on("get-teams-registered-reply", onReply);
+        ipcRenderer.send("get-teams-registered", { ...identity, __reqId: reqId });
 
         // hard-timeout supaya listener tak menggantung
         setTimeout(() => {
-          ipcRenderer.off("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
           // hanya matikan loading kalau tidak ada request lebih baru untuk panel ini
           if (this.lastTokenByPanel[panelKey] === token) {
             this.$set(this.loadingByPanel, panelKey, false);
@@ -1154,17 +1422,456 @@ export default {
       });
     },
 
+    // Nama kategori (raceCategories[].key, dipakai sbg raceActive.selected.name)
+    // tidak selalu sama persis dengan nama yang ditulis ke
+    // eventResult.categories[].name saat hasil disimpan dari masing-masing
+    // halaman race (lihat konstanta K di Sprint/H2H/Slalom/DRR/RX Race.vue).
+    _resultCategoryName(raceKey) {
+      const map = {
+        SPRINT: "SPRINT",
+        HEAD2HEAD: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      return map[String(raceKey || "").toUpperCase()] || String(raceKey || "").toUpperCase();
+    },
+
+    // Ambil daftar tim yang SUDAH punya hasil tersimpan (utk kategori race
+    // aktif) pada kombinasi divisi/race ini, lalu simpan sbg Set di
+    // competedTeamsByPanel[panelKey] supaya TeamPanel bisa menampilkan flag
+    // "sudah/belum bertanding".
+    async loadEventResultsForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastResultsTokenByPanel[panelKey] = token;
+
+      const categoryName = this._resultCategoryName(identity.eventName);
+      const reqId = "results|" + panelKey + "|" + token;
+
+      await new Promise((resolve) => {
+        let settled = false;
+
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener("event-results:get-reply", onReply);
+          if (settled) return;
+          settled = true;
+
+          if (this.lastResultsTokenByPanel[panelKey] !== token) return resolve();
+
+          const eventResult =
+            res && res.ok && res.doc && Array.isArray(res.doc.eventResult)
+              ? res.doc.eventResult
+              : [];
+
+          const competed = new Set();
+          eventResult.forEach((entry) => {
+            const cat = (entry.categories || []).find(
+              (c) => String(c.name || "").toUpperCase() === categoryName
+            );
+            const hasResult =
+              cat &&
+              ((cat.rankedByCats !== "" && cat.rankedByCats != null) ||
+                (cat.scored !== "" && cat.scored != null));
+            if (hasResult) {
+              const key = String(entry.teamId || entry.bib || "");
+              if (key) competed.add(key);
+            }
+          });
+
+          this.$set(this.competedTeamsByPanel, panelKey, competed);
+          resolve();
+        };
+
+        ipcRenderer.on("event-results:get-reply", onReply);
+        ipcRenderer.send("event-results:get", { ...identity, __reqId: reqId });
+
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("event-results:get-reply", onReply);
+          resolve();
+        }, 3000);
+      });
+    },
+
+    // Set tim yang sudah bertanding utk panel ini — dipakai template lewat
+    // prop competed-set di <team-panel>.
+    competedSetFor(panelKey) {
+      return this.competedTeamsByPanel[panelKey] || new Set();
+    },
+
+    // KHUSUS HEAD2HEAD: bangun status 3-tingkat per tim (Belum Bertanding /
+    // Bertanding di Round X / Sudah Selesai Bertanding) dari struktur bagan
+    // (h2h_brackets, tahu slot tim ada di round mana) + hasil per-round
+    // (h2h_results, tahu Win/Lose Final A/B) — beda dari kategori lain yang
+    // cuma py flag "sudah/belum" biner (loadEventResultsForPanel()).
+    async loadH2HStatusForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastH2HStatusTokenByPanel[panelKey] = token;
+
+      const bucket = {
+        eventId: identity.eventId,
+        initialId: identity.initialId,
+        raceId: identity.raceId,
+        divisionId: identity.divisionId,
+      };
+      const reqIdBase = "h2hstatus|" + panelKey + "|" + token;
+
+      const [bracketRes, resultsRes] = await Promise.all([
+        this._fetchOnce("h2h:bracket:get", bucket, reqIdBase + "|bracket"),
+        this._fetchOnce("h2h:results:getAll", bucket, reqIdBase + "|results"),
+      ]);
+
+      // panel sudah minta ulang (mis. ganti divisi/race cepat) -> buang balasan basi
+      if (this.lastH2HStatusTokenByPanel[panelKey] !== token) return;
+
+      const rounds =
+        bracketRes &&
+        bracketRes.ok &&
+        bracketRes.item &&
+        Array.isArray(bracketRes.item.rounds)
+          ? bracketRes.item.rounds
+          : [];
+      const resultRows =
+        resultsRes && resultsRes.ok && Array.isArray(resultsRes.items)
+          ? resultsRes.items
+          : [];
+
+      const statusMap = this._computeH2HStatusMap(rounds, resultRows);
+      this.$set(this.h2hStatusByPanel, panelKey, statusMap);
+    },
+
+    // rounds: array bagan (urutan besar->kecil, Final B disisipkan sebelum
+    // Final A — lihat buildEmptyBracket() di HeadToHead.vue) dgn
+    // round.matches[].team1/team2 = { name, bibTeam }. resultRows: dokumen
+    // h2h_results (roundId, nameTeam, result.winLose). Utk tiap tim, ambil
+    // round TERAKHIR (index tertinggi di array) tempat namanya muncul di
+    // sebuah slot — itu round paling "maju" yang pernah dicapai tim ini.
+    _computeH2HStatusMap(rounds, resultRows) {
+      const statusMap = {};
+      const list = Array.isArray(rounds) ? rounds : [];
+      const rows = Array.isArray(resultRows) ? resultRows : [];
+
+      const latestByTeam = new Map();
+      list.forEach((round, idx) => {
+        const matches = Array.isArray(round && round.matches) ? round.matches : [];
+        matches.forEach((m) => {
+          [m && m.team1, m && m.team2].forEach((slot) => {
+            const nm = String((slot && slot.name) || "").trim().toUpperCase();
+            if (!nm) return;
+            const prev = latestByTeam.get(nm);
+            if (!prev || idx > prev.roundIndex) {
+              latestByTeam.set(nm, {
+                roundIndex: idx,
+                roundId: String((round && round.id) || ""),
+                roundName: String((round && round.name) || ""),
+              });
+            }
+          });
+        });
+      });
+
+      const FINAL_NAMES = new Set(["FINAL A", "FINAL B"]);
+
+      latestByTeam.forEach((info, teamNameUpper) => {
+        let status = "in-round";
+        if (FINAL_NAMES.has(String(info.roundName || "").toUpperCase())) {
+          const hasWinLose = rows.some(
+            (r) =>
+              String((r && r.roundId) || "") === info.roundId &&
+              String((r && r.nameTeam) || "").trim().toUpperCase() ===
+                teamNameUpper &&
+              r.result &&
+              (r.result.winLose === "Win" || r.result.winLose === "Lose")
+          );
+          if (hasWinLose) status = "done";
+        }
+        statusMap[teamNameUpper] = { status, roundName: info.roundName };
+      });
+
+      return statusMap;
+    },
+
+    // Status detail per tim (KHUSUS HEAD2HEAD) utk panel ini — dipakai
+    // template lewat prop h2h-status-map di <team-panel>. null kalau
+    // kategori aktif BUKAN HEAD2HEAD, supaya TeamPanel selalu fallback ke
+    // flag biner Sudah/Belum Bertanding utk Sprint/Slalom/DRR/RX — WAJIB
+    // dicek di sini (bukan cuma di loadH2HStatusForPanel yg mengisi cache),
+    // karena panelKey (mis. "R4_MEN") dipakai bersama lintas kategori:
+    // tanpa guard ini, begitu H2H pernah dibuka lalu ganti kategori,
+    // h2hStatusByPanel[panelKey] yang lama masih ada dan bakal salah
+    // ke-apply ke kategori lain yang panelKey-nya sama.
+    h2hStatusFor(panelKey) {
+      if (this._safeSelectedName(this.raceActive) !== "HEAD2HEAD") return null;
+      return this.h2hStatusByPanel[panelKey] || null;
+    },
+
+    // KHUSUS SLALOM: bangun status per-run per tim dari temporarySlalomResult
+    // (result[0] = Run 1, result[1] = Run 2; totalTime terisi = run sudah
+    // dikerjakan) — dipakai TeamPanel utk kolom Status 3-tingkat, beda dari
+    // kategori lain yang cuma flag "sudah/belum" biner (loadEventResultsForPanel()).
+    async loadSlalomStatusForPanel(div, race) {
+      const identity = this._buildIdentity(div, race);
+      if (
+        !identity.eventId ||
+        !identity.initialId ||
+        !identity.raceId ||
+        !identity.divisionId
+      ) {
+        return;
+      }
+
+      const panelKey = div + "_" + race;
+      const token = Date.now() + "|" + Math.random();
+      this.lastSlalomStatusTokenByPanel[panelKey] = token;
+
+      const query = {
+        eventId: identity.eventId,
+        initialId: identity.initialId,
+        raceId: identity.raceId,
+        divisionId: identity.divisionId,
+      };
+      const reqId = "slalomstatus|" + panelKey + "|" + token;
+
+      const res = await this._fetchOnce("get-slalom-result", query, reqId);
+
+      if (this.lastSlalomStatusTokenByPanel[panelKey] !== token) return;
+
+      const docs = res && res.ok && Array.isArray(res.items) ? res.items : [];
+      const statusMap = {};
+      docs.forEach((doc) => {
+        const teams = Array.isArray(doc && doc.teams) ? doc.teams : [];
+        teams.forEach((t) => {
+          const key =
+            String((t && t.bibTeam) || "").trim() ||
+            String((t && t.nameTeam) || "").trim().toUpperCase();
+          if (!key) return;
+          const runs = Array.isArray(t.result) ? t.result : [];
+          const run1 = !!(runs[0] && String(runs[0].totalTime || "").trim());
+          const run2 = !!(runs[1] && String(runs[1].totalTime || "").trim());
+          statusMap[key] = { run1, run2 };
+        });
+      });
+
+      this.$set(this.slalomStatusByPanel, panelKey, statusMap);
+    },
+
+    // Status detail per tim (KHUSUS SLALOM) utk panel ini — dipakai template
+    // lewat prop slalom-status-map di <team-panel>. null kalau kategori
+    // aktif BUKAN SLALOM, dgn alasan sama seperti h2hStatusFor() di atas:
+    // panelKey dipakai bersama lintas kategori, jadi guard WAJIB di sini.
+    slalomStatusFor(panelKey) {
+      if (this._safeSelectedName(this.raceActive) !== "SLALOM") return null;
+      return this.slalomStatusByPanel[panelKey] || null;
+    },
+
+    // Fetch satu kali (reqId-safe, aman dipanggil bersamaan dgn request lain
+    // di channel yang sama) — dipakai autoFillFromPreviousCategory() utk
+    // mengintip bucket/hasil kategori LAIN (bukan yg sedang ditampilkan di
+    // panel), jadi tidak numpang di state loadingByPanel/lastTokenByPanel.
+    _fetchOnce(channel, payload, reqId) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const replyChannel = channel + "-reply";
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          if (settled) return;
+          settled = true;
+          resolve(res);
+        };
+        ipcRenderer.on(replyChannel, onReply);
+        ipcRenderer.send(channel, { ...payload, __reqId: reqId });
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener(replyChannel, onReply);
+          resolve(null);
+        }, 4000);
+      });
+    },
+
+    // Nama kategori tepat SEBELUM `categoryName`, mengikuti urutan
+    // categoriesEvent SESUAI EVENT INI (bukan urutan tetap kartu Race
+    // Category) — null kalau categoryName adalah yang pertama / tidak
+    // ditemukan.
+    _previousCategoryName(categoryName) {
+      const list = Array.isArray(this.events.categoriesEvent)
+        ? this.events.categoriesEvent
+        : [];
+      const names = list.map((c) => String((c && c.name) || "").toUpperCase());
+      const idx = names.indexOf(String(categoryName || "").toUpperCase());
+      if (idx <= 0) return null;
+      return names[idx - 1];
+    },
+
+    // Kalau panel (div/race) kategori yang SEDANG dibuka masih kosong,
+    // otomatis isi dengan tim yang SUDAH BERTANDING (bukan cuma terdaftar)
+    // di kategori sebelumnya (urutan categoriesEvent event ini) utk
+    // kombinasi divisi/race/initial yang sama. Tim yang pernah dihapus
+    // manual dari kategori ini (tercatat di excludedTeams) TIDAK ikut
+    // ditambahkan lagi. Add Team manual tetap berjalan seperti biasa —
+    // fitur ini cuma pre-fill sekali saat panel masih kosong.
+    async autoFillFromPreviousCategory(div, race) {
+      const currentName = this._safeSelectedName(this.raceActive);
+      const prevName = this._previousCategoryName(currentName);
+      if (!prevName) return;
+
+      // Panel sekarang sudah ada isinya (baik dari DB maupun auto-fill
+      // sebelumnya) -> jangan timpa/duplikasi.
+      const already = this.getTeamsBy(div, race, currentName);
+      if (already.length) return;
+
+      const currentIdentity = this._buildIdentityForCategory(
+        div,
+        race,
+        currentName
+      );
+      if (
+        !currentIdentity.eventId ||
+        !currentIdentity.initialId ||
+        !currentIdentity.raceId ||
+        !currentIdentity.divisionId
+      ) {
+        return;
+      }
+
+      const reqBase = [
+        currentIdentity.eventId,
+        currentIdentity.initialId,
+        currentIdentity.raceId,
+        currentIdentity.divisionId,
+        div,
+        race,
+        Date.now(),
+        Math.random(),
+      ].join("|");
+
+      // ambil bucket kategori ini sendiri -> cek excludedTeams (tombstone
+      // penghapusan manual)
+      const currentDocRes = await this._fetchOnce(
+        "get-teams-registered",
+        currentIdentity,
+        "autofill-cur|" + reqBase
+      );
+      const currentDoc = currentDocRes || {};
+      const excluded = new Set(
+        (Array.isArray(currentDoc.excludedTeams)
+          ? currentDoc.excludedTeams
+          : []
+        ).map(
+          (t) =>
+            String((t && t.nameTeam) || "").toUpperCase() +
+            "|" +
+            String((t && t.bibTeam) || "")
+        )
+      );
+
+      // ambil roster kategori SEBELUMNYA utk kombinasi yang sama
+      const prevIdentity = this._buildIdentityForCategory(div, race, prevName);
+      const prevDocRes = await this._fetchOnce(
+        "get-teams-registered",
+        prevIdentity,
+        "autofill-prev|" + reqBase
+      );
+      const prevTeams =
+        prevDocRes && Array.isArray(prevDocRes.teams) ? prevDocRes.teams : [];
+      if (!prevTeams.length) return;
+
+      // ambil dokumen hasil (dipakai bersama lintas kategori) utk tahu
+      // siapa yang SUDAH BERTANDING (bukan cuma terdaftar) di kategori
+      // sebelumnya
+      const resultsRes = await this._fetchOnce(
+        "event-results:get",
+        currentIdentity,
+        "autofill-res|" + reqBase
+      );
+      const eventResult =
+        resultsRes && resultsRes.ok && resultsRes.doc && Array.isArray(resultsRes.doc.eventResult)
+          ? resultsRes.doc.eventResult
+          : [];
+
+      const competedKeys = new Set();
+      eventResult.forEach((entry) => {
+        const cat = (entry.categories || []).find(
+          (c) => this._resultCategoryName(prevName) === String((c && c.name) || "").toUpperCase()
+        );
+        const hasResult =
+          cat &&
+          ((cat.rankedByCats !== "" && cat.rankedByCats != null) ||
+            (cat.scored !== "" && cat.scored != null));
+        if (hasResult) {
+          const key = String((entry && entry.teamId) || (entry && entry.bib) || "");
+          if (key) competedKeys.add(key);
+        }
+      });
+      if (!competedKeys.size) return;
+
+      const teamsToAdd = prevTeams.filter((t) => {
+        const idKey = String((t && t.teamId) || (t && t.bibTeam) || "");
+        const exKey =
+          String((t && t.nameTeam) || "").toUpperCase() +
+          "|" +
+          String((t && t.bibTeam) || "");
+        return competedKeys.has(idKey) && !excluded.has(exKey);
+      });
+      if (!teamsToAdd.length) return;
+
+      await this._fetchOnce(
+        "upsert-teams-registered",
+        { ...currentIdentity, teams: teamsToAdd },
+        "autofill-add|" + reqBase
+      );
+
+      await this.loadTeamsRegistered(div, race);
+    },
+
     async refreshVisibleBuckets() {
       await this.$nextTick();
       const jobs = [];
-      if (this.showPanel("R4", "MEN"))
-        jobs.push(this.loadTeamsRegistered("R4", "MEN"));
-      if (this.showPanel("R4", "WOMEN"))
-        jobs.push(this.loadTeamsRegistered("R4", "WOMEN"));
-      if (this.showPanel("R6", "MEN"))
-        jobs.push(this.loadTeamsRegistered("R6", "MEN"));
-      if (this.showPanel("R6", "WOMEN"))
-        jobs.push(this.loadTeamsRegistered("R6", "WOMEN"));
+      const combos = [];
+      if (this.showPanel("R4", "MEN")) combos.push(["R4", "MEN"]);
+      if (this.showPanel("R4", "WOMEN")) combos.push(["R4", "WOMEN"]);
+      if (this.showPanel("R6", "MEN")) combos.push(["R6", "MEN"]);
+      if (this.showPanel("R6", "WOMEN")) combos.push(["R6", "WOMEN"]);
+
+      combos.forEach(([div, race]) => {
+        jobs.push(
+          this.loadTeamsRegistered(div, race).then(() =>
+            this.autoFillFromPreviousCategory(div, race)
+          )
+        );
+        jobs.push(this.loadEventResultsForPanel(div, race));
+        if (this._safeSelectedName(this.raceActive) === "HEAD2HEAD") {
+          jobs.push(this.loadH2HStatusForPanel(div, race));
+        }
+        if (this._safeSelectedName(this.raceActive) === "SLALOM") {
+          jobs.push(this.loadSlalomStatusForPanel(div, race));
+        }
+      });
       await Promise.all(jobs);
     },
 
@@ -1216,6 +1923,11 @@ export default {
                 return allowSet.has(String(tt || "").toLowerCase());
               });
             }
+
+            // Jangan tampilkan tim yang statusnya Inactive (statusId !== 0)
+            // di dropdown "Pilih Tim" Registered Teams — hanya tim Active
+            // yang boleh di-assign ke kategori/bucket manapun.
+            items = items.filter((t) => Number((t && t.statusId) || 0) === 0);
 
             this.availableTeams = items.map((t) => ({
               id:
@@ -2213,6 +2925,25 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+/* Aksi destruktif (hapus semua hasil kompetisi event) — sengaja dibuat
+   solid merah & menonjol, BUKAN gaya netral seperti tombol settings
+   lainnya, supaya operator langsung sadar ini aksi berisiko sebelum klik. */
+.btn-race-reset {
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+  transition: all 0.25s ease;
+}
+.btn-race-reset:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.45);
 }
 
 .upload-hud {

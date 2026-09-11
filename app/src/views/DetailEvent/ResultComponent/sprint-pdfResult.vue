@@ -110,17 +110,19 @@
             </td>
             <td class="text-center">
               {{
-                row && row.result && row.result.penalty ? row.result.penalty : 0
+                row && row.result && row.result.totalPenalty
+                  ? row.result.totalPenalty
+                  : 0
               }}
             </td>
-            <td class="mono">
+            <td class="mono pen-time-red">
               {{
                 row && row.result && row.result.penaltyTime
                   ? row.result.penaltyTime
                   : "-"
               }}
             </td>
-            <td class="mono text-strong">
+            <td class="mono text-strong total-time-green">
               {{
                 row && row.result && row.result.totalTime
                   ? row.result.totalTime
@@ -147,7 +149,7 @@
    <div class="sign sign-two">
   <!-- Kolom kiri: tiga tanda tangan -->
   <div class="sign-left">
-    <div class="sig-card" v-if="data.signature && data.signature.technicalDelegate">
+    <div class="sig-card" v-if="data.showTechnicalDelegate !== false">
       <div class="sign-title">Technical Delegate</div>
       <img
         v-if="data.technicalDelegateSignature && data.technicalDelegateSignature.secure_url"
@@ -159,7 +161,7 @@
       <div class="sign-name">{{ data.technicalDelegate || "—" }}</div>
     </div>
 
-    <div class="sig-card" v-if="data.signature && data.signature.chiefJudge">
+    <div class="sig-card" v-if="data.showChiefJudge !== false">
       <div class="sign-title">Chief Judge</div>
       <img
         v-if="data.chiefJudgeSignature && data.chiefJudgeSignature.secure_url"
@@ -171,7 +173,7 @@
       <div class="sign-name">{{ data.chiefJudge || "—" }}</div>
     </div>
 
-    <div class="sig-card" v-if="data.signature && data.signature.raceDirector">
+    <div class="sig-card" v-if="data.showRaceDirector !== false">
       <div class="sign-title">Race Director</div>
       <img
         v-if="data.raceDirectorSignature && data.raceDirectorSignature.secure_url"
@@ -336,6 +338,10 @@ export default {
 .text-center { text-align: center; }
 .text-strong { font-weight: 700; }
 .mono { font-family: monospace; }
+/* Penalty Time merah, Result (total time stlh penalti) hijau — biar
+   langsung kebaca dampaknya, sama seperti PDF Head to Head. */
+.score-table td.pen-time-red { color: #d9534f; }
+.score-table td.total-time-green { color: #148a3b; }
 
 /* ==== FOOTER: SIGNATURE (70% - 30%) ==== */
 .sign.sign-two {

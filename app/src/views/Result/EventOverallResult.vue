@@ -51,14 +51,22 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="buckets.length === 0 || loading"
           variant="primary"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center"
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:download" class="mr-2" /> Download Result
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
       </div>
     </div>
 
@@ -122,28 +130,24 @@
                   <th rowspan="2" class="team-col">Team Name</th>
                   <th rowspan="2" class="w-70 text-center">BIB</th>
 
-                  <th colspan="2" class="group sprint text-center">Sprint</th>
-                  <th colspan="2" class="group h2h text-center">H2H</th>
-                  <th colspan="2" class="group slalom text-center">Slalom</th>
-                  <th colspan="2" class="group drr text-center">DRR</th>
-                  <th colspan="2" class="group rx text-center">
-                    Rafting Cross
+                  <th
+                    v-for="cat in visibleCategories"
+                    :key="cat.key"
+                    colspan="2"
+                    class="group text-center"
+                    :class="cat.cssClass"
+                  >
+                    {{ cat.label }}
                   </th>
 
                   <th rowspan="2" class="w-110 text-center">Total Score</th>
                   <th rowspan="2" class="w-110 text-center">Rank Overall</th>
                 </tr>
                 <tr>
-                  <th class="sub">Score</th>
-                  <th class="sub">Ranked</th>
-                  <th class="sub">Score</th>
-                  <th class="sub">Ranked</th>
-                  <th class="sub">Score</th>
-                  <th class="sub">Ranked</th>
-                  <th class="sub">Score</th>
-                  <th class="sub">Ranked</th>
-                  <th class="sub">Score</th>
-                  <th class="sub">Ranked</th>
+                  <template v-for="cat in visibleCategories">
+                    <th class="sub" :key="cat.key + '-score'">Score</th>
+                    <th class="sub" :key="cat.key + '-rank'">Ranked</th>
+                  </template>
                 </tr>
               </thead>
               <tbody>
@@ -155,16 +159,14 @@
                   </td>
                   <td class="text-center">{{ row.bib || "-" }}</td>
 
-                  <td class="text-center">{{ row.sprintScore || 0 }}</td>
-                  <td class="text-center">{{ row.sprintRank || "-" }}</td>
-                  <td class="text-center">{{ row.h2hScore || 0 }}</td>
-                  <td class="text-center">{{ row.h2hRank || "-" }}</td>
-                  <td class="text-center">{{ row.slalomScore || 0 }}</td>
-                  <td class="text-center">{{ row.slalomRank || "-" }}</td>
-                  <td class="text-center">{{ row.drrScore || 0 }}</td>
-                  <td class="text-center">{{ row.drrRank || "-" }}</td>
-                  <td class="text-center">{{ row.rxScore || 0 }}</td>
-                  <td class="text-center">{{ row.rxRank || "-" }}</td>
+                  <template v-for="cat in visibleCategories">
+                    <td class="text-center" :key="cat.key + '-score'">
+                      {{ row[cat.scoreField] || 0 }}
+                    </td>
+                    <td class="text-center" :key="cat.key + '-rank'">
+                      {{ row[cat.rankField] || "-" }}
+                    </td>
+                  </template>
 
                   <td class="text-center font-weight-bold">
                     {{ row.totalScore || 0 }}
@@ -174,7 +176,7 @@
                   </td>
                 </tr>
                 <tr v-if="!b.rows.length">
-                  <td class="empty" colspan="15">No data</td>
+                  <td class="empty" :colspan="overallColspan">No data</td>
                 </tr>
               </tbody>
             </table>
@@ -212,6 +214,7 @@
         <EventOverallPdf
           :data="pdfEventData"
           :buckets="buckets"
+          :categories="visibleCategories"
           :isOfficial="isOfficial"
         />
       </section>
@@ -229,15 +232,13 @@ import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
-
-// "categories[].name" di temporaryOverallEventResults kadang beda ejaan
-// dgn discipline key yg dipakai teamsRegisteredCollection utk Head to Head
-// (HEAD2HEAD saat registrasi, HEADTOHEAD saat hasil di-merge ke rekap).
-var DISCIPLINE_KEY_ALIASES = { HEAD2HEAD: "HEADTOHEAD" };
-function normalizeDisciplineKey(key) {
-  var up = String(key || "").toUpperCase();
-  return DISCIPLINE_KEY_ALIASES[up] || up;
-}
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { exportSheetsToExcel } from "@/utils/exportExcel";
 
 export default {
   name: "EventOverallResult",
@@ -262,9 +263,21 @@ export default {
       // dipakai cross-check skor lama vs status registrasi saat ini —
       // lihat buildBucketRows()/isTeamRegisteredFor()
       registeredBuckets: [],
+      // Race Category (SPRINT/HEAD2HEAD/SLALOM/DRR/RX) yang benar-benar
+      // dipilih utk event ini — null = fail-open (tampilkan semua kolom)
+      enabledCategoryKeys: null,
     };
   },
   computed: {
+    // kolom kategori yang benar-benar ditampilkan di tabel Overall,
+    // dipakai baik di layar maupun diteruskan ke komponen PDF
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    overallColspan() {
+      // No + Team Name + BIB + (Score,Rank per kategori) + Total Score + Rank
+      return 3 + this.visibleCategories.length * 2 + 2;
+    },
     hasEventLogo() {
       var logos = this.eventInfo.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
@@ -300,6 +313,7 @@ export default {
     if (eventId) {
       await this.loadEventById(eventId);
       await this.loadRegisteredBuckets(eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(eventId);
       await this.loadAllBuckets(eventId);
     }
   },
@@ -313,17 +327,7 @@ export default {
     // registeredBuckets kosong — isTeamRegisteredFor() akan fail-open (tidak
     // menyaring apa pun) daripada diam-diam menyembunyikan skor yang valid.
     async loadRegisteredBuckets(eventId) {
-      if (typeof ipcRenderer === "undefined") return;
-      await new Promise((resolve) => {
-        const timeoutId = setTimeout(resolve, 5000);
-        ipcRenderer.send("teams-registered:find-by-event", eventId);
-        ipcRenderer.once("teams-registered:find-by-event-reply", (_e, res) => {
-          clearTimeout(timeoutId);
-          this.registeredBuckets =
-            res && res.ok && Array.isArray(res.items) ? res.items : [];
-          resolve();
-        });
-      });
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(eventId);
     },
 
     // Apakah `teamName` benar-benar terdaftar di `disciplineKey` (SPRINT/
@@ -331,22 +335,13 @@ export default {
     // Fail-open (true) kalau registeredBuckets belum berhasil dimuat sama
     // sekali, supaya kegagalan fetch tidak menyembunyikan skor yang valid.
     isTeamRegisteredFor(disciplineKey, initialName, raceName, divisionName, teamName) {
-      if (!this.registeredBuckets.length) return true;
-
-      const wantedKey = normalizeDisciplineKey(disciplineKey);
-      const nameUpper = String(teamName || "").trim().toUpperCase();
-      const ini = String(initialName || "").toUpperCase();
-      const rac = String(raceName || "").toUpperCase();
-      const div = String(divisionName || "").toUpperCase();
-
-      return this.registeredBuckets.some(
-        (b) =>
-          normalizeDisciplineKey(b.raceCategory) === wantedKey &&
-          String(b.initialName || "").toUpperCase() === ini &&
-          String(b.raceName || "").toUpperCase() === rac &&
-          String(b.divisionName || "").toUpperCase() === div &&
-          Array.isArray(b.teamNames) &&
-          b.teamNames.indexOf(nameUpper) !== -1
+      return isTeamRegisteredFor(
+        this.registeredBuckets,
+        disciplineKey,
+        initialName,
+        raceName,
+        divisionName,
+        teamName
       );
     },
 
@@ -569,6 +564,32 @@ export default {
       }
     },
     onBeforeDownload() {},
+
+    downloadExcel() {
+      const cats = this.visibleCategories || [];
+      const sheets = (this.buckets || []).map((b) => {
+        const rows = (b.rows || []).map((row, i) => {
+          const obj = {
+            No: i + 1,
+            "Team Name": row.teamName || "-",
+            BIB: row.bib || "-",
+          };
+          cats.forEach((cat) => {
+            obj[`${cat.label} Score`] = row[cat.scoreField] || 0;
+            obj[`${cat.label} Ranked`] = row[cat.rankField] || "-";
+          });
+          obj["Total Score"] = row.totalScore || 0;
+          obj["Rank Overall"] = row.rank || "-";
+          return obj;
+        });
+        return {
+          name: `${b.divisionName || ""} ${b.raceName || ""} ${b.initialName || ""}`.trim(),
+          rows,
+        };
+      });
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportSheetsToExcel(`Event Overall Result - ${eventName}`, sheets);
+    },
     onPdfGenerated() {
       this.showPdf = false;
     },

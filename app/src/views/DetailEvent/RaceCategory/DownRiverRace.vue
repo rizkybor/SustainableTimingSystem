@@ -97,19 +97,33 @@
               </div>
 
               <div class="meta-row">
-                <!-- Select category -->
-                <b-form-group
-                  label="Switch DRR Category:"
-                  label-for="drrBucketSelect"
-                  class="mb-0 drr-actionbar__select"
-                >
-                  <b-form-select
-                    id="drrBucketSelect"
-                    :options="drrBucketOptions"
-                    v-model="selectedDrrKey"
-                    @change="onSelectDrrBucket"
-                  />
-                </b-form-group>
+                <!-- Select category: pilih Initial dulu, baru Divisi/Race —
+                     sama pola dgn Switch Sprint/Slalom Category -->
+                <div class="drr-actionbar__select">
+                  <div class="switch-label mb-1">Switch DRR Category:</div>
+
+                  <div class="init-tabs mb-2" v-if="initials.length">
+                    <button
+                      v-for="i in initials"
+                      :key="i.id"
+                      type="button"
+                      class="init-tab"
+                      :class="{ active: selectedInitialName === i.name }"
+                      @click="selectInitialTab(i)"
+                    >
+                      {{ i.name }}
+                    </button>
+                  </div>
+
+                  <b-form-group label-for="drrBucketSelect" class="mb-0">
+                    <b-form-select
+                      id="drrBucketSelect"
+                      :options="drrOptionsForSelectedInitial"
+                      v-model="selectedDrrKey"
+                      @change="onSelectDrrBucket"
+                    />
+                  </b-form-group>
+                </div>
               </div>
             </div>
           </b-col>
@@ -139,7 +153,7 @@
                 </div>
               </div>
 
-              <!-- connect -->
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -154,7 +168,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -190,6 +206,7 @@
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>
@@ -221,6 +238,13 @@
           </b-col>
           <b-col cols="6" md="6">
             <div class="drr-actionbar__buttons">
+              <JudgeActionHistoryModal
+                v-if="currentEventId"
+                :event-id="String(currentEventId)"
+                race-category="drr"
+                category-label="Down River Race"
+              />
+
               <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
               <!-- <button
                   type="button"
@@ -250,6 +274,17 @@
                 title="Urutkan berdasarkan rank naik/turun"
               >
                 <Icon icon="icon-park-outline:ranking" /> Sort Ranked
+              </button>
+
+              <!-- RESET ALL — destruktif, hapus SEMUA waktu DRR yang sudah
+                   bertanding pada event ini (semua divisi/race/initial) -->
+              <button
+                type="button"
+                class="btn-action btn-outline-danger"
+                @click="openResetAllModal"
+                title="Hapus semua waktu yang sudah bertanding di DRR (semua kategori) pada event ini"
+              >
+                <Icon icon="mdi:restore-alert" /> Reset All
               </button>
             </div>
           </b-col>
@@ -324,7 +359,7 @@
                           Select Penalty Start Time
                         </option>
                         <option
-                          v-for="p in penaltiesStartFinish"
+                          v-for="p in penaltiesStart"
                           :key="p.value"
                           :value="p.timePen"
                         >
@@ -353,7 +388,7 @@
                         >
                           <option disabled value="">Section {{ sIdx }}</option>
                           <option
-                            v-for="p in dataPenalties"
+                            v-for="p in penaltiesSection"
                             :key="p.value"
                             :value="p.timePen"
                           >
@@ -378,7 +413,7 @@
                           Select Penalty Finish Time
                         </option>
                         <option
-                          v-for="p in penaltiesStartFinish"
+                          v-for="p in penaltiesFinish"
                           :key="p.value"
                           :value="p.timePen"
                         >
@@ -530,6 +565,67 @@
       </div>
     </b-modal>
     <!-- === END MODAL PREVIEW JSON === -->
+
+    <!-- MODAL: konfirmasi Reset All (seluruh kategori DRR di event ini) -->
+    <b-modal
+      v-model="showResetAllModal"
+      title="Reset All - DRR"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="resetAllInProgress"
+      hide-footer
+      @hidden="onResetAllModalHidden"
+    >
+      <p class="mb-2">
+        Tindakan ini akan <strong>menghapus semua waktu yang sudah bertanding
+        di DRR</strong> — Start, tiap Section, Finish, penalty, dan skor —
+        untuk <strong>SELURUH kategori DRR</strong> (semua kombinasi divisi/
+        race/initial) pada event ini.
+      </p>
+      <p class="mb-2">
+        Semua tim akan kembali ke kondisi belum bertanding. Kategori lain
+        (Sprint/H2H/Slalom/Rafting Cross) <strong>tidak</strong> ikut
+        terhapus.
+      </p>
+      <p class="mb-3">
+        Tindakan ini <strong>tidak dapat dibatalkan</strong>.
+      </p>
+
+      <b-form-group v-if="!resetAllInProgress">
+        <label class="small text-muted mb-1">
+          Ketik <strong>{{ RESET_ALL_CONFIRM_PHRASE }}</strong> untuk konfirmasi:
+        </label>
+        <b-form-input
+          v-model="resetAllConfirmText"
+          :placeholder="RESET_ALL_CONFIRM_PHRASE"
+          autocomplete="off"
+          @keyup.enter="confirmResetAll"
+        />
+      </b-form-group>
+      <div v-else class="text-center text-muted py-3">
+        <b-spinner small class="mr-2" />
+        Mereset semua kategori DRR...
+      </div>
+
+      <div class="d-flex justify-content-end" style="gap: 8px">
+        <b-button
+          variant="outline-secondary"
+          :disabled="resetAllInProgress"
+          @click="showResetAllModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          variant="danger"
+          :disabled="
+            resetAllConfirmText !== RESET_ALL_CONFIRM_PHRASE || resetAllInProgress
+          "
+          @click="confirmResetAll"
+        >
+          Reset All
+        </b-button>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -546,6 +642,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 
 const drrBucketCache = createBucketCache("drrLocal");
 
@@ -757,7 +854,13 @@ function readEventDetailsFromLS() {
 
 export default {
   name: "SustainableTimingSystemDRRRace",
-  components: { OperationTimePanel, EmptyCard, Icon, CountryFlag },
+  components: {
+    OperationTimePanel,
+    EmptyCard,
+    Icon,
+    CountryFlag,
+    JudgeActionHistoryModal,
+  },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
@@ -768,11 +871,36 @@ export default {
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
       selectedDrrKey: "",
+      // Tab Initial (Youth/Junior/Open dll) yang sedang aktif — sama pola
+      // dgn Switch Sprint/Slalom Category, disinkronkan di _useDrrBucket().
+      selectedInitialName: "",
+      // Key bucket yang datanya BENAR-BENAR sedang termuat di this.participant
+      // — beda dari selectedDrrKey (di-bind ke <b-form-select> v-model, jadi
+      // sudah berubah ke key BARU begitu user pilih opsi lain, SEBELUM
+      // onSelectDrrBucket() sempat menyimpan data lama). Sama fix pattern dgn
+      // activeSlalomBucketKey di SlalomRace.vue — dulu pakai selectedDrrKey
+      // utk save-before-switch, menyebabkan data bucket lama ke-save ke slot
+      // cache bucket baru lalu ter-merge balik, membuat 2 kategori terlihat sama.
+      activeDrrBucketKey: "",
+      // Reset All (destruktif) — hapus semua waktu DRR yg sudah bertanding
+      // pada event ini (semua kategori/bucket) — sama pola dgn Reset All di
+      // SlalomRace.vue/HeadToHead.vue.
+      showResetAllModal: false,
+      resetAllConfirmText: "",
+      resetAllInProgress: false,
+      RESET_ALL_CONFIRM_PHRASE: "RESET DRR",
       currentBucket: null,
       drrSectionsCount: 3,
       editResult: false,
       dataPenalties: [],
+      // Override per-event dari Race Settings (Pilihan Pen. Start/Finish/
+      // Section), diisi di loadRaceSettings(); fallback ke dataPenalties
+      // (daftar global) di loadDataPenalties() sebelum race-settings dimuat.
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
+      dataPenaltiesSection: [],
       dataScore: [],
+      drrDefaultScoreBeyondRank: 0,
       isRankedDescending: false,
       participant: [],
       dataEvent: {},
@@ -786,21 +914,38 @@ export default {
     };
   },
   computed: {
-    // Opsi yang hanya boleh dipakai untuk Start & Finish
-  penaltiesStartFinish() {
-    if (!Array.isArray(this.dataPenalties)) return [];
-    const allowed = new Set([0, 10, 50]);
-    return this.dataPenalties.filter(function (p) {
-      return p && allowed.has(Number(p.value));
-    });
-  },
+    // Opsi Pen. Start — dulu whitelist KETAT {0,10,50} thd daftar GLOBAL
+    // (dataPenalties), jadi custom value dari Pilihan Pen. Start (Race
+    // Settings) tidak akan pernah muncul krn di-filter habis. Sekarang pakai
+    // dataPenaltiesStart (override per-event dari loadRaceSettings(),
+    // fallback ke daftar global TANPA filter kalau event blm dikustomisasi).
+    penaltiesStart() {
+      return Array.isArray(this.dataPenaltiesStart) &&
+        this.dataPenaltiesStart.length
+        ? this.dataPenaltiesStart
+        : [];
+    },
 
-  // Opsi lengkap untuk Section (boleh pakai langsung dataPenalties,
-  // tapi ini safe fallback jadi tetap array)
-  penaltiesSection() {
-    if (!Array.isArray(this.dataPenalties)) return [];
-    return this.dataPenalties.slice();
-  },
+    // Opsi Pen. Finish — independen dari Start (dulu keduanya berbagi 1
+    // whitelist yang sama).
+    penaltiesFinish() {
+      return Array.isArray(this.dataPenaltiesFinish) &&
+        this.dataPenaltiesFinish.length
+        ? this.dataPenaltiesFinish
+        : [];
+    },
+
+    // Opsi utk Section — override per-event dari Race Settings, fallback ke
+    // daftar global (dataPenalties) tanpa filter kalau blm dikustomisasi.
+    penaltiesSection() {
+      if (
+        Array.isArray(this.dataPenaltiesSection) &&
+        this.dataPenaltiesSection.length
+      ) {
+        return this.dataPenaltiesSection;
+      }
+      return Array.isArray(this.dataPenalties) ? this.dataPenalties.slice() : [];
+    },
     hasEventLogo() {
       var ev = this.dataEventSafe || {};
       var logos = ev.eventFiles;
@@ -889,6 +1034,26 @@ export default {
             name: String(i.name),
           }))
         : [];
+    },
+
+    // Kombinasi Divisi/Race (mis. "R4 MEN") milik Initial yang sedang aktif
+    // saja — sama pola dgn sprintOptionsForSelectedInitial() di
+    // SprintRace.vue / slalomOptionsForSelectedInitial() di SlalomRace.vue;
+    // labelnya tidak perlu menyertakan nama Initial lagi krn sudah dipilih
+    // lewat tab di atasnya.
+    drrOptionsForSelectedInitial() {
+      const opts = this.drrBucketOptions || [];
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.drrBucketMap[o.value];
+          return b && String(b.initialName || "").toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.drrBucketMap[o.value];
+          return { value: o.value, text: `${b.divisionName} ${b.raceName}` };
+        });
     },
   },
   async mounted() {
@@ -1138,48 +1303,40 @@ export default {
         }
 
         // --- numeric value (izinkan hanya nilai yang benar-benar ditawarkan UI) ---
+        // PS/PF sekarang independen (bukan berbagi 1 whitelist "StartFinish"
+        // lagi), jadi harus dibedakan — sama fix pattern dgn
+        // applyPenaltyFromSocketDirect() di SlalomRace.vue.
         var rawVal = 0;
         if (msg && msg.penalty != null) rawVal = msg.penalty;
         else if (msg && msg.value != null) rawVal = msg.value;
-        var ALLOWED = (kind === "section"
-          ? this.penaltiesSection
-          : this.penaltiesStartFinish
-        ).map(function (p) {
+        var ALLOWED_SRC =
+          kind === "section"
+            ? this.penaltiesSection
+            : kind === "start"
+            ? this.penaltiesStart
+            : this.penaltiesFinish;
+        var ALLOWED = (ALLOWED_SRC || []).map(function (p) {
           return Number(p.value);
         });
         var numericValue =
           ALLOWED.indexOf(Number(rawVal)) >= 0 ? Number(rawVal) : 0;
 
         // --- map numeric -> time string ---
-        var timeStr = "";
-        if (
-          Array.isArray(this.dataPenalties) &&
-          this.dataPenalties.length > 0
-        ) {
-          for (var dpi = 0; dpi < this.dataPenalties.length; dpi++) {
-            var dp = this.dataPenalties[dpi];
-            if (dp && Number(dp.value) === numericValue) {
-              timeStr = String(dp.timePen || "");
-              break;
-            }
-          }
-        }
-        if (!timeStr && msg && msg.timePen) timeStr = String(msg.timePen);
+        // BUG FIX: dulu cari numericValue di this.dataPenalties (daftar
+        // GLOBAL/legacy) via lookup by value dulu — kalau koleksi global itu
+        // kebetulan punya entry dgn value yg SAMA tapi timePen yg BEDA/tidak
+        // konsisten, timeStr yg dipakai jadi SALAH walau numericValue-nya
+        // sendiri sudah benar (sama root cause dgn bug timeToPenaltyValue()
+        // yg bikin Penalty Total meleset). value SELALU berarti detik, jadi
+        // konversi langsung pakai secondsToTimeString()/hhmmssFromSeconds()
+        // (keduanya sudah support minus utk bonus Pen. Section) — msg.timePen
+        // dari device cuma dipakai kalau device MEMANG kirim itu duluan.
+        var timeStr = msg && msg.timePen ? String(msg.timePen) : "";
         if (!timeStr) {
           if (typeof this.hhmmssFromSeconds === "function") {
             timeStr = this.hhmmssFromSeconds(Number(numericValue));
           } else {
-            var secs = Math.max(0, Math.floor(Number(numericValue) || 0));
-            var hh = Math.floor(secs / 3600);
-            var mm = Math.floor((secs % 3600) / 60);
-            var ss = secs % 60;
-            timeStr =
-              String(hh).padStart(2, "0") +
-              ":" +
-              String(mm).padStart(2, "0") +
-              ":" +
-              String(ss).padStart(2, "0") +
-              ".000";
+            timeStr = this.secondsToTimeString(Number(numericValue) || 0);
           }
         }
 
@@ -1268,30 +1425,25 @@ export default {
         this.$set(team.result, "sectionPenalty", sectionPenalty);
         this.$set(team.result, "totalPenalty", totalPenalty);
 
-        // --- hitung total penalty time (string) ---
-        var totalPenaltyTime = "00:00:00.000";
+        // --- hitung total penalty time (string ±HH:MM:SS.mmm) — pakai
+        // _sumPenaltyTimes() (milidetik bertanda) supaya bonus murni dari
+        // Pilihan Pen. Section tidak ke-clamp ke 0 oleh kurangiWaktu(). ---
         var fields = [];
         fields.push(team.result.penaltyStartTime || "00:00:00.000");
         fields.push(team.result.penaltyFinishTime || "00:00:00.000");
         for (var fi = 0; fi < secArr.length; fi++)
           fields.push(secArr[fi] || "00:00:00.000");
 
-        for (var gi = 0; gi < fields.length; gi++) {
-          var p = String(fields[gi] || "00:00:00.000");
-          if (p.charAt(0) === "-") {
-            var plus = p.replace("-", "");
-            totalPenaltyTime = await this.kurangiWaktu(totalPenaltyTime, plus);
-          } else {
-            totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, p);
-          }
-        }
+        var totalPenaltyTime = await this._sumPenaltyTimes(fields);
 
         this.$set(team.result, "penaltyTime", totalPenaltyTime);
         this.$set(team.result, "totalPenaltyTime", totalPenaltyTime);
 
-        // --- update totalTime apabila raceTime ada ---
+        // --- update totalTime apabila raceTime ada — _combineRaceAndPenaltyTime()
+        // (bukan tambahWaktu() polos) krn totalPenaltyTime sekarang boleh
+        // bertanda negatif (bonus dari Pilihan Pen. Section). ---
         if (team.result.raceTime) {
-          var tot = await this.tambahWaktu(
+          var tot = this._combineRaceAndPenaltyTime(
             team.result.raceTime,
             totalPenaltyTime
           );
@@ -1360,6 +1512,23 @@ export default {
         if (typeof this.checkEndGameStatus === "function")
           this.checkEndGameStatus();
         if (typeof this.$forceUpdate === "function") this.$forceUpdate();
+
+        // audit trail — catat tindakan judge ini, tidak menunggu balasan
+        if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+          ipcRenderer.send("judgeLog:send", {
+            eventId: this.currentEventId,
+            raceCategory: "drr",
+            type: msg.type,
+            text: msg.text,
+            teamId: team.teamId || team._id,
+            teamName: team.nameTeam,
+            bibTeam: team.bibTeam,
+            value: numericValue,
+            from: msg.from,
+            sourceTs: msg.ts,
+            raw: msg,
+          });
+        }
 
         return true;
       } catch (err) {
@@ -1502,16 +1671,24 @@ export default {
       try {
         ipcRenderer.send("option-penalties", type);
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          if (payload) {
-            this.dataPenalties = payload[0].data;
-          } else {
-            this.dataPenalties = [];
-          }
+          const data = payload && Array.isArray(payload[0] && payload[0].data)
+            ? payload[0].data
+            : [];
+          this.dataPenalties = data;
+          // dipakai sebagai fallback sebelum race-settings per-event dimuat
+          // — sama pola dgn SprintRace.vue.
+          this.dataPenaltiesStart = data;
+          this.dataPenaltiesFinish = data;
+          this.dataPenaltiesSection = data;
         });
       } catch (error) {
         this.dataPenalties = [];
+        this.dataPenaltiesStart = [];
+        this.dataPenaltiesFinish = [];
+        this.dataPenaltiesSection = [];
       }
     },
+
 
     resetRow(item) {
       if (!item || !item.result) return;
@@ -1716,9 +1893,15 @@ export default {
       const b = this.drrBucketMap[key];
       if (!b) return;
 
+      // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat —
+      // mencakup semua jalur (klik tab, restore dari localStorage, refresh)
+      // — sama pola dgn _useSprintBucket()/_useSlalomBucket().
+      this.selectedInitialName = b.initialName || this.selectedInitialName;
+
       // set participant & judul
       const freshParticipant = (b.teams || []).map((t) => ({ ...t }));
       this.participant = drrBucketCache.merge(freshParticipant, drrBucketCache.load(key));
+      this.activeDrrBucketKey = key;
       this.titleCategories = b._isAggregate
         ? "ALL DIVISION/RACE – ALL INITIAL (DRR)"
         : this._bucketLabel(b);
@@ -1756,9 +1939,102 @@ export default {
       }
     },
 
+    openResetAllModal() {
+      this.resetAllConfirmText = "";
+      this.showResetAllModal = true;
+    },
+
+    onResetAllModalHidden() {
+      if (!this.resetAllInProgress) this.resetAllConfirmText = "";
+    },
+
+    // Bersihkan SEMUA cache localStorage drrLocal:<eventId>|... — lintas
+    // SELURUH bucket DRR event ini (bukan cuma bucket yg sedang dibuka).
+    // WAJIB dipanggil sebelum reload di confirmResetAll(): drrBucketCache
+    // meng-overlay waktu tersimpan lokal di atas data DB yang baru
+    // di-fetch — tanpa ini, waktu lama tetap muncul lagi setelah reload
+    // krn cache tsb tidak ikut terhapus oleh Reset All di backend (yang
+    // cuma menghapus DB) — sama fix pattern dgn SlalomRace.vue/HeadToHead.vue.
+    _clearAllDrrLocalCachesForEvent(eventId) {
+      try {
+        const prefix = "drrLocal:" + String(eventId) + "|";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        /* noop */
+      }
+    },
+
+    async confirmResetAll() {
+      if (this.resetAllConfirmText !== this.RESET_ALL_CONFIRM_PHRASE) return;
+      const eventId = this.currentEventId ? String(this.currentEventId) : "";
+      if (!eventId) return;
+
+      this.resetAllInProgress = true;
+      try {
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("drr:reset-all-reply", (_e, r) => resolve(r));
+          ipcRenderer.send("drr:reset-all", eventId);
+        });
+
+        if (res && res.ok) {
+          this._clearAllDrrLocalCachesForEvent(eventId);
+          ipcRenderer.send("get-alert-saved", {
+            type: "question",
+            detail: "Semua waktu DRR pada event ini sudah dikosongkan.",
+            message: "Reset All berhasil",
+          });
+          // reload penuh supaya seluruh state (participant, socket
+          // listeners, dll.) dibangun ulang dari kondisi bersih — lebih
+          // aman drpd re-invoke manual banyak method async berurutan.
+          window.location.reload();
+        } else {
+          this.resetAllInProgress = false;
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            detail: (res && res.error) || "Unknown error",
+            message: "Reset All gagal",
+          });
+        }
+      } catch (err) {
+        this.resetAllInProgress = false;
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: err && err.message ? err.message : String(err),
+          message: "Reset All gagal",
+        });
+      }
+    },
+
+    // Klik tab Initial (Youth/Junior/Open dll) — sama pola dgn
+    // selectInitialTab() di SprintRace.vue / SlalomRace.vue.
+    async selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+
+      const target = String(i.name).toUpperCase();
+      const match = (this.drrBucketOptions || []).find((o) => {
+        const b = this.drrBucketMap[o.value];
+        return b && String(b.initialName || "").toUpperCase() === target;
+      });
+
+      if (match) {
+        await this.onSelectDrrBucket(match.value);
+      }
+    },
+
     async onSelectDrrBucket(key) {
-      if (this.selectedDrrKey) {
-        drrBucketCache.save(this.selectedDrrKey, this.participant);
+      // BUG FIX: dulu pakai this.selectedDrrKey di sini — tapi itu prop yg
+      // di-bind ke v-model <b-form-select>, jadi SUDAH berubah jadi key BARU
+      // (sama dgn param `key`) sebelum baris ini sempat jalan. activeDrrBucketKey
+      // baru di-update SETELAH bucket selesai dimuat (lihat fetchBucketTeamsByKey/
+      // _useDrrBucket), jadi di sini masih menunjuk bucket lama — sama fix
+      // pattern dgn activeSlalomBucketKey di SlalomRace.vue.
+      if (this.activeDrrBucketKey && this.activeDrrBucketKey !== key) {
+        drrBucketCache.save(this.activeDrrBucketKey, this.participant);
       }
       await this.fetchBucketTeamsByKey(key);
     },
@@ -1786,18 +2062,55 @@ export default {
         this.selectedDrrKey = key;
         localStorage.setItem("currentDRRBucketKey", key);
 
-        // request ke main
+        // reqId-safe: dulu pakai ipcRenderer.once() polos, yang menyalakan
+        // SEMUA once-listener yg masih menunggu di channel yang sama begitu
+        // balasan PERTAMA datang — jadi 2 klik pindah bucket yang tumpang
+        // tindih (mis. R4 MEN lalu cepat ke R4 WOMEN) bisa sama2 ke-resolve
+        // dgn payload yang SAMA, membuat tabel kedua kategori terlihat
+        // identik (bug yang sama dgn fetchSlalomTeamsByKey() sebelum
+        // diperbaiki). Sekarang dicocokkan lewat __reqId + token per-instance
+        // supaya balasan yang sudah usang (key sudah ganti lagi) dibuang.
+        const token = Date.now() + "|" + Math.random();
+        this._lastDrrTeamsToken = token;
+        const reqId = "drrteams|" + key + "|" + token;
+
         const res = await new Promise((resolve) => {
-          ipcRenderer.once("teams-registered:find-reply", (_e, payload) =>
-            resolve(payload)
-          );
-          ipcRenderer.send("teams-registered:find", filters);
+          let settled = false;
+          const onReply = (_e, payload) => {
+            if (!payload || payload.__reqId !== reqId) return;
+            ipcRenderer.removeListener(
+              "teams-registered:find-reply",
+              onReply
+            );
+            if (settled) return;
+            settled = true;
+            resolve(payload);
+          };
+          ipcRenderer.on("teams-registered:find-reply", onReply);
+          ipcRenderer.send("teams-registered:find", {
+            ...filters,
+            __reqId: reqId,
+          });
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener(
+              "teams-registered:find-reply",
+              onReply
+            );
+            resolve(null);
+          }, 8000);
         });
+
+        // permintaan sudah usang (user sudah pindah key lain sebelum
+        // balasan ini datang) -> buang, jangan timpa tabel yang aktif
+        if (this._lastDrrTeamsToken !== token) return;
 
         if (!res || !res.ok) {
           this.participant = [];
           this.currentBucket = null;
           this.titleCategories = this._bucketLabel(b);
+          this.activeDrrBucketKey = key;
           return;
         }
 
@@ -1809,6 +2122,8 @@ export default {
 
         // set participant + judul + currentBucket (buat save)
         this.participant = teams;
+        this.activeDrrBucketKey = key;
+        this.selectedInitialName = b.initialName || this.selectedInitialName;
         this.titleCategories = this._bucketLabel(b);
         this.currentBucket = {
           eventId: b.eventId,
@@ -1870,8 +2185,40 @@ export default {
 
           let count = 3;
           if (res && res.ok && res.settings && res.settings.drr) {
-            const c = parseInt(res.settings.drr.totalSection, 10);
+            const drrSettings = res.settings.drr;
+            const c = parseInt(drrSettings.totalSection, 10);
             if (Number.isFinite(c) && c > 0) count = c;
+
+            if (
+              Array.isArray(drrSettings.scoreByRank) &&
+              drrSettings.scoreByRank.length
+            ) {
+              this.dataScore = drrSettings.scoreByRank;
+            }
+            this.drrDefaultScoreBeyondRank =
+              Number(drrSettings.defaultScoreBeyondRank) || 0;
+
+            // Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Section —
+            // override daftar pilihan penalty per-event kalau dikustomisasi
+            // lewat Race Settings; kalau tidak ada, computed
+            // penaltiesStart/Finish/Section akan fallback ke dataPenalties
+            // (daftar global) yang di-set di loadDataPenalties().
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: this.secondsToTimeString(Number(p.value) || 0),
+                  }))
+                : null;
+
+            const startList = toList(drrSettings.startPenalties);
+            const finishList = toList(drrSettings.finishPenalties);
+            const sectionList = toList(drrSettings.sectionPenalties);
+
+            if (startList) this.dataPenaltiesStart = startList;
+            if (finishList) this.dataPenaltiesFinish = finishList;
+            if (sectionList) this.dataPenaltiesSection = sectionList;
           }
 
           this.applyDrrSectionCount(count);
@@ -1906,13 +2253,18 @@ export default {
       }
     },
 
+    // BUG FIX: dulu cari `p` di this.dataPenalties (daftar GLOBAL, legacy,
+    // dari optionPenalties "DRR") via lookup by timePen dulu — kalau
+    // koleksi global itu kebetulan punya entry dgn timePen string yg SAMA
+    // (mis. "00:00:05.000") tapi `value` yg BEDA/tidak konsisten (bukan
+    // hasil konversi detik langsung), fungsi ini diam2 balikin value LEGACY
+    // itu alih2 nilai yg benar2 dipilih user — nyebabin Penalty Total
+    // meleset jauh (mis. "1014" alih2 5) padahal pilihan di UI sudah benar.
+    // Sama fix pattern dgn penaltyValueToTime(): value SELALU berarti detik
+    // (konvensi yg sama di seluruh app), jadi cukup parse langsung dari
+    // string waktunya, tanpa lookup tabel yg gampang stale/tidak konsisten.
     timeToPenaltyValue(timeStr) {
       const p = String(timeStr || "");
-      // cari di dataPenalties by timePen
-      const found = this.dataPenalties.find((x) => x.timePen === p);
-      if (found) return Number(found.value) || 0;
-
-      // fallback: parse waktu jadi detik & pakai sebagai nilai (misal 00:00:50.000 → 50, tanda minus ikut)
       const neg = p.startsWith("-");
       const t = p.replace("-", "");
       const [hh = "0", mm = "0", ssms = "0"] = t.split(":");
@@ -1921,45 +2273,96 @@ export default {
       return (neg ? -1 : 1) * Math.round(val); // bulatkan ke detik terdekat
     },
 
-    // === MAP angka penalty ↔ time string (mengacu ke this.dataPenalties) ===
+    // sekunder → string "HH:MM:SS.000", sama pola dgn secondsToTimeString()
+    // di SprintRace.vue.
+    // KHUSUS DRR: Pilihan Pen. Section boleh punya nilai minus (bonus/
+    // pengurang waktu) — dulu di-clamp Math.max(0, ...) jadi nilai minus
+    // ke-flatten jadi "00:00:00.000" (nol), padahal timeToPenaltyValue()
+    // (kebalikannya) & _sumPenaltyTimes() sudah sama2 support prefix "-"
+    // dari dulu. Sekarang nilai negatif dipertahankan lewat prefix "-",
+    // konsisten dgn konvensi string waktu minus yg sudah dipakai di seluruh
+    // file ini (lihat updateTimePen()/_sumPenaltyTimes()).
+    secondsToTimeString(totalSec) {
+      const raw = Number(totalSec) || 0;
+      const neg = raw < 0;
+      const t = Math.abs(raw);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${neg ? "-" : ""}${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+
+    // === MAP angka penalty -> time string ===
+    // BUG FIX: dulu cari `val` di this.dataPenalties (daftar global) via
+    // lookup — kalau `val` berasal dari Pilihan Pen. Start/Finish/Section
+    // hasil override Race Settings (custom, blm tentu ada di daftar global),
+    // lookup gagal & balik "" (select jadi kosong walau nilainya valid).
+    // value SELALU berarti detik (sama konvensi dgn Slalom — lihat
+    // penaltyValueToMs() di SlalomRace.vue), jadi konversi langsung pakai
+    // rumus yg sama dgn timeToPenaltyValue()'s fallback, tanpa lookup tabel.
     penaltyValueToTime(val) {
       if (val == null) return "";
       const num = Number(val);
       if (!Number.isFinite(num)) return "";
-      const found = (this.dataPenalties || []).find(
-        (p) => Number(p.value) === num
+      return this.secondsToTimeString(num);
+    },
+
+    // Parse "±HH:MM:SS.mmm" jadi milidetik BERTANDA (boleh negatif) — dasar
+    // aritmatika waktu penalty yg sekarang boleh minus (bonus/pengurang
+    // waktu di Pilihan Pen. Section DRR). String kosong/invalid -> 0.
+    _signedMsFromTimeStr(str) {
+      const s = String(str || "0").trim();
+      const neg = s.startsWith("-");
+      const t = neg ? s.slice(1) : s;
+      const parts = t.split(":");
+      const hh = parseFloat(parts[0]) || 0;
+      const mm = parts.length > 1 ? parseFloat(parts[1]) || 0 : 0;
+      const ss = parts.length > 2 ? parseFloat(parts[2]) || 0 : 0;
+      const ms = hh * 3600000 + mm * 60000 + ss * 1000;
+      return neg ? -ms : ms;
+    },
+
+    // Kebalikan _signedMsFromTimeStr() — format ms bertanda balik ke
+    // "±HH:MM:SS.mmm".
+    _timeStrFromSignedMs(ms) {
+      const neg = ms < 0;
+      const t = Math.round(Math.abs(ms));
+      const hr = Math.floor(t / 3600000);
+      const rem1 = t % 3600000;
+      const min = Math.floor(rem1 / 60000);
+      const rem2 = rem1 % 60000;
+      const sec = Math.floor(rem2 / 1000);
+      const msPart = rem2 % 1000;
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      const s = `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(msPart, 3)}`;
+      return neg ? "-" + s : s;
+    },
+
+    // Gabungkan raceTime (non-negatif) dgn penaltyTime BERTANDA (boleh minus
+    // krn bonus Pen. Section) jadi totalTime — floor di 0 kalau bonus lebih
+    // besar drpd raceTime (kasus ekstrem, seharusnya jarang terjadi).
+    _combineRaceAndPenaltyTime(raceTime, penaltyTime) {
+      const totalMs = Math.max(
+        0,
+        this._signedMsFromTimeStr(raceTime) +
+          this._signedMsFromTimeStr(penaltyTime)
       );
-      return found ? String(found.timePen || "") : "";
+      return this._timeStrFromSignedMs(totalMs);
     },
 
-    // pastikan array section punya panjang sesuai setting (drrSectionsCount)
-    _coerceSectionArray(arr, targetLen) {
-      const n =
-        Number.isFinite(targetLen) && targetLen > 0
-          ? targetLen
-          : this.drrSectionsCount || 3;
-      if (Array.isArray(arr)) {
-        const out = arr.slice(0, n);
-        while (out.length < n) out.push(null);
-        return out;
-      }
-      // jika sumbernya angka tunggal/null, ubah jadi array length n
-      const out = [];
-      if (arr != null) out.push(arr);
-      while (out.length < n) out.push(null);
-      return out.slice(0, n);
-    },
-
-    // jumlahkan daftar time string (boleh ada tanda minus) → "HH:MM:SS.mmm"
+    // jumlahkan daftar time string (boleh ada tanda minus) → "±HH:MM:SS.mmm"
+    // BUG FIX: dulu diakumulasi lewat tambahWaktu()/kurangiWaktu() yg
+    // didesain utk DURASI NON-NEGATIF — kurangiWaktu() meng-clamp hasil ke 0
+    // kalau minus, jadi bonus murni (mis. cuma -15 di Section, tanpa
+    // penalty lain) malah hilang total alih2 menghasilkan total penalty
+    // BERTANDA negatif. Sekarang dijumlah sbg milidetik bertanda langsung.
     async _sumPenaltyTimes(times = []) {
-      let total = "00:00:00.000";
+      let totalMs = 0;
       for (const t of times) {
-        const v = String(t || "00:00:00.000");
-        total = v.startsWith("-")
-          ? await this.kurangiWaktu(total, v.slice(1))
-          : await this.tambahWaktu(total, v);
+        totalMs += this._signedMsFromTimeStr(t);
       }
-      return total;
+      return this._timeStrFromSignedMs(totalMs);
     },
 
     // ambil penalties dari dokumen teams-registered → set ke shape UI
@@ -1979,22 +2382,35 @@ export default {
 
         const startPenNum = Number(fromDB.startPenalty);
         const finishPenNum = Number(fromDB.finishPenalty);
-        const sectionPenRaw = fromDB.sectionPenalty;
 
         // angka → time string (untuk select)
         r.penaltyStartTime = this.penaltyValueToTime(startPenNum);
         r.penaltyFinishTime = this.penaltyValueToTime(finishPenNum);
 
-        const sectionNums = this._coerceSectionArray(sectionPenRaw, secCount);
-        const sectionTimes = sectionNums.map((n) => this.penaltyValueToTime(n));
+        // BUG FIX: dulu basis-nya fromDB.sectionPenalty — itu angka TOTAL
+        // (SUM semua section), bukan nilai per-section. _coerceSectionArray()
+        // lalu menaruh angka total itu ke slot Section 1 doang (mis. total=0
+        // utk tim yg blm py penalty section sama sekali → Section 1 kepilih
+        // "0" alih2 tampil placeholder "Section 1" spt section lain; kalau
+        // total>0 dari section lain, malah nyasar semua ke Section 1). Field
+        // yang BENAR per-section adalah fromDB.sectionPenaltyTime (array
+        // string waktu, 1 elemen = 1 section) — pakai itu langsung, resize
+        // pakai _resizePenaltySections() (pad "") spt dipakai select-nya.
+        const sectionTimeRaw = Array.isArray(fromDB.sectionPenaltyTime)
+          ? fromDB.sectionPenaltyTime
+          : [];
+        const sectionTimes = this._resizePenaltySections(
+          sectionTimeRaw,
+          secCount
+        );
         if (this.$set) this.$set(r, "penaltySection", sectionTimes);
         else r.penaltySection = sectionTimes;
 
         // set angka numerik (fallback 0 bila NaN)
         r.startPenalty = Number.isFinite(startPenNum) ? startPenNum : 0;
         r.finishPenalty = Number.isFinite(finishPenNum) ? finishPenNum : 0;
-        r.sectionPenalty = sectionNums.reduce(
-          (acc, v) => acc + (Number.isFinite(Number(v)) ? Number(v) : 0),
+        r.sectionPenalty = sectionTimes.reduce(
+          (acc, t) => acc + (t ? this.timeToPenaltyValue(t) : 0),
           0
         );
         r.totalPenalty =
@@ -2010,9 +2426,14 @@ export default {
         ]);
         r.totalPenaltyTime = r.penaltyTime;
 
-        // totalTime jika raceTime sudah ada
+        // totalTime jika raceTime sudah ada — pakai _combineRaceAndPenaltyTime()
+        // (bukan tambahWaktu() polos) krn r.penaltyTime sekarang boleh
+        // bertanda negatif (bonus dari Pilihan Pen. Section).
         if (r.raceTime)
-          r.totalTime = await this.tambahWaktu(r.raceTime, r.penaltyTime);
+          r.totalTime = this._combineRaceAndPenaltyTime(
+            r.raceTime,
+            r.penaltyTime
+          );
 
         // bawa info juri bila ada
         if (fromDB.judgesBy) r.judgesBy = String(fromDB.judgesBy);
@@ -2086,29 +2507,22 @@ export default {
       item.result.sectionPenalty = sectionPenalty;
       item.result.totalPenalty = totalPenalty;
 
-      // 4) hitung total penalty time (string HH:MM:SS.mmm) sesuai existing logic
-      let totalPenaltyTime = "00:00:00.000";
-      const fields = [
+      // 4) hitung total penalty time (string ±HH:MM:SS.mmm) — pakai
+      // _sumPenaltyTimes() (milidetik bertanda) supaya bonus murni dari
+      // Pilihan Pen. Section tidak ke-clamp ke 0 oleh kurangiWaktu().
+      const totalPenaltyTime = await this._sumPenaltyTimes([
         item.result.penaltyStartTime || "00:00:00.000",
         item.result.penaltyFinishTime || "00:00:00.000",
         ...(item.result.penaltySection || []).map((x) => x || "00:00:00.000"),
-      ];
-      for (const p of fields) {
-        if (String(p).startsWith("-")) {
-          totalPenaltyTime = await this.kurangiWaktu(
-            totalPenaltyTime,
-            String(p).replace("-", "")
-          );
-        } else {
-          totalPenaltyTime = await this.tambahWaktu(totalPenaltyTime, p);
-        }
-      }
+      ]);
       item.result.penaltyTime = totalPenaltyTime; // tetap isi field lama
       item.result.totalPenaltyTime = totalPenaltyTime; // kalau mau disimpan juga sesuai pattern baru
 
-      // 5) update totalTime bila raceTime ada
+      // 5) update totalTime bila raceTime ada — _combineRaceAndPenaltyTime()
+      // (bukan tambahWaktu() polos) krn totalPenaltyTime sekarang boleh
+      // bertanda negatif (bonus dari Pilihan Pen. Section).
       if (item.result.raceTime) {
-        item.result.totalTime = await this.tambahWaktu(
+        item.result.totalTime = this._combineRaceAndPenaltyTime(
           item.result.raceTime,
           totalPenaltyTime
         );
@@ -2124,7 +2538,15 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      if (m) return m.score;
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.drrDefaultScoreBeyondRank || 0;
+      }
+      return null;
     },
 
     toggleSortRanked() {
@@ -2371,14 +2793,17 @@ export default {
         if (!Number.isFinite(rank) || rank <= 0) return 0;
         var ds = Array.isArray(self.dataScore) ? self.dataScore : [];
         var i = 0;
+        var maxRank = 0;
         while (i < ds.length) {
           var d = ds[i] || {};
+          if (Number(d.ranking) > maxRank) maxRank = Number(d.ranking);
           if (Number(d.ranking) === Number(rank)) {
             var sc = Number(d.score);
             return Number.isFinite(sc) ? sc : 0;
           }
           i++;
         }
+        if (rank > maxRank) return self.drrDefaultScoreBeyondRank || 0;
         return 0;
       }
 
@@ -2706,6 +3131,46 @@ export default {
   border-color: rgb(0, 180, 255);
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
+
+.switch-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b3445;
+}
+
+/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn Switch
+   Sprint/Slalom Category */
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+}
+
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
 /* ---- End styling utk Switch DRR Category select ---- */
 
 .drr-actionbar {
@@ -2759,6 +3224,23 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-danger/
+   .btn-outline-danger (global, single class) karena atribut data-v-xxxx
+   scoped menambah spesifisitas — tanpa override ini, tombol "Reset"
+   tampil putih/netral biasa walau variant="danger" sudah benar. */
+.btn-action.btn-danger,
+.btn-action.btn-outline-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+.btn-action.btn-danger:hover,
+.btn-action.btn-outline-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
 }
 
 /* Connect/Disconnect: .btn-action's white background above wins by default

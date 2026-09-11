@@ -72,26 +72,24 @@
                 </th>
                 <th rowspan="2" class="w-70 text-center">BIB</th>
 
-                <th colspan="2" class="group sprint text-center">Sprint</th>
-                <th colspan="2" class="group h2h text-center">H2H</th>
-                <th colspan="2" class="group slalom text-center">Slalom</th>
-                <th colspan="2" class="group drr text-center">DRR</th>
-                <th colspan="2" class="group rx text-center">Rafting Cross</th>
+                <th
+                  v-for="cat in categories"
+                  :key="cat.key"
+                  colspan="2"
+                  class="group text-center"
+                  :class="cat.cssClass"
+                >
+                  {{ cat.label }}
+                </th>
 
                 <th rowspan="2" class="w-110 text-center">Total Score</th>
                 <th rowspan="2" class="w-110 text-center">Rank Overall</th>
               </tr>
               <tr>
-                <th class="sub">Score</th>
-                <th class="sub">Ranked</th>
-                <th class="sub">Score</th>
-                <th class="sub">Ranked</th>
-                <th class="sub">Score</th>
-                <th class="sub">Ranked</th>
-                <th class="sub">Score</th>
-                <th class="sub">Ranked</th>
-                <th class="sub">Score</th>
-                <th class="sub">Ranked</th>
+                <template v-for="cat in categories">
+                  <th class="sub" :key="cat.key + '-score'">Score</th>
+                  <th class="sub" :key="cat.key + '-rank'">Ranked</th>
+                </template>
               </tr>
             </thead>
             <tbody>
@@ -103,16 +101,14 @@
                 </td>
                 <td class="text-center">{{ r.bib }}</td>
 
-                <td class="text-center">{{ r.sprintScore }}</td>
-                <td class="text-center">{{ r.sprintRank }}</td>
-                <td class="text-center">{{ r.h2hScore }}</td>
-                <td class="text-center">{{ r.h2hRank }}</td>
-                <td class="text-center">{{ r.slalomScore }}</td>
-                <td class="text-center">{{ r.slalomRank }}</td>
-                <td class="text-center">{{ r.drrScore }}</td>
-                <td class="text-center">{{ r.drrRank }}</td>
-                <td class="text-center">{{ r.rxScore }}</td>
-                <td class="text-center">{{ r.rxRank }}</td>
+                <template v-for="cat in categories">
+                  <td class="text-center" :key="cat.key + '-score'">
+                    {{ r[cat.scoreField] }}
+                  </td>
+                  <td class="text-center" :key="cat.key + '-rank'">
+                    {{ r[cat.rankField] }}
+                  </td>
+                </template>
 
                 <td class="text-center font-weight-bold">{{ r.totalScore }}</td>
                 <td class="text-center font-weight-bold">{{ r.rank }}</td>
@@ -130,13 +126,24 @@
           >Cancel</b-button
         >
         <div>
-          <b-button
-            variant="outline-primary"
-            class="mr-2"
-            @click="generatePdfOverall"
+          <b-dropdown
+            variant="link"
+            toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+            menu-class="dropdown-menu--pill"
+            no-caret
           >
-            Download Result
-          </b-button>
+            <template #button-content>
+              <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+              Download Result
+              <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+            </template>
+            <b-dropdown-item @click="generatePdfOverall">
+              <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+            </b-dropdown-item>
+            <b-dropdown-item @click="downloadExcel">
+              <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+            </b-dropdown-item>
+          </b-dropdown>
         </div>
       </div>
     </div>
@@ -150,7 +157,7 @@
       :float-layout="false"
       :enable-download="true"
       :preview-modal="false"
-      :paginate-elements-by-height="1400"
+      :manual-pagination="true"
       :pdf-quality="2"
       :filename="pdfFilenameOverall"
       pdf-format="a4"
@@ -164,6 +171,7 @@
           :dataEvent="dataEvent"
           :rows="processedRows"
           :raceCats="raceCats"
+          :categories="categories"
           :isOfficial="isOfficial"
         />
       </section>
@@ -175,6 +183,9 @@
 import VueHtml2pdf from "vue-html2pdf";
 import OverallPdf from "../../views/DetailEvent/ResultComponent/Overall/by-alltime.vue";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { Icon } from "@iconify/vue2";
+import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 export default {
   name: "PrintOverallModal",
@@ -182,6 +193,7 @@ export default {
     VueHtml2pdf,
     OverallPdf,
     CountryFlag,
+    Icon,
   },
   data() {
     return {
@@ -200,6 +212,7 @@ export default {
       }),
     },
     raceCats: { type: Object, required: false },
+    categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
   },
   computed: {
@@ -292,6 +305,26 @@ export default {
         this.error = "Gagal membuat PDF";
       }
     },
+
+    downloadExcel() {
+      const cats = this.categories || [];
+      const rows = (this.processedRows || []).map((r) => {
+        const obj = {
+          No: r.rank,
+          "Team Name": r.teamName || "-",
+          BIB: r.bib || "-",
+        };
+        cats.forEach((cat) => {
+          obj[`${cat.label} Score`] = r[cat.scoreField] || 0;
+          obj[`${cat.label} Ranked`] = r[cat.rankField] || "-";
+        });
+        obj["Total Score"] = r.totalScore || 0;
+        obj["Rank Overall"] = r.rank || "-";
+        return obj;
+      });
+      exportRowsToExcel(this.pdfFilenameOverall, rows, "Overall");
+    },
+
     onPdfGenerated() {
       this.showPdf = false;
     },
@@ -433,6 +466,57 @@ export default {
   border-radius: 8px;
   font-weight: 700;
   padding: 6px 14px;
+}
+
+/* Download Result — sama pola pill+icon dgn Result pages (Sprint/H2H/
+   Slalom/DRR/RX), dulu cuma <b-dropdown variant="outline-primary"> polos
+   tanpa styling sama sekali. toggle-class/menu-class dirender oleh
+   <b-dropdown> (komponen anak), jadi butuh deep selector (>>>) supaya
+   scoped CSS di sini bisa menjangkaunya. */
+.btn-row >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.btn-row >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.btn-row >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.btn-row >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.btn-row >>> .btn-pill--solid:hover,
+.btn-row >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.btn-row >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.btn-row >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
 }
 
 /* --- Batasi tampilan maksimal 10 baris tanpa ubah lebar kolom --- */

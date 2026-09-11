@@ -59,6 +59,55 @@ async function insertNewTeam(payload = {}) {
   }
 }
 
+/**
+ * Bulk INSERT (dipakai fitur "Import from Excel") — insert banyak tim
+ * sekaligus, tapi tim yang bentrok (nameTeam+bibTeam sudah ada, lihat unique
+ * index) di-SKIP saja (bukan gagal total), supaya import ribuan baris tetap
+ * jalan walau sebagian sudah pernah diimport sebelumnya.
+ */
+async function insertManyTeams(payloads = []) {
+  const db = await getDb();
+  const coll = db.collection("teamsCollection");
+
+  const docs = (Array.isArray(payloads) ? payloads : [])
+    .map(sanitizeTeam)
+    .filter((d) => d.typeTeam && d.nameTeam);
+
+  if (!docs.length) {
+    return { insertedCount: 0, skippedCount: 0, skipped: [] };
+  }
+
+  try {
+    const result = await coll.insertMany(docs, { ordered: false });
+    return {
+      insertedCount: result.insertedCount || 0,
+      skippedCount: 0,
+      skipped: [],
+    };
+  } catch (e) {
+    // insertMany dengan ordered:false tetap masukkan semua doc yang VALID,
+    // dan melempar BulkWriteError berisi daftar error per-doc (mis. E11000
+    // duplikat) — hitung ulang mana yang sukses vs gagal dari sini.
+    const writeErrors = (e && e.writeErrors) || [];
+    const duplicateIndexes = new Set(writeErrors.map((we) => we.index));
+    const insertedCount = docs.length - duplicateIndexes.size;
+    const skipped = writeErrors.map((we) => ({
+      nameTeam: docs[we.index] ? docs[we.index].nameTeam : "",
+      reason:
+        we.code === 11000 ? "Sudah ada (duplikat)" : we.errmsg || "Gagal",
+    }));
+
+    // error selain duplikat (E11000) tetap dianggap kegagalan asli, bukan
+    // sekadar "sudah ada" — lempar supaya caller tahu ada masalah lain
+    const nonDuplicateErrors = writeErrors.filter((we) => we.code !== 11000);
+    if (nonDuplicateErrors.length === writeErrors.length && writeErrors.length) {
+      throw e;
+    }
+
+    return { insertedCount, skippedCount: skipped.length, skipped };
+  }
+}
+
 /** READ all (terbaru dulu) */
 async function getAllTeams() {
   const db = await getDb();
@@ -129,6 +178,7 @@ async function collUpdateOneSafe(oid, setDoc) {
 
 module.exports = {
   insertNewTeam,
+  insertManyTeams,
   getAllTeams,
   updateTeamById,
   deleteTeamById,

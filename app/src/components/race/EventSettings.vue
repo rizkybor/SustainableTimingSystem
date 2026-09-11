@@ -6,7 +6,8 @@
     centered
     size="xl"
     body-class="p-0"
-    content-class="rounded-20 overflow-hidden"
+    content-class="rounded-20 overflow-hidden rs-modal"
+    scrollable
   >
     <!-- Header -->
     <template #modal-header>
@@ -205,6 +206,48 @@
               label="name"
             />
           </b-form-group>
+        </section>
+
+        <!-- ===================== Poster Event ===================== -->
+        <section class="uploader-section">
+          <div class="section-title">Poster Event</div>
+          <div class="text-muted small mb-2">
+            Ditampilkan sebagai gambar kartu event di halaman Events List.
+          </div>
+
+          <div class="sig-upload">
+            <div class="sig-upload-row">
+              <img
+                v-if="posterPreview || posterUrl"
+                :src="posterPreview || posterUrl"
+                class="poster-thumb"
+                alt="Poster preview"
+              />
+              <div v-else class="poster-thumb poster-thumb-empty">No poster</div>
+
+              <div class="sig-upload-actions">
+                <input
+                  ref="posterInput"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  class="d-none"
+                  @change="onPosterFileChange"
+                />
+                <b-button size="sm" variant="outline-primary" @click="$refs.posterInput.click()">
+                  Choose Image
+                </b-button>
+                <b-button
+                  v-if="posterPreview || posterUrl"
+                  size="sm"
+                  variant="outline-danger"
+                  @click="removePosterFile"
+                >
+                  Remove
+                </b-button>
+              </div>
+            </div>
+            <div class="hint-danger mt-1">PNG/JPEG, maksimum {{ maxSizeMB }}MB</div>
+          </div>
         </section>
 
         <!-- ===================== Event Logo ===================== -->
@@ -503,8 +546,8 @@
       <!-- Footer -->
       <div class="footer-actions">
         <button type="button" class="btn-outline" @click="show = false">Cancel</button>
-        <button type="button" class="btn-primary" :disabled="isUpdating" @click="onUpdate">
-          {{ isUpdating ? "Updating…" : "Update" }}
+        <button type="button" class="btn-primary" :disabled="saving" @click="onUpdate">
+          {{ saving ? "Updating…" : "Update" }}
         </button>
       </div>
     </div>
@@ -526,6 +569,11 @@ export default {
     eventName: { type: String, default: "" },
     maxFiles: { type: Number, default: 10 },
     maxSizeMB: { type: Number, default: 100 },
+    // true selama parent (Details/index.vue) masih memproses simpan (upload
+    // file ke Cloudinary, update DB, dll — bisa beberapa detik). Dipakai
+    // utk menahan modal tetap terbuka sampai proses itu benar-benar
+    // selesai, bukan langsung tertutup begitu tombol Update diklik.
+    saving: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -595,7 +643,16 @@ export default {
       removeChiefJudgeSignature: false,
       removeRaceDirectorSignature: false,
 
-      isUpdating: false,
+      // ===== Poster Event (opsional, gambar tunggal) =====
+      posterFile: null, // File baru yang dipilih, belum diupload
+      posterUrl: "", // URL yang sudah tersimpan di DB
+      posterPreview: "", // object URL lokal utk file yang baru dipilih
+      removePoster: false, // true kalau user menghapus poster yang sudah ada
+
+      // true sesaat setelah tombol Update diklik, sampai prop `saving`
+      // (dikendalikan parent) kembali ke false — dipakai watcher `saving`
+      // di bawah utk tahu kapan boleh menutup modal.
+      waitingForSave: false,
     };
   },
 
@@ -622,6 +679,7 @@ export default {
     if (this.technicalDelegateSignaturePreview) URL.revokeObjectURL(this.technicalDelegateSignaturePreview);
     if (this.chiefJudgeSignaturePreview) URL.revokeObjectURL(this.chiefJudgeSignaturePreview);
     if (this.raceDirectorSignaturePreview) URL.revokeObjectURL(this.raceDirectorSignaturePreview);
+    if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
   },
 
   watch: {
@@ -654,6 +712,11 @@ export default {
         this.removeTechnicalDelegateSignature = false;
         this.removeChiefJudgeSignature = false;
         this.removeRaceDirectorSignature = false;
+
+        if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+        this.posterFile = null;
+        this.posterPreview = "";
+        this.removePoster = false;
 
         var self = this;
         function onReply(_e, ev) {
@@ -699,6 +762,13 @@ export default {
               ? String(ev.raceDirectorSignature.secure_url)
               : "";
 
+          self.posterUrl =
+            ev && ev.poster && ev.poster.secure_url
+              ? String(ev.poster.secure_url)
+              : ev && ev.poster_url
+              ? String(ev.poster_url)
+              : "";
+
           self.existingEventUrls   = ev && ev.eventFiles && Array.isArray(ev.eventFiles) ? ev.eventFiles.slice() : [];
           self.existingSponsorUrls = ev && ev.sponsorFiles && Array.isArray(ev.sponsorFiles) ? ev.sponsorFiles.slice() : [];
 
@@ -726,6 +796,16 @@ export default {
         this.form.endDateEvent < newStart
       ) {
         this.form.endDateEvent = "";
+      }
+    },
+    // Tutup modal HANYA setelah parent benar-benar selesai memproses simpan
+    // (saving balik ke false) — sebelumnya modal ditutup seketika begitu
+    // tombol Update diklik, padahal upload file & update DB di parent masih
+    // berjalan di background tanpa terlihat sedang berlangsung di modal ini.
+    saving: function (v) {
+      if (!v && this.waitingForSave) {
+        this.waitingForSave = false;
+        this.show = false;
       }
     },
   },
@@ -1039,8 +1119,43 @@ export default {
       }
     },
 
+    onPosterFileChange: function (e) {
+      var file = e && e.target && e.target.files ? e.target.files[0] : null;
+      if (e && e.target) e.target.value = "";
+      if (!file) return;
+
+      var isImg = /image\/(png|jpeg)/i.test(file.type || "") || /\.(png|jpe?g)$/i.test(file.name || "");
+      if (!isImg) {
+        var msg1 = "Poster harus berformat PNG atau JPEG";
+        if (this.$bvToast) this.$bvToast.toast(msg1, { title: "Format tidak didukung", variant: "warning", solid: true });
+        else alert(msg1);
+        return;
+      }
+      var sizeOk = file.size <= this.maxSizeMB * 1024 * 1024;
+      if (!sizeOk) {
+        var msg2 = "Ukuran poster maksimum " + this.maxSizeMB + "MB";
+        if (this.$bvToast) this.$bvToast.toast(msg2, { title: "File terlalu besar", variant: "warning", solid: true });
+        else alert(msg2);
+        return;
+      }
+
+      if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+      this.posterFile = file;
+      this.posterPreview = URL.createObjectURL(file);
+      this.removePoster = false;
+    },
+    removePosterFile: function () {
+      if (this.posterPreview) URL.revokeObjectURL(this.posterPreview);
+      this.posterFile = null;
+      this.posterPreview = "";
+      if (this.posterUrl) {
+        this.removePoster = true;
+        this.posterUrl = "";
+      }
+    },
+
     onUpdate: function () {
-      this.isUpdating = true;
+      this.waitingForSave = true;
 
       var payload = {
         eventId: this.eventId,
@@ -1084,15 +1199,51 @@ export default {
         removeTechnicalDelegateSignature: this.removeTechnicalDelegateSignature,
         removeChiefJudgeSignature: this.removeChiefJudgeSignature,
         removeRaceDirectorSignature: this.removeRaceDirectorSignature,
+
+        // ===== Poster Event (File baru, opsional) =====
+        posterFile: this.posterFile,
+        removePoster: this.removePoster,
       };
 
       this.$emit("update-settings", payload);
-      this.show = false;
-      this.isUpdating = false;
+      // JANGAN tutup modal di sini — upload file & update DB di parent
+      // (handleUpdateSettings) masih async dan bisa makan waktu beberapa
+      // detik. Modal ditutup otomatis oleh watcher `saving` di atas begitu
+      // parent selesai (baik sukses maupun gagal — parent sudah punya
+      // notifikasi get-alert/get-alert-saved sendiri utk itu).
     },
   },
 };
 </script>
+
+<!-- unscoped: .modal-header/.modal-body dirender BootstrapVue di luar root
+     komponen ini, jadi <style scoped> di bawah tidak bisa menjangkaunya -->
+<style>
+/* Batasi tinggi modal & jadikan layout fleksibel supaya bisa discroll saat
+   konten melebihi tinggi layar — sama dgn Race Settings & Judges Configuration.
+   PENTING: pakai !important — BootstrapVue's `centered` + `scrollable`
+   sekaligus menghasilkan class `.modal-dialog-centered.modal-dialog-
+   scrollable .modal-content { max-height: none }` yang spesifisitasnya
+   (3 class) lebih tinggi dari .rs-modal (1 class). */
+.rs-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 65vh !important;
+  overflow: hidden;
+}
+
+.rs-modal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+}
+
+.rs-modal .modal-body {
+  overflow: auto;
+}
+</style>
 
 <style scoped>
 .modal-inner { background: #f5f7fb; }
@@ -1212,6 +1363,26 @@ export default {
   border: 1px dashed #cbd5e1;
 }
 .sig-upload-actions { display: flex; align-items: center; gap: 8px; }
+
+.poster-thumb {
+  width: 90px;
+  height: 120px;
+  object-fit: cover;
+  background: #fff;
+  border: 1px solid #e6ebf4;
+  border-radius: 8px;
+  padding: 2px;
+}
+.poster-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 11px;
+  background: #fafafa;
+  border: 1px dashed #cbd5e1;
+  text-align: center;
+}
 
 /* Footer */
 .footer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }

@@ -4,18 +4,35 @@
       <b-row class="align-items-center justify-content-between">
         <!-- Left: Title -->
         <b-col cols="12" md="6" class="mb-2 mb-md-0">
-          <div class="font-weight-bold">
+          <div
+            class="font-weight-bold panel-toggle"
+            role="button"
+            :aria-expanded="!collapsed ? 'true' : 'false'"
+            @click="collapsed = !collapsed"
+          >
+            <Icon
+              :icon="collapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'"
+              class="mr-1"
+              width="20"
+              height="20"
+            />
             {{ title }} – {{ initialName || "—" }}
           </div>
         </b-col>
 
         <!-- Right: Actions -->
         <b-col cols="12" md="6" class="d-flex justify-content-md-end gap-2">
-          <!-- 👇 BARU: tampil hanya jika ada result -->
+          <!-- Disabled kalau belum ada tim terdaftar, atau belum ada satu pun
+               tim yang punya hasil tersimpan di kategori ini -->
           <b-button
             class="btn-add"
+            :disabled="!canShowResult"
             @click="$emit('show-result')"
-            title="Show saved results for this category"
+            :title="
+              canShowResult
+                ? 'Show saved results for this category'
+                : 'Belum ada hasil tersimpan utk kombinasi ini'
+            "
           >
             <Icon icon="mdi:podium" class="mr-1" /> Show Result
           </b-button>
@@ -41,7 +58,7 @@
       </b-row>
     </div>
 
-    <div class="panel-body" :class="{ 'is-loading': loading }">
+    <div v-show="!collapsed" class="panel-body" :class="{ 'is-loading': loading }">
       <div v-if="loading" class="panel-loading-overlay">
         <b-spinner small variant="primary" class="mr-2" />
         <span>Memuat data tim…</span>
@@ -53,6 +70,7 @@
             <th style="width: 64px">No</th>
             <th>Team Name</th>
             <th style="width: 180px">BIB Number</th>
+            <th style="width: 160px">Status</th>
             <th style="width: 120px" class="text-right">Action</th>
           </tr>
         </thead>
@@ -82,6 +100,7 @@
                 @input="onBibChange"
               />
             </td>
+            <td></td>
             <td class="text-right">
               <button
                 type="button"
@@ -110,15 +129,75 @@
               <CountryFlag :code="flagFor(r.nameTeam)" />
             </td>
             <td>{{ r.bibTeam }}</td>
+            <td>
+              <template v-if="h2hStatusMap">
+                <span
+                  v-if="h2hStatusForRow(r).status === 'done'"
+                  class="status-badge status-competed"
+                  title="Final A / Final B sudah punya Win/Lose utk tim ini"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Selesai Bertanding
+                </span>
+                <span
+                  v-else-if="h2hStatusForRow(r).status === 'in-round'"
+                  class="status-badge status-in-round"
+                  title="Tim ini sedang berada di round tsb pada bagan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Bertanding di Round {{ h2hStatusForRow(r).roundName }}
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding
+                </span>
+              </template>
+              <template v-else-if="slalomStatusMap">
+                <span
+                  v-if="slalomStatusForRow(r).run1 && slalomStatusForRow(r).run2"
+                  class="status-badge status-competed"
+                  title="Run 1 & Run 2 tim ini sudah punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Bertanding di Run 1 & 2
+                </span>
+                <span
+                  v-else-if="slalomStatusForRow(r).run1"
+                  class="status-badge status-in-round"
+                  title="Run 1 sudah, Run 2 tim ini belum punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Belum Bertanding di Run 2
+                </span>
+                <span
+                  v-else-if="slalomStatusForRow(r).run2"
+                  class="status-badge status-in-round"
+                  title="Run 2 sudah, Run 1 tim ini belum punya waktu tersimpan"
+                >
+                  <Icon icon="mdi:sync" width="14" height="14" />
+                  Belum Bertanding di Run 1
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding di Run 1 & 2
+                </span>
+              </template>
+              <template v-else>
+                <span
+                  v-if="hasCompeted(r)"
+                  class="status-badge status-competed"
+                  title="Tim ini sudah punya hasil tersimpan di kategori ini"
+                >
+                  <Icon icon="mdi:check-circle" width="14" height="14" />
+                  Sudah Bertanding
+                </span>
+                <span v-else class="status-badge status-pending">
+                  <Icon icon="mdi:clock-outline" width="14" height="14" />
+                  Belum Bertanding
+                </span>
+              </template>
+            </td>
             <td class="text-right">
-              <button
-                type="button"
-                class="btn-ghost"
-                @click="$emit('view-details', r)"
-                title="View Details"
-              >
-                <Icon icon="mdi:eye-outline" width="18" height="18" />
-              </button>
               <button
                 type="button"
                 class="btn-ghost danger ml-2"
@@ -131,7 +210,7 @@
           </tr>
 
           <tr v-if="!draft && !rows.length">
-            <td colspan="4" class="text-center text-muted py-3">
+            <td colspan="5" class="text-center text-muted py-3">
               There are no teams in this combination yet.
             </td>
           </tr>
@@ -165,10 +244,48 @@ export default {
     initialName: String,
     rows: { type: Array, default: () => [] },
     teamsAvailable: { type: Array, default: () => [] },
+    // Set berisi teamId/bib tim yang sudah punya hasil tersimpan di
+    // kategori race yang sedang aktif — dipakai buat flag "sudah/belum
+    // bertanding" di kolom Status.
+    competedSet: { type: Set, default: () => new Set() },
+    // KHUSUS HEAD2HEAD: Object (key = nama tim, uppercased) -> { status:
+    // "pending"|"in-round"|"done", roundName } — kalau diisi (non-null),
+    // kolom Status menampilkan 3 tingkat (Belum Bertanding / Bertanding di
+    // Round X / Sudah Selesai Bertanding) alih2 flag biner competedSet.
+    // null/undefined = kategori lain, pakai competedSet seperti biasa.
+    h2hStatusMap: { type: Object, default: null },
+    // KHUSUS SLALOM: Object (key = bibTeam, atau nama tim uppercased kalau
+    // bib kosong) -> { run1: bool, run2: bool } — kalau diisi (non-null),
+    // kolom Status menampilkan 3 tingkat (Belum Bertanding di Run 1 & 2 /
+    // Belum Bertanding di Run 2 / Sudah Bertanding di Run 1 & 2) alih2 flag
+    // biner competedSet. null/undefined = kategori lain, pakai competedSet.
+    slalomStatusMap: { type: Object, default: null },
     draft: { type: Object, default: null },
     loading: { type: Boolean, default: false },
+    // panel paling atas per kategori (comboIdx === 0 di parent) default
+    // terbuka, sisanya default tertutup — lihat watcher `eventName` di
+    // bawah: instance panel ini dipakai ulang lintas kategori (panelKey
+    // generik R4_MEN/R4_WOMEN/dst, sama di semua kategori), jadi collapsed
+    // perlu di-reset manual tiap kategori (eventName) berganti.
+    defaultCollapsed: { type: Boolean, default: false },
+  },
+  data() {
+    return {
+      collapsed: this.defaultCollapsed,
+    };
+  },
+  watch: {
+    eventName() {
+      this.collapsed = this.defaultCollapsed;
+    },
   },
   computed: {
+    // "Show Result" cuma berguna kalau minimal ada tim terdaftar DAN
+    // minimal satu di antaranya sudah punya hasil tersimpan.
+    canShowResult() {
+      if (!Array.isArray(this.rows) || this.rows.length === 0) return false;
+      return this.rows.some((r) => this.hasCompeted(r));
+    },
     selectOptions() {
       const base = Array.isArray(this.teamsAvailable)
         ? this.teamsAvailable
@@ -184,6 +301,32 @@ export default {
     },
   },
   methods: {
+    hasCompeted(row) {
+      const key = String((row && (row.teamId || row.bibTeam)) || "");
+      return !!key && this.competedSet.has(key);
+    },
+    // KHUSUS HEAD2HEAD — cocokkan by nama tim (uppercased), sesuai kunci yg
+    // dipakai _computeH2HStatusMap() di Details/index.vue (bagan H2H hanya
+    // simpan nama+bib per slot, bukan teamId).
+    h2hStatusForRow(row) {
+      const nm = String((row && (row.nameTeam || row.teamName)) || "")
+        .trim()
+        .toUpperCase();
+      const found = nm && this.h2hStatusMap ? this.h2hStatusMap[nm] : null;
+      return found || { status: "pending", roundName: "" };
+    },
+    // KHUSUS SLALOM — cocokkan by bibTeam dulu, fallback ke nama (uppercased)
+    // kalau bib kosong, sesuai kunci yg dipakai loadSlalomStatusForPanel() di
+    // Details/index.vue (dibangun dari dokumen temporarySlalomResult).
+    slalomStatusForRow(row) {
+      const bib = String((row && row.bibTeam) || "").trim();
+      const nm = String((row && (row.nameTeam || row.teamName)) || "")
+        .trim()
+        .toUpperCase();
+      const key = bib || nm;
+      const found = key && this.slalomStatusMap ? this.slalomStatusMap[key] : null;
+      return found || { run1: false, run2: false };
+    },
     onPickTeam(val) {
       this.$emit("draft-change", {
         ...(this.draft || {}),
@@ -273,6 +416,16 @@ export default {
   margin-left: 0.5rem;
 }
 
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.panel-toggle:hover {
+  opacity: 0.8;
+}
+
 /* konsisten padding panel */
 .panel-body {
   padding: 10px 16px 6px 16px;
@@ -339,6 +492,33 @@ export default {
 .team-table tbody td {
   padding: 10px 12px;
   vertical-align: middle;
+}
+
+/* ===== Status badge (sudah/belum bertanding) ===== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-competed {
+  background: #e6f7ee;
+  color: #1a7f4f;
+  border: 1px solid #b7e5cc;
+}
+.status-pending {
+  background: #f4f5f7;
+  color: #73809a;
+  border: 1px solid #e2e6ee;
+}
+.status-in-round {
+  background: #fff4e0;
+  color: #a86400;
+  border: 1px solid #f5d999;
 }
 .team-table tbody td.muted {
   color: var(--muted);
@@ -408,6 +588,22 @@ export default {
   color: #0d2f4f;
   box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
   cursor: pointer;
+}
+
+.btn-add:disabled,
+.btn-add.disabled {
+  background: #f4f5f7;
+  border-color: #e2e6ee;
+  color: #a7b0c0;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn-add:disabled:hover,
+.btn-add.disabled:hover {
+  background: #f4f5f7;
+  border-color: #e2e6ee;
+  color: #a7b0c0;
+  box-shadow: none;
 }
 
 /* ==== SearchableSelect tweaks agar mirip mockup ==== */

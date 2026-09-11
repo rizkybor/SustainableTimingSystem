@@ -21,13 +21,23 @@
     <div v-if="!loading" class="p-4">
       <div class="p-2 p-md-3">
         <!-- SPRINT -->
-        <section class="rs-card mb-3">
-          <div class="rs-section-title">Sprint Judges</div>
+        <section class="rs-card mb-3" v-if="showSprint">
+          <div class="rs-section-title rs-section-toggle" @click="toggleSection('sprint')">
+            <Icon
+              :icon="
+                collapsedSections.sprint ? 'mdi:chevron-right' : 'mdi:chevron-down'
+              "
+              class="mr-1"
+            />
+            Sprint Judges
+          </div>
+          <div v-show="!collapsedSections.sprint">
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
               <SearchableSelect
                 v-model="draft.sprint.juryStart"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -39,6 +49,7 @@
               <label class="form-label">Jury Finish</label>
               <SearchableSelect
                 v-model="draft.sprint.juryFinish"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -47,16 +58,27 @@
               />
             </b-col>
           </b-row>
+          </div>
         </section>
 
         <!-- HEAD TO HEAD -->
-        <section class="rs-card mb-3">
-          <div class="rs-section-title">Head to Head Judges</div>
+        <section class="rs-card mb-3" v-if="showH2H">
+          <div class="rs-section-title rs-section-toggle" @click="toggleSection('h2h')">
+            <Icon
+              :icon="
+                collapsedSections.h2h ? 'mdi:chevron-right' : 'mdi:chevron-down'
+              "
+              class="mr-1"
+            />
+            Head to Head Judges
+          </div>
+          <div v-show="!collapsedSections.h2h">
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
               <SearchableSelect
                 v-model="draft.h2h.juryStart"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -68,6 +90,7 @@
               <label class="form-label">Jury Finish</label>
               <SearchableSelect
                 v-model="draft.h2h.juryFinish"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -87,6 +110,7 @@
               <label class="form-label">Bouyan {{ key }}</label>
               <SearchableSelect
                 v-model="draft.h2hValues[key]"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -95,16 +119,27 @@
               />
             </b-col>
           </b-row>
+          </div>
         </section>
 
         <!-- SLALOM -->
-        <section class="rs-card mb-3">
-          <div class="rs-section-title">Slalom Judges</div>
+        <section class="rs-card mb-3" v-if="showSlalom">
+          <div class="rs-section-title rs-section-toggle" @click="toggleSection('slalom')">
+            <Icon
+              :icon="
+                collapsedSections.slalom ? 'mdi:chevron-right' : 'mdi:chevron-down'
+              "
+              class="mr-1"
+            />
+            Slalom Judges
+          </div>
+          <div v-show="!collapsedSections.slalom">
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
               <SearchableSelect
                 v-model="draft.slalom.juryStart"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -116,6 +151,7 @@
               <label class="form-label">Jury Finish</label>
               <SearchableSelect
                 v-model="draft.slalom.juryFinish"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -154,16 +190,27 @@
               />
             </b-col>
           </b-row>
+          </div>
         </section>
 
         <!-- RAFTING CROSS -->
-        <section class="rs-card mb-3">
-          <div class="rs-section-title">Rafting Cross Judges</div>
+        <section class="rs-card mb-3" v-if="showRx">
+          <div class="rs-section-title rs-section-toggle" @click="toggleSection('rx')">
+            <Icon
+              :icon="
+                collapsedSections.rx ? 'mdi:chevron-right' : 'mdi:chevron-down'
+              "
+              class="mr-1"
+            />
+            Rafting Cross Judges
+          </div>
+          <div v-show="!collapsedSections.rx">
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
               <SearchableSelect
                 v-model="draft.rx.juryStart"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -175,6 +222,7 @@
               <label class="form-label">Jury Finish</label>
               <SearchableSelect
                 v-model="draft.rx.juryFinish"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -194,6 +242,7 @@
               <label class="form-label">{{ rxGateLabel(key) }}</label>
               <SearchableSelect
                 v-model="draft.rxValues[key]"
+                @input="hasLocalEdits = true"
                 :options="selectOptions"
                 placeholder="Select jury name"
                 search-placeholder="Search jury…"
@@ -202,11 +251,21 @@
               />
             </b-col>
           </b-row>
+          </div>
         </section>
 
         <!-- DOWN RIVER RACE -->
-        <section class="rs-card mb-3">
-          <div class="rs-section-title">Down River Race Judges</div>
+        <section class="rs-card mb-3" v-if="showDrr">
+          <div class="rs-section-title rs-section-toggle" @click="toggleSection('drr')">
+            <Icon
+              :icon="
+                collapsedSections.drr ? 'mdi:chevron-right' : 'mdi:chevron-down'
+              "
+              class="mr-1"
+            />
+            Down River Race Judges
+          </div>
+          <div v-show="!collapsedSections.drr">
           <b-row>
             <b-col md="6" class="mb-3">
               <label class="form-label">Jury Start</label>
@@ -215,6 +274,7 @@
                 :disabled="saving"
                 :options="resolvedJuryOptions"
                 v-model="draft.drr.juryStart"
+                @change="hasLocalEdits = true"
               />
             </b-col>
             <b-col md="6" class="mb-3">
@@ -224,6 +284,7 @@
                 :disabled="saving"
                 :options="resolvedJuryOptions"
                 v-model="draft.drr.juryFinish"
+                @change="hasLocalEdits = true"
               />
             </b-col>
           </b-row>
@@ -257,7 +318,16 @@
               />
             </b-col>
           </b-row>
+          </div>
         </section>
+
+        <div
+          v-if="!showSprint && !showH2H && !showSlalom && !showDrr && !showRx"
+          class="text-center text-muted py-4"
+        >
+          Belum ada Race Category yang dipilih untuk event ini. Atur dulu di
+          Event Settings.
+        </div>
 
         <!-- Footer -->
         <div class="d-flex justify-content-between align-items-center mt-4">
@@ -289,7 +359,9 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { Icon } from "@iconify/vue2";
 import SearchableSelect from "@/components/SearchableSelect.vue";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 
 /* ========= helpers ========= */
 function pickId(u) {
@@ -413,7 +485,7 @@ function userHasEvent(user, eventId) {
 
 export default {
   name: "JudgesSettings",
-  components: { SearchableSelect },
+  components: { SearchableSelect, Icon },
   props: {
     id: { type: String, default: "judges-settings-modal" },
     value: { type: Boolean, default: false },
@@ -446,10 +518,40 @@ export default {
       usersRaw: [],
       previousAssignedEmails: [],
       assignedInfoMap: {},
+      // null = belum dimuat/gagal dimuat -> fail-open (tampilkan semua
+      // kategori) supaya kegagalan fetch tidak diam-diam menyembunyikan
+      // konfigurasi yang valid.
+      enabledCategoryKeys: null,
+      // per-kategori: true = konten config-nya sedang disembunyikan
+      // (chevron kanan). Default SEMUA true (tersembunyi) — beda dari
+      // Race Settings yang default terbuka — supaya modal ini tidak
+      // langsung penuh saat dibuka.
+      collapsedSections: {
+        sprint: true,
+        h2h: true,
+        slalom: true,
+        rx: true,
+        drr: true,
+      },
     };
   },
 
   computed: {
+    showSprint: function () {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SPRINT");
+    },
+    showH2H: function () {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("HEAD2HEAD");
+    },
+    showSlalom: function () {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SLALOM");
+    },
+    showDrr: function () {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("DRR");
+    },
+    showRx: function () {
+      return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("RX");
+    },
     // opsi untuk semua dropdown juri
     selectOptions: function () {
       var arr = Array.isArray(this.usersRaw) ? this.usersRaw : [];
@@ -533,6 +635,7 @@ export default {
         this.fetchSettingsIPC();
         this.fetchUsers();
         this.fetchAssignmentsByUserIPC();
+        this.fetchEnabledCategories();
         // this.fetchAssignmentsIPC();
       }
     },
@@ -548,7 +651,10 @@ export default {
   },
 
   mounted: function () {
-    if (this.eventId) this.fetchSettingsIPC();
+    if (this.eventId) {
+      this.fetchSettingsIPC();
+      this.fetchEnabledCategories();
+    }
     if (!(Array.isArray(this.juryOptions) && this.juryOptions.length > 0)) {
       this.fetchUsers();
     } else {
@@ -558,6 +664,12 @@ export default {
   },
 
   methods: {
+    toggleSection: function (key) {
+      this.$set(this.collapsedSections, key, !this.collapsedSections[key]);
+    },
+    fetchEnabledCategories: async function () {
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(this.eventId);
+    },
     getSectionValue: function (n) {
       var s = "";
       if (
@@ -905,6 +1017,14 @@ export default {
           drr.finish = true;
       }
 
+      // rx.gate1/gate2 tetap disimpan untuk kompatibilitas dengan draft lama
+      // di komponen ini, tapi konsumen di sts-jurysystem (app/judges/page.jsx
+      // & app/judges/raftingcross/page.jsx) HANYA membaca `rx.gates` sebagai
+      // array angka gate (persis pola slalom.gates / drr.sections di atas) —
+      // tanpa `gates`, tombol Rafting Cross judge selalu abu-abu walau sudah
+      // di-assign.
+      var rxGateKeyToNumber = { gate1: 1, gate2: 2 };
+      var rxGates = [];
       var rx = { start: false, finish: false, gate1: false, gate2: false };
       if (this.draft && this.draft.rx) {
         if (this.equalsEmail(this.draft.rx.juryStart, email)) rx.start = true;
@@ -919,9 +1039,15 @@ export default {
       ) {
         for (var ri2 = 0; ri2 < this.enabledRxGateKeys.length; ri2++) {
           var rk2 = this.enabledRxGateKeys[ri2];
-          if (this.equalsEmail(this.draft.rxValues[rk2], email)) rx[rk2] = true;
+          if (this.equalsEmail(this.draft.rxValues[rk2], email)) {
+            rx[rk2] = true;
+            if (rxGateKeyToNumber[rk2]) rxGates.push(rxGateKeyToNumber[rk2]);
+          }
         }
       }
+      rx.gates = Array.from(new Set(rxGates)).sort(function (a, b) {
+        return a - b;
+      });
 
       return {
         eventId: String(this.eventId),
@@ -1265,14 +1391,23 @@ export default {
                       userId: email2,
                       name: "",
                     });
-                  if (rx.gate1 === true)
+                  // Format baru: rx.gates = [1, 2, ...] (lihat
+                  // buildJudgeObjectForEmail). Tetap fallback ke gate1/gate2
+                  // boolean supaya assignment lama (sebelum fix ini) masih
+                  // ter-prefill dengan benar saat modal dibuka ulang.
+                  var rxGatesArr = Array.isArray(rx.gates) ? rx.gates : [];
+                  var hasGate1 =
+                    rxGatesArr.indexOf(1) !== -1 || rx.gate1 === true;
+                  var hasGate2 =
+                    rxGatesArr.indexOf(2) !== -1 || rx.gate2 === true;
+                  if (hasGate1)
                     list.push({
                       discipline: "rx",
                       position: "gate1",
                       userId: email2,
                       name: "",
                     });
-                  if (rx.gate2 === true)
+                  if (hasGate2)
                     list.push({
                       discipline: "rx",
                       position: "gate2",
@@ -1566,11 +1701,25 @@ export default {
   color: #1f2940;
 }
 
-/* Batasi tinggi modal & jadikan layout fleksibel */
+.rs-section-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+.rs-section-toggle:hover {
+  color: #1c4c7a;
+}
+
+/* Batasi tinggi modal & jadikan layout fleksibel.
+   PENTING: pakai !important — BootstrapVue's `centered` + `scrollable`
+   sekaligus menghasilkan class `.modal-dialog-centered.modal-dialog-
+   scrollable .modal-content { max-height: none }` yang spesifisitasnya
+   (3 class) lebih tinggi dari .rs-modal (1 class). */
 .rs-modal {
   display: flex;
   flex-direction: column;
-  max-height: 85vh; /* atur sesuai selera: 70–90vh */
+  max-height: 65vh !important;
   overflow: hidden;
 }
 

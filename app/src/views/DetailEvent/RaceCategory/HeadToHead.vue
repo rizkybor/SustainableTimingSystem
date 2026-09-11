@@ -96,19 +96,34 @@
               </div>
 
               <div class="meta-row">
-                <!-- Select category -->
-                <b-form-group
-                  label="Switch Head to Head Category:"
-                  label-for="h2hBucketSelect"
-                  class="mb-0 h2h-actionbar__select"
-                >
-                  <b-form-select
-                    id="h2hBucketSelect"
-                    :options="h2hBucketOptions"
-                    v-model="selectedH2HKey"
-                    @change="onSelectH2HBucket"
-                  />
-                </b-form-group>
+                <!-- Select category: pilih Initial dulu, baru Divisi/Race -->
+                <div class="h2h-actionbar__select">
+                  <div class="switch-label mb-1">
+                    Switch Head to Head Category:
+                  </div>
+
+                  <div class="init-tabs mb-2" v-if="initials.length">
+                    <button
+                      v-for="i in initials"
+                      :key="i.id"
+                      type="button"
+                      class="init-tab"
+                      :class="{ active: selectedInitialName === i.name }"
+                      @click="selectInitialTab(i)"
+                    >
+                      {{ i.name }}
+                    </button>
+                  </div>
+
+                  <b-form-group label-for="h2hBucketSelect" class="mb-0">
+                    <b-form-select
+                      id="h2hBucketSelect"
+                      :options="h2hOptionsForSelectedInitial"
+                      v-model="selectedH2HKey"
+                      @change="onSelectH2HBucket"
+                    />
+                  </b-form-group>
+                </div>
               </div>
             </div>
           </b-col>
@@ -138,7 +153,7 @@
                 </div>
               </div>
 
-              <!-- connect -->
+                            <!-- connect -->
               <button
                 type="button"
                 :class="{
@@ -153,7 +168,9 @@
                 <Icon v-else icon="ic:baseline-sync" />
                 {{
                   isConnectingPort
-                    ? "Connecting..."
+                    ? isPortConnected
+                      ? "Disconnecting..."
+                      : "Connecting..."
                     : isPortConnected
                     ? "Disconnect"
                     : "Connect Racetime"
@@ -189,24 +206,10 @@
                   }}</span>
                 </span>
               </div>
+
             </div>
           </b-col>
         </b-row>
-
-        <div class="d-flex flex-wrap mt-2" style="gap: 8px">
-          <span v-if="podium.gold" class="badge badge-success"
-            >🥇 Juara 1: {{ podium.gold }}</span
-          >
-          <span v-if="podium.silver" class="badge badge-primary"
-            >🥈 Juara 2: {{ podium.silver }}</span
-          >
-          <span v-if="podium.bronze" class="badge badge-warning"
-            >🥉 Juara 3: {{ podium.bronze }}</span
-          >
-          <span v-if="podium.fourth" class="badge badge-secondary"
-            >4th: {{ podium.fourth }}</span
-          >
-        </div>
       </div>
     </div>
 
@@ -227,6 +230,15 @@
           <small class="text-muted">
             Category active: {{ titleCategories || "-" }}
           </small>
+          <div class="d-flex align-items-center flex-wrap" style="gap: 8px">
+            <div v-if="bracketSizeLabel" class="bracket-size-badge">
+              {{ bracketSizeLabel }}
+            </div>
+            <div v-if="byeCountInfo" class="bracket-bye-info-badge">
+              <Icon icon="mdi:information-outline" class="mr-1" />
+              {{ byeCountInfo }}
+            </div>
+          </div>
         </div>
         <div class="toolbar-actions">
           <!-- Build / Edit -->
@@ -237,6 +249,36 @@
               role="group"
               aria-label="Build actions"
             >
+              <button
+                type="button"
+                class="btn-action btn-outline-primary"
+                @click="openHeatModal"
+                v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
+              >
+                <Icon icon="mdi:view-grid-outline" class="mr-1" />
+                Lihat Heat
+              </button>
+
+              <JudgeActionHistoryModal
+                v-if="currentEventId"
+                class="ml-2"
+                :event-id="String(currentEventId)"
+                race-category="h2h"
+                category-label="Head to Head"
+              />
+
+              <button
+                type="button"
+                class="btn-action btn-outline-secondary ml-2"
+                :disabled="isDownloadingBracketPdf"
+                @click="downloadBracketPdf"
+                v-b-tooltip.hover="'Download tampilan bagan saat ini sebagai PDF'"
+              >
+                <b-spinner v-if="isDownloadingBracketPdf" small class="mr-1" />
+                <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+                {{ isDownloadingBracketPdf ? "Menyiapkan PDF…" : "Download Bracket (PDF)" }}
+              </button>
+
               <button
                 v-if="visibleParticipants && visibleParticipants.length"
                 class="btn-action btn-outline-info ml-2"
@@ -257,22 +299,14 @@
               </button>
 
               <button
-                v-if="
-                  (visibleParticipants && visibleParticipants.length) ||
-                  currentRound == 'Semifinals'
-                "
-                class="btn-action btn-secondary"
-                @click="populateBronzeFromSemis"
-                v-b-tooltip.hover="'Ambil dua tim kalah semifinal'"
-              >
-                <Icon icon="mdi:medal-outline" class="mr-1" /> Assign Final B
-              </button>
-
-              <button
                 v-if="currentRound && !currentRound.bronze"
                 class="btn-action btn-outline-success"
                 @click="advanceToNextRound"
-                v-b-tooltip.hover="'Pindahkan semua pemenang babak ini ke babak berikutnya'"
+                v-b-tooltip.hover="
+                  currentRound && currentRound.size === 4
+                    ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
+                    : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
+                "
               >
                 <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
                 Advance to Next Round
@@ -308,6 +342,21 @@
               Next
             </button>
           </div>
+
+          <!-- Divider -->
+          <div class="toolbar-divider d-none d-md-block"></div>
+
+          <!-- Reset All — dipojok paling kanan, terpisah dari aksi build/edit
+               lain krn ini destruktif (hapus SEMUA kategori H2H event ini) -->
+          <button
+            type="button"
+            class="btn-action btn-outline-danger ml-md-3"
+            @click="openResetAllModal"
+            v-b-tooltip.hover="'Hapus semua data kompetisi H2H (semua kategori) pada event ini'"
+          >
+            <Icon icon="mdi:restore-alert" class="mr-1" />
+            Reset All
+          </button>
         </div>
       </div>
 
@@ -320,119 +369,189 @@
           <div class="text-muted">Loading bracket & teams…</div>
         </div>
       </div>
-      <div>
+      <div
+        class="bracket-card"
+        :class="{ 'pdf-export-mode': isDownloadingBracketPdf }"
+        ref="bracketCaptureArea"
+      >
         <div
-          v-if="showBracket"
-          class="bracket"
+          v-if="showBracket && visibleParticipants && visibleParticipants.length"
+          class="bracket-vtb-wrap"
           role="region"
           aria-label="Tournament Bracket"
         >
+          <!-- Tim yang belum punya nomor Heat / belum berpasangan — per babak -->
           <div
             v-for="(round, rIdx) in rounds"
-            :key="round.id"
-            class="bracket__round"
-            :class="{ 'bracket__round--bronze': round.bronze }"
+            :key="'pool-' + round.id"
+            class="bracket__pool"
+            v-if="round.pool && round.pool.length"
           >
-            <div class="bracket__round-header">
-              <span class="bracket__round-title">{{ round.name }}</span>
+            <div class="bracket__pool-title">
+              <Icon icon="mdi:timer-sand" class="mr-1" />
+              {{ round.bronze ? "Final B" : round.name }} — Menunggu Heat
+              ({{ round.pool.length }})
             </div>
-
-            <!-- Tim yang belum punya nomor Heat / belum berpasangan -->
-            <div class="bracket__pool" v-if="round.pool && round.pool.length">
-              <div class="bracket__pool-title">
-                <Icon icon="mdi:timer-sand" class="mr-1" />
-                Menunggu Heat ({{ round.pool.length }})
-              </div>
-              <div class="bracket__pool-list">
-                <span
-                  class="bracket__pool-chip"
-                  v-for="(t, tIdx) in round.pool"
-                  :key="'pool-' + rIdx + '-' + tIdx"
-                >
-                  {{ t.name }}
-                  <CountryFlag :code="flagFor(t.name)" />
-                </span>
-              </div>
-            </div>
-
-            <div class="bracket__list">
-              <div
-                v-for="(m, mIdx) in round.matches"
-                :key="m.id"
-                class="bracket__match"
-                :aria-label="`Match ${m.id}`"
+            <div class="bracket__pool-list">
+              <span
+                class="bracket__pool-chip"
+                v-for="(t, tIdx) in round.pool"
+                :key="'pool-' + rIdx + '-' + tIdx"
               >
-                <div class="bracket__heat" v-if="m.heat">Heat {{ m.heat }}</div>
-                <div
-                  class="bracket__winner"
-                  :class="{ 'bracket__winner--bye': m.bye }"
-                  v-if="m.winner && m.winner.name"
-                >
-                  <Icon :icon="m.bye ? 'mdi:transfer-right' : 'mdi:trophy-variant-outline'" />
-                  <span class="ml-1"
-                    >{{ m.winner.name }}{{ m.bye ? " — BYE, menunggu babak berikutnya" : "" }}<CountryFlag :code="flagFor(m.winner.name)" /></span
-                  >
-                </div>
-                <!-- Team 1 -->
-                <div class="bracket__team" :class="{ 'is-bye': !m.team1.name }">
-                  <div class="bracket__team-main">
-                    <span class="bracket__name">
-                      {{ m.team1.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
-                      <CountryFlag :code="flagFor(m.team1.name)" />
-                    </span>
-                  </div>
-                  <span class="bracket__score" v-if="m.score1 != null">{{
-                    m.score1
-                  }}</span>
-                </div>
-
-                <!-- vs divider -->
-                <div class="bracket__vs" aria-hidden="true">vs</div>
-
-                <!-- Team 2 -->
-                <div class="bracket__team" :class="{ 'is-bye': !m.team2.name }">
-                  <div class="bracket__team-main">
-                    <span class="bracket__name">
-                      {{ m.team2.name || (m.bye ? "— BYE —" : "— menunggu lawan —") }}
-                      <CountryFlag :code="flagFor(m.team2.name)" />
-                    </span>
-                  </div>
-                  <span class="bracket__score" v-if="m.score2 != null">{{
-                    m.score2
-                  }}</span>
-                </div>
-
-                <!-- Actions / badges -->
-                <div class="bracket__footer">
-                  <div
-                    class="bracket__actions"
-                    v-if="m.team1.name && m.team2.name"
-                  >
-                    <button
-                      class="btn-action btn-xs btn-outline-success"
-                      @click="declareMatchWinner(round, mIdx, 1)"
-                      title="Set winner: top"
-                    >
-                      <Icon icon="mdi:crown-outline" /> Top Win
-                    </button>
-                    <button
-                      class="btn-action btn-xs btn-outline-primary"
-                      @click="declareMatchWinner(round, mIdx, 2)"
-                      title="Set winner: bottom"
-                    >
-                      <Icon icon="mdi:crown-outline" /> Bottom Win
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <!-- /match -->
+                {{ t.name }}
+                <CountryFlag :code="flagFor(t.name)" />
+              </span>
             </div>
-            <!-- /list -->
           </div>
-          <!-- /round -->
+
+          <bracket :rounds="vtbRounds">
+            <template slot="player" slot-scope="{ player }">
+              <span
+                v-if="player.isPlaceholder && poolForRound(player.roundId).length"
+                class="vtb-team-name is-placeholder vtb-clickable"
+                @click="openAssignPicker(player)"
+              >
+                {{ player.name }}
+              </span>
+              <span
+                v-else-if="!player.isPlaceholder"
+                class="vtb-team-name vtb-clickable"
+                @click="openRemoveConfirm(player)"
+              >
+                <span class="vtb-team-name__label"
+                  >{{ player.name
+                  }}{{ player.bib ? " (" + player.bib + ")" : "" }}
+                  <CountryFlag :code="flagFor(player.name)" />
+                </span>
+                <span v-if="player.time" class="vtb-team-time">{{ player.time }}</span>
+                <span v-if="player.medal" class="vtb-medal-badge">
+                  <Icon
+                    v-if="player.medal !== 'fourth'"
+                    :icon="'mdi:medal'"
+                    class="vtb-medal-icon"
+                    :class="'vtb-medal-icon--' + player.medal"
+                    :title="player.medal === 'gold' ? 'Juara 1' : player.medal === 'silver' ? 'Juara 2' : 'Juara 3'"
+                  />
+                  <span v-else class="vtb-fourth-label" title="Juara 4">4th</span>
+                </span>
+              </span>
+              <span
+                v-else
+                class="vtb-team-name"
+                :class="{ 'is-placeholder': player.isPlaceholder }"
+              >
+                {{ player.name }}
+              </span>
+            </template>
+            <template slot="player-extension-bottom" slot-scope="{ match }">
+              <div
+                class="vtb-match-footer"
+                :class="{ 'vtb-match-footer--active': isActiveRoundMatch(match) }"
+              >
+                <span class="vtb-round-badge">{{ match.roundName }}</span>
+                <span
+                  v-if="isActiveRoundMatch(match)"
+                  class="vtb-active-round-badge"
+                  title="Match di babak yang sedang aktif (dipilih lewat Prev/Next Round di bawah)"
+                >
+                  <Icon icon="mdi:target" class="mr-1" />Babak Aktif
+                </span>
+                <span
+                  v-if="match.canDeclareWinner"
+                  class="vtb-heat-badge vtb-clickable"
+                  :class="{ 'vtb-heat-badge--empty': !match.heat }"
+                  @click="openHeatEditor(match)"
+                  >{{ match.heat ? "Heat " + match.heat : "+ Tentukan Heat" }}</span
+                >
+              </div>
+            </template>
+          </bracket>
+
+          <div v-if="vtbBronzeRounds.length" class="bracket-vtb-bronze mt-4">
+            <div class="bracket-vtb-bronze__title">Final B (3rd Place)</div>
+            <bracket :rounds="vtbBronzeRounds">
+              <template slot="player" slot-scope="{ player }">
+                <span
+                  v-if="player.isPlaceholder && poolForRound(player.roundId).length"
+                  class="vtb-team-name is-placeholder vtb-clickable"
+                  @click="openAssignPicker(player)"
+                >
+                  {{ player.name }}
+                </span>
+                <span
+                  v-else-if="!player.isPlaceholder"
+                  class="vtb-team-name vtb-clickable"
+                  @click="openRemoveConfirm(player)"
+                >
+                  <span class="vtb-team-name__label"
+                    >{{ player.name
+                    }}{{ player.bib ? " (" + player.bib + ")" : "" }}
+                    <CountryFlag :code="flagFor(player.name)" />
+                  </span>
+                  <span v-if="player.time" class="vtb-team-time">{{ player.time }}</span>
+                  <span v-if="player.medal" class="vtb-medal-badge">
+                    <Icon
+                      v-if="player.medal !== 'fourth'"
+                      :icon="'mdi:medal'"
+                      class="vtb-medal-icon"
+                      :class="'vtb-medal-icon--' + player.medal"
+                      :title="player.medal === 'gold' ? 'Juara 1' : player.medal === 'silver' ? 'Juara 2' : 'Juara 3'"
+                    />
+                    <span v-else class="vtb-fourth-label" title="Juara 4">4th</span>
+                  </span>
+                </span>
+                <span
+                  v-else
+                  class="vtb-team-name"
+                  :class="{ 'is-placeholder': player.isPlaceholder }"
+                >
+                  {{ player.name }}
+                </span>
+              </template>
+              <template slot="player-extension-bottom" slot-scope="{ match }">
+                <div
+                  class="vtb-match-footer"
+                  :class="{ 'vtb-match-footer--active': isActiveRoundMatch(match) }"
+                >
+                  <span class="vtb-round-badge">{{ match.roundName }}</span>
+                  <span
+                    v-if="isActiveRoundMatch(match)"
+                    class="vtb-active-round-badge"
+                    title="Match di babak yang sedang aktif (dipilih lewat Prev/Next Round di bawah)"
+                  >
+                    <Icon icon="mdi:target" class="mr-1" />Babak Aktif
+                  </span>
+                  <span
+                    v-if="match.canDeclareWinner"
+                    class="vtb-heat-badge vtb-clickable"
+                    :class="{ 'vtb-heat-badge--empty': !match.heat }"
+                    @click="openHeatEditor(match)"
+                    >{{ match.heat ? "Heat " + match.heat : "+ Tentukan Heat" }}</span
+                  >
+                </div>
+              </template>
+            </bracket>
+          </div>
         </div>
 
-        <div v-if="!showBracket" class="bracket-hidden-info">
+        <div
+          v-if="!visibleParticipants || !visibleParticipants.length"
+          class="bracket-hidden-info"
+        >
+          <div>
+            <Icon icon="mdi:account-off-outline" class="info-icon" />
+            <h5 class="mb-1">Belum Ada Tim Terdaftar</h5>
+            <p class="mb-0 text-muted">
+              Bracket akan muncul otomatis setelah ada tim yang ter-assign di
+              kategori H2H ini.
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-else-if="!showBracket"
+          class="bracket-hidden-info"
+        >
           <div>
             <Icon icon="mdi:eye-off-outline" class="info-icon" />
             <h5 class="mb-1">Bracket is Hidden</h5>
@@ -467,64 +586,89 @@
             </small>
           </div>
           <div
-            class="d-flex"
-            style="gap: 8px"
+            class="h2h-actions-panel d-flex flex-wrap"
             v-if="visibleParticipants && visibleParticipants.length"
           >
-            <!-- <button
-              class="btn-action btn-outline-success"
-              @click="saveAllRoundsLocal"
-            >
-              <Icon icon="mdi:content-save-all-outline" /> Save All (Local)
-            </button>
-            <button
-              class="btn-action btn-outline-dark"
-              @click="exportAllRoundsJSON"
-            >
-              <Icon icon="mdi:download" /> Export JSON
-            </button> -->
+            <!-- Scope: babak yang sedang aktif -->
+            <div class="h2h-action-group h2h-action-group--round">
+              <span class="h2h-action-group__label">Round</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isPrintingRound"
+                @click="printCurrentRoundVuePdf"
+                v-b-tooltip.hover="'Print hasil babak yang sedang aktif'"
+              >
+                <b-spinner v-if="isPrintingRound" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingRound ? "Menyiapkan…" : "Print" }}
+              </button>
+              <button
+                type="button"
+                class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingRound"
+                @click="saveCurrentRoundToDB"
+                v-b-tooltip.hover="'Simpan hasil babak aktif ke database'"
+              >
+                <b-spinner v-if="isSavingRound" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingRound ? "Menyimpan…" : "Save" }}
+              </button>
+            </div>
 
-            <!-- NEW: By Round -->
-            <button
-              class="btn-action btn-outline-dark"
-              @click="printCurrentRoundVuePdf"
-            >
-              <Icon icon="mdi:printer" /> Print Round
-            </button>
-            <button
-              class="btn-action btn-outline-secondary"
-              @click="saveCurrentRoundToDB"
-            >
-              <Icon icon="mdi:database-arrow-up-outline" /> Save Round (DB)
-            </button>
+            <!-- Scope: seluruh babak pada kategori ini -->
+            <div class="h2h-action-group h2h-action-group--all">
+              <span class="h2h-action-group__label">All Rounds</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isPrintingAllRounds"
+                @click="printAllRoundVuePdf"
+                v-b-tooltip.hover="'Print seluruh babak sekaligus'"
+              >
+                <b-spinner v-if="isPrintingAllRounds" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingAllRounds ? "Menyiapkan…" : "Print" }}
+              </button>
+              <button
+                type="button"
+                class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingAllRounds"
+                @click="saveAllRoundToDB"
+                v-b-tooltip.hover="'Simpan seluruh babak ke database'"
+              >
+                <b-spinner v-if="isSavingAllRounds" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingAllRounds ? "Menyimpan…" : "Save" }}
+              </button>
+            </div>
 
-            <!-- NEW: All Round -->
-            <button
-              class="btn-action btn-outline-dark"
-              @click="printAllRoundVuePdf"
-            >
-              <Icon icon="mdi:printer" /> Print All ROund
-            </button>
-            <button
-              class="btn-action btn-outline-secondary"
-              @click="saveAllRoundToDB"
-            >
-              <Icon icon="mdi:database-arrow-up-outline" /> Save All Round (DB)
-            </button>
-
-            <!-- NEW: All Round -->
-            <button
-              class="btn-action btn-outline-dark"
-              @click="printOverallVuePdf"
-            >
-              <Icon icon="mdi:printer" /> Print Overall
-            </button>
-            <button
-              class="btn-action btn-outline-secondary"
-              @click="saveOverallToDB"
-            >
-              <Icon icon="mdi:database-arrow-up-outline" /> Save Overall (DB)
-            </button>
+            <!-- Scope: ranking overall kategori ini -->
+            <div class="h2h-action-group h2h-action-group--overall">
+              <span class="h2h-action-group__label">Overall</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isPrintingOverall"
+                @click="printOverallVuePdf"
+                v-b-tooltip.hover="'Print ranking overall kategori ini'"
+              >
+                <b-spinner v-if="isPrintingOverall" small class="mr-1" />
+                <Icon v-else icon="mdi:printer-outline" class="mr-1" />
+                {{ isPrintingOverall ? "Menyiapkan…" : "Print" }}
+              </button>
+              <button
+                type="button"
+                class="h2h-action-btn h2h-action-btn--save"
+                :disabled="isSavingOverall"
+                @click="saveOverallToDB"
+                v-b-tooltip.hover="'Simpan overall kategori ini ke database'"
+              >
+                <b-spinner v-if="isSavingOverall" small class="mr-1" />
+                <Icon v-else icon="mdi:content-save-outline" class="mr-1" />
+                {{ isSavingOverall ? "Menyimpan…" : "Save" }}
+              </button>
+            </div>
           </div>
         </div>
         <b-row>
@@ -555,8 +699,22 @@
                     <th rowspan="2">BIB</th>
                     <th rowspan="2">Start Time</th>
 
-                    <!-- Grup Penalties -->
-                    <th colspan="9" class="text-center">Penalties Group</th>
+                    <!-- Grup Penalties (bisa di-minimize) -->
+                    <th
+                      :colspan="penaltiesCollapsed ? 1 : 9"
+                      class="text-center penalties-group-th"
+                      @click="penaltiesCollapsed = !penaltiesCollapsed"
+                    >
+                      <Icon
+                        :icon="
+                          penaltiesCollapsed
+                            ? 'mdi:chevron-right'
+                            : 'mdi:chevron-down'
+                        "
+                        class="mr-1"
+                      />
+                      Penalties Group
+                    </th>
                     <th rowspan="2">Penalty Total</th>
                     <th class="text-center" rowspan="2">Penalty Time</th>
                     <th class="text-center" rowspan="2">Finish Time</th>
@@ -567,7 +725,7 @@
                       Action
                     </th>
                   </tr>
-                  <tr>
+                  <tr v-if="!penaltiesCollapsed">
                     <th class="text-center">Pen. Start (PS)</th>
                     <th class="text-center">Cut Line (CL)</th>
                     <th class="text-center">R1</th>
@@ -586,19 +744,23 @@
                     :key="stableRowKey(item)"
                   >
                     <td>{{ index + 1 }}</td>
-                    <!-- Heat = index match pada babak aktif -->
+                    <!-- Heat kini read-only di sini — assign/ubah Heat
+                         dilakukan lewat klik langsung di bagan (klik slot
+                         TBD/BYE utk assign tim, klik badge "Heat N" utk
+                         ubah nomornya). Kolom ini cuma menampilkan hasilnya. -->
                     <td style="min-width: 110px">
-                      <b-form-select
-                        v-model="item.result.heat"
-                        :options="[
-                          { value: null, text: '— pilih heat —' },
-                          ...heatOptionsForItem(item),
-                        ]"
-                        size="sm"
-                        class="w-auto"
-                        @change="onHeatChanged(item, $event)"
-                        :disabled="isByeTeam(item)"
-                      />
+                      <span
+                        v-if="isByeTeam(item)"
+                        class="badge badge-light"
+                        >BYE</span
+                      >
+                      <span
+                        v-else-if="item.result && item.result.heat"
+                        class="h2h-heat-readonly"
+                      >
+                        Heat {{ item.result.heat }}
+                      </span>
+                      <span v-else class="text-muted small">—</span>
                     </td>
 
                     <td class="large-bold text-strong max-char text-left">
@@ -628,11 +790,6 @@
                       <div>
                         {{ item.nameTeam }}
                         <CountryFlag :code="flagFor(item.nameTeam)" />
-                        <span
-                          v-if="isByeTeam(item)"
-                          class="badge badge-light ml-2"
-                          >BYE</span
-                        >
                       </div>
                     </td>
                     <!-- BIB TEAM -->
@@ -643,6 +800,13 @@
                       {{ item.result.startTime }}
                     </td>
 
+                    <!-- Grup Penalties di-minimize -> 1 cell placeholder,
+                         kolomnya harus sama dgn colspan="1" di header -->
+                    <td v-if="penaltiesCollapsed" class="text-center text-muted">
+                      <Icon icon="mdi:dots-horizontal" />
+                    </td>
+
+                    <template v-if="!penaltiesCollapsed">
                     <!-- PENALTY START -->
                     <td>
                       <b-form-select
@@ -808,6 +972,7 @@
                         "
                       />
                     </td>
+                    </template>
 
                     <!-- PENALTY TOTAL  -->
                     <td class="large-bold">
@@ -924,6 +1089,7 @@
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="visibleParticipants"
+      :bye-names="byeTeamNamesInCurrentRound"
       :digit-time-start.sync="digitTimeStart"
       :digit-time-finish.sync="digitTimeFinish"
       @update-time="updateTime"
@@ -945,7 +1111,7 @@
       :float-layout="false"
       :enable-download="true"
       :preview-modal="false"
-      :paginate-elements-by-height="1400"
+      :manual-pagination="true"
       :pdf-quality="2"
       :filename="pdfFilename"
       pdf-format="a4"
@@ -1005,6 +1171,264 @@
         </section>
       </template>
     </vue-html2pdf>
+
+    <!-- MODAL: pilih tim utk slot TBD/BYE yang diklik langsung di bagan.
+         Pakai modal (bukan dropdown) karena bagan dibungkus container
+         overflow-x:auto utk scroll horizontal — dropdown BootstrapVue tidak
+         di-teleport ke <body>, jadi akan ke-clip/salah posisi di dalam
+         container yang overflow-nya bukan visible. Modal aman krn selalu
+         di-teleport ke <body>. -->
+    <b-modal
+      v-model="assignPicker.show"
+      centered
+      hide-header
+      hide-footer
+      size="sm"
+      content-class="h2h-picker-modal"
+      body-class="p-0"
+    >
+      <!-- TIDAK menanyakan nomor Heat di sini — kalau slotnya masih kosong,
+           tim ditaruh dulu tanpa Heat pasti (bisa jadi cuma BYE, tidak perlu
+           nomor Heat). Nomor Heat diatur/diubah lewat klik badge "Heat N" di
+           footer match (lihat openHeatEditor) — bukan di sini. -->
+      <div class="h2h-picker-header">
+        <div class="h2h-picker-header__text">
+          <div class="h2h-picker-header__title">Pilih Tim</div>
+          <div class="h2h-picker-header__subtitle">
+            Klik salah satu tim untuk assign ke slot ini
+          </div>
+        </div>
+        <button
+          type="button"
+          class="h2h-picker-close"
+          aria-label="Tutup"
+          @click="assignPicker.show = false"
+        >
+          <Icon icon="mdi:close" />
+        </button>
+      </div>
+      <div class="h2h-picker-body">
+        <div v-if="!assignPickerCandidates.length" class="h2h-picker-empty">
+          <Icon icon="mdi:information-outline" class="mr-1" />
+          Tidak ada tim yang menunggu di pool babak ini.
+        </div>
+        <button
+          v-for="t in assignPickerCandidates"
+          :key="'picker-' + t.name"
+          type="button"
+          class="h2h-picker-item"
+          @click="confirmAssignTeam(t)"
+        >
+          <CountryFlag :code="flagFor(t.name)" />
+          <span class="h2h-picker-item__name"
+            >{{ t.name }}{{ t.bibTeam ? " (" + t.bibTeam + ")" : "" }}</span
+          >
+          <Icon icon="mdi:chevron-right" class="h2h-picker-item__chevron" />
+        </button>
+      </div>
+    </b-modal>
+
+    <!-- MODAL: ubah nomor Heat sebuah match — dipicu klik badge "Heat N" di
+         footer bagan. Ini SATU-SATUNYA tempat nomor Heat ditentukan/diubah
+         utk match riil (2 tim); tidak tersedia utk match BYE karena BYE
+         tidak perlu nomor Heat. -->
+    <b-modal
+      v-model="heatEditor.show"
+      centered
+      hide-header
+      hide-footer
+      size="sm"
+      content-class="h2h-picker-modal"
+      body-class="p-0"
+    >
+      <div class="h2h-picker-header">
+        <div class="h2h-picker-header__text">
+          <div class="h2h-picker-header__title">Ubah Nomor Heat</div>
+          <div class="h2h-picker-header__subtitle">
+            Tentukan nomor Heat baru untuk match ini
+          </div>
+        </div>
+        <button
+          type="button"
+          class="h2h-picker-close"
+          aria-label="Tutup"
+          @click="heatEditor.show = false"
+        >
+          <Icon icon="mdi:close" />
+        </button>
+      </div>
+      <div class="h2h-picker-body h2h-heat-editor-body">
+        <div class="h2h-heat-stepper">
+          <button
+            type="button"
+            class="h2h-heat-stepper__btn"
+            @click="heatEditor.newHeat = Math.max(1, (heatEditor.newHeat || 1) - 1)"
+          >
+            <Icon icon="mdi:minus" />
+          </button>
+          <input
+            type="number"
+            min="1"
+            class="h2h-heat-stepper__input"
+            v-model.number="heatEditor.newHeat"
+          />
+          <button
+            type="button"
+            class="h2h-heat-stepper__btn"
+            @click="heatEditor.newHeat = (heatEditor.newHeat || 0) + 1"
+          >
+            <Icon icon="mdi:plus" />
+          </button>
+        </div>
+        <div class="h2h-heat-editor-actions">
+          <button
+            type="button"
+            class="btn-action btn-outline-secondary"
+            @click="heatEditor.show = false"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            class="btn-action btn-primary"
+            @click="confirmHeatEditor"
+          >
+            Simpan
+          </button>
+        </div>
+      </div>
+    </b-modal>
+
+    <!-- MODAL: Heat Assignment (seluruh kategori Head to Head di event ini) -->
+    <b-modal
+      v-model="heatModalVisible"
+      size="xl"
+      scrollable
+      hide-footer
+      content-class="heat-modal"
+    >
+      <template #modal-header>
+        <h5 class="modal-title">Heat Assignment – Head to Head</h5>
+        <div class="d-flex align-items-center" style="gap: 8px">
+          <button
+            type="button"
+            class="btn-action btn-outline-secondary"
+            :disabled="isDownloadingHeatModalPdf"
+            @click="downloadHeatAssignmentPdf"
+            v-b-tooltip.hover="'Download daftar Heat Assignment ini sebagai PDF'"
+          >
+            <b-spinner v-if="isDownloadingHeatModalPdf" small class="mr-1" />
+            <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+            {{ isDownloadingHeatModalPdf ? "Menyiapkan PDF…" : "Download PDF" }}
+          </button>
+          <button
+            type="button"
+            class="close"
+            aria-label="Tutup"
+            @click="heatModalVisible = false"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      </template>
+
+      <div ref="heatModalCaptureArea">
+        <div v-if="!heatModalGroups.length" class="text-center text-muted py-4">
+          Belum ada nomor Heat yang terassign di kategori Head to Head manapun
+          pada event ini.
+        </div>
+        <div v-else>
+          <div
+            v-for="group in heatModalGroups"
+            :key="group.heat"
+            class="heat-group mb-3"
+          >
+            <div class="heat-group__title">Heat {{ group.heat }}</div>
+            <table class="table table-sm heat-group__table mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 40px">#</th>
+                  <th style="width: 26%">Tim</th>
+                  <th class="text-left" style="width: 90px">Bib</th>
+                  <th class="text-left">Kategori (Divisi Race – Initial)</th>
+                  <th style="width: 140px">Babak</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(t, idx) in group.teams" :key="idx">
+                  <td>{{ idx + 1 }}</td>
+                  <td>{{ t.nameTeam || "-" }}</td>
+                  <td class="text-left">{{ t.bibTeam || "-" }}</td>
+                  <td class="text-left">{{ t.category }}</td>
+                  <td>{{ t.round || "-" }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </b-modal>
+
+    <!-- MODAL: konfirmasi Reset All (seluruh kategori Head to Head di event ini) -->
+    <b-modal
+      v-model="showResetAllModal"
+      title="Reset All - Head to Head"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="resetAllInProgress"
+      hide-footer
+      @hidden="onResetAllModalHidden"
+    >
+      <p class="mb-2">
+        Tindakan ini akan <strong>menghapus semua data kompetisi Head to
+        Head</strong> — bracket, hasil per-babak, dan skor overall H2H — utk
+        <strong>SELURUH kategori H2H</strong> (semua kombinasi divisi/race/
+        initial) pada event ini.
+      </p>
+      <p class="mb-2">
+        Semua tim akan kembali ke pool Round 1 tanpa nomor Heat, seperti
+        kondisi sebelum ada hasil sama sekali. Kategori lain (Sprint/Slalom/
+        DRR/Rafting Cross) <strong>tidak</strong> ikut terhapus.
+      </p>
+      <p class="mb-3">
+        Tindakan ini <strong>tidak dapat dibatalkan</strong>.
+      </p>
+
+      <b-form-group v-if="!resetAllInProgress">
+        <label class="small text-muted mb-1">
+          Ketik <strong>{{ RESET_ALL_CONFIRM_PHRASE }}</strong> untuk konfirmasi:
+        </label>
+        <b-form-input
+          v-model="resetAllConfirmText"
+          :placeholder="RESET_ALL_CONFIRM_PHRASE"
+          autocomplete="off"
+          @keyup.enter="confirmResetAll"
+        />
+      </b-form-group>
+      <div v-else class="text-center text-muted py-3">
+        <b-spinner small class="mr-2" />
+        Mereset semua kategori H2H...
+      </div>
+
+      <div class="d-flex justify-content-end" style="gap: 8px">
+        <b-button
+          variant="outline-secondary"
+          :disabled="resetAllInProgress"
+          @click="showResetAllModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          variant="danger"
+          :disabled="
+            resetAllConfirmText !== RESET_ALL_CONFIRM_PHRASE || resetAllInProgress
+          "
+          @click="confirmResetAll"
+        >
+          Reset All
+        </b-button>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -1013,6 +1437,7 @@ import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
+import logoSts from "@/assets/images/logo-sts.png";
 import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
@@ -1022,13 +1447,18 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import Bracket from "vue-tournament-bracket";
+import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
+// html2canvas + jspdf: sudah pasti ada di node_modules krn jadi dependency
+// transitif vue-html2pdf (lewat html2pdf.js) yang sudah dipakai project ini —
+// dipakai langsung (bukan lewat vue-html2pdf) krn kita mau capture bagan
+// LIVE apa adanya (heat badge, highlight menang/kalah, dll.) tanpa perlu
+// duplikat seluruh markup bagan ke slot pdf-content terpisah.
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 // NEW: key penyimpanan hasil per-babak
 const RESULTS_KEY_PREFIX = "h2hRoundResults:";
-// setiap nomor heat hanya boleh dipakai oleh maksimal 2 tim (1 match) —
-// 2 tim yang berbagi nomor Heat yang sama OTOMATIS jadi lawan satu sama lain
-// (lihat syncMatchesFromHeat()), divalidasi di onHeatChanged()
-const HEAT_MAX_TEAMS = 2;
 const SHOW_BRACKET_KEY = "h2h:ui:showBracket";
 
 function safeParse(str, fallback) {
@@ -1162,6 +1592,8 @@ export default {
     HeadToHeadPdfResult,
     Icon,
     CountryFlag,
+    Bracket,
+    JudgeActionHistoryModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
@@ -1179,9 +1611,48 @@ export default {
       endGame: false,
       isScrolled: false,
       showBracket: true,
+      heatModalVisible: false,
+      heatModalGroups: [],
+      showResetAllModal: false,
+      // grup kolom Penalties (PS/CL/R1/R2/L1/L2/PB/PF/PO) di tabel hasil bisa
+      // di-minimize — klik header "Penalties Group" utk toggle.
+      penaltiesCollapsed: false,
+      isDownloadingBracketPdf: false,
+      isDownloadingHeatModalPdf: false,
+      // BUG FIX: tombol Print/Save (Round/All Round/Overall) dulu tidak
+      // py pengaman apa pun terhadap klik ganda/beruntun — Save memakai
+      // ipcRenderer.once(`${channel}-reply}`) TANPA request-id (beda dgn
+      // saveBracketToDB() yg sudah py __reqId), jadi 2 klik cepat ke
+      // tombol Save yang SAMA bisa membuat balasan permintaan pertama
+      // "tertangkap" oleh listener permintaan kedua (atau sebaliknya) —
+      // notifikasi salah/dobel, atau upsertEventResultsH2H() ke-trigger
+      // dobel. Print pun bisa tumpang tindih (generatePdf() dipanggil lagi
+      // sebelum proses render sebelumnya selesai, isi pdfMode/pdfRound...
+      // masih dipakai bersama 1 komponen vue-html2pdf). Flag ini menahan
+      // klik kedua selagi proses pertama masih berjalan.
+      isSavingRound: false,
+      isSavingAllRounds: false,
+      isSavingOverall: false,
+      isPrintingRound: false,
+      isPrintingAllRounds: false,
+      isPrintingOverall: false,
+      // state modal "pilih tim" saat slot kosong di bagan diklik — tim
+      // ditaruh LANGSUNG ke slot (matchIndex + side) ini, TANPA Heat apa pun.
+      assignPicker: { show: false, roundId: null, matchIndex: null, side: null },
+      // state modal ubah nomor Heat, dipicu klik badge "Heat N"/"+ Tentukan
+      // Heat" di bagan — SATU-SATUNYA tempat operator menentukan sendiri
+      // nomor Heat, dan hanya tersedia utk match riil (2 tim, bukan BYE).
+      heatEditor: { show: false, roundId: null, matchIndex: null, newHeat: null },
+      resetAllConfirmText: "",
+      resetAllInProgress: false,
+      RESET_ALL_CONFIRM_PHRASE: "RESET H2H",
       h2hBucketOptions: [],
       h2hBucketMap: Object.create(null),
       selectedH2HKey: "",
+      // Initial (Youth/Junior/Open dll) yang sedang dipilih di tab "Switch
+      // Head to Head Category" — dropdown di bawahnya cuma menampilkan
+      // kombinasi Divisi/Race milik Initial ini, mengikuti pola Sprint.
+      selectedInitialName: "",
       currentBucket: null,
       roundResultsRootKey: null,
       booyanActive: { r1: false, r2: false, l1: false, l2: false },
@@ -1202,6 +1673,9 @@ export default {
       editResult: false,
       dataPenalties: [],
       dataScore: [],
+      // score utk tim dgn rank di luar daftar dataScore (Race Settings ->
+      // H2H -> Score by Rank -> "Score utk Rank N+ dan seterusnya").
+      h2hDefaultScoreBeyondRank: 0,
       isRankedDescending: false,
 
       /** penting: tipe konsisten */
@@ -1212,6 +1686,50 @@ export default {
   },
 
   computed: {
+    // Mapping this.rounds (struktur internal app) -> format yang dipahami
+    // vue-tournament-bracket ({games:[{player1,player2}]}). Bronze/Final B
+    // TIDAK ikut di sini — komponen bracket ini mengasumsikan tiap babak
+    // punya PERSIS separuh jumlah match babak sebelumnya (pohon eliminasi
+    // murni), sedangkan Final B bukan bagian dari pohon itu, jadi
+    // dirender terpisah lewat vtbBronzeRounds.
+    vtbRounds() {
+      return (this.rounds || [])
+        .filter((r) => !r.bronze)
+        .map((r) => {
+          const expected = Math.max(1, Math.floor((r.size || 2) / 2));
+          const games = [];
+          for (let i = 0; i < expected; i++) {
+            games.push(this._toVtbGame((r.matches || [])[i], r, i));
+          }
+          return { games };
+        });
+    },
+    vtbBronzeRounds() {
+      const bronze = (this.rounds || []).find((r) => r.bronze);
+      if (!bronze) return [];
+      return [{ games: [this._toVtbGame((bronze.matches || [])[0], bronze, 0)] }];
+    },
+
+    // Kombinasi Divisi/Race (mis. "R4 MEN") milik Initial yang sedang aktif
+    // saja — labelnya tidak perlu lagi menyertakan nama Initial karena sudah
+    // dipilih lewat tab di atasnya.
+    h2hOptionsForSelectedInitial() {
+      const opts = this.h2hBucketOptions || [];
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.h2hBucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.h2hBucketMap[o.value];
+          return {
+            value: o.value,
+            text: `${b.divisionName} ${b.raceName}`,
+          };
+        });
+    },
     headToHeadCats() {
       const payload = safeParse(
         localStorage.getItem("raceStartPayload") || "{}",
@@ -1372,6 +1890,43 @@ export default {
         ? this.participant
         : Object.values(this.participant || {});
     },
+    // Label "BAGAN X TIM" sesuai jumlah tim terdaftar di kategori aktif —
+    // mengikuti penamaan resmi di app/BAGAN HEAD TO HEAD CLEAR.pdf.
+    bracketSizeLabel() {
+      const t = (this.participantArr || []).length;
+      return t > 0 ? `BAGAN ${t} TIM` : "";
+    },
+    // Info jumlah BYE yang seharusnya ada di Round 1 (selisih ukuran bagan
+    // vs jumlah tim terdaftar) — MURNI informasi, operator tetap yang
+    // menentukan sendiri tim mana dapat Heat solo (BYE) lewat dropdown Heat
+    // di tabel, tidak ada saran/otomatisasi tim mana.
+    byeCountInfo() {
+      const t = (this.participantArr || []).length;
+      if (t < 3) return "";
+      const n = this.nextPow2(Math.min(Math.max(t, 4), 32));
+      const numByes = n - t;
+      if (numByes <= 0) return "";
+      return `${numByes} tim akan dapat BYE (bagan ${n} slot)`;
+    },
+    // tim yang tampil di modal "Pilih Tim" saat slot TBD/BYE di bagan diklik
+    assignPickerCandidates() {
+      return this.poolForRound(this.assignPicker.roundId);
+    },
+    // nama tim yang BYE di babak aktif — dipakai utk disable tombol BIB
+    // start/finish di OperationTimePanel (tim BYE tidak pernah balapan).
+    byeTeamNamesInCurrentRound() {
+      const r = this.currentRound;
+      if (!r || !r.matches) return [];
+      const names = [];
+      r.matches.forEach((m) => {
+        if (!m || !m.bye) return;
+        const n1 = m.team1 && m.team1.name;
+        const n2 = m.team2 && m.team2.name;
+        if (n1 && !n2) names.push(n1);
+        else if (n2 && !n1) names.push(n2);
+      });
+      return names;
+    },
     dataEventSafe() {
       return this.dataEvent && typeof this.dataEvent === "object"
         ? this.dataEvent
@@ -1451,6 +2006,13 @@ export default {
 
       const orderMap = this.buildHeatOrderPosMapFromBracket();
 
+      // Urutan tabel ikut POSISI SLOT di bagan (top-to-bottom match index)
+      // supaya baris tabel & kartu bagan selalu sinkron sama persis —
+      // heat TIDAK dipakai sbg kunci sort lagi krn sekarang cuma label
+      // manual (bisa berapa saja, tidak berurutan sesuai posisi bagan), dan
+      // tim BYE sengaja tidak punya Heat sama sekali (akan selalu ke bawah
+      // kalau heat dipakai sbg kunci utama, padahal posisinya di bagan bisa
+      // di atas).
       list.sort(function (a, b) {
         var nameA = String(
           (a && (a.nameTeam || a.teamName)) || ""
@@ -1459,29 +2021,19 @@ export default {
           (b && (b.nameTeam || b.teamName)) || ""
         ).toUpperCase();
 
-        // heat boleh null/'' (BYE / belum diisi) → disortir ke belakang
-        var heatA =
-          a &&
-          a.result &&
-          a.result.heat !== null &&
-          a.result.heat !== "" &&
-          typeof a.result.heat !== "undefined"
-            ? Number(a.result.heat)
-            : Number.POSITIVE_INFINITY;
-
-        var heatB =
-          b &&
-          b.result &&
-          b.result.heat !== null &&
-          b.result.heat !== "" &&
-          typeof b.result.heat !== "undefined"
-            ? Number(b.result.heat)
-            : Number.POSITIVE_INFINITY;
-
-        if (heatA !== heatB) return heatA - heatB;
-
         var recA = orderMap[nameA];
         var recB = orderMap[nameB];
+        var slotA =
+          recA && typeof recA.slot !== "undefined"
+            ? recA.slot
+            : Number.POSITIVE_INFINITY;
+        var slotB =
+          recB && typeof recB.slot !== "undefined"
+            ? recB.slot
+            : Number.POSITIVE_INFINITY;
+
+        if (slotA !== slotB) return slotA - slotB;
+
         var posA = recA && typeof recA.pos !== "undefined" ? recA.pos : 9; // team1=0, team2=1
         var posB = recB && typeof recB.pos !== "undefined" ? recB.pos : 9;
 
@@ -1511,7 +2063,13 @@ export default {
   },
 
   beforeRouteLeave(to, from, next) {
-    this.clearAllRoundResults();
+    // JANGAN clearAllRoundResults() di sini — itu menghapus cache lokal
+    // (roundResultsRootKey) tanpa syarat setiap kali user pindah halaman,
+    // termasuk saat hasil penalty/waktu yang baru diinput BELUM sempat
+    // diklik "Save Round"/"Save All Rounds"/"Save Overall". Cache-nya sudah
+    // ter-scope per bucket (division/race/initial) lewat roundResultsRootKey,
+    // jadi aman dibiarkan tersimpan — akan otomatis termuat lagi lewat
+    // loadRoundResultsForCurrentRound() saat user kembali ke bucket ini.
     next();
   },
 
@@ -1527,8 +2085,15 @@ export default {
       this.dataEvent = {};
     }
 
-    await this.loadDataScore("HEAD_TO_HEAD");
-    await this.loadDataPenalties("HEAD_TO_HEAD");
+    // PENTING: tipe di database tersimpan sbg "HEADTOHEAD" (tanpa underscore)
+    // — sama seperti catatan di loadDataPenalties() di bawah. Mengirim
+    // "HEAD_TO_HEAD" tidak pernah cocok dgn dokumen manapun di optionRanked,
+    // jadi dataScore selalu kosong dan SEMUA Score di Overall selalu 0
+    // (getScoreByRanked() jatuh ke defaultScoreBeyondRank, yg default-nya 0)
+    // kecuali event ini kebetulan sudah dikustomisasi lewat Race Settings.
+    await this.loadDataScore("HEADTOHEAD");
+    await this.loadDataPenalties();
+    await this.loadRaceSettings();
 
     // build opsi statik dari kategori event (fallback ke default bila kosong)
     this.buildStaticH2HOptions();
@@ -1549,11 +2114,14 @@ export default {
         // lewat Heat tidak tertimpa setiap kali halaman ini dibuka ulang
         const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
         this.rebuildBracketDynamic(n);
+        // auto-seed dari ranking Sprint DINONAKTIFKAN atas permintaan user —
+        // Heat Round 1 diisi manual oleh operator lewat dropdown, sama
+        // seperti babak2 berikutnya.
       }
       this.syncWinLoseFromBracketToParticipants();
     } else {
       // fallback: baca seluruh bucket H2H dari eventDetails (mode offline)
-      this.loadAllH2HBucketsFromEvent();
+      await this.loadAllH2HBucketsFromEvent();
       const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
       this.rebuildBracketDynamic(n);
       this.syncWinLoseFromBracketToParticipants();
@@ -1853,19 +2421,33 @@ export default {
       };
     },
 
-    async saveBracketToDB() {
+    // `silent`: lewati toast notify — dipakai auto-save di assignTeamToMatchSlot()/
+    // removeTeamFromMatchSlot()/renumberMatchHeat() supaya tiap aksi tidak memicu toast "Bracket tersimpan."
+    // bertubi-tubi; tombol "Save Round (DB)" tetap pakai mode normal (toast).
+    async saveBracketToDB(silent = false) {
       try {
         const payload = this.buildBracketDoc();
-        ipcRenderer.send("h2h:bracket:save", payload);
-        ipcRenderer.once("h2h:bracket:save-reply", (_e, res) => {
+        // __reqId dikirim & digemakan balik oleh main process supaya balasan
+        // ini bisa dicocokkan ke request-nya sendiri — saveBracketToDB() bisa
+        // terpanggil beruntun (heat berubah, advance round, dst.) tanpa
+        // menunggu satu sama lain, dan semuanya berbagi channel balasan yang
+        // sama, jadi ipcRenderer.once() polos bisa salah tangkap balasan.
+        const reqId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        payload.__reqId = reqId;
+        const handler = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener("h2h:bracket:save-reply", handler);
+          if (silent) return;
           if (res && res.ok) {
             this.notify("success", "Bracket tersimpan.", "Saved");
           } else {
             this.notify("error", (res && res.error) || "Save failed", "Failed");
           }
-        });
+        };
+        ipcRenderer.on("h2h:bracket:save-reply", handler);
+        ipcRenderer.send("h2h:bracket:save", payload);
       } catch (err) {
-        this.notify("error", String(err), "Failed");
+        if (!silent) this.notify("error", String(err), "Failed");
       }
     },
 
@@ -1886,7 +2468,16 @@ export default {
             this.currentRoundIndex = this.firstRoundIndex;
             this.computePodium();
             this.syncWinLoseFromBracketToParticipants();
-            this.persistRoundResults();
+            // BUG FIX: JANGAN persistRoundResults() di sini — this.participant
+            // di titik ini masih hasil reset polos dari _useH2HBucket() (belum
+            // di-merge dengan data tersimpan di localStorage, itu baru terjadi
+            // belakangan lewat loadRoundResultsForCurrentRound() yang dipanggil
+            // caller). Kalau tetap dipanggil, snapshot round yang SUDAH ADA di
+            // localStorage (heat & waktu yang sudah diisi operator) langsung
+            // KETIMPA data kosong/default — persis penyebab heat/waktu "hilang"
+            // saat switch kategori atau refresh. loadRoundResultsForCurrentRound()
+            // sendiri tidak butuh persist ulang di sini; ia akan menyimpan lagi
+            // secara wajar begitu ada aksi baru (assign Heat/isi waktu).
             resolve(true);
           } else {
             resolve(false);
@@ -1959,29 +2550,83 @@ export default {
       }
     },
     // === GETTER DATA ===
+    // BUG FIX: `p.result` adalah SATU object yang dipakai bersama lintas
+    // SEMUA babak (cuma menyimpan data babak yang SEDANG aktif/dimuat).
+    // buildRoundRows() dulu SELALU baca live p.result langsung, yang benar
+    // HANYA kalau roundObj === currentRound — dipanggil utk babak LAIN (lihat
+    // buildAllRoundsPackage()/buildOverallPackage()/
+    // buildOverallPlacingsFromLastRound(), dipakai Save All Round & Save
+    // Overall) hasilnya jadi data babak yang SALAH (ke-timpa data babak yang
+    // kebetulan sedang dibuka di layar). Sekarang: kalau roundObj BUKAN
+    // currentRound, baca dari SNAPSHOT localStorage round itu sendiri (sama
+    // pola dgn _teamResultTimeFromSnapshot() di bagan). Heat SELALU diambil
+    // dari round.matches (sumber kebenaran per-babak, tidak pernah bocor
+    // lintas babak) — bukan dari live/snapshot result.heat.
     buildRoundRows(roundObj) {
       const list = this.participantsForRound(roundObj);
-      return list.map((p, i) => ({
-        no: i + 1,
-        team: String(p.nameTeam || p.teamName || ""),
-        bib: String(p.bibTeam || ""),
-        heat: p.result ? p.result.heat : null,
-        start: p.result ? p.result.startTime || "" : "",
-        finish: p.result ? p.result.finishTime || "" : "",
-        race: p.result ? p.result.raceTime || "" : "",
-        penaltyTime: p.result
-          ? p.result.penaltyTime || "00:00:00.000"
-          : "00:00:00.000",
-        total: p.result ? p.result.totalTime || p.result.raceTime || "" : "",
-        penaltySum: this.getTotalPenalty(p),
-        penalties:
-          p.result && p.result.penalties
-            ? Object.assign({}, p.result.penalties)
-            : {},
-        flag: p.result ? p.result.flag || null : null,
-        winLose: p.result ? p.result.winLose || null : null,
-        ranked: p.result ? p.result.ranked || null : null,
-      }));
+      const isCurrentRound = !!(
+        this.currentRound &&
+        roundObj &&
+        this.currentRound.id === roundObj.id
+      );
+
+      let snapshotByName = null;
+      if (!isCurrentRound && this.roundResultsRootKey && roundObj) {
+        const all = readAllRoundResults(this.roundResultsRootKey);
+        const savedRows = Array.isArray(all[String(roundObj.id)])
+          ? all[String(roundObj.id)]
+          : [];
+        snapshotByName = new Map(
+          savedRows.map((row) => [
+            String(row.nameTeam || "").trim().toUpperCase(),
+            row.result || {},
+          ])
+        );
+      }
+
+      const heatByName = new Map();
+      (roundObj.matches || []).forEach((m) => {
+        if (!m) return;
+        [m.team1, m.team2].forEach((t) => {
+          if (t && t.name) {
+            heatByName.set(
+              String(t.name).trim().toUpperCase(),
+              m.bye ? null : m.heat != null ? m.heat : null
+            );
+          }
+        });
+      });
+
+      return list.map((p, i) => {
+        const nameKey = String(p.nameTeam || p.teamName || "")
+          .trim()
+          .toUpperCase();
+        const r = isCurrentRound
+          ? p.result || {}
+          : (snapshotByName && snapshotByName.get(nameKey)) || {};
+        const heat = heatByName.has(nameKey)
+          ? heatByName.get(nameKey)
+          : r.heat != null
+          ? r.heat
+          : null;
+
+        return {
+          no: i + 1,
+          team: String(p.nameTeam || p.teamName || ""),
+          bib: String(p.bibTeam || ""),
+          heat,
+          start: r.startTime || "",
+          finish: r.finishTime || "",
+          race: r.raceTime || "",
+          penaltyTime: r.penaltyTime || "00:00:00.000",
+          total: r.totalTime || r.raceTime || "",
+          penaltySum: this.getTotalPenalty({ result: r }),
+          penalties: r.penalties ? Object.assign({}, r.penalties) : {},
+          flag: r.flag || null,
+          winLose: r.winLose || null,
+          ranked: r.ranked || null,
+        };
+      });
     },
 
     // === Build All Rounds Package ===
@@ -2350,191 +2995,260 @@ export default {
       return copy;
     },
 
-    // === Print Round ===
-    printCurrentRoundVuePdf: async function () {
-      var r = this.currentRound;
-      if (!r) return;
+    // ================================================================
+    // Print/Save reusable helpers — Print Round, Print All Round, Print
+    // Overall dulunya (dan Save Round/Save All Round/Save Overall) 3x
+    // copy-paste blok yang IDENTIK persis (tunggu render → generatePdf,
+    // atau send IPC → tunggu reply → notify → sync Overall), cuma beda di
+    // data yang disiapkan. Diringkas jadi 2 helper di bawah TANPA mengubah
+    // perilaku/urutan eksekusi tiap tombol.
+    // ================================================================
 
-      var rows = this.buildRoundRows(r);
-      // rows = this.sortRowsByRankThenTime(rows);
-      rows = this.sortRowsByBracketAndBye(rows, r);
-
-      this.pdfMode = "round";
-      this.pdfFilename = "Result - " + (r.bronze ? "Final B" : r.name) + ".pdf";
-      this.pdfRound = r;
-      this.pdfRoundRows = rows;
-
-      await this.$nextTick();
-      await new Promise(function (resolve) {
-        setTimeout(resolve, 300);
+    // Cocokkan tiap sheet round (`{roundId, rows}`) ke object round asli di
+    // `this.rounds` (utk tahu apakah bronze/BYE dll.), lalu urutkan rows-nya
+    // — dipakai oleh Print All Round & Print Overall (sama-sama berisi
+    // banyak sheet round).
+    _applyBracketSortToRoundsSheets(roundsSheets) {
+      if (!Array.isArray(roundsSheets)) return roundsSheets;
+      roundsSheets.forEach((R) => {
+        const found =
+          (this.rounds || []).find((rr) => String(rr.id) === R.roundId) ||
+          null;
+        R.rows = this.sortRowsByBracketAndBye(R.rows, found);
       });
+      return roundsSheets;
+    },
+
+    // Tunggu Vue selesai render konten PDF (butuh 1 tick + jeda kecil utk
+    // vue-html2pdf menyiapkan DOM-nya) lalu panggil generatePdf(). Dipakai
+    // oleh ketiga tombol Print — hanya BEDA di data apa yang disiapkan
+    // sebelum method ini dipanggil (pdfMode/pdfFilename/pdfRound.../pdfOverallPkg).
+    async _renderAndDownloadPdf(errorLogFn) {
+      await this.$nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 300));
       await this.$nextTick();
 
-      if (!this.$refs) return;
-      if (!this.$refs.html2Pdf) return;
-      if (!this.$refs.html2Pdf.$el) return;
+      if (!this.$refs || !this.$refs.html2Pdf || !this.$refs.html2Pdf.$el) {
+        return;
+      }
 
       try {
         await this.$refs.html2Pdf.generatePdf();
       } catch (e) {
-        logger.error(e);
+        (errorLogFn || logger.error)(e);
+      }
+    },
+
+    // Kirim payload H2H ke satu channel IPC, tunggu balasannya, notify hasil,
+    // lalu auto-sync ke Overall (dokumen event-results kategori H2H) kalau
+    // sukses — dipakai oleh ketiga tombol Save. TIDAK di-await oleh
+    // caller (fire-and-forget), persis seperti perilaku aslinya sebelum
+    // dirapikan.
+    _saveH2HToDBAndSyncOverall(channel, payload, successMessage) {
+      return new Promise((resolve) => {
+        ipcRenderer.send(channel, payload);
+        ipcRenderer.once(`${channel}-reply`, async (_e, res) => {
+          if (res && res.ok) {
+            this.notify("success", successMessage, "Saved");
+            // Auto-sync ke Overall — dulu ini cuma kejadian kalau tombol
+            // "Save Overall (DB)" yang terpisah diklik sendiri, sehingga
+            // operator yang cuma terbiasa Save Round tiap babak tidak pernah
+            // melihat hasilnya muncul di View Overall. Samakan dgn Sprint
+            // yg otomatis sinkron begitu hasil disimpan.
+            try {
+              await this.upsertEventResultsH2H();
+            } catch (err) {
+              this.notify("error", String(err), "Sync Overall Gagal");
+            }
+          } else {
+            this.notify(
+              "error",
+              (res && res.error) || "Save failed",
+              "Failed"
+            );
+          }
+          resolve(res);
+        });
+      });
+    },
+
+    // === Print Round ===
+    async printCurrentRoundVuePdf() {
+      // BUG FIX: tidak ada pengaman thd klik ganda/beruntun — generatePdf()
+      // kedua bisa terpanggil sblm proses pertama selesai render, padahal
+      // keduanya berbagi state (pdfMode/pdfRound/pdfRoundRows) & 1 instance
+      // <vue-html2pdf> yg sama, jadi hasil PDF-nya bisa tercampur.
+      if (this.isPrintingRound) return;
+      const r = this.currentRound;
+      if (!r) return;
+
+      const rows = this.sortRowsByBracketAndBye(this.buildRoundRows(r), r);
+      if (!rows || !rows.length) {
+        this.notify("warning", "Tidak ada data round ini.", "Print Round");
+        return;
+      }
+
+      this.isPrintingRound = true;
+      try {
+        this.pdfMode = "round";
+        this.pdfFilename = "Result - " + (r.bronze ? "Final B" : r.name) + ".pdf";
+        this.pdfRound = r;
+        this.pdfRoundRows = rows;
+
+        await this._renderAndDownloadPdf(logger.error);
+      } finally {
+        this.isPrintingRound = false;
       }
     },
 
     // === Print All Round ===
-    printAllRoundVuePdf: async function () {
-      var roundsSheets = this.buildAllRoundsPackage();
-
-      if (roundsSheets && Array.isArray(roundsSheets)) {
-        var i = 0;
-        while (i < roundsSheets.length) {
-          var R = roundsSheets[i];
-          var found = null;
-          if (this.rounds && Array.isArray(this.rounds)) {
-            var j = 0;
-            while (j < this.rounds.length) {
-              if (String(this.rounds[j].id) === R.roundId) {
-                found = this.rounds[j];
-                break;
-              }
-              j = j + 1;
-            }
-          }
-          R.rows = this.sortRowsByBracketAndBye(R.rows, found);
-          i = i + 1;
-        }
-      }
-
-      this.pdfMode = "allround";
-      this.pdfFilename = "All Rounds — Results.pdf";
-      this.pdfOverallPkg = { rounds: roundsSheets, placements: [] };
-
-      await this.$nextTick();
-      await new Promise(function (resolve) {
-        setTimeout(resolve, 300);
-      });
-      await this.$nextTick();
-
-      if (!this.$refs) return;
-      if (!this.$refs.html2Pdf) return;
-      if (!this.$refs.html2Pdf.$el) return;
-
+    async printAllRoundVuePdf() {
+      if (this.isPrintingAllRounds) return;
+      this.isPrintingAllRounds = true;
       try {
-        await this.$refs.html2Pdf.generatePdf();
-      } catch (e) {
-        logger.error(e);
+        const roundsSheets = this._applyBracketSortToRoundsSheets(
+          this.buildAllRoundsPackage()
+        );
+
+        this.pdfMode = "allround";
+        this.pdfFilename = "All Rounds — Results.pdf";
+        this.pdfOverallPkg = { rounds: roundsSheets, placements: [] };
+
+        await this._renderAndDownloadPdf(logger.error);
+      } finally {
+        this.isPrintingAllRounds = false;
       }
     },
 
     // === Print Overall ===
-    printOverallVuePdf: async function () {
-      var pkg = this.buildOverallPackage();
-
-      if (pkg && pkg.rounds && Array.isArray(pkg.rounds)) {
-        var i = 0;
-        while (i < pkg.rounds.length) {
-          var R = pkg.rounds[i];
-          var found = null;
-          if (this.rounds && Array.isArray(this.rounds)) {
-            var j = 0;
-            while (j < this.rounds.length) {
-              if (String(this.rounds[j].id) === R.roundId) {
-                found = this.rounds[j];
-                break;
-              }
-              j = j + 1;
-            }
-          }
-          R.rows = this.sortRowsByBracketAndBye(R.rows, found);
-          i = i + 1;
-        }
-      }
-
-      this.pdfMode = "overall";
-      this.pdfFilename = "Overall Result.pdf";
-      this.pdfOverallPkg = pkg;
-
-      await this.$nextTick();
-      await new Promise(function (resolve) {
-        setTimeout(resolve, 300);
-      });
-      await this.$nextTick();
-
-      if (!this.$refs) return;
-      if (!this.$refs.html2Pdf) return;
-      if (!this.$refs.html2Pdf.$el) return;
-
+    async printOverallVuePdf() {
+      if (this.isPrintingOverall) return;
+      this.isPrintingOverall = true;
       try {
-        await this.$refs.html2Pdf.generatePdf();
-      } catch (e) {
-        logger.warn(e);
+        const pkg = this.buildOverallPackage();
+        if (pkg && Array.isArray(pkg.rounds)) {
+          this._applyBracketSortToRoundsSheets(pkg.rounds);
+        }
+
+        this.pdfMode = "overall";
+        this.pdfFilename = "Overall Result.pdf";
+        this.pdfOverallPkg = pkg;
+
+        await this._renderAndDownloadPdf(logger.warn);
+      } finally {
+        this.isPrintingOverall = false;
       }
     },
 
+    // === Save Round (DB) ===
     async saveCurrentRoundToDB() {
+      // BUG FIX: sama seperti Print — dulu tidak ada pengaman klik ganda.
+      // _saveH2HToDBAndSyncOverall() memakai ipcRenderer.once() TANPA
+      // request-id (beda dgn saveBracketToDB() yg sudah py __reqId), jadi
+      // 2 klik cepat bisa membuat balasan permintaan pertama "tertangkap"
+      // oleh listener permintaan kedua — notifikasi salah/dobel, atau
+      // upsertEventResultsH2H() (auto-sync ke Overall) ke-trigger dobel.
+      if (this.isSavingRound) return;
+
       const r = this.currentRound;
-      if (!r)
-        return this.notify("warning", "Tidak ada babak aktif.", "Save Round");
+      if (!r) {
+        this.notify("warning", "Tidak ada babak aktif.", "Save Round");
+        return;
+      }
 
-      const bucket = this._currentBucketOrThrow();
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save Round");
+        return;
+      }
 
-      const rows = this.buildRoundRows(r); // sudah kamu punya
-      if (!rows || !rows.length)
-        return this.notify(
-          "warning",
-          "Tidak ada data round ini.",
-          "Save Round"
+      const rows = this.buildRoundRows(r);
+      if (!rows || !rows.length) {
+        this.notify("warning", "Tidak ada data round ini.", "Save Round");
+        return;
+      }
+
+      this.isSavingRound = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:round:save",
+          {
+            bucket,
+            roundId: String(r.id),
+            roundName: r.bronze ? "Final B" : r.name,
+            rows,
+          },
+          "Hasil round tersimpan."
         );
-
-      ipcRenderer.send("h2h:round:save", {
-        bucket,
-        roundId: String(r.id),
-        roundName: r.bronze ? "Final B" : r.name,
-        rows,
-      });
-      ipcRenderer.once("h2h:round:save-reply", (_e, res) => {
-        if (res && res.ok)
-          this.notify("success", "Hasil round tersimpan.", "Saved");
-        else
-          this.notify("error", (res && res.error) || "Save failed", "Failed");
-      });
-      this.saveBracketToDB();
+        this.saveBracketToDB();
+      } finally {
+        this.isSavingRound = false;
+      }
     },
 
+    // === Save All Round (DB) ===
     async saveAllRoundToDB() {
-      const bucket = this._currentBucketOrThrow();
-      const roundsSheets = this.buildAllRoundsPackage(); // kamu sudah buat
+      if (this.isSavingAllRounds) return;
 
-      ipcRenderer.send("h2h:rounds:saveMany", { bucket, roundsSheets });
-      ipcRenderer.once("h2h:rounds:saveMany-reply", (_e, res) => {
-        if (res && res.ok)
-          this.notify("success", "Semua round tersimpan.", "Saved");
-        else
-          this.notify("error", (res && res.error) || "Save failed", "Failed");
-      });
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save All Round");
+        return;
+      }
+
+      const roundsSheets = this.buildAllRoundsPackage();
+
+      this.isSavingAllRounds = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:rounds:saveMany",
+          { bucket, roundsSheets },
+          "Semua round tersimpan."
+        );
+      } finally {
+        this.isSavingAllRounds = false;
+      }
     },
 
+    // === Save Overall (DB) ===
     async saveOverallToDB() {
-      const bucket = this._currentBucketOrThrow();
-      const overallPkg = this.buildOverallPackage(); // kamu sudah buat
+      if (this.isSavingOverall) return;
 
-      var self = this;
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (err) {
+        this.notify("error", String(err), "Save Overall");
+        return;
+      }
 
-      ipcRenderer.send("h2h:overall:save", { bucket, overallPkg });
-      ipcRenderer.once("h2h:overall:save-reply", async function (_e, res) {
-        if (res && res.ok) {
-          self.notify("success", "Overall tersimpan.", "Saved");
+      const overallPkg = this.buildOverallPackage();
+      // BUG FIX: dulu tidak dicek — klik "Save Overall" sebelum Final A/B
+      // (atau babak apa pun) selesai akan menyimpan dokumen Overall KOSONG
+      // ke database tanpa pemberitahuan apa pun ke operator.
+      if (!overallPkg || !overallPkg.overallRows || !overallPkg.overallRows.length) {
+        this.notify(
+          "warning",
+          "Belum ada hasil yang bisa disimpan sbg Overall (belum ada babak yang selesai).",
+          "Save Overall"
+        );
+        return;
+      }
 
-          // ⬇️⬇️ tambahkan ini: merge ke event-results kategori H2H
-          try {
-            await self.upsertEventResultsH2H();
-          } catch (err) {
-            self.notify("error", String(err), "Merge H2H Failed");
-          }
-        } else {
-          self.notify("error", (res && res.error) || "Save failed", "Failed");
-        }
-      });
+      this.isSavingOverall = true;
+      try {
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:overall:save",
+          { bucket, overallPkg },
+          "Overall tersimpan."
+        );
+      } finally {
+        this.isSavingOverall = false;
+      }
     },
 
     // === merge hasil OVERALL H2H ke dokumen event-results (kategori lain aman) ===
@@ -2589,6 +3303,24 @@ export default {
         return;
       }
 
+      // BUG FIX: dulu teamId SELALU dikosongkan di sini ("tidak tersedia
+      // di paket overall") — tapi teamId SEBENARNYA tersedia, cuma bukan
+      // di overallRows, melainkan di this.participantArr (live list tim
+      // kategori H2H ini, py field teamId asli dari normalizeTeamForH2H()).
+      // Akibat teamId selalu kosong: kolom "Sudah Bertanding" di tabel
+      // Registered Teams (TeamPanel.vue -> hasCompeted()) TIDAK PERNAH
+      // menyala utk tim yg hasil "sudah bertanding"-nya berasal dari H2H —
+      // hasCompeted() mencocokkan row.teamId (ID asli, ada) ke Set yg
+      // (krn entry.teamId kosong) malah ke-isi row.bibTeam sbg fallback,
+      // jadi key-nya tidak akan pernah cocok. Sprint/kategori lain sudah
+      // benar meneruskan teamId asli — H2H tadinya sengaja dikosongkan.
+      var teamIdByKey = new Map();
+      (self.participantArr || []).forEach(function (p) {
+        var k = teamKeyFrom(p.nameTeam || p.teamName || "", p.bibTeam || "");
+        var tid = String(p.teamId || "");
+        if (k && tid) teamIdByKey.set(k, tid);
+      });
+
       // siapkan incoming map: key = NAME|BIB → { ... }
       var incoming = new Map();
       var i = 0;
@@ -2602,7 +3334,7 @@ export default {
         if (key) {
           incoming.set(key, {
             key: key,
-            teamId: "", // tidak tersedia di paket overall → biarkan kosong
+            teamId: teamIdByKey.get(key) || "",
             teamName: nm,
             bib: bb,
             h2hCat: {
@@ -2894,7 +3626,7 @@ export default {
     },
 
     // --- load semua bucket H2H dari eventDetails (offline/fallback) ---
-    loadAllH2HBucketsFromEvent() {
+    async loadAllH2HBucketsFromEvent() {
       try {
         const raw = localStorage.getItem("eventDetails");
         const ev = raw ? JSON.parse(raw) : {};
@@ -2957,10 +3689,10 @@ export default {
         // pilih default
         const savedKey = localStorage.getItem("currentH2HBucketKey");
         if (savedKey && map[savedKey]) {
-          this._useH2HBucket(savedKey);
+          await this._useH2HBucket(savedKey);
           this.selectedH2HKey = savedKey;
         } else if (opts.length) {
-          this._useH2HBucket(opts[0].value);
+          await this._useH2HBucket(opts[0].value);
           this.selectedH2HKey = opts[0].value;
         }
       } catch {
@@ -2969,9 +3701,15 @@ export default {
     },
 
     // --- apply bucket yang dipilih: set teams, judul, currentBucket, dll. ---
-    _useH2HBucket(key) {
+    async _useH2HBucket(key) {
       const b = this.h2hBucketMap[key];
       if (!b) return;
+
+      // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat
+      // (bucket "ALL INITIAL" agregat tidak py satu Initial spesifik)
+      if (!b._isAggregate && b.initialName) {
+        this.selectedInitialName = b.initialName;
+      }
 
       // set teams
       this.participant = (b.teams || []).map((t) => ({ ...t }));
@@ -3019,13 +3757,48 @@ export default {
         /* noop */
       }
 
-      // rebuild bracket berdasar jumlah tim yang baru
+      // BUG FIX: dulu di sini SELALU rebuildBracketDynamic() tanpa syarat —
+      // artinya tiap kali pindah tab Initial/kategori lalu balik lagi ke
+      // bucket yang SAMA, bracket yang sudah jalan (Semifinal/Final/Heat
+      // babak lanjutan) ikut ke-reset jadi bracket kosong (cuma Round 1
+      // yang benar krn di-resync dari result.heat, babak 2+ pool/matches-nya
+      // dikosongkan lagi). Sekarang coba muat bracket tersimpan dari DB dulu
+      // (persis pola yang sudah dipakai di mounted()) — rebuild dari nol
+      // HANYA kalau memang belum pernah ada bracket tersimpan utk bucket ini.
+
+      // BUG FIX: `roundResultsRootKey` HARUS di-refresh ke bucket baru INI
+      // sebelum tryLoadBracketFromDB() dipanggil — fungsi itu bisa memanggil
+      // persistRoundResults() secara internal, dan persistRoundResults()
+      // menulis ke KEY LAMA (rootKey bucket sebelumnya) kalau ini belum
+      // di-refresh. Efeknya: heat yang barusan diisi tersimpan di lokasi
+      // localStorage yang SALAH, lalu loadRoundResultsForCurrentRound() di
+      // bawah me-reset result tabel (resetResultsForRound) dan reload dari
+      // rootKey BARU yang ternyata masih kosong → heat hilang dari tabel
+      // padahal bracket (round.matches[].heat, dibangun sebelum reset ini)
+      // masih benar.
+      this.roundResultsRootKey = getResultsRootKey();
+
       const n = Math.min(Math.max(this.participantArr.length || 8, 4), 32);
-      this.rebuildBracketDynamic(n);
+      // bucket agregat ("ALL H2H Teams") tidak py identity divisi/race/
+      // initial tunggal → tidak ada dokumen bracket tersendiri di DB utk
+      // itu, jadi tryLoadBracketFromDB() pasti gagal (malah bisa throw
+      // krn field bucket-nya kosong) — langsung rebuild aja utk kasus ini.
+      let loadedFromDB = false;
+      if (!b._isAggregate) {
+        try {
+          loadedFromDB = await this.tryLoadBracketFromDB();
+        } catch (e) {
+          loadedFromDB = false;
+        }
+      }
+      if (!loadedFromDB) {
+        this.rebuildBracketDynamic(n);
+        // auto-seed dari ranking Sprint DINONAKTIFKAN atas permintaan user —
+        // Heat Round 1 diisi manual oleh operator lewat dropdown, sama
+        // seperti babak2 berikutnya.
+      }
       this.syncWinLoseFromBracketToParticipants();
 
-      // reset hasil per-babak untuk root key baru
-      this.roundResultsRootKey = getResultsRootKey();
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat();
     },
@@ -3035,11 +3808,33 @@ export default {
       await this.fetchH2HBucketTeamsByKey(key);
     },
 
+    // === Klik tab Initial (Youth/Junior/Open dll) ===
+    async selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+
+      const target = String(i.name).toUpperCase();
+      const match = (this.h2hBucketOptions || []).find((o) => {
+        const b = this.h2hBucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+
+      if (match) {
+        await this.onSelectH2HBucket(match.value);
+      }
+    },
+
     // --- fetch teams via IPC (mirip DRR: fetchBucketTeamsByKey) ---
     async fetchH2HBucketTeamsByKey(key) {
+      // BUG FIX: `isLoadingBracket` sebelumnya bisa NYANGKUT true selamanya
+      // (bagan/tabel keliatan kosong terus, spinner "Loading..." tidak
+      // pernah selesai) dalam 2 skenario: (1) early `return` di jalur
+      // "!res.ok" MELOMPATI baris isLoadingBracket=false yang ada di LUAR
+      // try/catch, dan (2) kalau retry di blok catch JUGA throw, exception-nya
+      // tidak ketangkep apa pun dan keluar dari fungsi ini begitu saja.
+      // finally{} menjamin isLoadingBracket selalu balik false apa pun yang
+      // terjadi di dalam try/catch, termasuk early return atau retry gagal.
+      this.isLoadingBracket = true;
       try {
-        this.isLoadingBracket = true;
-
         if (
           !key ||
           !this.h2hBucketMap[key] ||
@@ -3068,7 +3863,7 @@ export default {
         if (!res || !res.ok) {
           // kosongkan participant tapi tetap apply bucket untuk judul & payload
           this.participant = [];
-          this._useH2HBucket(key);
+          await this._useH2HBucket(key);
           return;
         }
         const doc = Array.isArray(res.items) ? res.items[0] : res.items;
@@ -3084,13 +3879,18 @@ export default {
         };
 
         // apply bucket
-        this._useH2HBucket(key);
+        await this._useH2HBucket(key);
       } catch {
-        // fallback minimal
-        this._useH2HBucket(key);
+        // fallback minimal — kalau ini JUGA gagal, biarkan (tabel/bagan
+        // kosong lebih baik drpd spinner nyangkut selamanya)
+        try {
+          await this._useH2HBucket(key);
+        } catch {
+          /* noop — sudah dilog di _useH2HBucket kalau perlu */
+        }
+      } finally {
+        this.isLoadingBracket = false;
       }
-
-      this.isLoadingBracket = false;
     },
     _h2hBucketKey(b) {
       const ei = b && b.eventId ? String(b.eventId) : "";
@@ -3285,6 +4085,15 @@ export default {
         if (m.team1 && m.team1.name) want.add(m.team1.name.toUpperCase());
         if (m.team2 && m.team2.name) want.add(m.team2.name.toUpperCase());
       });
+      // BUG FIX: tim yang masih di round.pool (belum di-assign ke slot match
+      // apa pun) tidak ikut ke-reset kalau tidak dimasukkan di sini — karena
+      // `result` adalah SATU object yang dipakai bersama lintas SEMUA babak,
+      // tim itu akan tetap menampilkan Result/Win-Lose/waktu dari babak
+      // SEBELUMNYA selama masih menunggu di pool babak yang baru dibuka.
+      (roundObj.pool || []).forEach((t) => {
+        const n = t && (t.name || t.nameTeam || t.teamName);
+        if (n) want.add(String(n).toUpperCase());
+      });
       // map dari participantArr yg namanya ada di round ini
       const list = (this.participantArr || []).filter((p) =>
         want.has(String(p.nameTeam || p.teamName || "").toUpperCase())
@@ -3351,6 +4160,19 @@ export default {
       URL.revokeObjectURL(url);
     },
     // Tambahkan di methods:
+    // BUG FIX: dulu fungsi ini me-reset Win/Lose ke null utk SEMUA
+    // visibleParticipants dulu, baru mengisi ulang HANYA utk tim yang
+    // punya pasangan Heat (2 anggota). Sekarang Heat itu OPSIONAL/manual
+    // (diisi belakangan lewat klik badge "Heat N" di bagan, bukan lagi
+    // syarat pairing) — jadi match yang SUDAH diputuskan pemenangnya lewat
+    // evaluateHeatWinnersForCurrentRound()/syncWinLoseFromBracketToParticipants()
+    // (position-based, tidak butuh Heat) tapi BELUM diberi Heat, Win/Lose-nya
+    // ikut ke-reset ke null di sini padahal race-nya sudah selesai — makanya
+    // Win/Lose kelihatan "hilang" begitu ada recompute (mis. abis isi
+    // penalti). Sekarang HANYA tim yang benar2 py pasangan Heat (2 anggota)
+    // yang di-reset+dihitung ulang di sini; tim lain (belum py Heat sama
+    // sekali) dibiarkan apa adanya — hasil dari mekanisme position-based
+    // tetap berlaku.
     computeWinLoseByHeat() {
       // kelompokkan visibleParticipants berdasarkan nomor heat (yang valid)
       const groups = new Map();
@@ -3362,20 +4184,37 @@ export default {
         groups.get(h).push(p);
       });
 
-      // reset default (biar yang tidak berpasangan tidak menampilkan sisa status lama)
-      (this.visibleParticipants || []).forEach((p) => {
-        if (!p || !p.result) return;
-        p.result.winLose = null;
-      });
-
-      // bandingkan per grup heat
+      // bandingkan per grup heat — reset+recompute HANYA utk grup yang
+      // benar2 py 2 anggota (pasangan Heat lengkap)
       groups.forEach((arr) => {
         if (!Array.isArray(arr) || arr.length < 2) {
-          // belum lengkap pasangannya → biarkan null
+          // belum lengkap pasangannya → biarkan apa adanya, JANGAN direset
           return;
         }
         // jika lebih dari 2 (kasus input ganda), ambil 2 pertama saja
         const [A, B] = arr;
+        A.result.winLose = null;
+        B.result.winLose = null;
+
+        // BUG FIX: sama seperti evaluateHeatWinnersForCurrentRound() — tim
+        // yang di-flag DNF/DNS/DSQ punya waktu kosong, jadi tanpa
+        // penanganan khusus di sini Win/Lose-nya tidak pernah terisi
+        // (dianggap "waktu belum lengkap") padahal lawannya jelas menang.
+        const BAD_FLAGS = ["DNF", "DNS", "DSQ"];
+        const badA = BAD_FLAGS.includes(A.result && A.result.flag);
+        const badB = BAD_FLAGS.includes(B.result && B.result.flag);
+        if (badA || badB) {
+          if (badA && badB) {
+            // kedua sisi di-flag → tidak ada pemenang otomatis
+          } else if (badA) {
+            A.result.winLose = "Lose";
+            B.result.winLose = "Win";
+          } else {
+            A.result.winLose = "Win";
+            B.result.winLose = "Lose";
+          }
+          return;
+        }
 
         const tA = this.parsesTime(
           (A.result && (A.result.totalTime || A.result.raceTime)) || ""
@@ -3395,11 +4234,8 @@ export default {
         } else if (tB < tA) {
           A.result.winLose = "Lose";
           B.result.winLose = "Win";
-        } else {
-          // seri → kosongkan (atau ganti "Draw" kalau mau)
-          A.result.winLose = null;
-          B.result.winLose = null;
         }
+        // seri → biarkan null (sudah direset di atas)
       });
       this.editResult = true;
     },
@@ -3441,118 +4277,481 @@ export default {
       return { usage, maxHeat };
     },
 
-    // opsi heat per baris: nomor yang sudah dipakai di babak aktif (kategori
-    // ini) tetap ditawarkan agar terlihat, ditambah nomor BARU yang melanjutkan
-    // dari heat tertinggi yang sudah dipakai di SELURUH kategori H2H event ini.
-    heatOptionsForItem(item) {
-      const { usage, maxHeat } = this.getEventHeatUsage();
-
-      const usedInThisRound = new Set(
-        (this.visibleParticipants || [])
-          .map((p) => (p && p.result ? Number(p.result.heat) : null))
-          .filter((h) => Number.isFinite(h) && h > 0)
-      );
-
-      const keep =
-        item && item.result && item.result.heat != null
-          ? Number(item.result.heat)
-          : null;
-      if (keep != null) usedInThisRound.add(keep);
-
-      const totalNeeded =
-        this.currentRound && this.currentRound.matches
-          ? this.currentRound.matches.length
-          : 0;
-      const freshSlotsNeeded = Math.max(0, totalNeeded - usedInThisRound.size);
-
-      const freshNumbers = [];
-      for (let i = 1; i <= freshSlotsNeeded + 2; i++) {
-        freshNumbers.push(maxHeat + i);
-      }
-
-      const candidates = Array.from(
-        new Set([...usedInThisRound, ...freshNumbers])
-      ).sort((a, b) => a - b);
-
-      const allowed = candidates.filter((h) => {
-        const used = usage[h] || 0;
-        return used < HEAT_MAX_TEAMS || keep === h;
-      });
-
-      return allowed.map((v) => ({ value: v, text: "Heat " + v }));
+    // ukuran kolom (size) suatu roundId "R{k}" pada bucket dgn jumlah tim
+    // tertentu — meniru persis algoritma buildEmptyBracket() (base 2^n dari
+    // jumlah tim, mengecil separuh tiap kolom) supaya nama babak "R{k}" bisa
+    // dihitung utk bucket LAIN tanpa perlu memuat bucket itu ke state aktif.
+    _h2hRoundSizeForBucket(nTeams, roundIdStr) {
+      const m = /^R(\d+)$/.exec(roundIdStr || "");
+      if (!m) return null;
+      const k = parseInt(m[1], 10);
+      const cap = Math.min(Math.max(4, Number(nTeams) || 0), 32);
+      const base = this.nextPow2(cap);
+      const size = base >> (k - 1);
+      return size >= 2 ? size : null;
     },
 
-    onHeatChanged(item, newVal) {
-      if (!item || !item.result) return;
+    // label "posisi Babak" (mis. "Semifinals", "Final A", "Final B") utk
+    // roundId tertentu, dari JUMLAH TIM (bukan objek bucket) — lihat catatan
+    // BUG FIX di buildHeatAssignments() soal kenapa jumlah tim tidak diambil
+    // dari sini lagi.
+    _h2hRoundLabelForNTeams(nTeams, roundIdStr) {
+      if (roundIdStr === "R_B") return "Final B";
+      const size = this._h2hRoundSizeForBucket(nTeams, roundIdStr);
+      return size ? this.roundName(size) : `Babak ${roundIdStr}`;
+    },
 
-      const prev = Number.isFinite(Number(item.result.heat))
-        ? Number(item.result.heat)
-        : null;
+    // kumpulkan tim per nomor Heat lintas SEMUA bucket H2H (division/race/
+    // initial) pada event ini — sumber datanya sama dgn getEventHeatUsage()
+    // (localStorage per-bucket), tapi di sini kita juga ambil identitas tim,
+    // label kategorinya, dan posisi Babak utk ditampilkan di modal "Lihat Heat".
+    // BUG FIX: dulu jumlah tim per bucket diambil dari h2hBucketMap[key].teams
+    // — tapi map itu cuma di-isi PENUH utk bucket yang SUDAH DIBUKA sesi ini
+    // (buildStaticH2HOptions() taruh SEMUA kombinasi Divisi/Race/Initial di
+    // map dgn teams:[] kosong dulu; fetchH2HBucketTeamsByKey() baru mengisi
+    // .teams asli utk bucket yang benar2 dipilih operator). Akibatnya, label
+    // Babak (Semifinals/Final/dst.) di modal "Lihat Heat" bisa SALAH untuk
+    // kategori yang belum sempat dibuka sesi ini (dihitung seolah cuma 4 tim
+    // krn teams=[] fallback ke minimum bracket). Ambil jumlah tim yang
+    // BENAR dari cache localStorage `eventDetails` (dipakai juga oleh
+    // loadAllH2HBucketsFromEvent() sbg sumber kebenaran) — sumber ini sudah
+    // ada di memori/disk tanpa perlu bucket itu dibuka dulu.
+    _h2hRegisteredTeamCountByKey() {
+      const counts = Object.create(null);
+      try {
+        const raw = localStorage.getItem("eventDetails");
+        const ev = raw ? JSON.parse(raw) : {};
+        const participant = Array.isArray(ev.participant) ? ev.participant : [];
+        participant
+          .filter((b) => String(b.eventName || "").toUpperCase() === "HEAD2HEAD")
+          .forEach((b) => {
+            const key = this._h2hBucketKey(b);
+            counts[key] = Array.isArray(b.teams) ? b.teams.length : 0;
+          });
+      } catch (e) {
+        /* noop — fallback ke h2hBucketMap[key].teams.length di caller */
+      }
+      return counts;
+    },
 
-      let val = newVal === "" || newVal == null ? null : Number(newVal);
-      if (val != null && (!Number.isFinite(val) || val <= 0)) val = null;
+    buildHeatAssignments() {
+      const groups = {};
+      try {
+        const map = this.h2hBucketMap || {};
+        const registeredCounts = this._h2hRegisteredTeamCountByKey();
+        Object.keys(map).forEach((key) => {
+          const b = map[key];
+          if (!b || b._isAggregate) return;
 
-      if (val === prev) {
-        this.persistRoundResults();
-        this.computeWinLoseByHeat();
-        this.evaluateHeatWinnersForCurrentRound();
+          const rootKey = RESULTS_KEY_PREFIX + this._h2hBucketKey(b);
+          const label = this._h2hBucketLabel(b);
+          const allRounds = readAllRoundResults(rootKey) || {};
+          const nTeams =
+            registeredCounts[key] !== undefined
+              ? registeredCounts[key]
+              : Array.isArray(b.teams)
+              ? b.teams.length
+              : 0;
+
+          Object.keys(allRounds).forEach((roundId) => {
+            const roundLabel = this._h2hRoundLabelForNTeams(nTeams, roundId);
+            const rows = Array.isArray(allRounds[roundId])
+              ? allRounds[roundId]
+              : [];
+            rows.forEach((row) => {
+              const h = row && row.result ? Number(row.result.heat) : null;
+              if (!Number.isFinite(h) || h <= 0) return;
+
+              if (!groups[h]) groups[h] = [];
+              const nameTeam = String((row && row.nameTeam) || "");
+              const bibTeam = String((row && row.bibTeam) || "");
+              const already = groups[h].some(
+                (t) =>
+                  t.nameTeam === nameTeam &&
+                  t.bibTeam === bibTeam &&
+                  t.category === label &&
+                  t.round === roundLabel
+              );
+              if (!already) {
+                groups[h].push({
+                  nameTeam,
+                  bibTeam,
+                  category: label,
+                  round: roundLabel,
+                });
+              }
+            });
+          });
+        });
+      } catch (e) {
+        // localStorage tidak tersedia / data korup → tampilkan kosong
+      }
+
+      return Object.keys(groups)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map((h) => ({ heat: h, teams: groups[h] }));
+    },
+
+    openHeatModal() {
+      this.heatModalGroups = this.buildHeatAssignments();
+      this.heatModalVisible = true;
+    },
+
+    // Muat gambar (mis. logo) jadi data URL + dimensi asli — dipakai utk
+    // menempelkan logo ke PDF via jsPDF.addImage(), yang butuh data URL
+    // (bukan sekadar path/URL import webpack).
+    _loadImageAsDataUrl(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx2d = canvas.getContext("2d");
+          ctx2d.drawImage(img, 0, 0);
+          resolve({
+            dataUrl: canvas.toDataURL("image/png"),
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+          });
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    },
+
+    // Tanggal event utk keterangan di PDF bagan — pakai startDateEvent
+    // (+endDateEvent kalau beda) dari dokumen event, format "DD MMM YYYY".
+    _formatEventDateForPdf() {
+      const ev = this.dataEventSafe || {};
+      const fmt = (v) => {
+        if (!v) return "";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      };
+      const start = fmt(ev.startDateEvent);
+      const end = fmt(ev.endDateEvent);
+      if (start && end && start !== end) return `${start} - ${end}`;
+      return start || end || "";
+    },
+
+    // Capture LANGSUNG DOM bagan yang sedang tampil (heat badge, highlight
+    // menang/kalah, dll. apa adanya) jadi PDF — bukan render ulang lewat
+    // template PDF terpisah (beda dgn Print Round/All Round/Overall yang
+    // pakai HeadToHeadPdfResult), krn bagannya sendiri sudah representasi
+    // visual final yang mau di-export.
+    // Layout dasar semua PDF H2H (logo/keterangan/margin konten) — satu
+    // sumber angka spy "professional" & konsisten antar downloadBracketPdf()
+    // & downloadHeatAssignmentPdf(), bukan angka acak yang beda2 tiap fungsi.
+    _pdfLayout() {
+      return {
+        pageMargin: 14, // mm — margin luar standar dokumen cetak
+        // tinggi "kop" (logo STS kiri + logo Event & keterangan kanan) —
+        // cukup longgar utk logo Event (maks 14mm) + judul + 2 baris teks
+        // kanan atas tanpa numpuk sama gambar bagan/tabel di bawahnya.
+        headerHeight: 48, // mm
+        logoWidth: 34, // mm — logo STS lebar (aspect ~512x150) jadi cukup besar tanpa makan tinggi header
+      };
+    },
+
+    // Logo di pojok kiri atas halaman, sejajar vertikal dgn kop keterangan.
+    async _addLogoToPdf(pdf) {
+      try {
+        const { pageMargin, logoWidth } = this._pdfLayout();
+        const logo = await this._loadImageAsDataUrl(logoSts);
+        const logoH = (logo.height / logo.width) * logoWidth;
+        pdf.addImage(logo.dataUrl, "PNG", pageMargin, pageMargin, logoWidth, logoH);
+      } catch (logoErr) {
+        // logo gagal dimuat — lanjut tanpa logo drpd gagal total
+      }
+    },
+
+    // Logo EVENT (dari eventFiles, beda dgn logo STS di pojok kiri) di
+    // pojok KANAN atas, di ATAS blok keterangan Event/Round/Category.
+    // Return tinggi (mm) yang terpakai supaya _addInfoBlockToPdf() tau
+    // harus mulai menulis teks dari mana (spy tidak numpuk sama logo ini).
+    async _addEventLogoToPdf(pdf) {
+      try {
+        const url = this.eventLogoUrl;
+        if (!url) return 0;
+        const { pageMargin } = this._pdfLayout();
+        const logo = await this._loadImageAsDataUrl(url);
+        const maxH = 14; // mm
+        const maxW = 32; // mm
+        let h = maxH;
+        let w = (logo.width / logo.height) * h;
+        if (w > maxW) {
+          w = maxW;
+          h = (logo.height / logo.width) * w;
+        }
+        const pageW = pdf.internal.pageSize.getWidth();
+        const x = pageW - pageMargin - w;
+        pdf.addImage(logo.dataUrl, "PNG", x, pageMargin, w, h);
+        return h;
+      } catch (logoErr) {
+        // logo event gagal dimuat (mis. CORS) — lanjut tanpa logo drpd gagal total
+        return 0;
+      }
+    },
+
+    // jsPDF 1.x (font Helvetica bawaan) cuma bisa render WinAnsi/Latin-1 —
+    // karakter di luar itu (en dash "–", em dash "—", smart quotes, dst,
+    // sering ke-copy-paste dari nama kategori/divisi) bikin encoder-nya
+    // salah deteksi & nulis string sbg UTF-16 + BOM ("þÿ" + spasi di antara
+    // tiap huruf). Ganti dulu ke padanan ASCII sebelum di-render ke PDF.
+    _sanitizePdfText(str) {
+      return String(str == null ? "" : str)
+        .replace(/[–—]/g, "-") // en dash, em dash -> hyphen
+        .replace(/[‘’]/g, "'") // smart single quotes
+        .replace(/[“”]/g, '"') // smart double quotes
+        .replace(/…/g, "...") // ellipsis
+        .replace(/[   ]/g, " ") // non-breaking spaces
+        // eslint-disable-next-line no-control-regex
+        .replace(/[^\x00-\x7f]/g, ""); // sisa karakter non-ASCII lain
+    },
+
+    // Keterangan (Event/Tanggal/Round/Category dll) di pojok KANAN atas,
+    // rapi & right-aligned. `lines` = array of { label, value } ATAU string
+    // polos (baris pertama = judul/Event name, dibuat bold & sedikit lebih
+    // gelap; baris lain "Label: value" abu-abu). `topOffsetMm` menggeser
+    // titik mulai ke bawah kalau ada logo event yang sudah dipasang di atas
+    // blok ini (lihat _addEventLogoToPdf), spy tidak numpuk.
+    _addInfoBlockToPdf(pdf, lines, topOffsetMm = 0) {
+      try {
+        const { pageMargin } = this._pdfLayout();
+        const pageW = pdf.internal.pageSize.getWidth();
+        const rightX = pageW - pageMargin;
+        let y = pageMargin + 3.5 + topOffsetMm;
+
+        const filtered = (lines || []).filter((l) =>
+          typeof l === "string" ? l && l !== "-" : l && l.value && l.value !== "-"
+        );
+
+        filtered.forEach((l, i) => {
+          const isTitle = i === 0 && typeof l === "string";
+          if (isTitle) {
+            pdf.setFont(undefined, "bold");
+            pdf.setFontSize(11);
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(this._sanitizePdfText(l), rightX, y, { align: "right" });
+            y += 5.5;
+          } else {
+            const text =
+              typeof l === "string" ? l : `${l.label}: ${l.value}`;
+            pdf.setFont(undefined, "normal");
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(this._sanitizePdfText(text), rightX, y, { align: "right" });
+            y += 4.2;
+          }
+        });
+        pdf.setFont(undefined, "normal");
+      } catch (infoErr) {
+        // gagal nulis keterangan — lanjut simpan PDF apa adanya
+      }
+    },
+
+    // Tempelkan canvas hasil capture ke halaman PDF, di-skalakan supaya PAS
+    // (fit) di dalam area konten (di bawah kop logo/keterangan, dikurangi
+    // margin standar di kiri/kanan/bawah) sambil mempertahankan aspect
+    // ratio aslinya — dicentang di tengah area itu. Dipakai supaya ukuran
+    // PDF SELALU A4 baku, brp pun ukuran/rasio bagan atau tabel yang
+    // di-capture (lebar/sempit, panjang/pendek).
+    _addFittedImageToPdf(pdf, canvas) {
+      const { pageMargin, headerHeight } = this._pdfLayout();
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const contentTop = headerHeight;
+      const maxW = pageW - pageMargin * 2;
+      const maxH = pageH - contentTop - pageMargin;
+
+      const ratio = canvas.width / canvas.height;
+      let drawW = maxW;
+      let drawH = drawW / ratio;
+      if (drawH > maxH) {
+        drawH = maxH;
+        drawW = drawH * ratio;
+      }
+      const x = (pageW - drawW) / 2;
+      const y = contentTop + (maxH - drawH) / 2;
+
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", x, y, drawW, drawH);
+    },
+
+    async downloadBracketPdf() {
+      const el = this.$refs.bracketCaptureArea;
+      if (!el) {
+        this.notify("warning", "Bracket belum tersedia untuk di-export.", "Info");
         return;
       }
+      this.isDownloadingBracketPdf = true;
+      try {
+        await this.$nextTick();
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+        });
 
-      if (val !== null) {
-        // maksimal 2 tim per nomor heat, dihitung lintas SEMUA kategori H2H
-        // pada event ini (bukan cuma babak/kategori yang sedang dibuka) — 2 tim
-        // yang berbagi 1 nomor Heat OTOMATIS jadi lawan (lihat syncMatchesFromHeat),
-        // jadi cukup pastikan nomornya belum dipakai tim lain di kategori LAIN.
-        const { usage } = this.getEventHeatUsage();
-        const used = usage[val] || 0;
-        if (used >= HEAT_MAX_TEAMS) {
-          this.$bvToast &&
-            this.$bvToast.toast(
-              `Heat ${val} sudah dipakai ${HEAT_MAX_TEAMS}× di event ini.`,
-              {
-                variant: "warning",
-                autoHideDelay: 2500,
-                title: "Limit heat tercapai",
-              }
-            );
-          this.$forceUpdate && this.$forceUpdate();
-          return;
-        }
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+        });
 
-        if (used === 1) {
-          const heldInThisRound = (this.visibleParticipants || []).some(
-            (p) => p !== item && p.result && Number(p.result.heat) === val
-          );
-          if (!heldInThisRound) {
-            this.$bvToast &&
-              this.$bvToast.toast(
-                `Heat ${val} sudah dipakai oleh tim dari Head to Head Category lain.`,
-                {
-                  variant: "danger",
-                  autoHideDelay: 3000,
-                  title: "Heat tidak tersedia",
-                }
-              );
-            this.$forceUpdate && this.$forceUpdate();
-            return;
-          }
-        }
+        this._addFittedImageToPdf(pdf, canvas);
+        await this._addLogoToPdf(pdf);
+        const eventLogoH = await this._addEventLogoToPdf(pdf);
+
+        const roundLabel = this.currentRound
+          ? this.currentRound.bronze
+            ? "Final B"
+            : this.currentRound.name
+          : "-";
+        this._addInfoBlockToPdf(
+          pdf,
+          [
+            String(this.dataEventSafe.eventName || "-"),
+            this._formatEventDateForPdf(),
+            `Round: ${roundLabel} - Category: ${this.titleCategories || "-"}`,
+          ],
+          eventLogoH ? eventLogoH + 2 : 0
+        );
+
+        const safeName = String(this.titleCategories || "event")
+          .trim()
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "");
+        pdf.save(`H2H-Bracket-${safeName || "event"}.pdf`);
+      } catch (err) {
+        this.notify("error", String(err), "Gagal export PDF Bracket");
+      } finally {
+        this.isDownloadingBracketPdf = false;
       }
-
-      this.$set(item.result, "heat", val);
-
-      // simpan & hitung ulang; syncMatchesFromHeat membentuk/menata ulang
-      // pasangan match babak aktif sesuai tim mana saja yang kini berbagi
-      // nomor Heat yang sama
-      this.persistRoundResults();
-      this.computeWinLoseByHeat();
-      this.evaluateHeatWinnersForCurrentRound();
-      this.assignRanks(this.visibleParticipants);
-      this.syncMatchesFromHeat(this.currentRound);
-      this.$nextTick &&
-        this.$nextTick(() => this.$forceUpdate && this.$forceUpdate());
     },
+
+    // Download modal "Heat Assignment – Head to Head" (lintas SEMUA
+    // kategori H2H event ini) sebagai PDF — pola sama dgn downloadBracketPdf()
+    // tapi capture area-nya isi modal (tabel per-Heat), bukan bagan, dan
+    // halamannya A4 Portrait (lebih cocok utk daftar tabel memanjang ke bawah).
+    async downloadHeatAssignmentPdf() {
+      const el = this.$refs.heatModalCaptureArea;
+      if (!el) {
+        this.notify("warning", "Konten belum tersedia untuk di-export.", "Info");
+        return;
+      }
+      this.isDownloadingHeatModalPdf = true;
+      try {
+        await this.$nextTick();
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+        });
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        this._addFittedImageToPdf(pdf, canvas);
+        await this._addLogoToPdf(pdf);
+        const eventLogoH = await this._addEventLogoToPdf(pdf);
+
+        this._addInfoBlockToPdf(
+          pdf,
+          [
+            String(this.dataEventSafe.eventName || "-"),
+            this._formatEventDateForPdf(),
+            "Semua Kategori Head to Head",
+          ],
+          eventLogoH ? eventLogoH + 2 : 0
+        );
+
+        const safeName = String(this.dataEventSafe.eventName || "event")
+          .trim()
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "");
+        pdf.save(`H2H-Heat-Assignment-${safeName || "event"}.pdf`);
+      } catch (err) {
+        this.notify("error", String(err), "Gagal export PDF Heat Assignment");
+      } finally {
+        this.isDownloadingHeatModalPdf = false;
+      }
+    },
+
+    openResetAllModal() {
+      this.resetAllConfirmText = "";
+      this.showResetAllModal = true;
+    },
+
+    onResetAllModalHidden() {
+      if (!this.resetAllInProgress) this.resetAllConfirmText = "";
+    },
+
+    // Bersihkan SEMUA cache localStorage h2hRoundResults:<eventId>|... —
+    // lintas SELURUH bucket H2H event ini, bukan cuma yang sedang dibuka
+    // (prefix sama dgn yang dipakai getEventHeatUsage()/buildHeatAssignments()).
+    _clearAllH2HLocalCachesForEvent(eventId) {
+      try {
+        const prefix = RESULTS_KEY_PREFIX + String(eventId) + "|";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        /* noop */
+      }
+    },
+
+    async confirmResetAll() {
+      if (this.resetAllConfirmText !== this.RESET_ALL_CONFIRM_PHRASE) return;
+      const eventId = this.currentEventId || "";
+      if (!eventId) return;
+
+      this.resetAllInProgress = true;
+      try {
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("h2h:reset-all-reply", (_e, r) => resolve(r));
+          ipcRenderer.send("h2h:reset-all", eventId);
+        });
+
+        if (res && res.ok) {
+          this._clearAllH2HLocalCachesForEvent(eventId);
+          this.notify(
+            "success",
+            "Semua data kompetisi H2H pada event ini sudah dikosongkan.",
+            "Reset All berhasil"
+          );
+          // reload penuh supaya seluruh state (bracket, round results,
+          // socket listeners, dll.) dibangun ulang dari kondisi bersih —
+          // lebih aman drpd re-invoke manual banyak method async berurutan.
+          window.location.reload();
+        } else {
+          this.resetAllInProgress = false;
+          this.notify(
+            "error",
+            (res && res.error) || "Unknown error",
+            "Reset All gagal"
+          );
+        }
+      } catch (err) {
+        this.resetAllInProgress = false;
+        this.notify("error", String(err), "Reset All gagal");
+      }
+    },
+
     makeEmptyResult() {
       return {
         startTime: "",
@@ -3588,6 +4787,39 @@ export default {
         const P1 = map.get(n1);
         const P2 = map.get(n2);
         if (!P1 || !P2) return;
+
+        // BUG FIX: tim yang di-flag DNF/DNS/DSQ (markFlag()) sengaja
+        // mengosongkan raceTime/totalTime-nya — kalau winner HANYA
+        // ditentukan dari perbandingan waktu (di bawah), match ini TIDAK
+        // PERNAH punya pemenang (isFinite(T1/T2) selalu false utk sisi yang
+        // di-flag) padahal lawannya jelas menang. Akibatnya bracket macet
+        // permanen di match ini (advanceToNextRound() menolak lanjut selama
+        // masih ada match "undecided", dan TIDAK ADA cara manual lain utk
+        // set pemenang). Tim yang di-flag otomatis KALAH dari lawannya yang
+        // py waktu sah; kalau KEDUA sisi sama2 di-flag, tidak ada pemenang
+        // yang bisa ditentukan otomatis (operator perlu keputusan manual).
+        const BAD_FLAGS = ["DNF", "DNS", "DSQ"];
+        const flag1 = P1.result && P1.result.flag;
+        const flag2 = P2.result && P2.result.flag;
+        const bad1 = BAD_FLAGS.includes(flag1);
+        const bad2 = BAD_FLAGS.includes(flag2);
+
+        if (bad1 || bad2) {
+          if (bad1 && bad2) {
+            m.winner = null;
+            P1.result.winLose = null;
+            P2.result.winLose = null;
+          } else if (bad1) {
+            m.winner = m.team2;
+            P1.result.winLose = "Lose";
+            P2.result.winLose = "Win";
+          } else {
+            m.winner = m.team1;
+            P1.result.winLose = "Win";
+            P2.result.winLose = "Lose";
+          }
+          return;
+        }
 
         const t1 =
           (P1.result && (P1.result.totalTime || P1.result.raceTime)) || "";
@@ -3691,14 +4923,65 @@ export default {
       const target = this.participant[targetIndex];
       if (!target || !target.result) return;
 
+      // BUG FIX: `target.result` adalah SATU object yang dipakai bersama
+      // lintas SEMUA babak (lihat catatan _teamResultTime()/buildRoundRows()).
+      // onPenaltyChange() di bawah (evaluateHeatWinnersForCurrentRound,
+      // persistRoundResults, dst) SEMUANYA terikat ke this.currentRound /
+      // visibleParticipants. Kalau tim dari pesan realtime Judges Dashboard
+      // ini bukan bagian dari babak yang SEDANG ditampilkan di layar,
+      // perubahan ini akan diam2 HILANG begitu babak asli tim ini dimuat
+      // (loadRoundResultsForCurrentRound() me-reset result dari kosong lalu
+      // merge HANYA dari snapshot localStorage — update realtime ini tidak
+      // pernah sempat ke-persist ke babak yg benar). Drpd silently
+      // kehilangan data, tolak & beri tahu operator supaya pindah ke babak
+      // yang sesuai dulu.
+      const targetNameUp = String(
+        target.nameTeam || target.teamName || ""
+      ).toUpperCase();
+      const inCurrentRound = (this.teamsInCurrentRound || []).some(
+        (n) => String(n).toUpperCase() === targetNameUp
+      );
+      if (!inCurrentRound) {
+        this.notify(
+          "warning",
+          `Update realtime utk "${
+            target.nameTeam || target.teamName
+          }" diabaikan — babak tim ini tidak sedang ditampilkan. Buka babak yang sesuai dulu.`,
+          "Realtime Penalty"
+        );
+        return;
+      }
+
       this.ensurePenaltiesObject(target.result);
       const p = target.result.penalties;
 
+      // BUG FIX: dulu Start/Finish langsung diterima berapa pun nilainya
+      // dari socket, tanpa dicek dulu terhadap daftar Pilihan Pen. Start/
+      // Finish yang benar-benar dikonfigurasi lewat Race Settings — beda
+      // dari Sprint/Slalom/DRR/RX yg semua sudah memvalidasi msg.value
+      // terhadap daftar ALLOWED sebelum menerimanya. Cut Line (CL) malah
+      // SAMA SEKALI belum py cabang sendiri di sini — walau CL sudah bisa
+      // dikustomisasi penuh lewat Race Settings & sudah py dropdown
+      // editable manual (clChoices), operator tidak bisa mengisinya lewat
+      // device/socket sama sekali. Sekarang ketiganya (S/CL/F) dicek dulu
+      // terhadap sChoices/clChoices/fChoices sebelum diterima, sama pola
+      // dgn kategori lain.
       const kind = String(msg.type || "");
       if (kind === "PenaltyStart") {
-        this.$set(p, "s", Number(msg.value) || 0);
+        const v = Number(msg.value);
+        const allowed = (this.sChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "s", v);
+      } else if (kind === "PenaltyCutLine") {
+        const v = Number(msg.value);
+        const allowed = (this.clChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "cl", v);
       } else if (kind === "PenaltyFinish") {
-        this.$set(p, "f", Number(msg.value) || 0);
+        const v = Number(msg.value);
+        const allowed = (this.fChoices || []).map((o) => Number(o.value));
+        if (!allowed.includes(v)) return;
+        this.$set(p, "f", v);
       } else if (kind === "PenaltyOther") {
         this.$set(p, "o", Number(msg.value) || 0);
       } else if (kind === "BooyanCorner") {
@@ -3710,6 +4993,28 @@ export default {
         }
       } else {
         return;
+      }
+
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan
+      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        ipcRenderer.send("judgeLog:send", {
+          eventId: this.currentEventId,
+          raceCategory: "h2h",
+          type: msg.type,
+          text: msg.text,
+          teamId: target.teamId,
+          teamName: target.nameTeam || target.teamName,
+          bibTeam: target.bibTeam,
+          value:
+            kind === "BooyanCorner"
+              ? msg.touched
+                ? 1
+                : 0
+              : Number(msg.value),
+          from: msg.from,
+          sourceTs: msg.ts,
+          raw: msg,
+        });
       }
 
       await this.onPenaltyChange(target);
@@ -3837,19 +5142,25 @@ export default {
     },
 
     // map: NAMA_TIM (UPPER) -> { heat: number, pos: 0|1 }  (pos: team1=0, team2=1)
+    // map: NAMA_TIM (UPPER) -> { slot: index match di bagan, pos: 0|1 }.
+    // Pairing sekarang lewat SLOT (posisi klik operator di bagan), Heat cuma
+    // label manual belakangan (bisa berapa saja, tidak berurutan sesuai
+    // posisi bagan, dan tim BYE sengaja tidak punya Heat sama sekali) — jadi
+    // urutan tabel & tanda Heat per baris harus ikut posisi SLOT di bagan
+    // (dipakai di visibleParticipants() sbg kunci sort utama), bukan nomor
+    // Heat itu sendiri.
     buildHeatOrderPosMapFromBracket() {
       var r = this.currentRound;
       var map = Object.create(null);
       if (!r || !r.matches) return map;
 
       r.matches.forEach(function (m, i) {
-        var h = i + 1;
         var n1 =
           m.team1 && m.team1.name ? String(m.team1.name).toUpperCase() : "";
         var n2 =
           m.team2 && m.team2.name ? String(m.team2.name).toUpperCase() : "";
-        if (n1) map[n1] = { heat: h, pos: 0 };
-        if (n2) map[n2] = { heat: h, pos: 1 };
+        if (n1) map[n1] = { slot: i, pos: 0 };
+        if (n2) map[n2] = { slot: i, pos: 1 };
       });
       return map;
     },
@@ -3952,6 +5263,25 @@ export default {
         });
       }
 
+      // BUG FIX: override Heat dari round.matches (sumber kebenaran per-babak
+      // — properti milik MATCH, bukan tim) setelah merge di atas. Snapshot
+      // localStorage per-babak BISA korup kalau babak lain sempat diedit
+      // sementara babak ini sedang ditampilkan sebelum fix di
+      // _persistAfterCrossRoundEdit() ada (Heat babak lain "kebawa" masuk ke
+      // snapshot babak ini). round.matches sendiri TIDAK PERNAH korup krn
+      // Heat memang tersimpan langsung di situ per-babak — jadi selalu jadi
+      // acuan akhir, menimpa apa pun hasil merge di atas. BYE tidak perlu
+      // Heat sama sekali (heat: null).
+      (r.matches || []).forEach((m) => {
+        if (!m) return; // jaga2 bracket lama/korup dgn entry matches kosong
+        [m.team1, m.team2].forEach((t) => {
+          if (!t || !t.name) return;
+          const p = this._findParticipantByTeam(t);
+          if (!p || !p.result) return;
+          this.$set(p.result, "heat", m.bye ? null : m.heat != null ? m.heat : null);
+        });
+      });
+
       // hitung ulang konsekuensi untuk round ini
       this.assignRanks(this.visibleParticipants);
       this.evaluateHeatWinnersForCurrentRound();
@@ -4029,11 +5359,17 @@ export default {
       try {
         ipcRenderer.send("option-ranked", type);
         ipcRenderer.once("option-ranked-reply", (_e, payload) => {
-          if (payload) {
-            this.dataScore = payload[0].data;
-          } else {
-            this.dataScore = [];
-          }
+          // BUG FIX: `payload` = [] (array kosong, tidak ada dokumen yang
+          // cocok) masih truthy di JS — `payload[0].data` di sini akan
+          // throw TypeError ("Cannot read properties of undefined") yang
+          // tidak pernah ketangkap try/catch luar (callback ini async,
+          // dipanggil belakangan oleh ipcRenderer), jadi dataScore diam2
+          // tidak pernah keisi. Cek eksplisit payload[0] dulu, sama seperti
+          // pola aman di loadDataPenalties().
+          this.dataScore =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
         });
       } catch (error) {
         this.dataScore = [];
@@ -4041,40 +5377,93 @@ export default {
     },
 
     async loadDataPenalties() {
+      // Yes/No (dipakai dropdown R1/R2/L1/L2) bukan pilihan detik penalti —
+      // ini murni hasil negosiasi marker, dipakai onPenaltyChange() utk
+      // menghitung PB (0/50/100) otomatis. Tidak ada di optionPenalties,
+      // jadi tetap statis di sini.
+      this.ynChoices = [
+        { label: "Yes", value: "Y" },
+        { label: "No", value: "N" },
+      ];
+
       try {
-        ipcRenderer.send("option-penalties", "HEAD_TO_HEAD");
+        // PENTING: tipe di database tersimpan sbg "HEADTOHEAD" (tanpa
+        // underscore) — mengirim "HEAD_TO_HEAD" tidak pernah cocok dgn
+        // dokumen manapun, sehingga query selalu kosong dan SEMUA dropdown
+        // penalty (S/CL/F) selalu tanpa pilihan sama sekali.
+        ipcRenderer.send("option-penalties", "HEADTOHEAD");
 
         ipcRenderer.once("option-penalties-reply", (_e, payload) => {
-          if (!payload || !payload[0] || !payload[0].data) {
-            this.sChoices = [];
-            this.fChoices = [];
-            this.clChoices = [];
-            this.ynChoices = [];
-            return;
-          }
-
-          const arr = payload[0].data; // semua kategori
-          if (!Array.isArray(arr)) return;
-
-          // helper untuk ambil kategori
-          const getChoices = (key) => {
-            const cat = arr.find(
-              (d) =>
-                d.category && d.category.toUpperCase() === key.toUpperCase()
-            );
-            return cat && Array.isArray(cat.choices) ? cat.choices : [];
-          };
-
-          this.sChoices = getChoices("START");
-          this.fChoices = getChoices("FINISH");
-          this.clChoices = getChoices("CLASSIC");
-          this.ynChoices = getChoices("YESNO");
+          // Bentuk data di DB adalah list datar {label, value, timePen}[]
+          // (sama seperti SPRINT/SLALOM/DRR/RX) — BUKAN dikelompokkan per
+          // kategori {category, choices}[]. S, CL, dan F sama-sama dropdown
+          // "berapa detik penalti" jadi memakai list yang sama.
+          const data =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
+          this.sChoices = data;
+          this.fChoices = data;
+          this.clChoices = data;
         });
       } catch (error) {
         this.sChoices = [];
         this.fChoices = [];
         this.clChoices = [];
-        this.ynChoices = [];
+      }
+    },
+
+    // PS (Pen. Start), CL (Cut Line), dan PF (Pen. Finish) bisa
+    // dikustomisasi independen per-event lewat modal Race Settings. Kalau
+    // event ini belum pernah diatur, sChoices/clChoices/fChoices dari
+    // optionPenalties (global, diisi loadDataPenalties()) tetap dipakai.
+    async loadRaceSettings() {
+      try {
+        if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const h2hSettings = res && res.ok && res.settings && res.settings.h2h;
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: "",
+                  }))
+                : null;
+
+            const sList = h2hSettings && toList(h2hSettings.startPenalties);
+            const clList = h2hSettings && toList(h2hSettings.cutLinePenalties);
+            const fList = h2hSettings && toList(h2hSettings.finishPenalties);
+
+            if (sList) this.sChoices = sList;
+            if (clList) this.clChoices = clList;
+            if (fList) this.fChoices = fList;
+
+            // Score by Rank per-event (Race Settings) — override tabel
+            // global optionRanked "HEADTOHEAD" (dimuat loadDataScore()) kalau
+            // event ini sudah dikustomisasi. Dipakai scoreForRank()/
+            // getScoreByRanked() yg jadi sumber skor "Save Overall".
+            const scoreByRank =
+              h2hSettings && Array.isArray(h2hSettings.scoreByRank)
+                ? h2hSettings.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.h2hDefaultScoreBeyondRank =
+              Number(h2hSettings && h2hSettings.defaultScoreBeyondRank) || 0;
+
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", this.currentEventId);
+        });
+      } catch (error) {
+        // biarkan sChoices/clChoices/fChoices dari sumber global jika gagal
+        // memuat override
       }
     },
     /** Method podium config */
@@ -4167,7 +5556,6 @@ export default {
     rebuildBracketDynamic(nTeams) {
       this.rounds = this.buildEmptyBracket(nTeams);
       this.currentRoundIndex = this.firstRoundIndex;
-      this.syncMatchesFromHeat(this.currentRound);
       this.computePodium();
     },
 
@@ -4201,9 +5589,30 @@ export default {
       return `Round of ${size}`;
     },
 
-    /** Buat satu kolom ronde kosong — team1/team2 diisi belakangan oleh Heat */
+    /** Satu slot match kosong — team1/team2 diisi manual lewat klik bagan
+     * (assignTeamToMatchSlot), BUKAN otomatis dari Heat. Heat baru dipilih
+     * operator SETELAH kedua sisi terisi tim riil (lihat openHeatEditor). */
+    makeEmptySlot(id) {
+      return {
+        id,
+        team1: { name: "", bibTeam: "" },
+        team2: { name: "", bibTeam: "" },
+        score1: null,
+        score2: null,
+        winner: null,
+        bye: false,
+        heat: null,
+      };
+    },
+
+    /** Buat satu kolom ronde kosong, matches PRE-POPULATED sejumlah slot yang
+     * dibutuhkan (size/2) supaya posisi slot stabil (matchIndex konsisten)
+     * begitu operator mulai klik-assign tim satu per satu. */
     makeEmptyRound(id, size) {
-      return { id: `R${id}`, name: this.roundName(size), size, matches: [], pool: [] };
+      const expected = Math.max(1, Math.floor(size / 2));
+      const matches = [];
+      for (let i = 0; i < expected; i++) matches.push(this.makeEmptySlot(i + 1));
+      return { id: `R${id}`, name: this.roundName(size), size, matches, pool: [] };
     },
 
     /** Bangun struktur default kosong (kolom dari besar → final) */
@@ -4215,8 +5624,8 @@ export default {
       for (let size = base; size >= 2; size >>= 1) {
         rounds.push(this.makeEmptyRound(id++, size));
       }
-      // babak pertama diisi seluruh tim terdaftar — pasangan lawannya baru
-      // terbentuk begitu 2 tim mendapat nomor Heat yang sama (syncMatchesFromHeat)
+      // babak pertama diisi seluruh tim terdaftar — operator klik slot mana
+      // pun di bagan utk menaruh tim itu (tidak ada auto-pairing dari Heat).
       if (rounds.length) {
         rounds[0].pool = this.collectRegisteredTeams();
       }
@@ -4227,7 +5636,7 @@ export default {
           id: "R_B",
           name: "Final B",
           size: 2,
-          matches: [],
+          matches: [this.makeEmptySlot(1)],
           pool: [],
           bronze: true,
         });
@@ -4245,133 +5654,564 @@ export default {
       return src.filter((t) => t.name && !seen.has(t.name) && seen.add(t.name));
     },
 
-    /**
-     * Susun ulang round.matches dari round.pool (tim yang menunggu dipasangkan)
-     * + tim yang sudah berpasangan sebelumnya, dikelompokkan berdasarkan nomor
-     * Heat yang sama (result.heat pada babak aktif), diurutkan menaik. Match
-     * yang pasangannya tidak berubah mempertahankan id/winner/score1/score2
-     * supaya hasil yang sudah diisi tidak hilang saat resync.
-     */
-    syncMatchesFromHeat(round) {
-      if (!round) return;
+    // Fitur "Highlight per Round": tandai match di diagram bracket yang
+    // termasuk babak (currentRound) yang sedang dipilih lewat Prev/Next
+    // Round / dropdown Select Round di bawah — supaya operator langsung
+    // lihat bagian mana dari bracket yang sedang dia isi hasilnya di tabel.
+    isActiveRoundMatch(match) {
+      return !!(
+        this.currentRound &&
+        match &&
+        match.roundId === this.currentRound.id
+      );
+    },
 
-      const toKey = (t) =>
-        String((t && (t.nameTeam || t.teamName || t.name)) || "").toUpperCase();
+    // Bangun satu "game" utk vue-tournament-bracket dari match internal
+    // app (bisa undefined kalau babak itu belum pernah di-sync, mis.
+    // babak yang belum pernah dikunjungi operator — tampilkan placeholder
+    // "TBD" supaya struktur pohon bracket tetap utuh/tidak error).
+    _toVtbGame(m, round, idx) {
+      // roundId/matchIndex/side ditempel di player supaya slot "player" (yang
+      // cuma dikasih { player } oleh library, tanpa akses ke match/round)
+      // tetap tahu HARUS taruh tim di slot mana kalau diklik (lihat
+      // assignTeamToMatchSlot()/removeTeamFromMatchSlot()) — pairing kini
+      // ditentukan lewat POSISI slot yang diklik operator, BUKAN dari Heat.
+      const mkPlayer = (side) => {
+        const team = m && m[side];
+        const name = team && team.name;
+        if (!name) {
+          return {
+            id: `${round.id}-${idx}-${side}-empty`,
+            name: m && m.bye ? "BYE" : "TBD",
+            isPlaceholder: true,
+            // BUG FIX: library cuma skip styling winner/defeated kalau
+            // winner null/undefined (lihat getPlayerClass() di
+            // vue-tournament-bracket) — `false` dianggap "defeated" (background
+            // merah)! Slot TBD/BYE yang belum terisi HARUS null supaya tetap
+            // abu-abu netral, bukan merah seolah-olah tim ini "kalah".
+            winner: null,
+            roundId: round.id,
+            matchIndex: idx,
+            side,
+          };
+        }
+        // BUG FIX (sama seperti placeholder di atas): kalau match BELUM py
+        // pemenang (m.winner null — waktu belum lengkap/belum diputuskan),
+        // hasil HARUS null (bukan `false`) supaya kedua tim tetap netral
+        // abu-abu, bukan otomatis kelihatan "kalah" (merah) sebelum
+        // pertandingannya benar2 selesai.
+        const isWinner = m.winner ? m.winner.name === name : null;
 
-      // kumpulkan semua tim yang relevan: pool (belum berpasangan) + tim yang
-      // sudah ada di match manapun sebelumnya (supaya tidak hilang saat resync)
-      const teamMap = new Map(); // KEY -> { name, bibTeam }
-      (round.pool || []).forEach((t) => {
-        const key = toKey(t);
-        if (key)
-          teamMap.set(key, {
-            name: t.name || t.nameTeam || t.teamName,
-            bibTeam: t.bibTeam || "",
-          });
-      });
-      (round.matches || []).forEach((m) => {
-        [m.team1, m.team2].forEach((t) => {
-          const key = toKey(t);
-          if (key && !teamMap.has(key)) {
-            teamMap.set(key, { name: t.name, bibTeam: t.bibTeam || "" });
-          }
-        });
-      });
+        // Medali (pengganti section "Podium" yang dihapus) — cuma muncul
+        // di Final A (gold utk menang, silver utk kalah) & Final B (bronze
+        // utk menang, yg kalah/4th dapat teks "4th" bold-italic — bukan
+        // ikon medali — sesuai permintaan). Diam2 null kalau match belum
+        // py pemenang (isWinner === null).
+        let medal = null;
+        const isFinalA = !round.bronze && round.size === 2;
+        const isFinalB = !!round.bronze;
+        if (isFinalA) {
+          if (isWinner === true) medal = "gold";
+          else if (isWinner === false) medal = "silver";
+        } else if (isFinalB) {
+          if (isWinner === true) medal = "bronze";
+          else if (isWinner === false) medal = "fourth";
+        }
 
-      // ambil result.heat tim (sumbernya: participantArr, hasil babak aktif)
-      const getHeat = (key) => {
-        const p = (this.participantArr || []).find((pp) => toKey(pp) === key);
-        const h = p && p.result ? Number(p.result.heat) : null;
-        return Number.isFinite(h) && h > 0 ? h : null;
+        return {
+          id: name,
+          name,
+          bib: team.bibTeam || "",
+          isPlaceholder: false,
+          winner: isWinner,
+          medal,
+          roundId: round.id,
+          matchIndex: idx,
+          side,
+          time: this._teamResultTime(team, round.id),
+        };
       };
 
-      const groups = new Map(); // heat -> [{name,bibTeam}, ...]
-      const unassigned = [];
-      teamMap.forEach((team, key) => {
-        const h = getHeat(key);
-        if (h) {
-          if (!groups.has(h)) groups.set(h, []);
-          groups.get(h).push(team);
-        } else {
-          unassigned.push(team);
+      const p1 = mkPlayer("team1");
+      const p2 = mkPlayer("team2");
+      const canDeclareWinner = !!(
+        m &&
+        !m.bye &&
+        m.team1 &&
+        m.team1.name &&
+        m.team2 &&
+        m.team2.name
+      );
+
+      return {
+        id: (m && m.id) || `${round.id}-${idx}`,
+        roundId: round.id,
+        matchIndex: idx,
+        heat: m && m.heat,
+        bye: !!(m && m.bye),
+        canDeclareWinner,
+        // nama babak ditempel PERMANEN di tiap kartu (bukan cuma badge
+        // "Babak Aktif" yang cuma nongol utk babak yg lagi dipilih) supaya
+        // operator selalu tahu kartu ini punya babak apa tanpa perlu
+        // menyesuaikan Prev/Next Round dulu.
+        roundName: round.bronze ? "Final B" : round.name,
+        player1: p1,
+        player2: p2,
+      };
+    },
+
+    // Dipanggil tiap kali Heat berubah lewat klik di bagan (assign/hapus/ubah
+    // nomor). $set pada p.result.heat SEHARUSNYA sudah reaktif sendiri, tapi
+    // reassign array `this.participant` ke referensi BARU (bukan cuma
+    // $forceUpdate) memaksa SEMUA computed turunan (participantArr,
+    // visibleParticipants, dst.) — dan tabel Heat yang bergantung padanya —
+    // pasti ikut re-render segera, tanpa bergantung pada apakah 3rd-party
+    // bracket component/computed chain menangkap perubahan nested dgn benar.
+    _bumpParticipantReactivity() {
+      this.participant = Array.isArray(this.participant)
+        ? this.participant.slice()
+        : this.participant;
+      this.$nextTick(() => this.$forceUpdate());
+    },
+
+    // BUG FIX: bagan menampilkan SEMUA babak sekaligus, jadi operator bisa
+    // assign tim/Heat di match babak MANAPUN kapan saja — TIDAK harus babak
+    // yang lagi dipilih (currentRoundIndex) di tabel/Prev-Next. Tapi
+    // `result` adalah SATU object yang dipakai bersama lintas babak, jadi
+    // (1) simpan snapshot ke babak yang BENAR2 diedit (bukan selalu
+    // currentRound seperti persistRoundResults() biasa), lalu (2) kalau
+    // babak yang diedit BUKAN babak yang lagi ditampilkan di tabel,
+    // pulihkan live state ke data babak yang ditampilkan itu — supaya Heat
+    // babak lain (mis. Heat 14 semifinal) tidak "bocor" nempel ke tim yang
+    // kebetulan juga tampil di tabel babak yang sedang dibuka (mis.
+    // Quarterfinal, yang cuma py Heat 3/4).
+    _persistAfterCrossRoundEdit(editedRound) {
+      if (!editedRound) return;
+      this.persistRoundResultsFor(editedRound);
+      if (!this.currentRound || editedRound.id !== this.currentRound.id) {
+        this.loadRoundResultsForCurrentRound();
+      }
+    },
+
+    // Daftar tim yang masih menunggu dipasangkan (belum ada Heat) pada satu
+    // babak — dipakai utk isi modal "Pilih Tim" klik-assign di slot TBD/BYE.
+    poolForRound(roundId) {
+      const r = (this.rounds || []).find((rr) => rr.id === roundId);
+      return (r && r.pool) || [];
+    },
+
+    // Buka modal "Pilih Tim" saat slot TBD/BYE di bagan diklik.
+    // Cari participant asli (this.participantArr) dari stub tim {name,bibTeam}
+    // yang dipakai di round.pool/round.matches.
+    _findParticipantByTeam(team) {
+      if (!team || !team.name) return null;
+      const wantKey =
+        String(team.name || "").trim().toUpperCase() +
+        "|" +
+        String(team.bibTeam || "").trim();
+      return (this.participantArr || []).find(
+        (pp) =>
+          String(pp.nameTeam || pp.teamName || "").trim().toUpperCase() +
+            "|" +
+            String(pp.bibTeam || "").trim() ===
+          wantKey
+      );
+    },
+
+    // Waktu hasil tim (totalTime kalau ada penalti, else raceTime mentah) —
+    // ditampilkan di bagan begitu tim selesai bertanding (punya start+finish).
+    // BUG FIX: `result` adalah SATU object yang dipakai bersama lintas SEMUA
+    // babak (cuma menyimpan data babak yang SEDANG aktif/dimuat) — tapi
+    // bagan menampilkan SEMUA babak sekaligus. Kalau round yang lagi
+    // di-render BUKAN currentRound, this.participantArr.result tidak bisa
+    // dipercaya (bisa saja masih membawa waktu dari babak lain yang sedang
+    // aktif) — waktu tim itu utk round tsb harus dibaca dari SNAPSHOT
+    // localStorage per-babak, bukan dari state live.
+    _teamResultTime(team, roundId) {
+      if (!team || !team.name) return "";
+      if (this.currentRound && roundId === this.currentRound.id) {
+        const p = this._findParticipantByTeam(team);
+        const r = p && p.result;
+        if (r && (r.totalTime || r.raceTime)) return r.totalTime || r.raceTime;
+        return "";
+      }
+      return this._teamResultTimeFromSnapshot(team, roundId);
+    },
+
+    _teamResultTimeFromSnapshot(team, roundId) {
+      if (!this.roundResultsRootKey || !roundId) return "";
+      const all = readAllRoundResults(this.roundResultsRootKey);
+      const rows = Array.isArray(all[roundId]) ? all[roundId] : [];
+      const wantKey = String(team.name || "").trim().toUpperCase();
+      const row = rows.find(
+        (r) => String(r.nameTeam || "").trim().toUpperCase() === wantKey
+      );
+      const rr = row && row.result;
+      if (!rr) return "";
+      return rr.totalTime || rr.raceTime || "";
+    },
+
+    // Set heat seorang tim ke null (dipakai saat tim jadi BYE/dilepas dari
+    // match riil — BYE tidak perlu nomor Heat sama sekali).
+    _clearParticipantHeat(team) {
+      const p = this._findParticipantByTeam(team);
+      if (p && p.result) this.$set(p.result, "heat", null);
+    },
+
+    // Setelah team1/team2 sebuah slot berubah, tentukan ulang status BYE-nya:
+    // - 2 sisi terisi  -> match riil, TIDAK bye, heat TETAP kosong sampai
+    //   operator klik badge "+ Tentukan Heat" (openHeatEditor).
+    // - 1 sisi terisi  -> otomatis BYE, tim itu auto-menang, heat dikosongkan
+    //   (BYE tidak perlu Heat sama sekali, sesuai permintaan user).
+    // - 0 sisi terisi  -> slot kosong total, bukan apa2.
+    _recomputeMatchByeState(match) {
+      const has1 = !!(match.team1 && match.team1.name);
+      const has2 = !!(match.team2 && match.team2.name);
+      if (has1 && has2) {
+        // BUG FIX: kalau match ini SEBELUMNYA bye (cuma 1 sisi terisi),
+        // match.winner sudah ke-auto-set ke tim solo itu. Begitu sisi kedua
+        // diisi (jadi match riil), winner LAMA itu HARUS dibersihkan — kalau
+        // tidak, tim yang tadinya sendirian tetap tampil hijau "menang" dan
+        // lawan barunya tampil merah "kalah" padahal pertandingannya belum
+        // pernah berlangsung sama sekali.
+        match.bye = false;
+        match.winner = null;
+      } else if (has1 || has2) {
+        const solo = has1 ? match.team1 : match.team2;
+        match.bye = true;
+        match.winner = solo;
+        match.heat = null;
+        this._clearParticipantHeat(solo);
+      } else {
+        match.bye = false;
+        match.winner = null;
+        match.heat = null;
+      }
+    },
+
+    openAssignPicker(player) {
+      this.assignPicker = {
+        show: true,
+        roundId: player.roundId,
+        matchIndex: player.matchIndex,
+        side: player.side,
+      };
+    },
+
+    // Tim dipilih di modal -> ditaruh LANGSUNG ke slot (sisi) yang diklik,
+    // TANPA nomor Heat apa pun — operator yang menentukan Heat belakangan,
+    // dan HANYA kalau kedua sisi match ini sudah terisi tim riil (lihat
+    // openHeatEditor). Pairing sekarang murni dari POSISI slot yang diklik,
+    // bukan dari kesamaan nomor Heat.
+    confirmAssignTeam(team) {
+      this.assignTeamToMatchSlot(
+        {
+          roundId: this.assignPicker.roundId,
+          matchIndex: this.assignPicker.matchIndex,
+          side: this.assignPicker.side,
+        },
+        team
+      );
+      this.assignPicker.show = false;
+    },
+
+    assignTeamToMatchSlot(player, team) {
+      const round = (this.rounds || []).find((r) => r.id === player.roundId);
+      if (!round || !team) return;
+      if (!Array.isArray(round.matches)) this.$set(round, "matches", []);
+
+      // BUG FIX: bracket yang dimuat dari DB bisa saja masih pakai format
+      // LAMA (round.matches cuma sepanjang jumlah heat yang pernah dipakai,
+      // bukan sejumlah slot penuh size/2) — kalau matchIndex yang diklik
+      // (mis. slot ke-3/4) belum ada di array, buat slot kosong dulu di
+      // situ (pakai $set krn set-by-index butuh reaktivitas eksplisit di
+      // Vue 2) alih2 diam2 gagal assign.
+      let match = round.matches[player.matchIndex];
+      if (!match) {
+        match = this.makeEmptySlot(player.matchIndex + 1);
+        this.$set(round.matches, player.matchIndex, match);
+      }
+
+      this.$set(match, player.side, {
+        name: team.name,
+        bibTeam: team.bibTeam || "",
+      });
+
+      // buang dari pool babak ini — tim sudah menempati slot
+      round.pool = (round.pool || []).filter(
+        (t) =>
+          String(t.name || "").trim().toUpperCase() !==
+          String(team.name || "").trim().toUpperCase()
+      );
+
+      // BUG FIX: reset "mulai dari nol" saat tim maju babak (dilakukan
+      // sekali oleh advanceToNextRound() lewat _resetParticipantResultsByName())
+      // bisa "hilang" lagi kalau operator sempat membuka tab babak
+      // SEBELUMNYA (mis. Semifinal) di antara klik Advance dan klik
+      // assign-ke-slot ini — loadRoundResultsForCurrentRound() MEMANG BENAR
+      // memulihkan waktu
+      // asli babak lama itu ke `result` yang dipakai bersama (supaya tab
+      // itu tampil benar), tapi begitu terjadi, status "sudah direset utk
+      // babak baru" jadi hilang. Assign-ke-slot ini lalu menyimpan APA
+      // ADANYA `result` yang sedang aktif — yang ternyata sudah "kembali"
+      // berisi waktu babak lama itu — bocor ke babak baru (Final A/Final
+      // B, dst). Perbaikan: SELALU pastikan SELURUH peserta babak ini
+      // fresh SEBELUM disimpan (bukan cuma tim yang baru diassign — tim
+      // LAIN yang sudah lebih dulu ada di babak ini bisa saja live
+      // result-nya juga masih membawa babak lain), KECUALI babak ini
+      // sendiri sudah pernah punya catatan tersimpan utk tim itu (mis.
+      // sempat dihapus dari slot lalu ditambahkan lagi ke babak yang SAMA
+      // — hasilnya harus tetap ada). Lihat _ensureFreshResultsForRound().
+      this._ensureFreshResultsForRound(round);
+
+      this._recomputeMatchByeState(match);
+
+      this._persistAfterCrossRoundEdit(round);
+      this.saveBracketToDB(true);
+      this._bumpParticipantReactivity();
+    },
+
+    // Reset live `p.result` ke kosong HANYA kalau babak `round` ini belum
+    // pernah punya snapshot tersimpan utk tim `team` — jadi aman dipanggil
+    // berulang tanpa menghapus data yang memang sudah sah milik babak ini.
+    _ensureFreshResultForRoundEntry(team, round) {
+      if (!team || !team.name || !round) return;
+      const p = this._findParticipantByTeam(team);
+      if (!p) return;
+
+      // BUG FIX: cek pertama cuma mengecek APAKAH baris tersimpan sudah
+      // ADA — tapi advanceToNextRound() SENDIRI sudah menulis baris
+      // placeholder (result KOSONG) utk tim ini ke
+      // babak baru saat memindahkannya ke pool. Jadi "baris sudah ada"
+      // SELALU true utk tim yang baru saja maju babak, dan reset di sini
+      // jadi tidak pernah kejadian — persis skenario yang bocor. Yang
+      // benar dicek: apakah baris itu py DATA WAKTU SUNGGUHAN (bukan
+      // placeholder kosong). Kalau tidak ada waktu sungguhan tersimpan,
+      // tetap paksa reset (aman/idempoten) — cuma lewati reset kalau tim
+      // ini MEMANG sudah py catatan hasil race asli di babak ini.
+      if (this.roundResultsRootKey) {
+        const all = readAllRoundResults(this.roundResultsRootKey);
+        const rows = Array.isArray(all[String(round.id)]) ? all[String(round.id)] : [];
+        const row = rows.find(
+          (r) =>
+            String((r && r.nameTeam) || "").trim().toUpperCase() ===
+            String(team.name).trim().toUpperCase()
+        );
+        const hasRealData = !!(
+          row &&
+          row.result &&
+          (row.result.startTime || row.result.raceTime)
+        );
+        if (hasRealData) {
+          // BUG FIX: dulu cuma "return" (tidak disentuh) di sini — tapi
+          // live `p.result` saat itu belum tentu SAMA dgn hasil asli yang
+          // sudah tersimpan (bisa saja live-nya kebetulan lagi kosong/isi
+          // babak lain krn alasan lain) — persist yang dipanggil SETELAH
+          // fungsi ini tetap akan menyimpan APA ADANYA live state itu,
+          // menimpa data asli tanpa sengaja. Pulihkan dulu live state dari
+          // data asli babak ini, baru aman dibiarkan tersimpan lagi.
+          p.result = { ...p.result, ...row.result };
+          this.ensurePenaltiesObject(p.result);
+          return;
+        }
+      }
+
+      p.result = this.makeEmptyResult();
+      this.ensurePenaltiesObject(p.result);
+    },
+
+    // BUG FIX: _persistAfterCrossRoundEdit() menyimpan snapshot SATU BABAK
+    // PENUH (participantsForRound() — semua match + pool babak itu), bukan
+    // cuma 2 tim yang baru diedit. Kalau HANYA 2 tim yang baru diedit yang
+    // di-"fresh"-kan (assignTeamToMatchSlot/renumberMatchHeat lama), tim
+    // LAIN di babak yang sama yang live p.result-nya kebetulan masih
+    // membawa data babak LAIN (mis. baru dipulihkan lewat
+    // loadRoundResultsForCurrentRound() krn tab babak lain sempat dibuka)
+    // ikut ke-persist APA ADANYA saat itu — waktu babak lain "bocor" ke
+    // tim yang sama sekali tidak disentuh oleh aksi operator saat ini.
+    // Panggil ini SEBELUM mengubah field spesifik (heat/assign/dst.) di
+    // ketiga entry point cross-round edit, supaya SELURUH peserta babak
+    // ini benar2 merefleksikan data babak ini sebelum di-persist.
+    _ensureFreshResultsForRound(round) {
+      if (!round) return;
+      this.participantsForRound(round).forEach((p) => {
+        const name = p && (p.nameTeam || p.teamName);
+        if (!name) return;
+        this._ensureFreshResultForRoundEntry(
+          { name, bibTeam: p.bibTeam || "" },
+          round
+        );
+      });
+    },
+
+    // Klik tim yang SUDAH terisi di bagan -> "Hapus dari Slot" -> tim itu
+    // dilepas & kembali ke pool. Reuse _resetParticipantResultsByName supaya
+    // bersih total (heat, start/finish time, penalti, dll.).
+    openRemoveConfirm(player) {
+      this.$bvModal
+        .msgBoxConfirm(
+          `Hapus ${player.name} dari slot ini? Tim akan kembali ke pool.`,
+          {
+            title: "Hapus dari Bagan",
+            okTitle: "Hapus",
+            okVariant: "danger",
+            cancelTitle: "Batal",
+            centered: true,
+          }
+        )
+        .then((ok) => {
+          if (ok) this.removeTeamFromMatchSlot(player);
+        })
+        .catch(() => {});
+    },
+
+    removeTeamFromMatchSlot(player) {
+      const round = (this.rounds || []).find((r) => r.id === player.roundId);
+      if (!round || player.isPlaceholder || !player.name) return;
+      const match = round.matches[player.matchIndex];
+      if (!match) return;
+
+      const removed = match[player.side];
+      if (!removed || !removed.name) return;
+
+      // Pastikan SELURUH peserta babak ini fresh dulu (bukan cuma tim yang
+      // dihapus) — _persistAfterCrossRoundEdit() di bawah menyimpan
+      // snapshot SATU BABAK PENUH, jadi tim lain di babak yang sama yang
+      // live result-nya kebetulan masih membawa babak lain juga harus
+      // dipulihkan dulu, sama seperti assignTeamToMatchSlot()/
+      // renumberMatchHeat().
+      this._ensureFreshResultsForRound(round);
+
+      this._resetParticipantResultsByName([removed.name]);
+      this.$set(match, player.side, { name: "", bibTeam: "" });
+      round.pool = (round.pool || []).concat([
+        { name: removed.name, bibTeam: removed.bibTeam || "" },
+      ]);
+
+      // match bubar dari match riil (kalau sebelumnya py Heat, sisi yang
+      // TERSISA otomatis jadi BYE lagi lewat _recomputeMatchByeState, yang
+      // juga mengosongkan Heat-nya — BYE tidak perlu Heat.
+      this._recomputeMatchByeState(match);
+
+      this._persistAfterCrossRoundEdit(round);
+      this.saveBracketToDB(true);
+      this._bumpParticipantReactivity();
+    },
+
+    // Klik badge Heat (atau "+ Tentukan Heat") di footer match riil (2 tim,
+    // bukan BYE) -> buka modal utk pilih/ubah nomor Heat match itu.
+    openHeatEditor(match) {
+      const suggested = Math.max(this.getEventHeatUsage().maxHeat || 0, 0) + 1;
+      this.heatEditor = {
+        show: true,
+        roundId: match.roundId,
+        matchIndex: match.matchIndex,
+        newHeat: match.heat || suggested,
+      };
+    },
+
+    confirmHeatEditor() {
+      const newHeat = Math.max(1, parseInt(this.heatEditor.newHeat, 10) || 0);
+      if (!newHeat) return;
+      const round = (this.rounds || []).find(
+        (r) => r.id === this.heatEditor.roundId
+      );
+      if (!round) return;
+      const match = round.matches[this.heatEditor.matchIndex];
+      if (match) this.renumberMatchHeat(round, match, newHeat);
+      this.heatEditor.show = false;
+    },
+
+    // Set/ubah nomor Heat SATU match riil (2 tim) sekaligus utk kedua sisi.
+    // Hanya berlaku utk match yang KEDUA sisinya sudah terisi tim riil &
+    // bukan BYE — BYE tidak pernah butuh Heat. Tolak kalau newHeat sudah
+    // dipakai tim lain (kategori H2H manapun di event ini).
+    renumberMatchHeat(round, match, newHeat) {
+      if (!match || match.bye) return;
+      const has1 = !!(match.team1 && match.team1.name);
+      const has2 = !!(match.team2 && match.team2.name);
+      if (!has1 || !has2) return;
+      if (match.heat === newHeat) return;
+
+      const { usage } = this.getEventHeatUsage();
+      if ((usage[newHeat] || 0) > 0) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            `Heat ${newHeat} sudah dipakai tim lain di event ini.`,
+            { variant: "warning", autoHideDelay: 2500, title: "Tidak bisa diubah" }
+          );
+        return;
+      }
+
+      // BUG FIX: `p.result` adalah SATU object yang dipakai bersama lintas
+      // SEMUA babak, dan operator BISA mengubah Heat match babak X sambil
+      // tabel sedang menampilkan babak Y (Y != X) — lihat catatan cross-
+      // round di _persistAfterCrossRoundEdit(). _persistAfterCrossRoundEdit()
+      // di bawah menyimpan snapshot SATU BABAK PENUH (semua match + pool
+      // babak X), bukan cuma 2 tim di match ini — jadi SEMUA peserta babak
+      // X harus dipastikan fresh dulu (bukan cuma 2 tim match ini), kalau
+      // tidak tim LAIN di babak yang sama yang live result-nya kebetulan
+      // masih membawa babak lain ikut ke-persist tercampur juga. Panggil
+      // SEBELUM match.heat diubah supaya urutan operasi selalu: pulihkan
+      // semua peserta ke data babak ini -> baru tempelkan heat baru.
+      this._ensureFreshResultsForRound(round);
+
+      match.heat = newHeat;
+      [match.team1, match.team2].forEach((t) => {
+        const p = this._findParticipantByTeam(t);
+        if (p) {
+          if (!p.result) this.$set(p, "result", this.makeEmptyResult());
+          this.$set(p.result, "heat", newHeat);
         }
       });
 
-      const sortedHeats = Array.from(groups.keys()).sort((a, b) => a - b);
-
-      const prevMatches = round.matches || [];
-      const findPrevMatch = (n1, n2) =>
-        prevMatches.find((m) => {
-          const a = String((m.team1 && m.team1.name) || "").toUpperCase();
-          const b = String((m.team2 && m.team2.name) || "").toUpperCase();
-          const target1 = String(n1 || "").toUpperCase();
-          const target2 = String(n2 || "").toUpperCase();
-          return (
-            (a === target1 && b === target2) || (a === target2 && b === target1)
-          );
-        });
-
-      let nextId =
-        Math.max(0, ...prevMatches.map((m) => Number(m.id) || 0)) + 1;
-
-      const newMatches = sortedHeats.map((h) => {
-        const teams = groups.get(h);
-        const t1 = teams[0];
-        const t2 = teams[1] || null;
-        const prev = findPrevMatch(t1.name, t2 && t2.name);
-        // nomor Heat yang cuma diisi 1 tim otomatis berstatus BYE — tim itu
-        // langsung dianggap menang & menunggu di babak berikutnya, tanpa
-        // perlu tindakan manual apa pun.
-        const isLone = !t2;
-        return {
-          id: prev ? prev.id : nextId++,
-          team1: { name: t1.name, bibTeam: t1.bibTeam || "" },
-          team2: t2
-            ? { name: t2.name, bibTeam: t2.bibTeam || "" }
-            : { name: "", bibTeam: "" },
-          score1: prev ? prev.score1 : null,
-          score2: prev ? prev.score2 : null,
-          winner: prev
-            ? prev.winner
-            : isLone
-            ? { name: t1.name, bibTeam: t1.bibTeam || "" }
-            : null,
-          bye: prev ? !!prev.bye : isLone,
-          heat: h,
-        };
-      });
-
-      round.matches = newMatches;
-      round.pool = unassigned;
-    },
-
-    /** Set pemenang satu match secara manual (override / untuk kasus seri) */
-    declareMatchWinner(round, matchIndex, winnerIdx /* 1 atau 2 */) {
-      if (!round) return;
-      const match = round.matches[matchIndex];
-      if (!match) return;
-
-      match.winner = winnerIdx === 1 ? match.team1 : match.team2;
-
-      const isFinal = !round.bronze && round.size === 2;
-      const isBronze = !!round.bronze;
-      if (isFinal || isBronze) {
-        this.computePodium();
-      }
-      this.syncWinLoseFromBracketToParticipants();
-      this.persistRoundResults();
+      this._persistAfterCrossRoundEdit(round);
+      this.saveBracketToDB(true);
+      this._bumpParticipantReactivity();
     },
 
     /** Pindahkan semua pemenang babak aktif ke pool babak kompetitif berikutnya */
+    // Memindahkan pemenang babak aktif ke pool babak berikutnya (Final A,
+    // dst). KHUSUS kalau babak yang ditinggalkan adalah Semifinal, tombol
+    // ini SEKALIGUS mengarahkan 2 tim yang KALAH ke pool Final B — operator
+    // tidak perlu lagi tombol "Assign Final B" terpisah (dulu ada, sekarang
+    // digabung ke sini atas permintaan user, sekaligus menutup seluruh
+    // kelas bug "tim kalah bawa waktu Semifinal ke Final B" yang muncul
+    // krn ada jeda antara klik Advance & klik Assign Final B — di mana
+    // operator sempat membuka tab Semifinal lagi di antaranya, memulihkan
+    // waktu asli ke `result` yang dipakai bersama sebelum akhirnya
+    // ke-assign salah ke Final B. Sekarang keduanya jadi SATU aksi atomik.
     advanceToNextRound() {
       const round = this.currentRound;
-      if (!round || round.bronze) return;
+      if (!round || round.bronze) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Tidak ada babak kompetitif yang sedang aktif.",
+            { variant: "warning", autoHideDelay: 2500, title: "Tidak bisa lanjut" }
+          );
+        return;
+      }
 
       if (!round.matches.length || (round.pool || []).length) {
         this.$bvToast &&
           this.$bvToast.toast(
             "Masih ada tim yang belum dipasangkan Heat pada babak ini.",
             { variant: "warning", autoHideDelay: 2500, title: "Belum lengkap" }
+          );
+        return;
+      }
+
+      const orphanEmpty = round.matches.filter(
+        (m) =>
+          !m.bye &&
+          !(m.team1 && m.team1.name) &&
+          !(m.team2 && m.team2.name)
+      );
+      if (orphanEmpty.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            `Ada ${orphanEmpty.length} slot match yang masih kosong (belum diisi tim apa pun). Isi dulu slot itu di bagan sebelum lanjut.`,
+            { variant: "warning", autoHideDelay: 3000, title: "Belum lengkap" }
           );
         return;
       }
@@ -4395,51 +6235,113 @@ export default {
           break;
         }
       }
-      if (nextRoundIndex === -1) return;
+      if (nextRoundIndex === -1) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Ini sudah babak terakhir (Final) — tidak ada babak berikutnya untuk dituju.",
+            { variant: "info", autoHideDelay: 2500, title: "Sudah Final" }
+          );
+        return;
+      }
 
       const winners = round.matches
         .map((m) => m.winner)
         .filter((w) => w && w.name);
 
+      if (!winners.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Tidak ada pemenang yang bisa dipindahkan ke babak berikutnya.",
+            { variant: "danger", autoHideDelay: 3000, title: "Advance gagal" }
+          );
+        return;
+      }
+
       const next = this.rounds[nextRoundIndex];
+
+      // Khusus meninggalkan Semifinal (size 4, bukan bronze): sekaligus
+      // siapkan pool Final B dari 2 tim yang kalah. Skip diam2 (bukan
+      // error) kalau Final B tidak ada di bagan ini, atau sudah pernah
+      // terisi 2 tim sebelumnya (mis. Reset manual/assign ulang) — winners
+      // tetap lanjut ke Final A seperti biasa.
+      const isLeavingSemifinal = !round.bronze && round.size === 4;
+      let bronze = null;
+      let bronzeLosers = [];
+      if (isLeavingSemifinal) {
+        bronze = this.rounds.find((r) => r.bronze) || null;
+        if (bronze) {
+          const bronzeHas1 = !!(bronze.matches[0] && bronze.matches[0].team1 && bronze.matches[0].team1.name);
+          const bronzeHas2 = !!(bronze.matches[0] && bronze.matches[0].team2 && bronze.matches[0].team2.name);
+          if (!bronzeHas1 || !bronzeHas2) {
+            const losers = round.matches.map((m) => {
+              if (!m.winner) return null;
+              const lose =
+                m.winner.name === (m.team1 && m.team1.name) ? m.team2 : m.team1;
+              return lose && lose.name ? lose : null;
+            });
+            if (losers[0] && losers[1]) bronzeLosers = [losers[0], losers[1]];
+          }
+        }
+      }
+
+      // PENTING: item.result (start/finish/heat/dll.) adalah satu object yang
+      // dipakai bersama lintas SEMUA babak (bukan per-round). Kalau tidak
+      // direset di sini, nomor Heat babak SEBELUMNYA masih menempel di tim
+      // yang baru menang, padahal babak baru belum tentu heat/lawannya sama.
+      // Reset dulu supaya tim yang maju betul-betul berstatus "menunggu
+      // di-assign manual ke slot bagan babak baru" tanpa Heat.
+      this._resetParticipantResultsByName(winners.map((w) => w.name));
       next.pool = (next.pool || []).concat(
         winners.map((w) => ({ name: w.name, bibTeam: w.bibTeam || "" }))
       );
 
-      this.currentRoundIndex = nextRoundIndex;
-      this.syncMatchesFromHeat(this.rounds[nextRoundIndex]);
-      this.persistRoundResults();
-    },
-
-    /** Isi Bronze (3rd place) setelah SF selesai — 2 tim kalah menunggu Heat */
-    populateBronzeFromSemis() {
-      const sfIdx = this.rounds.findIndex((r) => !r.bronze && r.size === 4);
-      const bronzeIdx = this.rounds.findIndex((r) => r.bronze);
-      if (sfIdx === -1 || bronzeIdx === -1) return;
-
-      const sf = this.rounds[sfIdx];
-      const bronze = this.rounds[bronzeIdx];
-      if (sf.matches.length < 2) return;
-
-      // asumsikan pemenang sudah di-set; ambil 'kalah' dari masing-masing semi
-      const losers = sf.matches.map((m) => {
-        if (!m.winner) return null;
-        const lose =
-          m.winner && m.winner.name === (m.team1 && m.team1.name)
-            ? m.team2
-            : m.team1;
-        return lose && lose.name ? lose : null;
-      });
-
-      if (losers[0] && losers[1]) {
+      if (bronzeLosers.length === 2) {
+        // sama seperti pemenang — reset dulu supaya waktu Semifinal tidak
+        // ikut terbawa ke Final B (Final B mulai kosong dari nol).
+        this._resetParticipantResultsByName(bronzeLosers.map((l) => l.name));
         bronze.pool = [
-          { name: losers[0].name, bibTeam: losers[0].bibTeam || "" },
-          { name: losers[1].name, bibTeam: losers[1].bibTeam || "" },
+          { name: bronzeLosers[0].name, bibTeam: bronzeLosers[0].bibTeam || "" },
+          { name: bronzeLosers[1].name, bibTeam: bronzeLosers[1].bibTeam || "" },
         ];
-        this.syncMatchesFromHeat(bronze);
-        this.persistRoundResults();
       }
+
+      // next.matches sudah pre-populated kosong (lihat makeEmptyRound) —
+      // operator klik-assign tim yang menang satu per satu ke slot bagan
+      // babak ini, sama seperti Round 1. Heat TIDAK auto-diisi di sini.
+      this.currentRoundIndex = nextRoundIndex;
+      this.persistRoundResults(); // persist Final A (babak yg baru jadi aktif)
+
+      if (bronzeLosers.length === 2) {
+        // Final B BUKAN babak yang baru aktif (Final A yang aktif) — harus
+        // di-persist eksplisit di sini, persis pola _persistAfterCrossRoundEdit().
+        this.persistRoundResultsFor(bronze);
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Pemenang lanjut ke Final A, tim yang kalah otomatis diarahkan ke Final B.",
+            { variant: "success", autoHideDelay: 2500, title: "Advance berhasil" }
+          );
+      }
+
+      // auto-save — lihat catatan di assignTeamToMatchSlot() soal kenapa ini perlu
+      this.saveBracketToDB(true);
     },
+
+    // reset .result (heat, start/finish/race time, penalti, winLose, dll.)
+    // milik satu/lebih tim by nama — dipakai saat tim pindah babak supaya
+    // tidak membawa data babak sebelumnya (lihat komentar di advanceToNextRound).
+    _resetParticipantResultsByName(names) {
+      const wantUpper = new Set(
+        (names || []).filter(Boolean).map((n) => String(n).toUpperCase())
+      );
+      if (!wantUpper.size) return;
+      (this.participantArr || []).forEach((p) => {
+        const key = String(p.nameTeam || p.teamName || "").toUpperCase();
+        if (!wantUpper.has(key)) return;
+        p.result = this.makeEmptyResult();
+        this.ensurePenaltiesObject(p.result);
+      });
+    },
+
 
     /** SIGN BRACKET */
     /** load dari payload baru */
@@ -4517,7 +6419,17 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === ranked);
-      return m ? m.score : null;
+      if (m) return m.score;
+      // rank di luar daftar (mis. list cuma diisi Rank 1-4) → pakai score
+      // fallback "Rank N+ dan seterusnya" dari Race Settings, kalau ada.
+      const list = this.dataScore || [];
+      const maxRank = list.length
+        ? Math.max(...list.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.h2hDefaultScoreBeyondRank || 0;
+      }
+      return null;
     },
 
     async updateTime(val, visIndex, title) {
@@ -4612,11 +6524,14 @@ export default {
       localStorage.removeItem("raceStartPayload");
       localStorage.removeItem("participantByCategories");
       localStorage.removeItem("currentCategories");
-      localStorage.removeItem("h2hRoundResults");
 
+      // TIDAK memanggil clearAllRoundResults() di sini — tombol Back ini
+      // sering diklik tanpa wasit sadar hasil round terbaru belum di-Save
+      // ke database. Cache lokal per-bucket aman dibiarkan; akan otomatis
+      // termuat lagi lewat loadRoundResultsForCurrentRound() kalau bucket
+      // ini dibuka lagi nanti.
       this.participant = [];
       this.titleCategories = "";
-      this.clearAllRoundResults(); // NEW
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
   },
@@ -4662,6 +6577,45 @@ export default {
   border-color: rgb(0, 180, 255);
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
+
+.switch-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b3445;
+}
+
+/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn halaman Details/Sprint */
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+}
+
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+}
 /* ---- End styling utk Switch DRR Category select ---- */
 
 .btn-action {
@@ -4671,6 +6625,93 @@ export default {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-outline-*
+   (global, single class) karena atribut data-v-xxxx scoped menambah
+   spesifisitas — jadi tanpa override eksplisit ini, tombol
+   "btn-action btn-outline-danger" (mis. Reset All) tampil putih/netral
+   biasa, BUKAN merah, walau variant class-nya sudah benar. Aksi
+   destruktif dibuat solid merah & menonjol supaya operator sadar sebelum
+   klik. */
+.btn-action.btn-outline-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+.btn-action.btn-outline-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+}
+
+/* Print/Save Round-All Round-Overall — dikelompokkan per scope (bukan 6
+   tombol flat sejajar) supaya operator langsung lihat scope-nya sebelum
+   pilih Print/Save, dan tidak salah pencet "Save" mengira itu utk semua
+   babak padahal cuma babak aktif. Garis warna di kiri tiap grup = penanda
+   cepat scope (biru=Round, ungu=All Rounds, kuning=Overall). */
+.h2h-actions-panel {
+  gap: 10px;
+}
+.h2h-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-left-width: 3px;
+  background: #f8fafc;
+}
+.h2h-action-group--round {
+  border-left-color: #3b82f6;
+}
+.h2h-action-group--all {
+  border-left-color: #8b5cf6;
+}
+.h2h-action-group--overall {
+  border-left-color: #f59e0b;
+}
+.h2h-action-group__label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  padding-right: 8px;
+  margin-right: 2px;
+  border-right: 1px dashed #cbd5e1;
+  white-space: nowrap;
+}
+.h2h-action-btn {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.h2h-action-btn:hover {
+  background: #eef4ff;
+}
+.h2h-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+/* Save = tombol solid (nulis ke DB, konsekuensinya lebih besar drpd cuma
+   generate file PDF) supaya beda bobot visual dgn Print. */
+.h2h-action-btn--save {
+  background: #1c4c7a;
+  border-color: #1c4c7a;
+  color: #ffffff;
+}
+.h2h-action-btn--save:hover {
+  background: #163c61;
 }
 
 /* Connect/Disconnect: .btn-action's white background above wins by default
@@ -5007,6 +7048,338 @@ td {
   border-radius: 999px;
   padding: 2px 10px;
 }
+
+/* ===== Card pembungkus seluruh area bracket H2H ===== */
+.bracket-card {
+  background: #ffffff;
+  border: 1px solid #dde3ec;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+
+/* ===== vue-tournament-bracket (Head to Head bracket display) =====
+   Library-nya cuma nyediain skeleton flex + connector line (warna abu
+   default #999) — semua "kartu" match (nama tim, badge Heat, tombol
+   dll.) sengaja di-restyle total di sini karena default-nya
+   solid abu tanpa rounded corner. PENTING: class winner/defeated di bawah
+   ini datang dari LIBRARY (bukan buatan kita) — jangan diganti namanya. */
+.bracket-vtb-wrap {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+/* posisikan bagan di tengah kalau lebih sempit dari container — pakai
+   width:fit-content + margin:auto (BUKAN flexbox align-items:center) supaya
+   saat bagan lebih LEBAR dari container (banyak babak), overflow-x:auto
+   tetap bisa di-scroll normal dari kiri tanpa ada bagian yang ke-clip
+   (flexbox center akan memotong sisi kiri konten yang overflow). */
+.bracket-vtb-wrap >>> .vtb-wrapper {
+  width: -moz-fit-content;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* kartu match: bungkus nama tim (.vtb-item-players) + footer Heat/tombol
+   jadi SATU card putih rounded — defaultnya abu solid tanpa radius.
+   BUG FIX: dulu pakai overflow:hidden di sini utk membulatkan sudut, tapi
+   itu bisa MEMOTONG/menghalangi klik baris team2 kalau tinggi konten kartu
+   (badge Heat, dll — semuanya tambahan kita, bukan
+   bawaan library) berubah-ubah lebih tinggi dari asumsi awal library.
+   Sekarang radius dipasang langsung di elemen ujung (baris pertama & footer)
+   supaya TIDAK ada clipping konten sama sekali. */
+.bracket-vtb-wrap >>> .vtb-item-players {
+  background: #ffffff !important;
+  color: inherit !important;
+  border: 1px solid #cbd2dc;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  /* jaga2 thd garis penghubung antar babak (pseudo-element absolute milik
+     library, dihitung dari tinggi kartu asumsi bawaan) supaya tidak pernah
+     menutupi/menghalangi klik di atas kartu, walau kartu kita jadi lebih
+     tinggi dari standar bawaan library */
+  position: relative;
+  z-index: 1;
+}
+
+.bracket-vtb-wrap >>> .vtb-player {
+  min-width: 260px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e9f0;
+  transition: background-color 0.15s ease;
+}
+.bracket-vtb-wrap >>> .vtb-player:first-of-type {
+  border-radius: 12px 12px 0 0;
+}
+.bracket-vtb-wrap >>> .vtb-player:last-of-type {
+  border-bottom: none;
+}
+.bracket-vtb-wrap >>> .vtb-player:hover {
+  background: #eef2f7;
+}
+
+/* winner/defeated/highlight = class asli dari library */
+.bracket-vtb-wrap >>> .vtb-player.winner {
+  background: #ecfdf5;
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+.bracket-vtb-wrap >>> .vtb-player.defeated {
+  background: #fef2f2;
+  box-shadow: inset 3px 0 0 #dc2626;
+  opacity: 0.85;
+}
+.bracket-vtb-wrap >>> .vtb-player.winner.highlight {
+  background: #d1fae5;
+}
+.bracket-vtb-wrap >>> .vtb-player.defeated.highlight {
+  background: #fee2e2;
+}
+
+/* garis penghubung antar babak — dibuat sedikit lebih gelap dari abu muda
+   sebelumnya (#cbd5e1) supaya lebih kelihatan di atas card putih */
+.bracket-vtb-wrap >>> .vtb-item-parent:after,
+.bracket-vtb-wrap >>> .vtb-item-child:before,
+.bracket-vtb-wrap >>> .vtb-item-child:after {
+  background-color: #94a3b8 !important;
+}
+
+/* nama+bib+bendera di kiri, waktu hasil di kanan — sebaris (bukan
+   bertumpuk), makanya .vtb-team-name jadi flex row */
+.vtb-team-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+.bracket-vtb-wrap >>> .vtb-player.winner .vtb-team-name {
+  color: #15803d;
+}
+.bracket-vtb-wrap >>> .vtb-player.defeated .vtb-team-name {
+  color: #64748b;
+  font-weight: 600;
+}
+.vtb-team-name.is-placeholder {
+  color: #94a3b8;
+  font-style: italic;
+  font-weight: 500;
+}
+.vtb-team-name__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* Medali di sebelah KANAN Time (bukan sebelah nama) — pengganti section
+   "Podium" terpisah yang dihapus. Cuma muncul di kartu Final A
+   (gold/silver) & Final B (bronze utk menang, teks "4th" bold-italic utk
+   yg kalah). Dibungkus lingkaran putih supaya kontras & konsisten
+   tampilannya di atas latar hijau/merah menang-kalah kartu bagan. */
+.vtb-medal-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  margin-left: 2px;
+}
+.vtb-medal-icon {
+  width: 13px;
+  height: 13px;
+}
+.vtb-medal-icon--gold {
+  color: #d4af37;
+}
+.vtb-medal-icon--silver {
+  color: #9aa5b1;
+}
+.vtb-medal-icon--bronze {
+  color: #b56a34;
+}
+.vtb-fourth-label {
+  font-weight: 700;
+  font-style: italic;
+  font-size: 9px;
+  color: #475569;
+  line-height: 1;
+}
+.vtb-team-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+.bracket-vtb-wrap >>> .vtb-player.winner .vtb-team-time {
+  color: #16a34a;
+}
+
+/* klik-assign/hapus tim langsung di slot bagan — buka modal (bukan
+   dropdown inline) krn bagan ada di dalam container overflow-x:auto */
+.vtb-clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.vtb-clickable:hover {
+  color: #2563eb !important;
+}
+
+/* footer (badge Heat) — lanjutan card putih yang
+   sama, dikasih garis pemisah tipis dari baris nama tim di atasnya */
+.vtb-match-footer {
+  background: #f1f4f8;
+  border-top: 1px solid #e2e7ee;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-radius: 0 0 12px 12px;
+}
+/* Highlight per Round — fitur baru: match yang termasuk currentRound
+   (dipilih via Prev/Next Round / dropdown Select Round) ditandai jelas
+   supaya operator langsung lihat bagian bracket mana yang lagi dia isi. */
+.vtb-match-footer--active {
+  background: #eff6ff;
+  border-top-color: #93c5fd;
+  box-shadow: inset 0 2px 0 #2563eb;
+}
+.bracket-vtb-wrap >>> .vtb-item-players:has(.vtb-match-footer--active) {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+/* saat capture utk Download Bracket (PDF) — hilangkan highlight biru
+   "Babak Aktif" (badge + background biru match-footer), sisakan cuma
+   label nama babak (.vtb-round-badge). */
+.pdf-export-mode .vtb-active-round-badge {
+  display: none !important;
+}
+.pdf-export-mode >>> .vtb-match-footer--active {
+  background: #f1f4f8 !important;
+  border-top-color: #e2e7ee !important;
+  box-shadow: none !important;
+}
+.pdf-export-mode >>> .vtb-item-players:has(.vtb-match-footer--active) {
+  border-color: #cbd2dc !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+}
+/* BUG FIX: box-shadow inset (border hijau/merah kiri Win/Lose) di-render
+   html2canvas sbg potongan diagonal yang jelek (keterbatasan library, bukan
+   masalah CSS-nya) — di export PDF, hilangkan cuma box-shadow-nya, sisakan
+   tint background hijau/merah yang tetap render bersih. */
+.pdf-export-mode >>> .vtb-player.winner {
+  box-shadow: none !important;
+}
+.pdf-export-mode >>> .vtb-player.defeated {
+  box-shadow: none !important;
+}
+.vtb-active-round-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  background: #2563eb;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+/* label babak PERMANEN di tiap kartu match — beda dgn vtb-active-round-badge
+   yang cuma muncul utk babak yg lagi aktif dipilih */
+.vtb-round-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.vtb-heat-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: #2563eb;
+  background: #eef6ff;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+/* match riil yang belum diberi nomor Heat sama sekali — beda warna supaya
+   operator sadar masih perlu klik utk menentukan Heat-nya */
+.vtb-heat-badge--empty {
+  color: #b45309;
+  background: #fff7ed;
+  border-color: rgba(180, 83, 9, 0.2);
+}
+.bracket-size-badge {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #7c3aed;
+  background: #f3ecff;
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.bracket-bye-info-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff7ed;
+  border: 1px solid rgba(180, 83, 9, 0.2);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+/* header grup "Penalties Group" — klik utk minimize/expand kolom2 penalti */
+.penalties-group-th {
+  cursor: pointer;
+  user-select: none;
+}
+.penalties-group-th:hover {
+  /* thead background gelap (#383838) + teks putih — hover HARUS tetap
+     gelap (bukan warna terang spt #eef2f7 sebelumnya) supaya teks putihnya
+     tidak "hilang" ketika di-hover */
+  background: #4d4d4d;
+}
+
+/* kolom Heat di tabel hasil — read-only, cuma menampilkan Heat yang sudah
+   ditentukan lewat bagan (lihat openHeatEditor) — kosong kalau BYE */
+.h2h-heat-readonly {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eef6ff;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.bracket-vtb-bronze {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 16px;
+}
+.bracket-vtb-bronze__title {
+  font-weight: 800;
+  color: #92400e;
+  margin-bottom: 8px;
+}
 .bracket__heat {
   display: inline-block;
   font-size: 11px;
@@ -5326,5 +7699,199 @@ thead th[colspan="8"] {
 .bracket-empty {
   border: 1px dashed #dee2e6;
   border-radius: 6px;
+}
+
+</style>
+
+<!-- unscoped: b-modal renders its content outside this component's scoped
+     CSS reach (portalled to <body>), sama seperti kasus di EventSettings.vue -->
+<style>
+/* Tooltip BootstrapVue (v-b-tooltip) di-append ke <body>, jadi z-index
+   bawaannya (1070) lebih tinggi drpd Navbar (z-index: 1000 di App.vue) —
+   akibatnya tooltip tombol2 di header H2H (yg posisinya dekat/menempel
+   Navbar) tampil MENIMPA Navbar. Turunkan supaya tooltip selalu di BAWAH
+   Navbar, tanpa mengubah tampilan tooltip itu sendiri. */
+.tooltip {
+  z-index: 990 !important;
+}
+
+.heat-modal {
+  max-height: 85vh !important;
+}
+.heat-modal .modal-body {
+  max-height: calc(85vh - 112px);
+  overflow-y: auto;
+}
+.heat-modal .heat-group__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #343a40;
+}
+.heat-modal .heat-group__table th,
+.heat-modal .heat-group__table td {
+  vertical-align: middle;
+}
+/* table-layout: fixed + width tetap di tiap <th> supaya kolom Bib & Kategori
+   sejajar rapi ANTAR tabel Heat 1/2/3/dst — tanpa ini tiap <table> auto-size
+   kolomnya sendiri2 berdasar isi (nama tim/kategori beda panjang), jadi
+   posisi kolom Bib bisa geser2 dari satu tabel Heat ke tabel Heat lainnya. */
+.heat-modal .heat-group__table {
+  table-layout: fixed;
+}
+.heat-modal .heat-group__table td {
+  overflow-wrap: break-word;
+}
+
+/* Modal "Pilih Tim" & "Ubah Nomor Heat" — header custom (bukan header
+   bawaan bootstrap-vue) + body dgn padding sendiri, dipakai bareng di 2
+   modal supaya konsisten. content-class="h2h-picker-modal" mem-bulatkan
+   sudut modal-content krn kita pakai body-class="p-0" (header custom jadi
+   menempel rata ke tepi kalau modal-content tidak dibulatkan di sini). */
+.h2h-picker-modal {
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+}
+.h2h-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  background: #2563eb;
+  position: relative;
+}
+.h2h-picker-header__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.h2h-picker-header__title {
+  font-weight: 800;
+  font-size: 16px;
+  color: #ffffff;
+}
+.h2h-picker-header__subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 2px;
+}
+.h2h-picker-close {
+  flex: 0 0 auto;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.h2h-picker-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+.h2h-picker-body {
+  padding: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.h2h-picker-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+}
+.h2h-picker-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.h2h-picker-item:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.h2h-picker-item + .h2h-picker-item {
+  margin-top: 2px;
+}
+.h2h-picker-item__name {
+  flex: 1 1 auto;
+}
+.h2h-picker-item__chevron {
+  color: #94a3b8;
+  font-size: 16px;
+}
+.h2h-picker-item:hover .h2h-picker-item__chevron {
+  color: #2563eb;
+}
+
+/* modal "Ubah Nomor Heat" — stepper angka + tombol aksi */
+.h2h-heat-editor-body {
+  padding: 20px !important;
+  overflow: visible;
+}
+.h2h-heat-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.h2h-heat-stepper__btn {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.h2h-heat-stepper__btn:hover {
+  background: #eef2f7;
+  color: #2563eb;
+}
+.h2h-heat-stepper__input {
+  width: 90px;
+  height: 44px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  -moz-appearance: textfield;
+}
+.h2h-heat-stepper__input::-webkit-outer-spin-button,
+.h2h-heat-stepper__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.h2h-heat-editor-actions {
+  display: flex;
+  gap: 10px;
+}
+.h2h-heat-editor-actions .btn-action {
+  flex: 1 1 0;
+  justify-content: center;
 }
 </style>

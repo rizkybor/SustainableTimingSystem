@@ -61,23 +61,70 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="results.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
+
+        <b-dropdown
+          variant="link"
+          class="action-btn"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
+          no-caret
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch Sprint Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <div class="switch-category-panel px-3 py-2">
+            <div class="init-tabs mb-2" v-if="bucketInitials.length">
+              <button
+                v-for="i in bucketInitials"
+                :key="i.id"
+                type="button"
+                class="init-tab"
+                :class="{ active: selectedInitialName === i.name }"
+                @click="selectInitialTab(i)"
+              >
+                {{ i.name }}
+              </button>
+            </div>
+            <b-form-select
+              :options="bucketOptionsForSelectedInitial"
+              :value="currentBucketKey"
+              size="sm"
+              @change="goToBucket"
+            />
+          </div>
+        </b-dropdown>
       </div>
     </div>
 
@@ -138,10 +185,12 @@
               <th class="text-center">No</th>
               <th class="text-start">Team Name</th>
               <th class="text-center">BIB</th>
-              <th class="text-center">Penalty Time</th>
               <th class="text-center">Start Time</th>
+              <th class="text-center">Pen. Start (PS)</th>
+              <th class="text-center">Pen. Finish (PF)</th>
               <th class="text-center">Finish Time</th>
               <th class="text-center">Race Time</th>
+              <th class="text-center">Penalty Time</th>
               <th class="text-center">Result</th>
               <th class="text-center">Ranked</th>
               <th class="text-center">Score</th>
@@ -158,17 +207,6 @@
                 </div>
               </td>
               <td class="text-center">{{ r.bibTeam || "-" }}</td>
-              <td class="text-center" style="color: red">
-                <input
-                  v-if="!isOfficial"
-                  type="text"
-                  class="cell-input"
-                  placeholder="00:00:00.000"
-                  :value="r.penaltyTime"
-                  @change="onEditTimeField(r, 'penaltyTime', $event.target.value)"
-                />
-                <span v-else>{{ r.penaltyTime || "00:00:000" }}</span>
-              </td>
               <td class="text-center">
                 <input
                   v-if="!isOfficial"
@@ -179,6 +217,50 @@
                   @change="onEditTimeField(r, 'startTime', $event.target.value)"
                 />
                 <span v-else>{{ r.startTime || "00:00:000" }}</span>
+              </td>
+              <!-- BUG FIX: dulu Penalty Time yg diketik bebas — seharusnya
+                   operator memilih Pen. Start/Pen. Finish dari daftar (sama
+                   seperti menu Sprint Details), Penalty Time cuma HASIL
+                   perhitungan, bukan input langsung. -->
+              <td class="text-center">
+                <select
+                  v-if="!isOfficial"
+                  class="cell-input"
+                  :value="r.startPenalty"
+                  @change="
+                    r.startPenalty = Number($event.target.value);
+                    onPenaltyDropdownChange(r);
+                  "
+                >
+                  <option
+                    v-for="p in dataPenaltiesStart"
+                    :key="'sp-' + idx + '-' + p.value"
+                    :value="p.value"
+                  >
+                    {{ p.label }}
+                  </option>
+                </select>
+                <span v-else>{{ r.startPenalty || 0 }}</span>
+              </td>
+              <td class="text-center">
+                <select
+                  v-if="!isOfficial"
+                  class="cell-input"
+                  :value="r.finishPenalty"
+                  @change="
+                    r.finishPenalty = Number($event.target.value);
+                    onPenaltyDropdownChange(r);
+                  "
+                >
+                  <option
+                    v-for="p in dataPenaltiesFinish"
+                    :key="'fp-' + idx + '-' + p.value"
+                    :value="p.value"
+                  >
+                    {{ p.label }}
+                  </option>
+                </select>
+                <span v-else>{{ r.finishPenalty || 0 }}</span>
               </td>
               <td class="text-center">
                 <input
@@ -192,6 +274,9 @@
                 <span v-else>{{ r.finishTime || "00:00:000" }}</span>
               </td>
               <td class="bold text-center">{{ r.raceTime || "00:00:000" }}</td>
+              <td class="text-center" style="color: red">
+                {{ r.penaltyTime || "00:00:000" }}
+              </td>
               <td class="bold text-center" style="color: green">
                 {{ r.resultTime || "00:00:000" }}
               </td>
@@ -251,6 +336,7 @@
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
       :raceCats="sprintCats"
+      :categories="visibleCategories"
       @close="showOverallModal = false"
     />
   </div>
@@ -267,6 +353,14 @@ import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
+import { exportRowsToExcel } from "@/utils/exportExcel";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -339,6 +433,13 @@ export default {
       results: [],
       showPdf: false,
       eventInfo: {},
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check di buildAggregateFromDoc() (modal Print Result
+      // Overall) — lihat src/utils/registeredTeamsFilter.js
+      registeredBuckets: [],
+      // Race Category yang benar-benar dipilih utk event ini — null =
+      // fail-open (tampilkan semua kolom kategori)
+      enabledCategoryKeys: null,
       dataScore: [
         { ranking: 1, score: 100 },
         { ranking: 2, score: 92 },
@@ -373,6 +474,19 @@ export default {
         { ranking: 31, score: 14 },
         { ranking: 32, score: 12 },
       ],
+      // score fallback utk rank di luar daftar dataScore (Race Settings ->
+      // Sprint -> "Score utk Rank N+ dan seterusnya")
+      sprintDefaultScoreBeyondRank: 0,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
+      // Daftar pilihan Pen. Start (PS) / Pen. Finish (PF) — {label,value,
+      // timePen}[], sama pola dgn SprintRace.vue: default dari optionPenalties
+      // (global), di-override per-event lewat Race Settings kalau ada.
+      dataPenaltiesStart: [],
+      dataPenaltiesFinish: [],
       showOverallModal: false,
       dataAggregate: {
         header: {
@@ -384,10 +498,55 @@ export default {
         },
         rows: [],
       },
+      // Switch Sprint Category (sama pola dgn SprintRace.vue): tab Initial
+      // yg sedang dipilih di switcher toolbar.
+      selectedInitialName: "",
     };
   },
 
   computed: {
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    // Kombinasi statis Divisi x Race x Initial (dari config event, sama
+    // seperti buildStaticSprintOptions() di SprintRace.vue) — dipakai
+    // switcher "Switch Sprint Category" supaya berpindah bucket TANPA
+    // balik ke Dashboard, identik dgn switcher di halaman Race Detail-nya.
+    bucketData() {
+      const q = this.$route.query || {};
+      const eventId = String(q.eventId || this.$route.params.id || "");
+      return buildStaticBucketOptions(this.eventInfo, eventId);
+    },
+    bucketInitials() {
+      return this.bucketData.initials;
+    },
+    // Opsi Divisi/Race saja (Initial sudah dipilih lewat tab) — label tanpa
+    // nama Initial, sama seperti sprintOptionsForSelectedInitial().
+    bucketOptionsForSelectedInitial() {
+      const opts = this.bucketData.bucketOptions;
+      if (!this.selectedInitialName) return opts;
+      const target = String(this.selectedInitialName).toUpperCase();
+      return opts
+        .filter((o) => {
+          const b = this.bucketData.bucketMap[o.value];
+          return b && String(b.initialName).toUpperCase() === target;
+        })
+        .map((o) => {
+          const b = this.bucketData.bucketMap[o.value];
+          return { value: o.value, text: `${b.divisionName} ${b.raceName}` };
+        });
+    },
+    // Key bucket yg SEDANG ditampilkan (dari $route.query saat ini) —
+    // dipakai supaya <b-form-select> menunjukkan pilihan yg aktif.
+    currentBucketKey() {
+      const q = this.$route.query || {};
+      return [
+        String(q.eventId || ""),
+        String(q.initialId || ""),
+        String(q.raceId || ""),
+        String(q.divisionId || ""),
+      ].join("|");
+    },
     hasEventLogo() {
       var ev = this.eventInfo || {};
       var logos = ev.eventFiles;
@@ -433,17 +592,25 @@ export default {
       return parts.join(" - ");
     },
     sprintCats() {
+      // BUG FIX: dulu localStorage (raceStartPayload) diprioritaskan di atas
+      // $route.query — cocok dulu krn satu-satunya cara masuk ke halaman ini
+      // adalah dari Race Detail yg selalu menulis localStorage bucket SAAT
+      // ITU JUGA (selalu sinkron dgn query). Sekarang "Switch Sprint
+      // Category" berpindah bucket murni lewat query (router push), TANPA
+      // menyentuh localStorage — localStorage jadi bucket LAMA yg basi,
+      // sehingga judul tetap menampilkan bucket sebelumnya walau tabel
+      // hasil di bawahnya sudah benar pindah. Balik urutannya: query dulu.
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem("raceStartPayload") || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
         // urutan sesuai permintaan: Initial, Race, Division
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
     // eventInfo() {
@@ -470,7 +637,13 @@ export default {
 
     // Data untuk komponen PDF
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     pdfParticipants() {
       return (this.results || []).map((r) => ({
@@ -508,14 +681,51 @@ export default {
   async created() {
     // ambil event langsung dari IPC
     const q = this.$route.query || {};
+    await this.loadDataPenalties("SPRINT");
     if (q.eventId) {
       await this.loadEventById(q.eventId);
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
+    this.selectedInitialName = String(q.initialName || "").toUpperCase();
 
     this.loadSprintResult();
   },
   mounted() {},
   methods: {
+    // Switch Sprint Category (sama pola dgn onSelectSprintBucket() +
+    // selectInitialTab() di SprintRace.vue) — navigasi ke Sprint Result yg
+    // SAMA dgn bucket (Initial/Divisi/Race) baru; router-view di-key by
+    // fullPath (lihat DetailEvent/index.vue) supaya halaman full-remount &
+    // memuat ulang data bucket barunya dari created().
+    goToBucket(key) {
+      const b = this.bucketData.bucketMap[key];
+      if (!b) return;
+      this.$router.push({
+        path: this.$route.path,
+        query: {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "SPRINT",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        },
+      });
+    },
+    selectInitialTab(i) {
+      this.selectedInitialName = i.name;
+      const target = String(i.name).toUpperCase();
+      const match = this.bucketData.bucketOptions.find((o) => {
+        const b = this.bucketData.bucketMap[o.value];
+        return b && String(b.initialName).toUpperCase() === target;
+      });
+      if (match) this.goToBucket(match.value);
+    },
+
     // builder data untuk modal Overall (header + rows)
     buildAggregateFromDoc: function (doc, eventInfo) {
       var headerTitle = "";
@@ -602,14 +812,39 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore = 0;
-        if (t && t.totalScore != null) {
-          totalScore = Number(t.totalScore);
-          if (!Number.isFinite(totalScore))
-            totalScore = Number(t.totalScore) || 0;
-        } else {
-          totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb saat ini — mencegah skor
+        // basi (tim sudah dihapus/dipindah dari Registered Teams) tetap
+        // muncul di Print Result Overall.
+        var initialName = doc && doc.initialName;
+        var raceName = doc && doc.raceName;
+        var divisionName = doc && doc.divisionName;
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SPRINT", initialName, raceName, divisionName, teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
         }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "HEAD2HEAD", initialName, raceName, divisionName, teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SLALOM", initialName, raceName, divisionName, teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "DRR", initialName, raceName, divisionName, teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "RX", initialName, raceName, divisionName, teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
+
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         rows.push({
           no: i + 1,
           teamName: teamName,
@@ -710,6 +945,148 @@ export default {
       }
     },
 
+    // Daftar pilihan Pen. Start/Finish global (optionPenalties "SPRINT") —
+    // dipakai sbg fallback sebelum Race Settings per-event dimuat, sama
+    // pola dgn loadDataPenalties() di SprintRace.vue.
+    async loadDataPenalties(type) {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        ipcRenderer.send("option-penalties", type);
+        ipcRenderer.once("option-penalties-reply", (_e, payload) => {
+          const data =
+            payload && payload[0] && Array.isArray(payload[0].data)
+              ? payload[0].data
+              : [];
+          this.dataPenaltiesStart = data;
+          this.dataPenaltiesFinish = data;
+        });
+      } catch (error) {
+        this.dataPenaltiesStart = [];
+        this.dataPenaltiesFinish = [];
+      }
+    },
+
+    // sekon -> "HH:MM:SS.000", sama pola dgn secondsToTimeString() di
+    // SprintRace.vue supaya timePen konsisten dgn Race Detail.
+    secondsToTimeString(totalSec) {
+      const t = Math.max(0, Number(totalSec) || 0);
+      const sec = Math.floor(t % 60);
+      const min = Math.floor((t / 60) % 60);
+      const hr = Math.floor(t / 3600);
+      const pad = (n, w = 2) => String(n).padStart(w, "0");
+      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+    },
+
+    // Score by Rank per-event (Race Settings) — override tabel default
+    // (dulunya global/hardcoded lewat optionRanked "SPRINT") kalau event
+    // ini sudah dikustomisasi.
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const scoreByRank =
+              res &&
+              res.ok &&
+              res.settings &&
+              res.settings.sprint &&
+              Array.isArray(res.settings.sprint.scoreByRank)
+                ? res.settings.sprint.scoreByRank
+                : null;
+            if (scoreByRank && scoreByRank.length) {
+              this.dataScore = scoreByRank.map((p) => ({
+                ranking: Number(p.ranking) || 0,
+                score: Number(p.score) || 0,
+              }));
+            }
+            this.sprintDefaultScoreBeyondRank =
+              Number(
+                res &&
+                  res.settings &&
+                  res.settings.sprint &&
+                  res.settings.sprint.defaultScoreBeyondRank
+              ) || 0;
+
+            // PS (Pen. Start) & PF (Pen. Finish) — daftar pilihan independen
+            // yg bisa dikustomisasi per-event lewat Race Settings, sama
+            // pola persis dgn loadRaceSettings() di SprintRace.vue.
+            const sprintSettings = res && res.ok && res.settings && res.settings.sprint;
+            const toList = (arr) =>
+              Array.isArray(arr) && arr.length > 0
+                ? arr.map((p) => ({
+                    label: String(p.label || p.value),
+                    value: Number(p.value) || 0,
+                    timePen: this.secondsToTimeString(Number(p.value) || 0),
+                  }))
+                : null;
+            const startList = sprintSettings && toList(sprintSettings.startPenalties);
+            const finishList = sprintSettings && toList(sprintSettings.finishPenalties);
+            if (startList) this.dataPenaltiesStart = startList;
+            if (finishList) this.dataPenaltiesFinish = finishList;
+
+            // On/off kolom Technical Delegate/Chief Judge/Race Director di
+            // PDF Result Sprint — diatur per kategori lewat Race Settings,
+            // default TAMPIL (true) kalau belum pernah diatur.
+            const boolOrDefault = (v, d) => (v === undefined || v === null ? d : !!v);
+            this.showTechnicalDelegate = boolOrDefault(
+              sprintSettings && sprintSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              sprintSettings && sprintSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              sprintSettings && sprintSettings.showRaceDirector,
+              true
+            );
+
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan dataScore/dataPenalties default kalau gagal memuat override
+      }
+    },
+
+    // Cari opsi penalty by value (seconds) dari salah satu list — dipakai
+    // saat operator ganti pilihan Pen. Start/Finish, sama pola dgn
+    // findPenalty() di SprintRace.vue.
+    findPenaltyOption(val, list) {
+      return (
+        (list || []).find((p) => Number(p.value) === Number(val)) || {
+          value: 0,
+          timePen: "00:00:00.000",
+        }
+      );
+    },
+
+    // Dipanggil saat Pen. Start / Pen. Finish diganti di dropdown: hitung
+    // ulang Penalty Time (PS + PF) dari opsi yg dipilih (BUKAN diketik
+    // bebas), lalu Result Time, re-rank/re-score, dan simpan — sama pola
+    // dgn recalcPenalties() di SprintRace.vue (menu Sprint Details).
+    onPenaltyDropdownChange(row) {
+      const sp = this.findPenaltyOption(row.startPenalty, this.dataPenaltiesStart);
+      const fp = this.findPenaltyOption(row.finishPenalty, this.dataPenaltiesFinish);
+
+      row.startPenaltyTime = sp.timePen;
+      row.finishPenaltyTime = fp.timePen;
+      row.totalPenalty = Number(sp.value) + Number(fp.value);
+
+      const totalPenaltyTime = this.tambahWaktu(sp.timePen, fp.timePen);
+      row.penaltyTime = totalPenaltyTime;
+      row.totalPenaltyTime = totalPenaltyTime;
+
+      row.totalTime = row.raceTime
+        ? this.tambahWaktu(row.raceTime, totalPenaltyTime)
+        : "";
+      row.resultTime = row.totalTime;
+
+      this.results = this.computeRanksAndScores(this.results);
+      this.saveResultsToDb();
+    },
+
     async toggleOfficial() {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
@@ -739,7 +1116,16 @@ export default {
 
     getScoreByRanked(ranked) {
       const m = this.dataScore.find((d) => d.ranking === Number(ranked));
-      return m ? m.score : 0;
+      if (m) return m.score;
+      // rank di luar daftar (mis. list cuma diisi Rank 1-5) → pakai score
+      // fallback "Rank N+ dan seterusnya" dari Race Settings, kalau ada
+      const maxRank = this.dataScore.length
+        ? Math.max(...this.dataScore.map((d) => d.ranking))
+        : 0;
+      if (Number(ranked) > maxRank) {
+        return this.sprintDefaultScoreBeyondRank || 0;
+      }
+      return 0;
     },
 
     /** Normalisasi baris hasil; aman untuk 2 bentuk: flat atau r.result */
@@ -937,8 +1323,11 @@ export default {
           finishPenalty: r.finishPenalty || 0,
           penalty: r.totalPenalty || 0,
           totalPenalty: r.totalPenalty || 0,
-          startPenaltyTime: "00:00:00.000",
-          finishPenaltyTime: "00:00:00.000",
+          // BUG FIX: dulu di-hardcode "00:00:00.000" di sini apa pun nilai
+          // startPenalty/finishPenalty-nya — breakdown waktu PS/PF individual
+          // jadi selalu ke-nolkan tiap kali disimpan (walau totalnya benar).
+          startPenaltyTime: r.startPenaltyTime || "00:00:00.000",
+          finishPenaltyTime: r.finishPenaltyTime || "00:00:00.000",
           totalPenaltyTime: r.penaltyTime || "00:00:00.000",
           penaltyTime: r.penaltyTime || "00:00:00.000",
           totalTime: r.totalTime || r.resultTime || "",
@@ -957,6 +1346,149 @@ export default {
             message: "Gagal menyimpan",
             detail:
               (res && res.error) || "Perubahan tidak tersimpan ke database.",
+          });
+          return;
+        }
+        // Editan di halaman Result (mis. koreksi penalty/waktu) tetap harus
+        // ikut memperbarui dokumen "View Overall" — kalau tidak, ranking di
+        // View Overall diam-diam jadi usang begitu ada koreksi di sini.
+        this.upsertEventResults(q, this.results);
+      });
+    },
+
+    // === merge hasil SPRINT (versi terkoreksi di halaman Result) ke
+    // dokumen event-results (kategori lain aman) — mirror logika yang sama
+    // dgn SprintRace.vue supaya View Overall selalu ikut ter-update. ===
+    async upsertEventResults(identity, rows) {
+      const K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      const toNumOrEmpty = (v) => (v || v === 0 ? v : "");
+
+      const baseFilter = {
+        eventId: String(identity.eventId || ""),
+        initialId: String(identity.initialId || ""),
+        raceId: String(identity.raceId || ""),
+        divisionId: String(identity.divisionId || ""),
+      };
+
+      const incoming = new Map();
+      (rows || []).forEach((r) => {
+        const key = String(r.teamId || r.bibTeam || "");
+        if (!key) return;
+        const ranked = r.ranked || r.ranked === 0 ? r.ranked : "";
+        const scored = ranked !== "" ? this.getScoreByRanked(ranked) : "";
+        incoming.set(key, {
+          teamId: r.teamId || "",
+          teamName: r.nameTeam || "",
+          bib: r.bibTeam || "",
+          sprintCat: {
+            name: K.SPRINT,
+            rankedByCats: toNumOrEmpty(ranked),
+            scored: toNumOrEmpty(scored),
+          },
+          totalRanked: toNumOrEmpty(ranked),
+          totalScore: toNumOrEmpty(scored),
+        });
+      });
+
+      let existingDoc = null;
+      try {
+        const gres = await new Promise((resolve) => {
+          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      const now = new Date();
+      const payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: "SPRINT",
+        initialName: String(identity.initialName || this.sprintCats.initial || ""),
+        raceName: String(identity.raceName || this.sprintCats.race || ""),
+        divisionName: String(identity.divisionName || this.sprintCats.division || ""),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+
+        const map = new Map();
+        (Array.isArray(existingDoc.eventResult) ? existingDoc.eventResult : []).forEach(
+          (row) => {
+            const k = String((row && row.teamId) || (row && row.bib) || "");
+            if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+        );
+
+        incoming.forEach((inc, key) => {
+          let prev = map.get(key);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: "",
+              totalScore: "",
+            };
+          }
+          const prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          const foundIdx = prevCats.findIndex(
+            (c) => String((c && c.name) || "").toUpperCase() === K.SPRINT
+          );
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.sprintCat;
+          else prevCats.push(inc.sprintCat);
+
+          map.set(key, {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+        });
+
+        payload.eventResult = Array.from(map.values());
+      } else {
+        payload.eventResult = Array.from(incoming.values()).map((inc) => ({
+          teamId: inc.teamId,
+          teamName: inc.teamName,
+          bib: inc.bib,
+          categories: [
+            inc.sprintCat,
+            { name: K.H2H, rankedByCats: "", scored: "" },
+            { name: K.SLALOM, rankedByCats: "", scored: "" },
+            { name: K.DRR, rankedByCats: "", scored: "" },
+            { name: K.RX, rankedByCats: "", scored: "" },
+          ],
+          totalRanked: inc.totalRanked,
+          totalScore: inc.totalScore,
+        }));
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Sync Overall gagal",
+            detail: (res && res.error) || "Unknown error",
           });
         }
       });
@@ -982,12 +1514,20 @@ export default {
           divisionName: String(q.divisionName || ""),
         };
 
-        const timeoutId = setTimeout(() => resolve(null), 5000);
+        // reqId supaya balasan channel ini tidak ketukar dengan request lain
+        // yang kebetulan nembak IPC "get-teams-registered" bersamaan (mis.
+        // halaman Details yang fetch beberapa panel divisi/race sekaligus).
+        const reqId = "sprintResult|" + Date.now() + "|" + Math.random();
+        let settled = false;
 
-        ipcRenderer.send("get-teams-registered", identity);
-        ipcRenderer.once("get-teams-registered-reply", (_e, bucket) => {
+        const onReply = (_e, bucket) => {
+          if (!bucket || bucket.__reqId !== reqId) return;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          if (settled) return;
+          settled = true;
           clearTimeout(timeoutId);
-          if (!bucket || !Array.isArray(bucket.teams)) {
+
+          if (!Array.isArray(bucket.teams)) {
             resolve(null);
             return;
           }
@@ -997,7 +1537,17 @@ export default {
             if (n) names.add(n);
           });
           resolve(names);
-        });
+        };
+
+        const timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("get-teams-registered-reply", onReply);
+          resolve(null);
+        }, 5000);
+
+        ipcRenderer.on("get-teams-registered-reply", onReply);
+        ipcRenderer.send("get-teams-registered", { ...identity, __reqId: reqId });
       });
     },
 
@@ -1122,6 +1672,26 @@ export default {
     onPdfGenerated() {
       this.showPdf = false;
     },
+
+    downloadExcel() {
+      const rows = (this.results || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        "Penalty Time": r.penaltyTime || "00:00:00.000",
+        "Start Time": r.startTime || "00:00:00.000",
+        "Finish Time": r.finishTime || "00:00:00.000",
+        "Race Time": r.raceTime || "00:00:00.000",
+        Result: r.resultTime || "00:00:00.000",
+        Ranked: r.ranked || "-",
+        Score:
+          r.score !== undefined && r.score !== null && r.score !== ""
+            ? r.score
+            : this.getScoreByRanked(r.ranked) || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Sprint Result - ${eventName}`, rows, "Sprint Result");
+    },
   },
 };
 </script>
@@ -1167,6 +1737,87 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result & Switch Sprint Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 /* card */
 .card {
@@ -1356,4 +2007,37 @@ export default {
   object-fit: contain;
   border-radius: 10px;
 }
+
+/* ---- Styling utk Switch Sprint Category (dropdown toolbar) ---- */
+.switch-category-panel {
+  min-width: 260px;
+}
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #f1f3f7;
+  padding: 6px;
+  border-radius: 10px;
+}
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #2b3445;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+.init-tab:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+.init-tab.active {
+  background: rgb(54, 142, 180);
+  color: #fff;
+}
+/* ---- End styling utk Switch Sprint Category ---- */
 </style>

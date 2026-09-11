@@ -51,22 +51,35 @@
       </div>
 
       <div class="right-actions">
-        <b-button
+        <b-dropdown
           :disabled="rows.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          @click="generatePdf"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
-          <Icon icon="mdi:download" class="mr-2" /> Download Result (PDF)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <b-dropdown-item @click="generatePdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
 
         <b-button
-          variant="outline-primary"
-          class="action-btn"
+          variant="link"
+          class="action-btn btn-pill btn-pill--outline"
           :disabled="loading"
           @click="fetchEventResultsAggregate"
         >
-          <Icon icon="mdi:table-large" class="mr-2" /> View Overall
+          <Icon icon="mdi:table-large" class="mr-2" width="18" height="18" />
+          View Overall
         </b-button>
 
         <b-button
@@ -78,15 +91,45 @@
           <Icon icon="mdi:sitemap" class="mr-2" /> Print Bracket
         </b-button>
 
-        <b-button
+        <b-dropdown
           variant="outline-secondary"
           class="action-btn"
+          toggle-class="d-flex align-items-center"
           :disabled="loading"
-          @click="generateAllOverallPdf"
         >
-          <Icon icon="mdi:trophy-outline" class="mr-2" /> Print Overall (All
-          Categories)
-        </b-button>
+          <template #button-content>
+            <Icon icon="mdi:trophy-outline" class="mr-2" /> Print Overall (All
+            Categories)
+          </template>
+          <b-dropdown-item @click="generateAllOverallPdf">
+            <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
+          </b-dropdown-item>
+          <b-dropdown-item @click="downloadAllOverallExcel">
+            <Icon icon="mdi:file-excel-box" class="mr-2" /> Excel (.xlsx)
+          </b-dropdown-item>
+        </b-dropdown>
+
+        <b-dropdown
+          variant="link"
+          class="action-btn"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--outline"
+          menu-class="dropdown-menu--pill"
+          no-caret
+        >
+          <template #button-content>
+            <Icon icon="mdi:swap-horizontal" class="mr-2" width="18" height="18" />
+            Switch RX Category
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
+          </template>
+          <div class="switch-category-panel px-3 py-2">
+            <b-form-select
+              :options="bucketData.bucketOptions"
+              :value="currentBucketKey"
+              size="sm"
+              @change="goToBucket"
+            />
+          </div>
+        </b-dropdown>
       </div>
     </div>
 
@@ -298,6 +341,7 @@
       :dataEvent="eventInfo"
       :aggregate="dataAggregate"
       :raceCats="rxCats"
+      :categories="visibleCategories"
       @close="showOverallModal = false"
     />
   </div>
@@ -316,6 +360,14 @@ import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
+import {
+  loadRegisteredBucketsByEvent,
+  isTeamRegisteredFor,
+} from "@/utils/registeredTeamsFilter";
+import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
+import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
+import { exportRowsToExcel, exportSheetsToExcel } from "@/utils/exportExcel";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -346,6 +398,18 @@ export default {
       isOfficial: false,
       loading: false,
       error: "",
+      // semua bucket registrasi (lintas race category) utk event ini,
+      // dipakai cross-check di buildAggregateFromDoc() (modal Print Result
+      // Overall) — lihat src/utils/registeredTeamsFilter.js
+      registeredBuckets: [],
+      // Race Category yang benar-benar dipilih utk event ini — null =
+      // fail-open (tampilkan semua kolom kategori)
+      enabledCategoryKeys: null,
+      // On/off kolom tanda tangan di PDF Result — per kategori lewat Race
+      // Settings, default TAMPIL (true), di-refresh di loadRaceSettings().
+      showTechnicalDelegate: true,
+      showChiefJudge: true,
+      showRaceDirector: true,
       rows: [],
       podium: [],
       showPdf: false,
@@ -359,6 +423,27 @@ export default {
     };
   },
   computed: {
+    visibleCategories() {
+      return getVisibleCategoryMeta(this.enabledCategoryKeys);
+    },
+    // Kombinasi statis Divisi x Race x Initial (dari config event, sama
+    // seperti buildStaticRxOptions() di RaftingCross.vue) — dipakai
+    // switcher "Switch RX Category" (flat select, sama seperti Race
+    // Detail-nya).
+    bucketData() {
+      const q = this.$route.query || {};
+      const eventId = String(q.eventId || this.$route.params.id || "");
+      return buildStaticBucketOptions(this.eventInfo, eventId);
+    },
+    currentBucketKey() {
+      const q = this.$route.query || {};
+      return [
+        String(q.eventId || ""),
+        String(q.initialId || ""),
+        String(q.raceId || ""),
+        String(q.divisionId || ""),
+      ].join("|");
+    },
     hasEventLogo() {
       var logos = this.eventInfo.eventFiles;
       if (Array.isArray(logos) && logos.length > 0) {
@@ -378,16 +463,21 @@ export default {
       return "";
     },
     rxCats() {
+      // BUG FIX: query dulu, localStorage cuma fallback — lihat catatan
+      // di h2hCats() (HeadToHeadResult.vue)/sprintCats() (SprintResult.vue)
+      // soal kenapa localStorage-first bikin judul basi setelah "Switch RX
+      // Category" (yg cuma ganti $route.query, tidak menyentuh
+      // localStorage).
+      const q = this.$route.query || {};
       const payload = safeParse(
         localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
         {}
       );
       const b = payload.bucket || {};
-      const q = this.$route.query || {};
       return {
-        initial: b.initialName || q.initialName || "-",
-        race: b.raceName || q.raceName || "-",
-        division: b.divisionName || q.divisionName || "-",
+        initial: q.initialName || b.initialName || "-",
+        race: q.raceName || b.raceName || "-",
+        division: q.divisionName || b.divisionName || "-",
       };
     },
     pdfFilename() {
@@ -407,7 +497,13 @@ export default {
       return parts.join(" - ");
     },
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        showTechnicalDelegate: this.showTechnicalDelegate,
+        showChiefJudge: this.showChiefJudge,
+        showRaceDirector: this.showRaceDirector,
+      };
     },
     bracketPdfFilename() {
       const parts = [];
@@ -455,12 +551,65 @@ export default {
     const q = this.$route.query || {};
     if (q.eventId) {
       await this.loadEventById(q.eventId);
+      this.registeredBuckets = await loadRegisteredBucketsByEvent(q.eventId);
+      this.enabledCategoryKeys = await loadEnabledCategoryKeys(q.eventId);
+      await this.loadRaceSettings(q.eventId);
     }
     await this.loadRxResult();
   },
   methods: {
+    // On/off kolom Technical Delegate/Chief Judge/Race Director di PDF
+    // Result RX — diatur per kategori lewat Race Settings, default TAMPIL
+    // (true) kalau belum pernah diatur. Sama pola dgn loadRaceSettings() di
+    // SprintResult.vue/DrrResult.vue.
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            const rxSettings = res && res.ok && res.settings && res.settings.rx;
+            const boolOrDefault = (v, d) =>
+              v === undefined || v === null ? d : !!v;
+            this.showTechnicalDelegate = boolOrDefault(
+              rxSettings && rxSettings.showTechnicalDelegate,
+              true
+            );
+            this.showChiefJudge = boolOrDefault(
+              rxSettings && rxSettings.showChiefJudge,
+              true
+            );
+            this.showRaceDirector = boolOrDefault(
+              rxSettings && rxSettings.showRaceDirector,
+              true
+            );
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (error) {
+        // biarkan default (true) kalau gagal memuat override
+      }
+    },
+
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
+    },
+    goToBucket(key) {
+      const b = this.bucketData.bucketMap[key];
+      if (!b) return;
+      this.$router.push({
+        path: this.$route.path,
+        query: {
+          eventId: b.eventId,
+          initialId: b.initialId,
+          raceId: b.raceId,
+          divisionId: b.divisionId,
+          eventName: "RX",
+          initialName: b.initialName,
+          raceName: b.raceName,
+          divisionName: b.divisionName,
+        },
+      });
     },
     async toggleOfficial() {
       const q = this.$route.query || {};
@@ -659,13 +808,43 @@ export default {
             rxRank = rk;
           }
         }
-        var totalScore =
-          t && t.totalScore != null
-            ? Number(t.totalScore) || 0
-            : sprintScore + h2hScore + slalomScore + drrScore + rxScore;
+        // Skor/rank per discipline hanya dipercaya kalau tim ini MASIH
+        // benar-benar terdaftar di discipline tsb saat ini — mencegah skor
+        // basi (tim sudah dihapus/dipindah dari Registered Teams) tetap
+        // muncul di Print Result Overall.
+        var initialName = doc && doc.initialName;
+        var raceName = doc && doc.raceName;
+        var divisionName = doc && doc.divisionName;
+        var teamName = t.teamName || "";
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SPRINT", initialName, raceName, divisionName, teamName)) {
+          sprintScore = 0;
+          sprintRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "HEAD2HEAD", initialName, raceName, divisionName, teamName)) {
+          h2hScore = 0;
+          h2hRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "SLALOM", initialName, raceName, divisionName, teamName)) {
+          slalomScore = 0;
+          slalomRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "DRR", initialName, raceName, divisionName, teamName)) {
+          drrScore = 0;
+          drrRank = 0;
+        }
+        if (!isTeamRegisteredFor(this.registeredBuckets, "RX", initialName, raceName, divisionName, teamName)) {
+          rxScore = 0;
+          rxRank = 0;
+        }
+
+        var hasAnyValidDiscipline =
+          sprintRank > 0 || h2hRank > 0 || slalomRank > 0 || drrRank > 0 || rxRank > 0;
+        if (!hasAnyValidDiscipline) continue;
+
+        var totalScore = sprintScore + h2hScore + slalomScore + drrScore + rxScore;
         rows.push({
           no: i + 1,
-          teamName: t.teamName || "",
+          teamName: teamName,
           bib: t.bib || "",
           countryCode: this.flagFor(t.teamName),
           sprintScore: sprintScore,
@@ -702,6 +881,41 @@ export default {
     onBeforeDownload() {},
     onPdfGenerated() {
       this.showPdf = false;
+    },
+
+    downloadExcel() {
+      const rows = (this.rows || []).map((r, idx) => ({
+        No: idx + 1,
+        "Team Name": r.nameTeam || "-",
+        BIB: r.bibTeam || "-",
+        "Race Time": r.raceTime || "-",
+        "Penalty Time": r.penaltyTime || "-",
+        "Total Time": r.totalTime || "-",
+        Ranked: r.ranked || "-",
+        Score: r.score || 0,
+      }));
+      const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+      exportRowsToExcel(`Rafting Cross Result - ${eventName}`, rows, "RX Result");
+    },
+
+    async downloadAllOverallExcel() {
+      try {
+        await this.loadAllCategoriesOverall();
+        const sheets = (this.allCategoriesOverall || []).map((cat) => ({
+          name: `${cat.divisionName || ""} ${cat.raceName || ""} ${cat.initialName || ""}`.trim(),
+          rows: (cat.rows || []).map((r, idx) => ({
+            No: idx + 1,
+            "Team Name": r.nameTeam || "-",
+            BIB: r.bibTeam || "-",
+            Ranked: r.ranked || "-",
+            Score: r.score || 0,
+          })),
+        }));
+        const eventName = (this.eventInfo && this.eventInfo.eventName) || "Event";
+        exportSheetsToExcel(`RX Overall All Categories - ${eventName}`, sheets);
+      } catch (e) {
+        this.error = "Gagal membuat Excel overall semua kategori";
+      }
     },
 
     // bucket kategori RX yang sedang dibuka (dipakai untuk bracket & overall lintas kategori)
@@ -872,6 +1086,87 @@ export default {
   font-weight: 600;
 }
 
+/* ---- Redesign: Download Result & Switch Category buttons ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .btn-pill--outline {
+  background: #fff;
+  color: #37475a !important;
+  border-color: #dbe0e8;
+}
+.right-actions >>> .btn-pill--outline:hover,
+.right-actions >>> .btn-pill--outline:focus {
+  border-color: #1c6fb0;
+  color: #1c6fb0 !important;
+  background: #f2f9fd;
+  transform: translateY(-1px);
+}
+.right-actions >>> .btn-pill--outline:disabled {
+  background: #fff;
+  border-color: #e4e7ed;
+  color: #b4bac4 !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
+
 .card {
   background: #fff;
   border-radius: 14px;
@@ -1036,4 +1331,10 @@ export default {
   color: #6c7a93;
   font-size: 12px;
 }
+
+/* ---- Styling utk Switch RX Category (dropdown toolbar) ---- */
+.switch-category-panel {
+  min-width: 260px;
+}
+/* ---- End styling utk Switch RX Category ---- */
 </style>

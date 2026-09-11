@@ -1343,7 +1343,7 @@ export default {
 .chat-widget {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  bottom: 70px;
   z-index: 1050;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;

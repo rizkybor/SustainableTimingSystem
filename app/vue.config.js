@@ -22,8 +22,8 @@ module.exports = {
       builderOptions: {
         appId: "com.kpu.sustainabletimingsystem",
         productName: "STiming System 424",
-        directories: { buildResources: "assets/icons" },
-        extraResources: [{ from: "assets/icons", to: "assets/icons" }],
+        directories: { buildResources: "src/assets/icons" },
+        extraResources: [{ from: "src/assets/icons", to: "assets/icons" }],
         asarUnpack: ["**/*.node"],
         files: [
           "**/*",

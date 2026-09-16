@@ -22,6 +22,55 @@
     <!-- Body -->
     <div class="p-4" v-if="!loading">
       <div class="p-4">
+        <!-- GENERAL: Protest Time -->
+        <div class="rs-card mb-3">
+          <div class="px-3 py-3">
+            <div class="h4 font-weight-bold mb-1">General</div>
+            <div class="font-weight-bold mb-1">Protest Time</div>
+            <small class="text-muted d-block mb-3">
+              Ditampilkan di PDF Result setiap kategori & initial selama
+              status masih UNOFFICIAL (mis. "Protest Time : 00:00:05.000
+              min").
+            </small>
+            <div class="d-flex align-items-end flex-wrap" style="gap: 16px">
+              <div>
+                <small class="text-muted d-block mb-1">Menit</small>
+                <b-form-spinbutton
+                  v-model="protestMin"
+                  min="0"
+                  max="59"
+                  style="width: 120px"
+                />
+              </div>
+              <div>
+                <small class="text-muted d-block mb-1">Detik</small>
+                <b-form-spinbutton
+                  v-model="protestSec"
+                  min="0"
+                  max="59"
+                  style="width: 120px"
+                />
+              </div>
+              <div>
+                <small class="text-muted d-block mb-1">Milidetik</small>
+                <b-form-spinbutton
+                  v-model="protestMs"
+                  min="0"
+                  max="999"
+                  step="1"
+                  style="width: 120px"
+                />
+              </div>
+              <div>
+                <small class="text-muted d-block mb-1">Preview</small>
+                <div class="font-weight-bold" style="padding: 6px 0">
+                  {{ draft.protestTime }} min
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- SPRINT -->
         <div class="rs-card mb-3" v-if="showSprint">
           <div class="px-3 py-3">
@@ -1221,6 +1270,12 @@
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import {
+  DEFAULT_PROTEST_TIME,
+  normalizeProtestTime,
+  parseProtestTimeParts,
+  buildProtestTime,
+} from "@/utils/protestTime";
 // Gambar dekoratif di pojok kanan header tiap panel kategori (immersive) —
 // satu gambar khas per kategori, murni visual (tidak ada makna fungsional).
 import sprintBannerImg from "@/assets/images/Rectangle-3.png";
@@ -1439,6 +1494,7 @@ const DEFAULT_PDF_SIGNATURE_TOGGLES = {
 };
 
 const DEFAULT_SETTINGS = {
+  protestTime: DEFAULT_PROTEST_TIME,
   sprint: {
     startPenalties: DEFAULT_START_PENALTIES.map((p) => ({ ...p })),
     finishPenalties: DEFAULT_FINISH_PENALTIES.map((p) => ({ ...p })),
@@ -1543,6 +1599,37 @@ export default {
     };
   },
   computed: {
+    // Protest Time disimpan sbg satu string "HH:MM:SS.mmm" di draft.protestTime
+    // (dikirim apa adanya ke PDF Result) — 3 spinbutton di bawah cuma UI utk
+    // mengedit bagian menit/detik/milidetik-nya tanpa user harus ketik
+    // format string manual. Getter parse dari string, setter compose ulang.
+    protestMin: {
+      get() {
+        return parseProtestTimeParts(this.draft.protestTime).min;
+      },
+      set(v) {
+        const p = parseProtestTimeParts(this.draft.protestTime);
+        this.draft.protestTime = buildProtestTime(v, p.sec, p.ms);
+      },
+    },
+    protestSec: {
+      get() {
+        return parseProtestTimeParts(this.draft.protestTime).sec;
+      },
+      set(v) {
+        const p = parseProtestTimeParts(this.draft.protestTime);
+        this.draft.protestTime = buildProtestTime(p.min, v, p.ms);
+      },
+    },
+    protestMs: {
+      get() {
+        return parseProtestTimeParts(this.draft.protestTime).ms;
+      },
+      set(v) {
+        const p = parseProtestTimeParts(this.draft.protestTime);
+        this.draft.protestTime = buildProtestTime(p.min, p.sec, v);
+      },
+    },
     showSprint() {
       return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SPRINT");
     },
@@ -1686,6 +1773,7 @@ export default {
       });
 
       return {
+        protestTime: normalizeProtestTime(src.protestTime),
         sprint: {
           startPenalties: cleanList(
             src.sprint && src.sprint.startPenalties,

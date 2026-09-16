@@ -12,6 +12,16 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   // Sanitasi minimal (biar selalu konsisten)
   const incoming = safe(settings);
 
+  // Protest Time — satu nilai GLOBAL (bukan per-kategori), ditampilkan di
+  // PDF Result semua kategori & initial saat status masih UNOFFICIAL.
+  // Format "HH:MM:SS.mmm", sama dgn format waktu race lain di app ini.
+  const DEFAULT_PROTEST_TIME = "00:00:05.000";
+  const PROTEST_TIME_RE = /^([0-9]{2}):([0-9]{2}):([0-9]{2})\.([0-9]{3})$/;
+  const cleanProtestTime = (raw) =>
+    typeof raw === "string" && PROTEST_TIME_RE.test(raw)
+      ? raw
+      : DEFAULT_PROTEST_TIME;
+
   // Default sesuai Pasal 37 & 43 Peraturan Kompetisi Arung Jeram FAJI. PS
   // (Pen. Start) dan PF (Pen. Finish) punya daftar pilihan independen:
   // PS = 0 (tidak ada), 50 (kesalahan start).
@@ -257,6 +267,7 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   }));
 
   const cleanSettings = {
+    protestTime: cleanProtestTime(incoming.protestTime),
     sprint: {
       startPenalties: cleanPenaltyList(
         incoming.sprint && incoming.sprint.startPenalties,

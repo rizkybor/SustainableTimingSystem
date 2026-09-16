@@ -38,7 +38,10 @@
                 <b-row>
                   <!-- KIRI: field level, event name, river name -->
                   <b-col md="8">
-                    <b-form-group label="Event Level (Tingkat Event)">
+                    <b-form-group>
+                      <template #label>
+                        Event Level (Tingkat Event) <span class="text-danger">*</span>
+                      </template>
                       <b-input-group>
                         <!-- Dropdown Event Level -->
                         <b-form-select
@@ -126,7 +129,10 @@
                     </b-modal>
 
                     <!-- EVENT NAME  -->
-                    <b-form-group label="Event Name (Nama Event)">
+                    <b-form-group>
+                      <template #label>
+                        Event Name (Nama Event) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.eventName"
                         placeholder="Enter your event name"
@@ -135,7 +141,10 @@
                     </b-form-group>
 
                     <!-- RIVER NAME  -->
-                    <b-form-group label="River Name (Nama Sungai)">
+                    <b-form-group>
+                      <template #label>
+                        River Name (Nama Sungai) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.riverName"
                         placeholder="Enter river name"
@@ -213,7 +222,10 @@
                 </p>
 
                 <!-- DISTRICT  -->
-                <b-form-group label="District (Daerah)">
+                <b-form-group>
+                  <template #label>
+                    District (Daerah) <span class="text-danger">*</span>
+                  </template>
                   <b-form-input
                     v-model="formEvent.addressDistrict"
                     placeholder="Enter District"
@@ -226,7 +238,10 @@
                 <b-row>
                   <!-- SUBDISTRICT  -->
                   <b-col cols="6">
-                    <b-form-group label="Sub District (Kecamatan)">
+                    <b-form-group>
+                      <template #label>
+                        Sub District (Kecamatan) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressSubDistrict"
                         placeholder="Enter Sub District"
@@ -239,7 +254,10 @@
 
                   <!-- VILLAGE  -->
                   <b-col cols="6">
-                    <b-form-group label="Village (Desa)">
+                    <b-form-group>
+                      <template #label>
+                        Village (Desa) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressVillage"
                         placeholder="Enter Village"
@@ -254,7 +272,10 @@
                 <b-row>
                   <!-- CITY  -->
                   <b-col cols="6">
-                    <b-form-group label="City (Kota)">
+                    <b-form-group>
+                      <template #label>
+                        City (Kota) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressCity"
                         placeholder="Enter City"
@@ -267,7 +288,10 @@
 
                   <!-- PROVINCE  -->
                   <b-col cols="6">
-                    <b-form-group label="Province (Provinsi)">
+                    <b-form-group>
+                      <template #label>
+                        Province (Provinsi) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressProvince"
                         placeholder="Enter Province"
@@ -282,7 +306,10 @@
                 <b-row>
                   <!-- ZIP CODE  -->
                   <b-col cols="6">
-                    <b-form-group label="ZIP Code (Kode Pos)">
+                    <b-form-group>
+                      <template #label>
+                        ZIP Code (Kode Pos) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressZipCode"
                         placeholder="Enter ZIP Code"
@@ -295,7 +322,10 @@
 
                   <b-col>
                     <!-- STATE -->
-                    <b-form-group label="State (Negara)">
+                    <b-form-group>
+                      <template #label>
+                        State (Negara) <span class="text-danger">*</span>
+                      </template>
                       <b-form-input
                         v-model="formEvent.addressState"
                         placeholder="Enter State"
@@ -310,7 +340,10 @@
                 <b-row>
                   <b-col cols="6">
                     <!-- START DATE -->
-                    <b-form-group label="Start Date (Tanggal Mulai)">
+                    <b-form-group>
+                      <template #label>
+                        Start Date (Tanggal Mulai) <span class="text-danger">*</span>
+                      </template>
                       <b-form-datepicker
                         v-model="formEvent.startDateEvent"
                         placeholder="Select start date"
@@ -323,7 +356,10 @@
                   </b-col>
                   <b-col cols="6">
                     <!-- END DATE -->
-                    <b-form-group label="End Date (Tanggal Berakhir)">
+                    <b-form-group>
+                      <template #label>
+                        End Date (Tanggal Berakhir) <span class="text-danger">*</span>
+                      </template>
                       <b-form-datepicker
                         :disabled="formEvent.startDateEvent === ''"
                         v-model="formEvent.endDateEvent"
@@ -343,7 +379,10 @@
                 </p>
 
                 <!-- EVENT CATEGORIES -->
-                <b-form-group label="Event Categories (Kategori Event)" label-cols="3">
+                <b-form-group label-cols="3">
+                  <template #label>
+                    Event Categories (Kategori Event) <span class="text-danger">*</span>
+                  </template>
                   <multiselect
                     v-model="formEvent.categoriesEvent"
                     :options="optionCategories"
@@ -355,7 +394,10 @@
                 </b-form-group>
 
                 <!-- DIVISION CATEGORIES -->
-                <b-form-group label="Division Categories (Kategori Divisi)" label-cols="3">
+                <b-form-group label-cols="3">
+                  <template #label>
+                    Division Categories (Kategori Divisi) <span class="text-danger">*</span>
+                  </template>
                   <multiselect
                     v-model="formEvent.categoriesDivision"
                     :options="optionDivisions"
@@ -367,7 +409,10 @@
                 </b-form-group>
 
                 <!-- RACE CATEGORIES -->
-                <b-form-group label="Race Categories (Kategori Lomba)" label-cols="3">
+                <b-form-group label-cols="3">
+                  <template #label>
+                    Race Categories (Kategori Lomba) <span class="text-danger">*</span>
+                  </template>
                   <multiselect
                     v-model="formEvent.categoriesRace"
                     :options="optionRaces"
@@ -379,7 +424,10 @@
                 </b-form-group>
 
                 <!-- INITIAL CATEGORIES -->
-                <b-form-group label="Initial Categories (Kategori Inisial)" label-cols="3">
+                <b-form-group label-cols="3">
+                  <template #label>
+                    Initial Categories (Kategori Inisial) <span class="text-danger">*</span>
+                  </template>
                   <multiselect
                     v-model="formEvent.categoriesInitial"
                     :options="optionInitials"
@@ -759,10 +807,7 @@ export default {
         !(f.categoriesEvent && f.categoriesEvent.length) ||
         !(f.categoriesDivision && f.categoriesDivision.length) ||
         !(f.categoriesRace && f.categoriesRace.length) ||
-        !(f.categoriesInitial && f.categoriesInitial.length) ||
-        !f.chiefJudge ||
-        !f.raceDirector ||
-        !f.technicalDelegate
+        !(f.categoriesInitial && f.categoriesInitial.length)
       ) {
         return false;
       }

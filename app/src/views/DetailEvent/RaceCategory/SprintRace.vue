@@ -828,6 +828,25 @@ export default {
     var audio = new Audio(tone);
 
     try {
+      const events = localStorage.getItem("eventDetails");
+      this.dataEvent = events ? JSON.parse(events) : {};
+    } catch {
+      this.dataEvent = {};
+    }
+
+    await this.loadDataScore("SPRINT");
+    await this.loadDataPenalties("SPRINT");
+    await this.loadRaceSettings();
+
+    // ====== SOCKET INIT & LISTENERS ======
+    // BUG FIX: dulu dipasang SEBELUM loadDataPenalties()/loadRaceSettings()
+    // di atas selesai — kalau ada pesan socket Start/Finish dari Judges
+    // Dashboard masuk di jendela waktu itu, dataPenaltiesStart/Finish masih
+    // kosong dan applyPenaltyFromSocket() diam2 menolak (allowed.includes()
+    // selalu false utk array kosong), penalti judge hilang tanpa jejak.
+    // Dipindah ke sini (setelah await di atas) supaya jendela race-nya
+    // hilang sama sekali — listener baru aktif stlh daftar penalti siap.
+    try {
       const socket = getSocket();
 
       const isSameEvent = (m) => {
@@ -887,16 +906,6 @@ export default {
       if (logger && logger.warn) logger.warn("socket init failed:", err);
     }
 
-    try {
-      const events = localStorage.getItem("eventDetails");
-      this.dataEvent = events ? JSON.parse(events) : {};
-    } catch {
-      this.dataEvent = {};
-    }
-
-    await this.loadDataScore("SPRINT");
-    await this.loadDataPenalties("SPRINT");
-    await this.loadRaceSettings();
     const ok = this.loadFromRaceStartPayload();
     if (!ok) await this.checkValueStorage();
 
@@ -940,10 +949,26 @@ export default {
         idx = items.findIndex((t) => String(t.bibTeam || "") === bib);
       }
       if (idx === -1 && payload.nameTeam) {
+        // BUG FIX: dulu blind ambil match PERTAMA by nama — dua tim beda
+        // (beda BIB/teamId) yang kebetulan nama-nya sama bisa salah kena
+        // penalti. Kumpulkan semua kandidat, saring pakai bibTeam dari
+        // payload kalau ada >1 kandidat; kalau masih ambigu, JANGAN tebak.
         const nameLC = String(payload.nameTeam).toLowerCase();
-        idx = items.findIndex(
-          (t) => String(t.nameTeam || "").toLowerCase() === nameLC
-        );
+        const candidateIdxs = [];
+        items.forEach((t, i) => {
+          if (String((t && t.nameTeam) || "").toLowerCase() === nameLC) {
+            candidateIdxs.push(i);
+          }
+        });
+        if (candidateIdxs.length === 1) {
+          idx = candidateIdxs[0];
+        } else if (candidateIdxs.length > 1 && payload.bibTeam) {
+          const bib = String(payload.bibTeam);
+          const match = candidateIdxs.find(
+            (i) => String(items[i].bibTeam || "") === bib
+          );
+          if (match !== undefined) idx = match;
+        }
       }
       if (idx === -1) return;
 

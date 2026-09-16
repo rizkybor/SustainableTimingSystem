@@ -53,12 +53,16 @@
       <div class="right-actions">
         <b-dropdown
           :disabled="buckets.length === 0 || loading"
-          variant="primary"
+          variant="link"
           class="action-btn"
-          toggle-class="d-flex align-items-center"
+          toggle-class="d-flex align-items-center btn-pill btn-pill--solid"
+          menu-class="dropdown-menu--pill"
+          no-caret
         >
           <template #button-content>
-            <Icon icon="mdi:download" class="mr-2" /> Download Result
+            <Icon icon="mdi:tray-arrow-down" class="mr-2" width="18" height="18" />
+            Download Result
+            <Icon icon="mdi:chevron-down" class="caret-icon" width="16" height="16" />
           </template>
           <b-dropdown-item @click="generatePdf">
             <Icon icon="mdi:file-pdf-box" class="mr-2" /> PDF
@@ -224,6 +228,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import EventOverallPdf from "../DetailEvent/ResultComponent/Overall/event-overall-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
@@ -266,6 +271,9 @@ export default {
       // Race Category (SPRINT/HEAD2HEAD/SLALOM/DRR/RX) yang benar-benar
       // dipilih utk event ini — null = fail-open (tampilkan semua kolom)
       enabledCategoryKeys: null,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Overall selama status masih UNOFFICIAL.
+      protestTime: DEFAULT_PROTEST_TIME,
     };
   },
   computed: {
@@ -305,7 +313,11 @@ export default {
       return parts.join(" - ");
     },
     pdfEventData() {
-      return { ...this.eventInfo, levelName: this.eventInfo.levelName || "-" };
+      return {
+        ...this.eventInfo,
+        levelName: this.eventInfo.levelName || "-",
+        protestTime: this.protestTime,
+      };
     },
   },
   async created() {
@@ -315,9 +327,26 @@ export default {
       await this.loadRegisteredBuckets(eventId);
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(eventId);
       await this.loadAllBuckets(eventId);
+      await this.loadRaceSettings(eventId);
     }
   },
   methods: {
+    async loadRaceSettings(eventId) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !eventId) return;
+        await new Promise((resolve) => {
+          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
+            resolve();
+          });
+          ipcRenderer.send("race-settings:get", eventId);
+        });
+      } catch (err) {
+        // biarkan protestTime default kalau gagal memuat
+      }
+    },
     goBack() {
       this.$router.push(`/event-detail/${this.$route.params.id}`);
     },
@@ -635,6 +664,73 @@ export default {
   padding: 8px 16px;
   font-weight: 600;
 }
+
+/* ---- Redesign: Download Result button — .action-btn di atas cuma target
+   div wrapper <b-dropdown>, bukan tombol sungguhan yg di-render
+   Bootstrap-Vue di dalamnya, jadi tidak pernah kepakai. Styling sungguhan
+   ditarget lewat toggle-class + deep selector di sini (pola sama persis
+   dgn SprintResult.vue/SlalomResult.vue dkk). ---- */
+.right-actions >>> .btn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none !important;
+}
+.right-actions >>> .btn-pill .caret-icon {
+  margin-left: 8px;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+.right-actions >>> .btn-pill[aria-expanded="true"] .caret-icon {
+  transform: rotate(180deg);
+}
+.right-actions >>> .btn-pill--solid {
+  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.32);
+}
+.right-actions >>> .btn-pill--solid:hover,
+.right-actions >>> .btn-pill--solid:focus {
+  background: linear-gradient(135deg, #3aa3ec, #1f7bc2);
+  box-shadow: 0 8px 20px rgba(28, 111, 176, 0.42);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+.right-actions >>> .btn-pill--solid:disabled {
+  background: #cfd6de;
+  box-shadow: none;
+  color: #fff !important;
+  transform: none;
+}
+.right-actions >>> .dropdown-menu--pill {
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(20, 30, 45, 0.14);
+  padding: 8px;
+  margin-top: 8px;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #37475a;
+  display: flex;
+  align-items: center;
+}
+.right-actions >>> .dropdown-menu--pill .dropdown-item:hover,
+.right-actions >>> .dropdown-menu--pill .dropdown-item:focus {
+  background: #f2f9fd;
+  color: #1c6fb0;
+}
+/* ---- End redesign ---- */
 
 .card {
   background: #fff;

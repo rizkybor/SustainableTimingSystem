@@ -1960,15 +1960,16 @@ export default {
       return `${numByes} tim akan dapat BYE (bagan ${n} slot)`;
     },
     // tim yang tampil di modal "Pilih Tim" saat slot TBD/BYE di bagan diklik.
-    // Dedup by nama — jaga2 kalau round.pool sempat kemasukan entri
+    // Dedup by identitas tim (nama+BIB, bukan nama saja — lihat
+    // _teamIdentityKey) — jaga2 kalau round.pool sempat kemasukan entri
     // duplikat dari data lama (sblm advanceToNextRound() dikasih guard
     // anti-duplikat), supaya tim yang sama tidak pernah tampil 2x di sini.
     assignPickerCandidates() {
       const pool = this.poolForRound(this.assignPicker.roundId);
       const seen = new Set();
       return pool.filter((t) => {
-        const key = String((t && t.name) || "").toUpperCase();
-        if (!key || seen.has(key)) return false;
+        const key = this._teamIdentityKey(t);
+        if (!t || !t.name || seen.has(key)) return false;
         seen.add(key);
         return true;
       });
@@ -4113,6 +4114,7 @@ export default {
 
     onOthersTyping(val, item) {
       if (!item || !item.result) return;
+      if (this.needsHeat(item)) return;
       this.ensurePenaltiesObject(item.result);
 
       var s = String(val || "");
@@ -5179,6 +5181,10 @@ export default {
 
     async onPenaltyChange(item) {
       if (!item || !item.result) return;
+      // Guard data-layer — jangan cuma andalkan input yg ke-disable di UI
+      // (lihat needsHeat()): tim non-BYE tanpa Heat tidak boleh kecatat
+      // penalti-nya lewat jalur manapun, termasuk pemanggilan langsung.
+      if (this.needsHeat(item)) return;
       this.ensurePenaltiesObject(item.result);
       const p = item.result.penalties;
       const mode = this.getBooyanMode();
@@ -5909,21 +5915,29 @@ export default {
       return (r && r.pool) || [];
     },
 
+    // Identitas asli satu tim = nameTeam + bibTeam (BUKAN nama saja) — dua
+    // tim beda klub bisa kebetulan pakai nama yang sama, BIB-nya yang
+    // membedakan. Dipakai di manapun perlu bandingkan/dedup tim by identity
+    // (assignPickerCandidates, guard anti-duplikat advanceToNextRound, dll.)
+    // supaya konsisten dgn _findParticipantByTeam() di bawah.
+    _teamIdentityKey(team) {
+      return (
+        String((team && (team.name || team.nameTeam || team.teamName)) || "")
+          .trim()
+          .toUpperCase() +
+        "|" +
+        String((team && team.bibTeam) || "").trim()
+      );
+    },
+
     // Buka modal "Pilih Tim" saat slot TBD/BYE di bagan diklik.
     // Cari participant asli (this.participantArr) dari stub tim {name,bibTeam}
     // yang dipakai di round.pool/round.matches.
     _findParticipantByTeam(team) {
       if (!team || !team.name) return null;
-      const wantKey =
-        String(team.name || "").trim().toUpperCase() +
-        "|" +
-        String(team.bibTeam || "").trim();
+      const wantKey = this._teamIdentityKey(team);
       return (this.participantArr || []).find(
-        (pp) =>
-          String(pp.nameTeam || pp.teamName || "").trim().toUpperCase() +
-            "|" +
-            String(pp.bibTeam || "").trim() ===
-          wantKey
+        (pp) => this._teamIdentityKey(pp) === wantKey
       );
     },
 
@@ -6368,25 +6382,27 @@ export default {
 
       const next = this.rounds[nextRoundIndex];
 
-      // Cegah duplikat: skip tim yg namanya SUDAH ada di pool atau slot
-      // match babak berikutnya — bisa terjadi kalau "Advance to Next
-      // Round" ke-klik lebih dari sekali (mis. double-click, atau user
-      // mundur ke babak ini via Prev/round selector lalu klik Advance
-      // lagi). Tanpa filter ini, next.pool.concat() di bawah akan
-      // menambahkan tim yang sama berkali-kali → tim itu tampil duplikat
-      // di modal "Pilih Tim" dan bisa ke-assign ke 2 slot sekaligus.
-      const nextTakenNames = new Set();
+      // Cegah duplikat: skip tim yg identitasnya (nama+BIB — lihat
+      // _teamIdentityKey; BUKAN nama saja, krn dua tim beda klub bisa
+      // kebetulan pakai nama sama) SUDAH ada di pool atau slot match babak
+      // berikutnya — bisa terjadi kalau "Advance to Next Round" ke-klik
+      // lebih dari sekali (mis. double-click, atau user mundur ke babak
+      // ini via Prev/round selector lalu klik Advance lagi). Tanpa filter
+      // ini, next.pool.concat() di bawah akan menambahkan tim yang sama
+      // berkali-kali → tim itu tampil duplikat di modal "Pilih Tim" dan
+      // bisa ke-assign ke 2 slot sekaligus.
+      const nextTakenKeys = new Set();
       (next.pool || []).forEach((p) => {
-        if (p && p.name) nextTakenNames.add(String(p.name).toUpperCase());
+        if (p && p.name) nextTakenKeys.add(this._teamIdentityKey(p));
       });
       (next.matches || []).forEach((m) => {
         if (m.team1 && m.team1.name)
-          nextTakenNames.add(String(m.team1.name).toUpperCase());
+          nextTakenKeys.add(this._teamIdentityKey(m.team1));
         if (m.team2 && m.team2.name)
-          nextTakenNames.add(String(m.team2.name).toUpperCase());
+          nextTakenKeys.add(this._teamIdentityKey(m.team2));
       });
       const newWinners = winners.filter(
-        (w) => !nextTakenNames.has(String(w.name).toUpperCase())
+        (w) => !nextTakenKeys.has(this._teamIdentityKey(w))
       );
 
       if (!newWinners.length) {
@@ -6590,6 +6606,11 @@ export default {
       if (targetIndex === -1) return;
 
       const target = this.participant[targetIndex];
+
+      // Guard data-layer — sama seperti onPenaltyChange(): tim non-BYE
+      // tanpa Heat tidak boleh kecatat Start/Finish Time-nya, terlepas
+      // dari tombol BIB di OperationTeamPanel yg sudah di-disable di UI.
+      if (this.needsHeat(target)) return;
 
       if (title === "start") target.result.startTime = val;
       if (title === "finish") {

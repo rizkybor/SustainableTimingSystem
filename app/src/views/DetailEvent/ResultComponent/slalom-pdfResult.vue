@@ -220,7 +220,10 @@
           class="unofficial-stamp"
           :class="{ 'official-stamp': isOfficial }"
         >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+          <div style="font-size: 14px; display: flex; justify-content: center;">
+            {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+          </div>
+          <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small>
         </span>
       </div>
     </footer>

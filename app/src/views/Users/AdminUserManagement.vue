@@ -63,17 +63,38 @@
             </div>
           </div>
 
-          <!-- LIST USERS -->
-
-          <div
-            class="d-flex align-items-center justify-content-between px-3 pt-3"
-          >
-            <div class="d-flex align-items-center">
-              <span class="label-strong mr-2 mb-0">Total Users:</span>
-              <b-badge variant="primary" pill>{{ users.length }}</b-badge>
+          <!-- STAT SUMMARY -->
+          <div class="stat-strip">
+            <div class="stat-card">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:account-multiple-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ users.length }}</div>
+                <div class="stat-card__label">Total Users</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--success">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:calendar-star" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ usersWithEventsCount }}</div>
+                <div class="stat-card__label">With Main Events</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--neutral">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:calendar-multiple" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ eventOptions.length }}</div>
+                <div class="stat-card__label">Events Available</div>
+              </div>
             </div>
           </div>
 
+          <!-- LIST USERS -->
           <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
             <b-table
               striped
@@ -86,7 +107,17 @@
               class="um-table mt-3"
               :per-page="perPage"
               :current-page="currentPage"
+              show-empty
+              empty-text=""
             >
+              <template #empty>
+                <div class="stx-empty-state">
+                  <Icon icon="mdi:account-off-outline" width="40" height="40" />
+                  <div>No user data found</div>
+                  <small>Click "Refresh Users" to reload the list.</small>
+                </div>
+              </template>
+
               <template #cell(index)="row">
                 <span class="text-muted">
                   {{ (currentPage - 1) * perPage + row.index + 1 }}
@@ -180,15 +211,15 @@
       :no-close-on-esc="true"
       :no-close-on-backdrop="true"
       body-class="p-0"
-      content-class="custom-modal"
+      content-class="stx-modal-content"
       centered
     >
       <!-- Header -->
-      <div class="modal-header-custom">
-        <h5 class="mb-0">Judges Profil Configuration</h5>
+      <div class="stx-modal-header">
+        <h5>Judges Profil Configuration</h5>
         <button
           type="button"
-          class="btn-close-x"
+          class="stx-modal-close"
           aria-label="Close"
           @click="showEdit = false"
         >
@@ -197,7 +228,7 @@
       </div>
 
       <!-- Body -->
-      <div class="modal-body-custom">
+      <div class="stx-modal-body">
         <!-- User Detail -->
         <div class="text-center py-4">
           <img
@@ -265,7 +296,7 @@
       </div>
 
       <!-- Footer -->
-      <div class="modal-footer-custom">
+      <div class="stx-modal-footer">
         <b-button
           variant="outline-danger"
           class="btn-pill"
@@ -397,6 +428,11 @@ export default {
         map[String(o.value)] = o.text;
       }
       return map;
+    },
+    usersWithEventsCount() {
+      return (this.users || []).filter(
+        (u) => Array.isArray(u.mainEvents) && u.mainEvents.length > 0
+      ).length;
     },
   },
   mounted() {
@@ -674,268 +710,3 @@ export default {
 };
 </script>
 
-<style>
-/* ===== Page header ===== */
-.page-title {
-  font-weight: 800;
-  color: #0f172a;
-}
-.page-subtitle {
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
-/* ===== Cards ===== */
-.um-card {
-  border-radius: 24px;
-  border: 1px solid #eef2f7;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-}
-
-/* ===== Labels & inputs (match Create Team) ===== */
-.label-strong {
-  font-weight: 700;
-  color: #1f2937;
-  font-size: 0.95rem;
-}
-.input-soft,
-.form-control,
-.custom-select {
-  height: 44px !important;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  padding: 0.5rem 0.875rem;
-}
-.input-soft::placeholder {
-  color: #9aa5b1;
-}
-.input-soft:focus,
-.custom-select:focus {
-  background: #ffffff;
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-}
-
-/* ===== Buttons (match Create Team) ===== */
-.btn-primary-pill {
-  border-radius: 10px;
-  padding: 0.55rem 1.25rem;
-  font-weight: 700;
-}
-.btn-outline-pill {
-  border-radius: 10px;
-  padding: 0.55rem 1.25rem;
-  font-weight: 700;
-}
-.btn-icon {
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* ===== Table Wrapper ===== */
-.table-rounded-wrapper {
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-}
-
-/* Header soft modern */
-.um-table thead th {
-  background: #f1f5f9 !important; /* abu soft */
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border-bottom: 2px solid #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Body cells */
-.um-table tbody td {
-  background: #ffffff;
-  color: #374151;
-  font-size: 0.9rem;
-  padding: 0.75rem;
-  vertical-align: middle;
-  border-color: #f1f5f9;
-}
-
-/* Hover effect row */
-.um-table tbody tr:hover td {
-  background: #f9fafb;
-  transition: background 0.2s ease-in-out;
-}
-
-/* First column (index) styling */
-.um-table td:first-child,
-.um-table th:first-child {
-  text-align: center;
-  font-weight: 600;
-  color: #6b7280;
-}
-
-/* Rounded corners only top header & bottom last row */
-.um-table thead tr:first-child th:first-child {
-  border-top-left-radius: 18px;
-}
-.um-table thead tr:first-child th:last-child {
-  border-top-right-radius: 18px;
-}
-.um-table tbody tr:last-child td:first-child {
-  border-bottom-left-radius: 18px;
-}
-.um-table tbody tr:last-child td:last-child {
-  border-bottom-right-radius: 18px;
-}
-
-/* Action buttons spacing in cell */
-.um-table .btn-icon {
-  margin: 0 2px;
-}
-
-/* ===== Events list ===== */
-.event-list {
-  display: flex;
-  flex-wrap: wrap; /* otomatis ke baris baru kalau panjang */
-  gap: 6px 16px; /* jarak antar item */
-  max-width: 100%; /* batasi di dalam kolom tabel */
-}
-
-.event-item {
-  font-size: 0.85rem;
-  color: #374151;
-  white-space: nowrap; /* tiap item jangan terpotong */
-  overflow: hidden;
-  text-overflow: ellipsis; /* kalau super panjang */
-  max-width: 220px; /* atur max width tiap item */
-}
-
-/* ===== Avatars & chips ===== */
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #e5e7eb;
-}
-.avatar.lg {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-}
-.chip {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 12px;
-  line-height: 1;
-}
-
-/* ===== Custom Pagination ===== */
-.custom-pagination .page-item {
-  margin: 0 4px;
-}
-
-.custom-pagination .page-link {
-  border-radius: 999px !important; /* full rounded pill */
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #374151;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s ease-in-out;
-}
-
-.custom-pagination .page-link:hover {
-  background: #eff6ff;
-  color: rgb(0, 180, 255);
-  border-color: #93c5fd;
-}
-
-.custom-pagination .page-item.active .page-link {
-  background: #3b82f6 !important;
-  color: #fff !important;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
-}
-
-.custom-pagination .page-item.disabled .page-link {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-color: #e5e7eb;
-  cursor: not-allowed;
-}
-
-/* ===== Modal Styling ===== */
-.custom-modal {
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.modal-header-custom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e6ebf4;
-  background: #f9fafb;
-}
-
-.modal-body-custom {
-  padding: 20px 24px;
-  background: #fff;
-}
-
-.modal-footer-custom {
-  display: flex;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-top: 1px solid #e6ebf4;
-  background: #f9fafb;
-}
-
-.avatar-xl {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.section-box {
-  border: 1px solid #e6ebf4;
-  border-radius: 12px;
-  padding: 16px;
-  margin-top: 24px;
-  background: #fafafa;
-}
-
-.btn-add {
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
-  color: #fff;
-  font-weight: 500;
-  padding: 6px 14px;
-}
-
-.btn-pill {
-  border-radius: 24px;
-  padding: 6px 20px;
-  font-weight: 500;
-}
-
-.btn-icon {
-  border-radius: 8px;
-  padding: 6px 8px;
-}
-
-.event-table {
-  font-size: 0.9rem;
-}
-</style>

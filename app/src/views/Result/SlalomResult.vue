@@ -467,7 +467,7 @@
     <PrintOverallModal
       centered
       :show="showOverallModal"
-      :dataEvent="eventInfo"
+      :dataEvent="{ ...eventInfo, protestTime }"
       :aggregate="dataAggregate"
       :raceCats="slalomCats"
       :categories="visibleCategories"
@@ -478,6 +478,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import SlalomPdf from "../DetailEvent/ResultComponent/slalom-pdfResult.vue";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
@@ -600,6 +601,9 @@ export default {
       showTechnicalDelegate: true,
       showChiefJudge: true,
       showRaceDirector: true,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Result selama status masih UNOFFICIAL.
+      protestTime: DEFAULT_PROTEST_TIME,
       // Daftar pilihan Start/Finish/Gate Penalty (global optionPenalties
       // "SLALOM") — sama sumber & filter value yg dipakai SlalomRace.vue
       // (filteredPenalties()), dipakai dropdown editable di tabel ini.
@@ -699,6 +703,7 @@ export default {
         showTechnicalDelegate: this.showTechnicalDelegate,
         showChiefJudge: this.showChiefJudge,
         showRaceDirector: this.showRaceDirector,
+        protestTime: this.protestTime,
       };
     },
     pdfParticipants() {
@@ -943,6 +948,9 @@ export default {
             // sinkron dgn override di SlalomRace.vue supaya dropdown editable
             // di halaman Result ini identik dgn Race Detail.
             const sl = res && res.ok && res.settings && res.settings.slalom;
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
             if (sl) {
               if (Array.isArray(sl.startPenalties) && sl.startPenalties.length) {
                 this.dataPenaltiesStart = sl.startPenalties;

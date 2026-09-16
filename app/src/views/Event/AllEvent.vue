@@ -57,30 +57,67 @@
             </div>
           </div>
 
-          <!-- TOOLBAR (Search + Filters) -->
+          <!-- STAT SUMMARY -->
+          <div class="stat-strip">
+            <div class="stat-card">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:calendar-multiple" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ normalizedEvents.length }}</div>
+                <div class="stat-card__label">Total Events</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--success">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:calendar-check-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ activeEventCount }}</div>
+                <div class="stat-card__label">Active</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--warning">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:calendar-remove-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ inactiveEventCount }}</div>
+                <div class="stat-card__label">Inactive</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TOOLBAR: Search (pojok kiri) + Filters (pojok kanan) — satu
+               baris, sejajar. Filter by Event & Filter by Status
+               bersebelahan di grup kanan (margin-left:auto, BUKAN
+               justify-content-between, supaya kalau window sempit & baris
+               ke-wrap, grup filter tetap nempel kanan — bukan malah balik
+               ke kiri krn cuma sendirian di barisnya). -->
           <div
-            class="d-flex justify-content-between align-items-center pt-3 flex-wrap"
+            class="d-flex align-items-center flex-wrap pt-3 pb-1"
             style="gap: 12px"
           >
-            <div>
-              <!-- Search -->
-              <b-input-group class="input-soft" style="max-width: 320px">
-                <template #prepend>
-                  <span class="input-icon-left">
-                    <Icon icon="mdi:magnify" />
-                  </span>
-                </template>
-                <b-form-input
-                  v-model="query"
-                  placeholder="Input some text..."
-                  class="no-border-input"
-                />
-              </b-input-group>
-            </div>
+            <!-- Search -->
+            <b-input-group class="input-group-soft" style="max-width: 320px">
+              <template #prepend>
+                <span class="input-icon-left">
+                  <Icon icon="mdi:magnify" />
+                </span>
+              </template>
+              <b-form-input
+                v-model="query"
+                placeholder="Search event name, level, date…"
+                class="no-border-input"
+              />
+            </b-input-group>
 
-            <div class="d-flex align-items-center" style="gap: 12px">
+            <div
+              class="d-flex align-items-center flex-nowrap ml-auto"
+              style="gap: 12px"
+            >
               <!-- Filter Level -->
-              <b-input-group class="input-soft" style="max-width: 220px">
+              <b-input-group class="input-group-soft" style="max-width: 220px">
                 <template #prepend>
                   <span class="input-icon-left">
                     <Icon icon="mdi:filter-variant" />
@@ -99,7 +136,7 @@
               </b-input-group>
 
               <!-- Filter Status -->
-              <b-input-group class="input-soft" style="max-width: 220px">
+              <b-input-group class="input-group-soft" style="max-width: 220px">
                 <template #prepend>
                   <span class="input-icon-left">
                     <Icon icon="mdi:filter-variant" />
@@ -116,6 +153,16 @@
                   </span>
                 </template>
               </b-input-group>
+
+              <b-button
+                v-if="query || levelFilter || statusFilter"
+                size="sm"
+                variant="outline-secondary"
+                style="border-radius: 12px"
+                @click="resetFilters"
+              >
+                Reset
+              </b-button>
             </div>
           </div>
 
@@ -139,6 +186,17 @@
               <template #table-busy>
                 <div class="text-center my-3">
                   <b-spinner small class="mr-2" /> Loading events…
+                </div>
+              </template>
+
+              <template #empty>
+                <div class="stx-empty-state">
+                  <Icon icon="mdi:calendar-blank-outline" width="40" height="40" />
+                  <div>No event data found</div>
+                  <small
+                    >Try adjusting your search/filter or create a new
+                    event.</small
+                  >
                 </div>
               </template>
 
@@ -180,8 +238,12 @@
               class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap"
               style="gap: 12px"
             >
-              <!-- kiri: jumlah row -->
-              <small class="text-muted">{{ perPage }} Row</small>
+              <!-- kiri: jumlah row ditampilkan -->
+              <small class="text-muted">
+                {{ filteredEvents.length === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
+                {{ Math.min(currentPage * perPage, filteredEvents.length) }}
+                of {{ filteredEvents.length }} events
+              </small>
 
               <!-- tengah: pagination -->
               <b-pagination
@@ -191,6 +253,8 @@
                 align="center"
                 size="md"
                 class="custom-pagination mb-0"
+                first-number
+                last-number
               />
 
               <!-- kanan: select rows per page -->
@@ -334,6 +398,15 @@ export default {
       return rows;
     },
 
+    activeEventCount() {
+      return this.normalizedEvents.filter((e) => e.status === "activated")
+        .length;
+    },
+    inactiveEventCount() {
+      return this.normalizedEvents.filter((e) => e.status !== "activated")
+        .length;
+    },
+
     currentDateTime() {
       const d = new Date();
       return (
@@ -369,6 +442,12 @@ export default {
     goBack() {
       if (this.$router) this.$router.back();
       else this.$emit("back");
+    },
+
+    resetFilters() {
+      this.query = "";
+      this.levelFilter = "";
+      this.statusFilter = "";
     },
 
     async confirmDeleteEvent(item) {
@@ -413,181 +492,3 @@ export default {
 };
 </script>
 
-<style>
-/* Top text */
-.page-title {
-  font-weight: 800;
-  color: #0f172a;
-}
-.page-subtitle {
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
-/* Inputs with icons */
-.input-soft {
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  padding: 0;
-  overflow: hidden;
-}
-.input-soft .form-control,
-.input-soft .custom-select {
-  border: 0;
-  background: transparent;
-  height: 44px;
-}
-.input-soft:focus-within {
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-  border-color: #93c5fd;
-}
-.input-icon-left,
-.input-icon-right {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  color: #94a3b8;
-}
-.no-border-input:focus,
-.no-border-select:focus {
-  box-shadow: none;
-}
-
-/* Create button */
-.btn-primary-pill {
-  border-radius: 10px;
-  padding: 0.55rem 1.25rem;
-  font-weight: 700;
-}
-.btn-icon {
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* Table wrapper */
-.table-rounded-wrapper {
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-  background: #fff;
-}
-.um-table thead th {
-  background: #f1f5f9 !important;
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border-bottom: 2px solid #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.um-table tbody td {
-  background: #fff;
-  color: #374151;
-  font-size: 0.9rem;
-  padding: 0.9rem 0.75rem;
-  vertical-align: middle;
-  border-color: #f1f5f9;
-}
-.um-table tbody tr:hover td {
-  background: #f9fafb;
-  transition: background 0.2s;
-}
-
-/* Status pill */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 12px;
-  border: 1px solid transparent;
-}
-.status-pill .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.status-upcoming {
-  background: #fffbeb;
-  color: #92400e;
-  border-color: #fde68a;
-}
-.status-upcoming .dot {
-  background: #f59e0b;
-}
-.status-success {
-  background: #ecfdf5;
-  color: #065f46;
-  border-color: #a7f3d0;
-}
-.status-success .dot {
-  background: #10b981;
-}
-
-/* Dummy pager (visual mimic) */
-.dummy-pager {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.dummy-pager .page {
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 0.35rem 0.7rem;
-  color: #374151;
-  font-weight: 600;
-}
-.dummy-pager .page.current {
-  background: #e8f1ff;
-  color: #2563eb;
-  border-color: #93c5fd;
-}
-.dummy-pager .nav-ctrl {
-  color: #9ca3af;
-}
-
-.btn-action {
-  background: #ffffff;
-  border: 1px solid #cfd8e6;
-  color: #1c4c7a;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 8px 14px;
-}
-
-.btn-action:hover {
-  background-color: #1f6fa3 !important;
-  border: none;
-}
-
-.card-wrapper {
-  border-radius: 18px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-}
-
-.btn-custom {
-  cursor: pointer;
-}
-
-.btn-custom:hover {
-  color: #1f6fa3;
-}
-
-.breadcrumb {
-  background-color: transparent !important;
-  padding: 0;
-  margin-bottom: 0;
-}
-.breadcrumb-item + .breadcrumb-item::before {
-  color: #9ca3af;
-}
-</style>

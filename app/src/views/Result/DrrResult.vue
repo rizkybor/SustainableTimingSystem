@@ -396,7 +396,7 @@
     <PrintOverallModal
       centered
       :show="showOverallModal"
-      :dataEvent="eventInfo"
+      :dataEvent="{ ...eventInfo, protestTime }"
       :aggregate="dataAggregate"
       :raceCats="drrCats"
       :categories="visibleCategories"
@@ -411,6 +411,7 @@ import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import VueHtml2pdf from "vue-html2pdf";
 import DrrPdf from "../DetailEvent/ResultComponent/drr-pdfResult.vue";
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -581,6 +582,9 @@ export default {
       showTechnicalDelegate: true,
       showChiefJudge: true,
       showRaceDirector: true,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Result selama status masih UNOFFICIAL.
+      protestTime: DEFAULT_PROTEST_TIME,
     };
   },
 
@@ -682,6 +686,7 @@ export default {
         showTechnicalDelegate: this.showTechnicalDelegate,
         showChiefJudge: this.showChiefJudge,
         showRaceDirector: this.showRaceDirector,
+        protestTime: this.protestTime,
       };
     },
 
@@ -861,6 +866,10 @@ export default {
               if (finishList) this.dataPenaltiesFinish = finishList;
               if (sectionList) this.dataPenaltiesSection = sectionList;
             }
+
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
 
             // On/off kolom Technical Delegate/Chief Judge/Race Director di
             // PDF Result DRR — diatur per kategori lewat Race Settings,

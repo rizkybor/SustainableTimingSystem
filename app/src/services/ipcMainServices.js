@@ -1,4 +1,4 @@
-const { ipcMain, dialog, app } = require("electron");
+const { ipcMain, dialog, app, shell } = require("electron");
 const { EJSON } = require("bson");
 const path = require("path");
 const fs = require("fs");
@@ -672,6 +672,25 @@ function setupIPCMainHandlers() {
         error: error && error.message ? error.message : String(error),
       });
     }
+  });
+
+  // App version (buat modal "About") — app.getVersion() Electron otomatis
+  // baca dari package.json "version", jadi tinggal bump versi di situ tiap
+  // rilis, tidak perlu di-hardcode ulang di renderer.
+  ipcMain.handle("app:get-version", async function () {
+    return { ok: true, version: app.getVersion() };
+  });
+
+  // Buka link (website/email) dari modal "About" di browser/mail-client
+  // default OS — dibatasi ke http(s)/mailto supaya tidak disalahgunakan
+  // buka skema lain (file://, dll.) dari renderer.
+  ipcMain.handle("app:open-external", async function (_e, url) {
+    const safe = String(url || "");
+    if (!/^(https?:|mailto:)/i.test(safe)) {
+      return { ok: false, error: "URL tidak diizinkan" };
+    }
+    await shell.openExternal(safe);
+    return { ok: true };
   });
 
   // ========================================================================

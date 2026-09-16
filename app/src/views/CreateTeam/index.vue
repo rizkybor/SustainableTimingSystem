@@ -39,7 +39,10 @@
           </div>
           <form ref="form-newTeam">
             <!-- TEAM TYPE -->
-            <b-form-group label="Team Type" label-class="label-strong">
+            <b-form-group label-class="label-strong">
+              <template #label>
+                Team Type <span class="text-danger">*</span>
+              </template>
               <b-form-select
                 size="sm"
                 v-model="formTeam.teamType"
@@ -59,7 +62,10 @@
             </b-form-group>
 
             <!-- TEAM NAME -->
-            <b-form-group label="Team Name" label-class="label-strong">
+            <b-form-group label-class="label-strong">
+              <template #label>
+                Team Name <span class="text-danger">*</span>
+              </template>
               <b-form-input
                 size="sm"
                 v-model="formTeam.teamName"
@@ -131,6 +137,47 @@
               View, edit, and delete all teams that have been created.
             </p>
           </div>
+
+          <!-- STAT SUMMARY -->
+          <div class="stat-strip">
+            <div class="stat-card">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:account-group-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ teams.length }}</div>
+                <div class="stat-card__label">Total Teams</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--success">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:check-circle-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ activeTeamCount }}</div>
+                <div class="stat-card__label">Active</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--warning">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:close-circle-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ inactiveTeamCount }}</div>
+                <div class="stat-card__label">Inactive</div>
+              </div>
+            </div>
+            <div class="stat-card stat-card--neutral">
+              <div class="stat-card__icon">
+                <Icon icon="mdi:shape-outline" />
+              </div>
+              <div>
+                <div class="stat-card__value">{{ teamTypeCount }}</div>
+                <div class="stat-card__label">Team Types</div>
+              </div>
+            </div>
+          </div>
+
           <!-- ✅ LIST TEAM -->
           <div class="d-flex align-items-center mb-3">
             <label class="mb-0 mr-2 font-weight-bold">Filter:</label>
@@ -142,6 +189,7 @@
               size="sm"
             />
             <b-button
+              v-if="filterType !== 'ALL'"
               size="sm"
               class="ml-2 btn-outline-pill"
               variant="outline-secondary"
@@ -171,27 +219,10 @@
 
               <!-- ✅ Empty State -->
               <template #empty>
-                <div
-                  class="text-center py-5"
-                  style="
-                    color: #6c757d;
-                    font-size: 14px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                >
-                  <Icon
-                    icon="mdi:account-group-outline"
-                    width="40"
-                    height="40"
-                    style="opacity: 0.5; margin-bottom: 8px"
-                  />
+                <div class="stx-empty-state">
+                  <Icon icon="mdi:account-group-outline" width="40" height="40" />
                   <div>No team data found</div>
-                  <small class="text-muted"
-                    >Try adjusting your filter or add a new team.</small
-                  >
+                  <small>Try adjusting your filter or add a new team.</small>
                 </div>
               </template>
 
@@ -306,28 +337,149 @@
     <!-- ✏️ Edit Team Modal -->
     <b-modal
       id="modal-edit-team"
-      :title="`Edit Team: ${editForm.nameTeam || ''}`"
-      ok-title="Save"
-      cancel-title="Cancel"
-      @ok="submitEdit"
       :no-close-on-esc="true"
       :no-close-on-backdrop="true"
-      modal-class="um-modal"
-      content-class="um-modal-content"
-      header-class="um-modal-header"
-      body-class="um-modal-body"
-      footer-class="um-modal-footer"
+      hide-header
+      hide-footer
+      body-class="p-0"
+      content-class="stx-modal-content"
       centered
     >
-      <b-form @submit.stop.prevent>
-        <b-form-group label="Team Type" label-class="label-strong">
+      <div class="stx-modal-header">
+        <h5>Edit Team: {{ editForm.nameTeam || "" }}</h5>
+        <button
+          type="button"
+          class="stx-modal-close"
+          aria-label="Close"
+          @click="$bvModal.hide('modal-edit-team')"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="stx-modal-body">
+        <b-form @submit.stop.prevent="submitEdit">
+          <b-form-group label-class="label-strong">
+            <template #label>
+              Team Type <span class="text-danger">*</span>
+            </template>
+            <b-form-select
+              v-model="editForm.typeTeam"
+              :options="optionTeamTypes"
+              value-field="value"
+              text-field="name"
+              class="input-soft"
+              required
+            >
+              <template #first>
+                <b-form-select-option :value="null" disabled
+                  >Select type</b-form-select-option
+                >
+              </template>
+            </b-form-select>
+          </b-form-group>
+
+          <b-form-group label-class="label-strong">
+            <template #label>
+              Team Name <span class="text-danger">*</span>
+            </template>
+            <b-form-input
+              v-model="editForm.nameTeam"
+              class="input-soft"
+              required
+              placeholder="Enter team name"
+            />
+          </b-form-group>
+
+          <b-form-group label="Status" label-class="label-strong">
+            <b-form-select
+              v-model="editForm.statusId"
+              :options="[
+                { value: 0, text: 'Active' },
+                { value: 1, text: 'Inactive' },
+              ]"
+              class="input-soft"
+            />
+          </b-form-group>
+
+          <b-form-group label="Country (optional)" label-class="label-strong">
+            <b-form-select
+              v-model="editForm.countryCode"
+              :options="countryOptions"
+              value-field="code"
+              text-field="name"
+              class="input-soft"
+            >
+              <template #first>
+                <b-form-select-option :value="''"
+                  >No country</b-form-select-option
+                >
+              </template>
+            </b-form-select>
+          </b-form-group>
+        </b-form>
+      </div>
+
+      <div class="stx-modal-footer">
+        <b-button
+          variant="outline-secondary"
+          class="btn-pill"
+          @click="$bvModal.hide('modal-edit-team')"
+        >
+          Cancel
+        </b-button>
+        <b-button variant="primary" class="btn-pill" @click="submitEdit">
+          Save
+        </b-button>
+      </div>
+    </b-modal>
+
+    <!-- Import from Excel: preview + konfirmasi -->
+    <b-modal
+      id="modal-bulk-import-team"
+      v-model="showBulkImportModal"
+      size="lg"
+      scrollable
+      :no-close-on-backdrop="bulkImporting"
+      :no-close-on-esc="bulkImporting"
+      hide-header
+      hide-footer
+      body-class="p-0"
+      content-class="stx-modal-content"
+      centered
+    >
+      <div class="stx-modal-header">
+        <h5>Import Teams from Excel</h5>
+        <button
+          type="button"
+          class="stx-modal-close"
+          aria-label="Close"
+          :disabled="bulkImporting"
+          @click="showBulkImportModal = false"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="stx-modal-body">
+        <p class="mb-2 text-muted small">
+          File: <strong>{{ bulkFileName || "-" }}</strong> — kolom
+          <strong>Asal PENGPROV</strong> diambil sebagai nama tim.
+        </p>
+
+        <b-form-group label-class="label-strong">
+          <template #label>
+            Team Type untuk semua tim di bawah <span class="text-danger">*</span>
+          </template>
           <b-form-select
-            v-model="editForm.typeTeam"
+            size="sm"
+            v-model="bulkTeamType"
             :options="optionTeamTypes"
             value-field="value"
             text-field="name"
             class="input-soft"
-            required
+            style="border-radius: 12px"
+            :disabled="bulkImporting"
           >
             <template #first>
               <b-form-select-option :value="null" disabled
@@ -337,127 +489,57 @@
           </b-form-select>
         </b-form-group>
 
-        <b-form-group label="Team Name" label-class="label-strong">
-          <b-form-input
-            v-model="editForm.nameTeam"
-            class="input-soft"
-            required
-            placeholder="Enter team name"
-          />
-        </b-form-group>
-
-        <b-form-group label="Status" label-class="label-strong">
-          <b-form-select
-            v-model="editForm.statusId"
-            :options="[
-              { value: 0, text: 'Active' },
-              { value: 1, text: 'Inactive' },
-            ]"
-            class="input-soft"
-          />
-        </b-form-group>
-
-        <b-form-group label="Country (optional)" label-class="label-strong">
-          <b-form-select
-            v-model="editForm.countryCode"
-            :options="countryOptions"
-            value-field="code"
-            text-field="name"
-            class="input-soft"
+        <div v-if="!bulkRows.length" class="text-center text-muted py-4">
+          Tidak ada nilai "Asal PENGPROV" yang ditemukan di file ini.
+        </div>
+        <div v-else class="table-responsive table-rounded-wrapper">
+          <b-table
+            striped
+            small
+            hover
+            :items="bulkRows"
+            :fields="bulkFields"
+            class="um-table mb-0"
           >
-            <template #first>
-              <b-form-select-option :value="''"
-                >No country</b-form-select-option
-              >
+            <template #head(selected)>
+              <b-form-checkbox
+                :checked="allNewSelected"
+                :indeterminate="someNewSelected && !allNewSelected"
+                :disabled="bulkImporting"
+                @change="toggleSelectAllBulkRows"
+              />
             </template>
-          </b-form-select>
-        </b-form-group>
-      </b-form>
-    </b-modal>
-
-    <!-- Import from Excel: preview + konfirmasi -->
-    <b-modal
-      id="modal-bulk-import-team"
-      v-model="showBulkImportModal"
-      title="Import Teams from Excel"
-      size="lg"
-      scrollable
-      :no-close-on-backdrop="bulkImporting"
-      :no-close-on-esc="bulkImporting"
-      hide-footer
-    >
-      <p class="mb-2 text-muted small">
-        File: <strong>{{ bulkFileName || "-" }}</strong> — kolom
-        <strong>Asal PENGPROV</strong> diambil sebagai nama tim.
-      </p>
-
-      <b-form-group label="Team Type untuk semua tim di bawah" label-class="label-strong">
-        <b-form-select
-          size="sm"
-          v-model="bulkTeamType"
-          :options="optionTeamTypes"
-          value-field="value"
-          text-field="name"
-          class="input-soft"
-          style="border-radius: 12px"
-          :disabled="bulkImporting"
-        >
-          <template #first>
-            <b-form-select-option :value="null" disabled
-              >Select type</b-form-select-option
-            >
-          </template>
-        </b-form-select>
-      </b-form-group>
-
-      <div v-if="!bulkRows.length" class="text-center text-muted py-4">
-        Tidak ada nilai "Asal PENGPROV" yang ditemukan di file ini.
-      </div>
-      <div v-else class="table-responsive">
-        <b-table
-          striped
-          small
-          hover
-          :items="bulkRows"
-          :fields="bulkFields"
-          class="mb-0"
-        >
-          <template #head(selected)>
-            <b-form-checkbox
-              :checked="allNewSelected"
-              :indeterminate="someNewSelected && !allNewSelected"
-              :disabled="bulkImporting"
-              @change="toggleSelectAllBulkRows"
-            />
-          </template>
-          <template #cell(selected)="row">
-            <b-form-checkbox
-              v-model="row.item.selected"
-              :disabled="row.item.duplicate || bulkImporting"
-            />
-          </template>
-          <template #cell(nameTeam)="row">
-            {{ row.item.nameTeam }}
-          </template>
-          <template #cell(status)="row">
-            <span v-if="row.item.duplicate" class="status-pill status-upcoming">
-              Sudah ada
-            </span>
-            <span v-else class="status-pill status-success">Baru</span>
-          </template>
-        </b-table>
+            <template #cell(selected)="row">
+              <b-form-checkbox
+                v-model="row.item.selected"
+                :disabled="row.item.duplicate || bulkImporting"
+              />
+            </template>
+            <template #cell(nameTeam)="row">
+              {{ row.item.nameTeam }}
+            </template>
+            <template #cell(status)="row">
+              <span v-if="row.item.duplicate" class="status-pill status-upcoming">
+                Sudah ada
+              </span>
+              <span v-else class="status-pill status-success">Baru</span>
+            </template>
+          </b-table>
+        </div>
       </div>
 
-      <div class="d-flex justify-content-end mt-3" style="gap: 8px">
+      <div class="stx-modal-footer">
         <b-button
           variant="outline-secondary"
+          class="btn-pill"
           :disabled="bulkImporting"
           @click="showBulkImportModal = false"
         >
           Batal
         </b-button>
         <b-button
-          variant="outline-info"
+          variant="primary"
+          class="btn-pill"
           :disabled="!canConfirmBulkImport"
           @click="confirmBulkImport"
         >
@@ -565,6 +647,23 @@ export default {
       if (this.filterType === "ALL") return list;
       const sel = String(this.filterType).toLowerCase();
       return list.filter((t) => String(t.typeTeam || "").toLowerCase() === sel);
+    },
+
+    activeTeamCount() {
+      return (this.teams || []).filter((t) => Number(t.statusId) === 0)
+        .length;
+    },
+    inactiveTeamCount() {
+      return (this.teams || []).filter((t) => Number(t.statusId) !== 0)
+        .length;
+    },
+    teamTypeCount() {
+      const set = new Set(
+        (this.teams || [])
+          .map((t) => String(t.typeTeam || "").trim().toUpperCase())
+          .filter(Boolean)
+      );
+      return set.size;
     },
 
     selectedBulkCount() {
@@ -923,257 +1022,3 @@ export default {
 };
 </script>
 
-<!-- jadi -->
-<style>
-.team-card {
-  border-radius: 24px;
-  border: 1px solid #eef2f7;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-}
-
-.label-strong {
-  font-weight: 700;
-  color: #1f2937;
-  font-size: 0.95rem;
-  margin-bottom: 0.35rem;
-}
-
-.input-soft,
-.form-control,
-.custom-select {
-  height: 44px !important;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  padding: 0.5rem 0.875rem;
-}
-.input-soft::placeholder {
-  color: #9aa5b1;
-}
-.input-soft:focus,
-.custom-select:focus {
-  background: #ffffff;
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-}
-
-.btn-primary-pill {
-  border-radius: 10px;
-  padding: 0.55rem 1.25rem;
-  font-weight: 700;
-}
-
-.btn-outline-pill {
-  border-radius: 10px;
-  padding: 0.55rem 1.25rem;
-  font-weight: 700;
-}
-
-.card-title {
-  font-weight: 800;
-  color: #0f172a;
-}
-.card-subtitle {
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
-.btn-icon {
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* Sudah kamu sediakan */
-.table-rounded-wrapper {
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-  background: #fff;
-}
-.um-table thead th {
-  background: #f1f5f9 !important;
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border-bottom: 2px solid #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.um-table tbody td {
-  background: #fff;
-  color: #374151;
-  font-size: 0.9rem;
-  padding: 0.9rem 0.75rem;
-  vertical-align: middle;
-  border-color: #f1f5f9;
-}
-.um-table tbody tr:hover td {
-  background: #f9fafb;
-  transition: background 0.2s;
-}
-
-/* Tambahan agar identik dengan contoh kedua */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  font-weight: 600;
-  font-size: 0.8rem;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  color: #0f172a;
-}
-.status-success {
-  background: #ecfdf5;
-  color: #065f46;
-  border-color: #a7f3d0;
-}
-.status-upcoming {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fed7aa;
-}
-.status-pill .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
-  display: inline-block;
-}
-
-.status-neutral {
-  background: #eff6ff;
-  color: rgb(0, 180, 255);
-  border-color: #bfdbfe;
-}
-
-/* Ikon tombol kecil rapi */
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem 0.45rem;
-  border-radius: 10px;
-}
-
-/* Pagination & select tampak halus */
-.custom-pagination .page-item .page-link {
-  border-radius: 10px;
-}
-.input-soft {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 6px 10px;
-}
-.no-border-select.form-control {
-  box-shadow: none !important;
-}
-
-/* Modal wrapper */
-.modal-content {
-  border-radius: 20px !important;
-  border: none;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
-}
-
-/* Modal header */
-.modal-header {
-  border-bottom: none;
-  border-radius: 20px 20px 0 0 !important;
-  background: #f8fafc;
-  padding: 1rem 1.25rem;
-}
-.modal-title {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: #0f172a;
-}
-
-/* Modal body */
-.modal-body {
-  padding: 1.25rem;
-  background: #ffffff;
-  border-radius: 0 0 20px 20px;
-}
-
-/* Form group spacing */
-.modal-body .form-group {
-  margin-bottom: 1.25rem;
-}
-
-/* Input dan select dalam modal */
-.modal-body .input-soft {
-  border-radius: 12px !important;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-}
-.modal-body .input-soft:focus {
-  background: #ffffff;
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-}
-
-/* Footer (Save/Cancel buttons) */
-.modal-footer {
-  border-top: none;
-  padding: 1rem 1.25rem;
-  justify-content: flex-end;
-}
-.modal-footer .btn {
-  border-radius: 10px;
-  font-weight: 600;
-  padding: 0.5rem 1.2rem;
-}
-.modal-footer .btn-primary {
-  background: #2563eb;
-  border-color: #2563eb;
-}
-.modal-footer .btn-primary:hover {
-  background: #1d4ed8;
-  border-color: rgb(0, 180, 255);
-}
-.modal-footer .btn-secondary {
-  background: #f1f5f9;
-  color: #374151;
-  border: none;
-}
-.modal-footer .btn-secondary:hover {
-  background: #e5e7eb;
-}
-
-.section-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #6b7280; /* abu teks */
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.section-divider::before,
-.section-divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.section-divider:not(:empty)::before {
-  margin-right: 1rem;
-}
-.section-divider:not(:empty)::after {
-  margin-left: 1rem;
-}
-
-/* Optional: buat teks divider lebih lembut */
-.section-divider span {
-  background: #fff;
-  padding: 0 0.75rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  color: #9ca3af;
-}
-</style>

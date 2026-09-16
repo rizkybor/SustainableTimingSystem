@@ -35,24 +35,31 @@
           </b-navbar-nav>
 
           <b-navbar-nav class="ml-auto">
+            <b-nav-item @click="showAbout = true">About</b-nav-item>
             <b-nav-item @click="lockAndExit">🔒 Lock Apps</b-nav-item>
             <b-nav-item @click="exitApp">Exit</b-nav-item>
           </b-navbar-nav>
         </b-collapse>
       </div>
     </b-navbar>
+
+    <AboutModal v-model="showAbout" />
   </div>
 </template>
 
 <script>
 import { lock } from "@/utils/auth";
 import { logger } from "@/utils/logger";
+import AboutModal from "@/components/AboutModal.vue";
 
 export default {
   name: "SustainableTimingSystemRaftingNavbar",
+  components: { AboutModal },
 
   data() {
-    return {};
+    return {
+      showAbout: false,
+    };
   },
 
   computed: {},

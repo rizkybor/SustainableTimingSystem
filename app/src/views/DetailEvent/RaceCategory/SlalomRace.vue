@@ -1381,8 +1381,16 @@ export default {
       this.$set(this.selectedSession, String(t._id), this.activeRun)
     );
 
-    // Ambil jumlah gate untuk slalom dari pengaturan
-    this.fetchSlalomGateCountFromSettings();
+    // Ambil jumlah gate untuk slalom dari pengaturan — di-AWAIT (bukan
+    // fire-and-forget) SEBELUM listener socket dipasang di bawah. BUG FIX:
+    // sebelumnya listener langsung terpasang sementara IPC race-settings:get
+    // ini masih berjalan async; kalau ada pesan socket:penalti dari judge
+    // masuk di jendela waktu itu, dataPenaltiesStart/Finish/Gate masih
+    // kosong → applyPenaltyFromSocketDirect() fallback ke allowedList
+    // default, dan custom value yg sah bisa ke-reject jadi 0. Await di sini
+    // menghilangkan jendela racenya sama sekali (listener baru terpasang
+    // setelah daftar penalti dipastikan sudah ter-load).
+    await this.fetchSlalomGateCountFromSettings();
     this.refreshSlalomCats();
 
     // ====== SOCKET INIT & LISTENERS ======
@@ -1557,20 +1565,45 @@ export default {
             : "";
 
         let f = this._findTeamAndSessionIndex(idOrBib, undefined);
+        // BUG FIX: fallback by-nama dulu blind ambil match PERTAMA — dua tim
+        // beda (beda BIB/teamId) yang kebetulan nama-nya sama bisa salah
+        // kena penalti. Kalau ada >1 kandidat nama sama, saring dgn BIB dari
+        // pesan (kalau ada); kalau masih ambigu, JANGAN tebak (skip) drpd
+        // silently apply ke tim yang salah.
         if ((!f || !f.team) && msg && msg.teamName) {
           const nameLC = String(msg.teamName).toLowerCase();
+          const bibFromMsg =
+            msg.bib != null
+              ? String(msg.bib)
+              : msg.bibTeam != null
+              ? String(msg.bibTeam)
+              : "";
+          const candidates = [];
           for (let i = 0; i < this.teams.length; i++) {
             const t = this.teams[i] || {};
             if (String(t.nameTeam || "").toLowerCase() === nameLC) {
-              const chosen = this.selectedSession[String(t._id)];
-              const sessIdx = Number.isFinite(chosen)
-                ? chosen
-                : Number.isFinite(this.activeRun)
-                ? this.activeRun
-                : 0;
-              f = { team: t, teamIdx: i, sessionIdx: sessIdx };
-              break;
+              candidates.push({ t, i });
             }
+          }
+          let picked = null;
+          if (candidates.length === 1) {
+            picked = candidates[0];
+          } else if (candidates.length > 1 && bibFromMsg) {
+            picked =
+              candidates.find(
+                (c) => String(c.t.bibTeam || "") === bibFromMsg
+              ) || null;
+          }
+          if (picked) {
+            const t = picked.t;
+            const i = picked.i;
+            const chosen = this.selectedSession[String(t._id)];
+            const sessIdx = Number.isFinite(chosen)
+              ? chosen
+              : Number.isFinite(this.activeRun)
+              ? this.activeRun
+              : 0;
+            f = { team: t, teamIdx: i, sessionIdx: sessIdx };
           }
         }
         if (!f || !f.team) return false;
@@ -2069,15 +2102,16 @@ export default {
               payload && payload[0] && payload[0].data ? payload[0].data : [];
             var out = [];
             var i = 0;
+            // BUG FIX: sama seperti clampPenalty() di atas — dulu whitelist
+            // ketat {0,5,10,50} bikin custom penalty value dari Race Settings
+            // diam2 hilang dari dropdown. Pakai clamp umum, bukan whitelist.
             while (i < raw.length) {
               var it = raw[i] || {};
-              var val = Number(it.value);
-              if (val === 0 || val === 5 || val === 10 || val === 50) {
-                out.push({
-                  label: String(it.label != null ? it.label : val),
-                  value: val,
-                });
-              }
+              var val = clampPenalty(it.value);
+              out.push({
+                label: String(it.label != null ? it.label : val),
+                value: val,
+              });
               i = i + 1;
             }
             if (out.length === 0) {
@@ -2617,16 +2651,21 @@ export default {
       if (!team) return;
       const s = this.currentSession(team);
       if (title === "start") s.startTime = val;
-      if (title === "finish") {
-        s.finishTime = val;
-        if (s.startTime && s.finishTime) {
-          const diff = Math.max(
-            0,
-            hmsToMs(s.finishTime) - hmsToMs(s.startTime)
-          );
-          s.raceTime = msToHMSms(diff);
-          this.recalcSession(s);
-        }
+      if (title === "finish") s.finishTime = val;
+      // BUG FIX: sebelumnya raceTime cuma dihitung di branch "finish" — kalau
+      // operator klik tombol Finish SEBELUM Start (mis. antrian BIB ramai),
+      // finishTime kecatat tapi raceTime tidak pernah dihitung; giliran Start
+      // diklik setelahnya, branch "start" tidak pernah cek/hitung ulang, dan
+      // tombol Finish sudah keburu ke-disable (finishTime sudah terisi) jadi
+      // tidak ada cara memicu ulang selain resetRow(). Cek di sini, di luar
+      // kedua branch, supaya urutan klik Start/Finish tidak lagi masalah.
+      if (s.startTime && s.finishTime) {
+        const diff = Math.max(
+          0,
+          hmsToMs(s.finishTime) - hmsToMs(s.startTime)
+        );
+        s.raceTime = msToHMSms(diff);
+        this.recalcSession(s);
       }
       this.checkEndGameStatus();
       if (this.selectedSlalomKey) {

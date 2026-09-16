@@ -1,0 +1,527 @@
+/*
+ * Shared design system for the "admin list" pages: All Teams (CreateTeam),
+ * All Events (AllEvent), User Management (AdminUserManagement) — and their
+ * modals. Imported ONCE, globally, in src/main.js.
+ *
+ * WHY a shared file instead of per-page <style> (like before): these 3
+ * pages used to each carry their OWN unscoped <style> block defining the
+ * same class names (.card-wrapper, .page-title, .status-pill, .um-table,
+ * .custom-pagination, .btn-icon, …) with slightly different values. Because
+ * Vue's unscoped <style> is genuinely global once bundled, whichever page's
+ * definition happened to load last silently "won" — and a handful of OTHER
+ * pages (RaftingCross/SprintRace/DownRiverRace/HeadToHead/SlalomRace,
+ * CreateEvent, TeamDetail) were themselves relying on that leakage for
+ * their own .card-wrapper/.page-title/etc. look, without defining it
+ * themselves. Centralizing here removes the duplication AND the
+ * load-order fragility, for every page that used these classes — not just
+ * these 3.
+ *
+ * .input-soft in particular had two INCOMPATIBLE definitions fighting each
+ * other: CreateTeam/AdminUserManagement styled it as the control itself
+ * (height/border/bg directly on .input-soft), while AllEvent styled it as
+ * an input-group WRAPPER (.input-soft .form-control nested, padding:0).
+ * Kept both patterns here under different names — .input-soft (direct
+ * control) and .input-group-soft (wrapper) — so they stop colliding.
+ */
+
+/* ===== Page shell ===== */
+.page-title {
+  font-weight: 800;
+  color: #0f172a;
+}
+.page-subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+.card-wrapper {
+  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+}
+.btn-custom {
+  cursor: pointer;
+}
+.btn-custom:hover {
+  color: #1f6fa3;
+}
+.breadcrumb {
+  background-color: transparent !important;
+  padding: 0;
+  margin-bottom: 0;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+  color: #9ca3af;
+}
+.section-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.section-divider::before,
+.section-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+.section-divider:not(:empty)::before {
+  margin-right: 1rem;
+}
+.section-divider:not(:empty)::after {
+  margin-left: 1rem;
+}
+.section-divider span {
+  background: #fff;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+/* ===== Stat summary strip (new) ===== */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+.stat-card__icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #0ea5e9;
+  font-size: 20px;
+}
+.stat-card--success .stat-card__icon {
+  background: #ecfdf5;
+  color: #10b981;
+}
+.stat-card--warning .stat-card__icon {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+.stat-card--neutral .stat-card__icon {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+.stat-card__value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+.stat-card__label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ===== Labels & form controls ===== */
+.label-strong {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+/* Direct-on-control usage: class="input-soft" on the b-form-input /
+   b-form-select itself (CreateTeam, AdminUserManagement, AllEvent's
+   filter/rows-per-page selects). */
+.input-soft,
+.form-control,
+.custom-select {
+  height: 44px !important;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 0.5rem 0.875rem;
+}
+.input-soft::placeholder {
+  color: #9aa5b1;
+}
+.input-soft:focus,
+.custom-select:focus {
+  background: #ffffff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+.no-border-select.form-control {
+  box-shadow: none !important;
+}
+
+/* Wrapper usage: b-input-group with a prepend/append icon (AllEvent's
+   search box & filter selects). Distinct name from .input-soft above so
+   the two patterns never collide again. */
+.input-group-soft {
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 0;
+  overflow: hidden;
+}
+.input-group-soft .form-control,
+.input-group-soft .custom-select {
+  border: 0;
+  background: transparent;
+  height: 44px !important;
+}
+.input-group-soft:focus-within {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+  border-color: #93c5fd;
+}
+.input-icon-left,
+.input-icon-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  color: #94a3b8;
+}
+.no-border-input:focus {
+  box-shadow: none;
+}
+
+/* ===== Buttons ===== */
+.btn-primary-pill,
+.btn-outline-pill {
+  border-radius: 10px;
+  padding: 0.55rem 1.25rem;
+  font-weight: 700;
+}
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 0 2px;
+}
+.btn-action {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+.btn-action:hover {
+  background-color: #1f6fa3 !important;
+  border: none;
+  color: #fff;
+}
+.btn-add {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 14px;
+}
+.btn-pill {
+  border-radius: 24px;
+  padding: 6px 20px;
+  font-weight: 600;
+}
+
+/* ===== Table ===== */
+.table-rounded-wrapper {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+}
+.um-table thead th {
+  background: #f1f5f9 !important;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-bottom: 2px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.um-table tbody td {
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.9rem;
+  padding: 0.85rem 0.75rem;
+  vertical-align: middle;
+  border-color: #f1f5f9;
+}
+.um-table tbody tr:hover td {
+  background: #f9fafb;
+  transition: background 0.2s ease-in-out;
+}
+.um-table td:first-child,
+.um-table th:first-child {
+  text-align: center;
+  font-weight: 600;
+  color: #6b7280;
+}
+.um-table thead tr:first-child th:first-child {
+  border-top-left-radius: 18px;
+}
+.um-table thead tr:first-child th:last-child {
+  border-top-right-radius: 18px;
+}
+.um-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 18px;
+}
+.um-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 18px;
+}
+
+/* Empty state (shared across all 3 tables) */
+.stx-empty-state {
+  color: #6c757d;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+}
+.stx-empty-state .iconify {
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+.stx-empty-state small {
+  color: #9ca3af;
+}
+
+/* ===== Status pill ===== */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.status-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+}
+.status-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.status-upcoming {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+.status-neutral {
+  background: #eff6ff;
+  color: #0ea5e9;
+  border-color: #bfdbfe;
+}
+
+/* ===== Avatars & chips ===== */
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5e7eb;
+}
+.avatar-xl {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.chip {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1;
+}
+.event-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-width: 100%;
+}
+.event-item {
+  font-size: 0.85rem;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.section-box {
+  border: 1px solid #e6ebf4;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 24px;
+  background: #fafafa;
+}
+.event-table {
+  font-size: 0.9rem;
+}
+
+/* ===== Pagination ===== */
+.custom-pagination .page-item {
+  margin: 0 4px;
+}
+.custom-pagination .page-link {
+  border-radius: 999px !important;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease-in-out;
+}
+.custom-pagination .page-link:hover {
+  background: #eff6ff;
+  color: #0ea5e9;
+  border-color: #93c5fd;
+}
+.custom-pagination .page-item.active .page-link {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+}
+.custom-pagination .page-item.disabled .page-link {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+/* ===== Modal: base rounding kept app-wide (unchanged from before — many
+   other pages' modals, e.g. Head to Head's, relied on this leaking from
+   CreateTeam.vue) ===== */
+.modal-content {
+  border-radius: 20px !important;
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+}
+.modal-header {
+  border-bottom: none;
+  border-radius: 20px 20px 0 0 !important;
+  background: #f8fafc;
+  padding: 1rem 1.25rem;
+}
+.modal-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+.modal-body {
+  padding: 1.25rem;
+  background: #ffffff;
+}
+.modal-body .form-group {
+  margin-bottom: 1.25rem;
+}
+.modal-footer {
+  border-top: none;
+  padding: 1rem 1.25rem;
+  justify-content: flex-end;
+}
+.modal-footer .btn {
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 0.5rem 1.2rem;
+}
+.modal-footer .btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+.modal-footer .btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #0ea5e9;
+}
+.modal-footer .btn-secondary {
+  background: #f1f5f9;
+  color: #374151;
+  border: none;
+}
+.modal-footer .btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+/* ===== "stx-modal": unified custom modal language (header/body/footer as
+   plain divs via hide-header + hide-footer) — standard for Edit Team,
+   Import Excel and Edit User modals. Namespaced with stx- so it never
+   collides with Bootstrap's own .modal-header/.modal-body/.modal-footer
+   used elsewhere in the app. ===== */
+.stx-modal-content {
+  border-radius: 20px;
+  overflow: hidden;
+}
+.stx-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e6ebf4;
+  background: #f8fafc;
+}
+.stx-modal-header h5,
+.stx-modal-header .stx-modal-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+.stx-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.stx-modal-close:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+.stx-modal-body {
+  padding: 22px 24px;
+  background: #fff;
+}
+.stx-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid #e6ebf4;
+  background: #f9fafb;
+}

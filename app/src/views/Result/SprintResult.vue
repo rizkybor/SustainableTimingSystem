@@ -333,7 +333,7 @@
     <PrintOverallModal
       centered
       :show="showOverallModal"
-      :dataEvent="eventInfo"
+      :dataEvent="{ ...eventInfo, protestTime }"
       :aggregate="dataAggregate"
       :raceCats="sprintCats"
       :categories="visibleCategories"
@@ -344,6 +344,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
@@ -482,6 +483,10 @@ export default {
       showTechnicalDelegate: true,
       showChiefJudge: true,
       showRaceDirector: true,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Result selama status masih UNOFFICIAL. Di-refresh di
+      // loadRaceSettings() sama seperti showTechnicalDelegate dkk.
+      protestTime: DEFAULT_PROTEST_TIME,
       // Daftar pilihan Pen. Start (PS) / Pen. Finish (PF) — {label,value,
       // timePen}[], sama pola dgn SprintRace.vue: default dari optionPenalties
       // (global), di-override per-event lewat Race Settings kalau ada.
@@ -643,6 +648,7 @@ export default {
         showTechnicalDelegate: this.showTechnicalDelegate,
         showChiefJudge: this.showChiefJudge,
         showRaceDirector: this.showRaceDirector,
+        protestTime: this.protestTime,
       };
     },
     pdfParticipants() {
@@ -999,6 +1005,10 @@ export default {
                 score: Number(p.score) || 0,
               }));
             }
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
+
             this.sprintDefaultScoreBeyondRank =
               Number(
                 res &&

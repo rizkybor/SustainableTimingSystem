@@ -338,7 +338,7 @@
     <PrintOverallModal
       centered
       :show="showOverallModal"
-      :dataEvent="eventInfo"
+      :dataEvent="{ ...eventInfo, protestTime }"
       :aggregate="dataAggregate"
       :raceCats="rxCats"
       :categories="visibleCategories"
@@ -349,6 +349,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import RaftingCrossPdf from "../DetailEvent/ResultComponent/rafting-cross-pdfResult.vue";
 import RaftingCrossByBracketPdf from "../DetailEvent/ResultComponent/RaftingCross/by-bracket-pdfResult.vue";
 import RaftingCrossOverallPdf from "../DetailEvent/ResultComponent/RaftingCross/overall-pdfResult.vue";
@@ -410,6 +411,9 @@ export default {
       showTechnicalDelegate: true,
       showChiefJudge: true,
       showRaceDirector: true,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Result selama status masih UNOFFICIAL.
+      protestTime: DEFAULT_PROTEST_TIME,
       rows: [],
       podium: [],
       showPdf: false,
@@ -503,6 +507,7 @@ export default {
         showTechnicalDelegate: this.showTechnicalDelegate,
         showChiefJudge: this.showChiefJudge,
         showRaceDirector: this.showRaceDirector,
+        protestTime: this.protestTime,
       };
     },
     bracketPdfFilename() {
@@ -568,6 +573,9 @@ export default {
         await new Promise((resolve) => {
           ipcRenderer.once("race-settings:get-reply", (_e, res) => {
             const rxSettings = res && res.ok && res.settings && res.settings.rx;
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
             const boolOrDefault = (v, d) =>
               v === undefined || v === null ? d : !!v;
             this.showTechnicalDelegate = boolOrDefault(

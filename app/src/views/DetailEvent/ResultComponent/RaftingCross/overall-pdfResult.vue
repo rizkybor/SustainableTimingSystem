@@ -166,7 +166,7 @@
             {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px"
-            >Protest Time : 00:00:05.000 min</small
+            >Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small
           >
         </span>
       </div>

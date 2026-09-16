@@ -446,7 +446,7 @@
     <PrintOverallModal
       centered
       :show="showOverallModal"
-      :dataEvent="eventInfo"
+      :dataEvent="{ ...eventInfo, protestTime }"
       :aggregate="dataAggregate"
       :raceCats="h2hCats"
       :categories="visibleCategories"
@@ -457,6 +457,7 @@
 
 <script>
 import { ipcRenderer } from "electron";
+import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import HeadToHeadPdf from "../DetailEvent/ResultComponent/head-to-head-pdfResult.vue";
 import EmptyStateFull from "@/components/EmptyStateFull.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
@@ -519,6 +520,9 @@ export default {
       showTechnicalDelegate: true,
       showChiefJudge: true,
       showRaceDirector: true,
+      // Protest Time — satu nilai GLOBAL (Race Settings -> General), dicetak
+      // di PDF Result selama status masih UNOFFICIAL.
+      protestTime: DEFAULT_PROTEST_TIME,
       showOverallModal: false,
       dataAggregate: null,
       selectedInitialName: "",
@@ -648,6 +652,7 @@ export default {
         showTechnicalDelegate: this.showTechnicalDelegate,
         showChiefJudge: this.showChiefJudge,
         showRaceDirector: this.showRaceDirector,
+        protestTime: this.protestTime,
       };
     },
     pdfOverallPkg() {
@@ -744,6 +749,9 @@ export default {
         await new Promise((resolve) => {
           ipcRenderer.once("race-settings:get-reply", (_e, res) => {
             const h2hSettings = res && res.ok && res.settings && res.settings.h2h;
+            this.protestTime = normalizeProtestTime(
+              res && res.settings && res.settings.protestTime
+            );
             const boolOrDefault = (v, d) =>
               v === undefined || v === null ? d : !!v;
             this.showTechnicalDelegate = boolOrDefault(

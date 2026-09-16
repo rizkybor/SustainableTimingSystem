@@ -2563,17 +2563,22 @@ export default {
     async updateTime(val, id, title) {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
       if (title === "start") this.participant[id].result.startTime = val;
-      if (title === "finish") {
-        this.participant[id].result.finishTime = val;
-        if (
-          this.participant[id].result.startTime &&
+      if (title === "finish") this.participant[id].result.finishTime = val;
+      // BUG FIX: sebelumnya raceTime cuma dihitung di branch "finish" — kalau
+      // operator klik tombol Finish SEBELUM Start, finishTime kecatat tapi
+      // raceTime tidak pernah dihitung; giliran Start diklik setelahnya,
+      // branch "start" tidak pernah cek/hitung ulang, dan tombol Finish
+      // sudah keburu ke-disable (finishTime sudah terisi) jadi tidak ada
+      // cara memicu ulang selain reset baris. Cek di luar kedua branch
+      // supaya urutan klik Start/Finish tidak lagi masalah.
+      if (
+        this.participant[id].result.startTime &&
+        this.participant[id].result.finishTime
+      ) {
+        this.participant[id].result.raceTime = await this.hitungSelisihWaktu(
+          this.participant[id].result.startTime,
           this.participant[id].result.finishTime
-        ) {
-          this.participant[id].result.raceTime = await this.hitungSelisihWaktu(
-            this.participant[id].result.startTime,
-            this.participant[id].result.finishTime
-          );
-        }
+        );
       }
 
       if (this.selectedDrrKey) {

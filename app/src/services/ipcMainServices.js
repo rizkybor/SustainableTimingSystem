@@ -1,4 +1,4 @@
-const { ipcMain, dialog } = require("electron");
+const { ipcMain, dialog, app } = require("electron");
 const { EJSON } = require("bson");
 const path = require("path");
 const fs = require("fs");
@@ -678,6 +678,31 @@ function setupIPCMainHandlers() {
   // File picker & Cloudinary (TIDAK ADA optional chaining)
   // ========================================================================
   // (opsional) file picker untuk preload → window.fileAPI.pickImage()
+  // Ambil isi PDF panduan pengisian bagan Head to Head sbg data URL, utk
+  // ditampilkan inline (modal) di renderer — bukan dibuka di app eksternal
+  ipcMain.handle("file:get-h2h-guide-pdf", async function () {
+    const file = "BAGAN HEAD TO HEAD CLEAR.pdf";
+    // Dev (electron:serve): electron dijalankan dgn cwd "dist_electron",
+    // jadi app.getAppPath() = <project root>/dist_electron — PDF-nya ada
+    // satu level di atas, di root project (tempat file sumber ini disimpan).
+    const filePath = app.isPackaged
+      ? path.join(process.resourcesPath, "docs", file)
+      : path.join(app.getAppPath(), "..", file);
+
+    if (!fs.existsSync(filePath)) {
+      return { ok: false, error: "File panduan tidak ditemukan: " + filePath };
+    }
+    try {
+      const buf = await fs.promises.readFile(filePath);
+      return {
+        ok: true,
+        dataUrl: "data:application/pdf;base64," + buf.toString("base64"),
+      };
+    } catch (err) {
+      return { ok: false, error: String((err && err.message) || err) };
+    }
+  });
+
   ipcMain.handle("file:pick-image", async function () {
     const r = await dialog.showOpenDialog({
       properties: ["openFile"],

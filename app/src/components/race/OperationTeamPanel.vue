@@ -92,13 +92,23 @@
                         :key="'start-' + index"
                         type="button"
                         class="btn custom-btn btn-block"
-                        :disabled="hasStartTime(button) || isByeTeam(button)"
+                        :disabled="
+                          hasStartTime(button) ||
+                          isByeTeam(button) ||
+                          needsHeat(button)
+                        "
                         :class="
-                          hasStartTime(button) || isByeTeam(button)
+                          hasStartTime(button) || isByeTeam(button) || needsHeat(button)
                             ? 'btn-secondary'
                             : 'btn-info'
                         "
-                        :title="isByeTeam(button) ? 'Tim BYE — tidak perlu waktu' : ''"
+                        :title="
+                          isByeTeam(button)
+                            ? 'Tim BYE — tidak perlu waktu'
+                            : needsHeat(button)
+                            ? 'Heat belum ditentukan — assign dulu lewat bagan'
+                            : ''
+                        "
                         @click="
                           $emit('update-time', digitTimeStart, index, 'start')
                         "
@@ -155,13 +165,23 @@
                         :key="'finish-' + index"
                         type="button"
                         class="btn custom-btn btn-block"
-                        :disabled="hasFinishTime(button) || isByeTeam(button)"
+                        :disabled="
+                          hasFinishTime(button) ||
+                          isByeTeam(button) ||
+                          needsHeat(button)
+                        "
                         :class="
-                          hasFinishTime(button) || isByeTeam(button)
+                          hasFinishTime(button) || isByeTeam(button) || needsHeat(button)
                             ? 'btn-secondary'
                             : 'btn-info'
                         "
-                        :title="isByeTeam(button) ? 'Tim BYE — tidak perlu waktu' : ''"
+                        :title="
+                          isByeTeam(button)
+                            ? 'Tim BYE — tidak perlu waktu'
+                            : needsHeat(button)
+                            ? 'Heat belum ditentukan — assign dulu lewat bagan'
+                            : ''
+                        "
                         @click="
                           $emit('update-time', digitTimeFinish, index, 'finish')
                         "
@@ -199,6 +219,11 @@ export default {
     // di-disable krn tidak pernah balapan. Kosong/tidak dipakai di kategori
     // lain (Sprint/Slalom/dll.) yang tidak punya konsep BYE.
     byeNames: { type: Array, default: () => [] },
+    // true khusus dari Head to Head — tombol BIB non-BYE ikut di-disable
+    // selama tim itu belum diassign Heat (lewat klik di bagan). Default
+    // false supaya kategori lain (yg tidak punya konsep Heat) tidak
+    // terpengaruh.
+    requireHeat: { type: Boolean, default: false },
   },
   computed: {},
   methods: {
@@ -256,6 +281,11 @@ export default {
       const nm = String((btn && (btn.nameTeam || btn.teamName)) || "").toUpperCase();
       if (!nm) return false;
       return this.byeNames.some((n) => String(n).toUpperCase() === nm);
+    },
+    needsHeat(btn) {
+      if (!this.requireHeat || this.isByeTeam(btn)) return false;
+      const heat = btn && btn.result && btn.result.heat;
+      return heat === null || heat === undefined || heat === "";
     },
   },
 };

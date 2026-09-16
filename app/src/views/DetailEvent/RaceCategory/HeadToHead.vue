@@ -241,78 +241,95 @@
           </div>
         </div>
         <div class="toolbar-actions">
-          <!-- Build / Edit -->
-          <div class="toolbar-actions">
-            <!-- Kelompok tombol -->
-            <div
-              class="btn-group-actions"
-              role="group"
-              aria-label="Build actions"
+          <!-- Info & docs: view-only, tidak mengubah data -->
+          <div class="h2h-action-group h2h-action-group--info">
+            <span class="h2h-action-group__label">Info</span>
+            <button
+              type="button"
+              class="h2h-action-btn"
+              @click="openHeatModal"
+              v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
             >
-              <button
-                type="button"
-                class="btn-action btn-outline-primary"
-                @click="openHeatModal"
-                v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
-              >
-                <Icon icon="mdi:view-grid-outline" class="mr-1" />
-                Lihat Heat
-              </button>
+              <Icon icon="mdi:view-grid-outline" class="mr-1" />
+              Lihat Heat
+            </button>
 
-              <JudgeActionHistoryModal
-                v-if="currentEventId"
-                class="ml-2"
-                :event-id="String(currentEventId)"
-                race-category="h2h"
-                category-label="Head to Head"
-              />
+            <button
+              type="button"
+              class="h2h-action-btn"
+              :disabled="isOpeningGuidePdf"
+              @click="openH2HGuidePdf"
+              v-b-tooltip.hover="'Buka panduan cara mengisi bagan Head to Head (PDF)'"
+            >
+              <b-spinner v-if="isOpeningGuidePdf" small class="mr-1" />
+              <Icon v-else icon="mdi:file-question-outline" class="mr-1" />
+              Panduan Bagan (PDF)
+            </button>
 
-              <button
-                type="button"
-                class="btn-action btn-outline-secondary ml-2"
-                :disabled="isDownloadingBracketPdf"
-                @click="downloadBracketPdf"
-                v-b-tooltip.hover="'Download tampilan bagan saat ini sebagai PDF'"
-              >
-                <b-spinner v-if="isDownloadingBracketPdf" small class="mr-1" />
-                <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
-                {{ isDownloadingBracketPdf ? "Menyiapkan PDF…" : "Download Bracket (PDF)" }}
-              </button>
-
-              <button
-                v-if="visibleParticipants && visibleParticipants.length"
-                class="btn-action btn-outline-info ml-2"
-                @click="toggleBracket"
-                v-b-tooltip.hover="
-                  showBracket ? 'Sembunyikan bracket' : 'Tampilkan bracket'
-                "
-                aria-controls="h2h-bracket"
-                :aria-expanded="showBracket ? 'true' : 'false'"
-              >
-                <Icon
-                  :icon="
-                    showBracket ? 'mdi:eye-off-outline' : 'mdi:eye-outline'
-                  "
-                  class="mr-1"
-                />
-                {{ showBracket ? "Hide Bracket" : "Show Bracket" }}
-              </button>
-
-              <button
-                v-if="currentRound && !currentRound.bronze"
-                class="btn-action btn-outline-success"
-                @click="advanceToNextRound"
-                v-b-tooltip.hover="
-                  currentRound && currentRound.size === 4
-                    ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
-                    : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
-                "
-              >
-                <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
-                Advance to Next Round
-              </button>
-            </div>
+            <JudgeActionHistoryModal
+              v-if="currentEventId"
+              class="h2h-judge-trigger"
+              :event-id="String(currentEventId)"
+              race-category="h2h"
+              category-label="Head to Head"
+            />
           </div>
+
+          <!-- Bracket: export & tampilan -->
+          <div class="h2h-action-group h2h-action-group--bracket">
+            <span class="h2h-action-group__label">Bracket</span>
+            <button
+              type="button"
+              class="h2h-action-btn"
+              :disabled="isDownloadingBracketPdf"
+              @click="downloadBracketPdf"
+              v-b-tooltip.hover="'Download tampilan bagan saat ini sebagai PDF'"
+            >
+              <b-spinner v-if="isDownloadingBracketPdf" small class="mr-1" />
+              <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+              {{ isDownloadingBracketPdf ? "Menyiapkan PDF…" : "Download Bracket (PDF)" }}
+            </button>
+
+            <button
+              v-if="visibleParticipants && visibleParticipants.length"
+              type="button"
+              class="h2h-action-btn"
+              @click="toggleBracket"
+              v-b-tooltip.hover="
+                showBracket ? 'Sembunyikan bracket' : 'Tampilkan bracket'
+              "
+              aria-controls="h2h-bracket"
+              :aria-expanded="showBracket ? 'true' : 'false'"
+            >
+              <Icon
+                :icon="
+                  showBracket ? 'mdi:eye-off-outline' : 'mdi:eye-outline'
+                "
+                class="mr-1"
+              />
+              {{ showBracket ? "Hide Bracket" : "Show Bracket" }}
+            </button>
+          </div>
+
+          <!-- Divider -->
+          <div class="toolbar-divider d-none d-md-block"></div>
+
+          <!-- Aksi utama: mengubah state babak — dipisah & ditonjolkan
+               supaya jelas beda bobot drpd tombol view-only di atas -->
+          <button
+            v-if="currentRound && !currentRound.bronze"
+            type="button"
+            class="h2h-advance-btn"
+            @click="advanceToNextRound"
+            v-b-tooltip.hover="
+              currentRound && currentRound.size === 4
+                ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
+                : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
+            "
+          >
+            <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
+            Advance to Next Round
+          </button>
 
           <!-- Divider -->
           <div class="toolbar-divider d-none d-md-block"></div>
@@ -760,7 +777,12 @@
                       >
                         Heat {{ item.result.heat }}
                       </span>
-                      <span v-else class="text-muted small">—</span>
+                      <span
+                        v-else
+                        class="badge badge-warning small"
+                        v-b-tooltip.hover="'Heat belum ditentukan — assign dulu lewat bagan sblm bisa mencatat Start/Finish Time & Penalties'"
+                        >Belum ada Heat</span
+                      >
                     </td>
 
                     <td class="large-bold text-strong max-char text-left">
@@ -819,6 +841,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
                         "
                       />
@@ -836,6 +859,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
                         "
                       />
@@ -853,6 +877,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
                           !showR1
                         "
@@ -871,6 +896,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
                           !showR2
                         "
@@ -889,6 +915,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
                           !showL1
                         "
@@ -907,6 +934,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag) ||
                           !showL2
                         "
@@ -948,6 +976,7 @@
                         @change="onPenaltyChange(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
                         "
                       />
@@ -968,6 +997,7 @@
                         @change="onOthersCommit(item)"
                         :disabled="
                           isByeTeam(item) ||
+                          needsHeat(item) ||
                           ['DNF', 'DNS', 'DSQ'].includes(item.result.flag)
                         "
                       />
@@ -1090,6 +1120,7 @@
       :digit-time="digitTime"
       :participant="visibleParticipants"
       :bye-names="byeTeamNamesInCurrentRound"
+      :require-heat="true"
       :digit-time-start.sync="digitTimeStart"
       :digit-time-finish.sync="digitTimeFinish"
       @update-time="updateTime"
@@ -1429,6 +1460,23 @@
         </b-button>
       </div>
     </b-modal>
+
+    <!-- Panduan Bagan H2H (PDF) — view-only, embed inline lewat data URL -->
+    <b-modal
+      v-model="showGuidePdfModal"
+      title="Panduan Cara Mengisi Bagan Head to Head"
+      centered
+      size="xl"
+      hide-footer
+      body-class="p-0"
+    >
+      <embed
+        v-if="guidePdfDataUrl"
+        :src="guidePdfDataUrl"
+        type="application/pdf"
+        class="h2h-guide-pdf-embed"
+      />
+    </b-modal>
   </div>
 </template>
 
@@ -1618,6 +1666,9 @@ export default {
       // di-minimize — klik header "Penalties Group" utk toggle.
       penaltiesCollapsed: false,
       isDownloadingBracketPdf: false,
+      isOpeningGuidePdf: false,
+      showGuidePdfModal: false,
+      guidePdfDataUrl: "",
       isDownloadingHeatModalPdf: false,
       // BUG FIX: tombol Print/Save (Round/All Round/Overall) dulu tidak
       // py pengaman apa pun terhadap klik ganda/beruntun — Save memakai
@@ -1908,9 +1959,19 @@ export default {
       if (numByes <= 0) return "";
       return `${numByes} tim akan dapat BYE (bagan ${n} slot)`;
     },
-    // tim yang tampil di modal "Pilih Tim" saat slot TBD/BYE di bagan diklik
+    // tim yang tampil di modal "Pilih Tim" saat slot TBD/BYE di bagan diklik.
+    // Dedup by nama — jaga2 kalau round.pool sempat kemasukan entri
+    // duplikat dari data lama (sblm advanceToNextRound() dikasih guard
+    // anti-duplikat), supaya tim yang sama tidak pernah tampil 2x di sini.
     assignPickerCandidates() {
-      return this.poolForRound(this.assignPicker.roundId);
+      const pool = this.poolForRound(this.assignPicker.roundId);
+      const seen = new Set();
+      return pool.filter((t) => {
+        const key = String((t && t.name) || "").toUpperCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     },
     // nama tim yang BYE di babak aktif — dipakai utk disable tombol BIB
     // start/finish di OperationTimePanel (tim BYE tidak pernah balapan).
@@ -4586,6 +4647,46 @@ export default {
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH);
     },
 
+    // Tampilkan PDF panduan cara mengisi bagan H2H (BAGAN HEAD TO HEAD
+    // CLEAR.pdf) inline di dalam modal — bukan dibuka di app eksternal,
+    // krn tujuannya cuma utk dilihat sekilas sbg referensi.
+    async openH2HGuidePdf() {
+      this.isOpeningGuidePdf = true;
+      try {
+        if (!this.guidePdfDataUrl) {
+          const res = await ipcRenderer.invoke("file:get-h2h-guide-pdf");
+          if (!res || !res.ok) {
+            ipcRenderer.send("get-alert", {
+              type: "error",
+              detail: (res && res.error) || "Gagal memuat panduan PDF.",
+              message: "Panduan Bagan",
+            });
+            return;
+          }
+          // embed[type=application/pdf] via data: URL tidak reliable di
+          // viewer PDF bawaan Chromium (Electron) — konversi dulu ke Blob
+          // + object URL (blob:) yg didukung penuh oleh PDF viewer plugin.
+          const base64 = res.dataUrl.split(",")[1] || "";
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: "application/pdf" });
+          this.guidePdfDataUrl = URL.createObjectURL(blob);
+        }
+        this.showGuidePdfModal = true;
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          detail: String((err && err.message) || err),
+          message: "Gagal memuat panduan PDF",
+        });
+      } finally {
+        this.isOpeningGuidePdf = false;
+      }
+    },
+
     async downloadBracketPdf() {
       const el = this.$refs.bracketCaptureArea;
       if (!el) {
@@ -4869,6 +4970,14 @@ export default {
         }
       }
       return false;
+    },
+    // Heat wajib diassign dulu (lewat klik di bagan) sblm tim non-BYE bisa
+    // dicatat Start Time / Finish Time / Penalties-nya — mencegah hasil
+    // "nyasar" ke slot yg belum jelas Heat-nya.
+    needsHeat(item) {
+      if (this.isByeTeam(item)) return false;
+      const heat = item && item.result && item.result.heat;
+      return heat === null || heat === undefined || heat === "";
     },
     getPenaltyCount(item) {
       const has = item && item.result;
@@ -6259,6 +6368,36 @@ export default {
 
       const next = this.rounds[nextRoundIndex];
 
+      // Cegah duplikat: skip tim yg namanya SUDAH ada di pool atau slot
+      // match babak berikutnya — bisa terjadi kalau "Advance to Next
+      // Round" ke-klik lebih dari sekali (mis. double-click, atau user
+      // mundur ke babak ini via Prev/round selector lalu klik Advance
+      // lagi). Tanpa filter ini, next.pool.concat() di bawah akan
+      // menambahkan tim yang sama berkali-kali → tim itu tampil duplikat
+      // di modal "Pilih Tim" dan bisa ke-assign ke 2 slot sekaligus.
+      const nextTakenNames = new Set();
+      (next.pool || []).forEach((p) => {
+        if (p && p.name) nextTakenNames.add(String(p.name).toUpperCase());
+      });
+      (next.matches || []).forEach((m) => {
+        if (m.team1 && m.team1.name)
+          nextTakenNames.add(String(m.team1.name).toUpperCase());
+        if (m.team2 && m.team2.name)
+          nextTakenNames.add(String(m.team2.name).toUpperCase());
+      });
+      const newWinners = winners.filter(
+        (w) => !nextTakenNames.has(String(w.name).toUpperCase())
+      );
+
+      if (!newWinners.length) {
+        this.$bvToast &&
+          this.$bvToast.toast(
+            "Semua pemenang babak ini sudah pernah dipindahkan ke babak berikutnya — tidak diulang.",
+            { variant: "info", autoHideDelay: 3000, title: "Sudah pernah di-advance" }
+          );
+        return;
+      }
+
       // Khusus meninggalkan Semifinal (size 4, bukan bronze): sekaligus
       // siapkan pool Final B dari 2 tim yang kalah. Skip diam2 (bukan
       // error) kalau Final B tidak ada di bagan ini, atau sudah pernah
@@ -6290,9 +6429,9 @@ export default {
       // yang baru menang, padahal babak baru belum tentu heat/lawannya sama.
       // Reset dulu supaya tim yang maju betul-betul berstatus "menunggu
       // di-assign manual ke slot bagan babak baru" tanpa Heat.
-      this._resetParticipantResultsByName(winners.map((w) => w.name));
+      this._resetParticipantResultsByName(newWinners.map((w) => w.name));
       next.pool = (next.pool || []).concat(
-        winners.map((w) => ({ name: w.name, bibTeam: w.bibTeam || "" }))
+        newWinners.map((w) => ({ name: w.name, bibTeam: w.bibTeam || "" }))
       );
 
       if (bronzeLosers.length === 2) {
@@ -6539,6 +6678,13 @@ export default {
 </script>
 
 <style scoped>
+.h2h-guide-pdf-embed {
+  width: 100%;
+  height: 80vh;
+  border: 0;
+  display: block;
+}
+
 .racetime-header {
   display: flex;
   flex-direction: column; /* susun vertikal */
@@ -7483,19 +7629,65 @@ thead th[colspan="8"] {
 /* Bar aksi kanan: select + tombol sejajar rapi */
 .toolbar-actions {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap; /* biar responsif */
 }
 
-/* Kelompok tombol (bukan .btn-group bootstrap agar tidak “paksa” tombol-only) */
-.btn-group-actions {
-  display: flex;
+/* Grup tombol toolbar bagan (Info / Bracket) — sama bahasa visual dgn
+   .h2h-action-group di panel Print/Save Output Racetime (garis warna kiri
+   = penanda cepat kelompok) supaya konsisten satu halaman. */
+.h2h-action-group--info {
+  border-left-color: #0ea5e9;
+}
+.h2h-action-group--bracket {
+  border-left-color: #6366f1;
+}
+
+/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
+   disamakan tinggi/paddingnya dgn .h2h-action-btn di sini supaya tidak
+   njomplang saat sejajar dlm satu grup. */
+.h2h-judge-trigger ::v-deep .jah-trigger {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border-color: #cfd8e6;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c4c7a;
+}
+.h2h-judge-trigger ::v-deep .jah-trigger:hover {
+  background: #eef4ff;
+}
+
+/* Aksi utama "Advance to Next Round" — solid & menonjol, beda bobot dari
+   tombol view-only (Info/Bracket) di sebelahnya. */
+.h2h-advance-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  cursor: pointer;
+  background: #16a34a;
+  border: 1px solid #16a34a;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 8px 16px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.h2h-advance-btn:hover {
+  background: #15803d;
+  border-color: #15803d;
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
+  transform: translateY(-1px);
+}
+.h2h-advance-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Sedikit konsistensi ukuran tombol custom */

@@ -23,7 +23,13 @@ module.exports = {
         appId: "com.kpu.sustainabletimingsystem",
         productName: "STiming System 424",
         directories: { buildResources: "src/assets/icons" },
-        extraResources: [{ from: "src/assets/icons", to: "assets/icons" }],
+        extraResources: [
+          { from: "src/assets/icons", to: "assets/icons" },
+          {
+            from: "BAGAN HEAD TO HEAD CLEAR.pdf",
+            to: "docs/BAGAN HEAD TO HEAD CLEAR.pdf",
+          },
+        ],
         asarUnpack: ["**/*.node"],
         files: [
           "**/*",

@@ -94,6 +94,7 @@ function createMain(preloadPath) {
       preload: preloadPath,
       nodeIntegration: true,
       contextIsolation: false,
+      plugins: true,
     },
   });
 

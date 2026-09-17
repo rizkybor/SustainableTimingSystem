@@ -28,4 +28,21 @@ function notifyResultsUpdated(payload) {
   }
 }
 
-module.exports = { notifyResultsUpdated };
+// Beritahu sts-jurysystem bahwa satu team Sprint baru saja diisi Start
+// Time-nya oleh operator (live, sebelum "Save Result" diklik) — dipakai
+// jurysystem utk validasi "team belum Start" pada submit penalty juri.
+function notifyTeamStarted(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "sprint:team-started",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, teamId, bibTeam, startTime }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan input operator
+  }
+}
+
+module.exports = { notifyResultsUpdated, notifyTeamStarted };

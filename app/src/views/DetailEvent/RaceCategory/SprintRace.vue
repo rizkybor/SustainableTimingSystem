@@ -1552,7 +1552,30 @@ export default {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
       const row = this.participant[id];
 
-      if (title === "start") row.result.startTime = val;
+      if (title === "start") {
+        row.result.startTime = val;
+        // Broadcast LIVE begitu Start Time diisi — TIDAK menunggu "Save
+        // Result" (yang cuma bulk-save di akhir). sts-jurysystem dengar
+        // event ini utk validasi "team belum Start" sebelum juri submit
+        // penalty. Fire-and-forget: kosongkan/salah isi Start Time tidak
+        // boleh gagalkan input operator.
+        if (val && String(val).trim()) {
+          try {
+            const bucket = getBucket();
+            ipcRenderer.send("sprint:team-started", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(row.teamId || ""),
+              bibTeam: String(row.bibTeam || ""),
+              startTime: String(val),
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
+      }
       if (title === "finish") {
         row.result.finishTime = val;
       }

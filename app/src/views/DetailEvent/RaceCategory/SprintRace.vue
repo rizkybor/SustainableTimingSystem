@@ -695,6 +695,20 @@ export default {
   computed: {
     // === SPRINT BUCKET ===
     currentEventId() {
+      // BUG FIX: `fromEvent` (dari localStorage "eventDetails", bisa basi
+      // ketinggalan event lain yang pernah dibuka di sesi yg sama) dulu
+      // diprioritaskan DI ATAS `fromRoute` (param URL halaman ini sendiri,
+      // TIDAK PERNAH basi — selalu event yg sungguh sedang dibuka). Selama
+      // ini tidak kelihatan efeknya krn onMessage() socket dulu fail-open
+      // (skip pengecekan eventId sama sekali kalau pesan judge tidak bawa
+      // eventId) — begitu jury system Sprint mulai kirim eventId asli,
+      // currentEventId yg salah/basi ini bikin SEMUA pesan penalty dari
+      // judge ketolak (isSameEvent selalu false). fromRoute sekarang jadi
+      // prioritas pertama.
+      let fromRoute = "";
+      if (this.$route && this.$route.params && this.$route.params.id) {
+        fromRoute = String(this.$route.params.id);
+      }
       let fromEvent = "";
       if (
         this.dataEventSafe &&
@@ -702,15 +716,11 @@ export default {
       ) {
         fromEvent = String(this.dataEventSafe._id || this.dataEventSafe.id);
       }
-      let fromRoute = "";
-      if (this.$route && this.$route.params && this.$route.params.id) {
-        fromRoute = String(this.$route.params.id);
-      }
       let fromBucket = "";
       const bucket = getBucket();
       if (bucket && bucket.eventId) fromBucket = String(bucket.eventId);
 
-      return fromEvent || fromRoute || fromBucket || "";
+      return fromRoute || fromEvent || fromBucket || "";
     },
 
     divisions() {

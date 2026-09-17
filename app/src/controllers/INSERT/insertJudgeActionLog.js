@@ -33,6 +33,19 @@ async function insertJudgeActionLog(payload) {
     bibTeam: p.bibTeam ? String(p.bibTeam) : "",
     value: Number.isFinite(value) ? value : null,
     from: p.from ? String(p.from) : "",
+    // Nama juri yang mengirim tindakan ini (username dari sts-jurysystem)
+    // — sebelumnya cuma ada "from" (label generik "Judges Dashboard - X"),
+    // tidak ada identitas juri sungguhan.
+    judge: p.judge ? String(p.judge) : "",
+    // Info kategori (Initial/Division/Race) tempat tindakan ini terjadi —
+    // sebelumnya tidak disimpan sama sekali, jadi Riwayat Judge tidak bisa
+    // menampilkan kategori per-entry.
+    initialId: p.initialId ? String(p.initialId) : "",
+    divisionId: p.divisionId ? String(p.divisionId) : "",
+    raceId: p.raceId ? String(p.raceId) : "",
+    initialName: p.initialName ? String(p.initialName) : "",
+    divisionName: p.divisionName ? String(p.divisionName) : "",
+    raceName: p.raceName ? String(p.raceName) : "",
     sourceTs: p.sourceTs ? String(p.sourceTs) : "",
     raw: p.raw && typeof p.raw === "object" ? p.raw : null,
     receivedAt: new Date(),

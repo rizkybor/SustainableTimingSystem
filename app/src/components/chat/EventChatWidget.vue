@@ -585,6 +585,11 @@ export default {
     this._mediaStream = null;
     this._recordedChunks = [];
     this._recordTimer = null;
+    // guard start-up (bukan this.recording) — mic-permission prompt bisa
+    // berlangsung lama & this.recording baru true SETELAH itu selesai;
+    // tanpa flag ini tombol mic masih bisa diklik 2x saat prompt tampil,
+    // memicu getUserMedia() ganda (lihat BUG FIX di startRecording()).
+    this._startingRecording = false;
   },
   mounted() {
     if (this.eventId) this.loadEventContext();
@@ -904,9 +909,20 @@ export default {
     },
 
     async startRecording() {
-      if (this.recording || this.uploading) return;
+      // BUG FIX: guard cuma cek `this.recording` sebelumnya — flag itu baru
+      // jadi true SETELAH getUserMedia() (prompt izin mikrofon) selesai.
+      // Tombol mic sendiri tidak di-disable selama recording (supaya bisa
+      // diklik lagi utk stop), jadi kalau user klik 2x cepat SEBELUM prompt
+      // selesai, startRecording() terpanggil 2x bersamaan → 2 stream mic
+      // aktif + 2 interval, yang pertama jadi orphan (tidak pernah
+      // di-stop, mic nyala terus diam2). Tambah flag `_startingRecording`
+      // yang di-set true SEBELUM await, supaya panggilan kedua langsung
+      // ke-block.
+      if (this.recording || this.uploading || this._startingRecording) return;
+      this._startingRecording = true;
+      let stream = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this._mediaStream = stream;
 
         const mimeType = pickSupportedAudioMime();
@@ -935,7 +951,16 @@ export default {
           if (this.recordSeconds >= MAX_RECORD_SECONDS) this.stopRecording();
         }, 1000);
       } catch (err) {
+        // BUG FIX: kalau getUserMedia() berhasil (mic sudah aktif) tapi
+        // `new MediaRecorder(...)` sesudahnya yang gagal/throw, stream yg
+        // sudah didapat tidak pernah di-stop — mic nyala terus tanpa
+        // indikator apa pun di UI (this.recording tetap false). Selalu
+        // matikan track stream kalau proses ini gagal di tengah jalan.
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        this._mediaStream = null;
         this.showUploadError("Tidak bisa mengakses mikrofon");
+      } finally {
+        this._startingRecording = false;
       }
     },
 

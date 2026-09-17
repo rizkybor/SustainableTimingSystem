@@ -1005,20 +1005,37 @@ function setupIPCMainHandlers() {
   // Race Settings (GET/UPSERT)
   // =========================
   // GET
-  ipcMain.on("race-settings:get", async (event, eventId) => {
+  // BUG FIX: sama persis kelas bug yg sudah diperbaiki di
+  // "teams-slalom-registered:find" (lihat komentar di situ) — dulu
+  // eventId dikirim polos (string), balasannya lewat .once() di SEMUA
+  // pemanggil (13 komponen: 5 race category + 5 result page + RaceSettings
+  // modal + JudgesSettings). Kalau 2 komponen sama2 minta race-settings
+  // hampir bersamaan (mis. RaceSettingsModal ikut ke-mount di halaman yg
+  // sama), balasan PERTAMA yg datang menyalakan SEMUA .once() listener yg
+  // masih menunggu — bukan cuma punya pemanggil yg sebenarnya request itu.
+  // Kalau requestnya utk eventId BEDA, komponen yg "salah dapat" balasan
+  // ini berakhir pakai Race Settings event lain. __reqId (kalau dikirim)
+  // digemakan balik supaya pemanggil bisa cocokkan balasan ke request-nya
+  // sendiri via ipcRenderer.on()+cek __reqId — pemanggil lama yg kirim
+  // eventId polos (bukan object) tidak terpengaruh (__reqId cuma undefined).
+  ipcMain.on("race-settings:get", async (event, payload) => {
+    const isObj = payload && typeof payload === "object";
+    const id = (isObj ? payload.eventId : payload || "").toString();
+    const reqId = isObj ? payload.__reqId : undefined;
     try {
-      const id = (eventId || "").toString();
       const doc = await getRaceSettingsByEventId(id);
       const settings = doc && doc.settings ? doc.settings : null;
 
       event.reply("race-settings:get-reply", {
         ok: true,
         settings: settings,
+        __reqId: reqId,
       });
     } catch (err) {
       event.reply("race-settings:get-reply", {
         ok: false,
         error: err && err.message ? err.message : String(err),
+        __reqId: reqId,
       });
     }
   });

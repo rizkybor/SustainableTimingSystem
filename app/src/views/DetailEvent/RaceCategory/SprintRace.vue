@@ -1136,8 +1136,27 @@ export default {
     async loadRaceSettings() {
       try {
         if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+        // BUG FIX: sama kelas bug dgn "teams-slalom-registered:find" —
+        // dulu .once() polos di channel "race-settings:get-reply" yg
+        // dipakai bersama oleh BANYAK komponen (RaceSettings modal,
+        // JudgesSettings, 5 race category page, 5 result page). Kalau ada
+        // komponen lain yg juga minta race-settings hampir bersamaan (mis.
+        // RaceSettingsModal ikut ke-mount), balasan PERTAMA yg datang
+        // menyalakan .once() listener DI SINI walau balasan itu sebenarnya
+        // utk request komponen lain — dataPenaltiesFinish bisa diam2 gagal
+        // ke-update (Finish penalty dari Judges Dashboard ditolak walau
+        // nilainya valid di Race Settings). __reqId + ipcRenderer.on()
+        // (bukan .once()) memastikan cuma balasan utk request kita SENDIRI
+        // yang diproses.
+        const reqId = "sprintRaceSettings|" + this.currentEventId + "|" + Date.now() + "|" + Math.random();
         await new Promise((resolve) => {
-          ipcRenderer.once("race-settings:get-reply", (_e, res) => {
+          let settled = false;
+          const onReply = (_e, res) => {
+            if (!res || res.__reqId !== reqId) return;
+            ipcRenderer.removeListener("race-settings:get-reply", onReply);
+            if (settled) return;
+            settled = true;
+
             const sprintSettings = res && res.ok && res.settings && res.settings.sprint;
             const toList = (arr) =>
               Array.isArray(arr) && arr.length > 0
@@ -1173,8 +1192,18 @@ export default {
             ) || 0;
 
             resolve();
+          };
+          ipcRenderer.on("race-settings:get-reply", onReply);
+          ipcRenderer.send("race-settings:get", {
+            eventId: this.currentEventId,
+            __reqId: reqId,
           });
-          ipcRenderer.send("race-settings:get", this.currentEventId);
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener("race-settings:get-reply", onReply);
+            resolve();
+          }, 8000);
         });
       } catch (error) {
         // biarkan dataPenaltiesStart/Finish dari sumber global jika gagal memuat override

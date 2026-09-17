@@ -5457,11 +5457,14 @@ export default {
       });
     },
     notify(type, detail, message = "Info") {
-      if (this.$ipc || (window && window.ipcRenderer)) {
-        const ir = this.$ipc || window.ipcRenderer;
-        ir.send && ir.send("get-alert", { type, detail, message });
-      }
-      // bisa juga set state:
+      // BUG FIX: sebelumnya cuma jalan kalau `window.ipcRenderer`/`this.$ipc`
+      // ada — keduanya TIDAK PERNAH di-set di aplikasi ini (component ini
+      // sudah `import { ipcRenderer } from "electron"` langsung di atas),
+      // jadi kondisi if-nya selalu false dan SEMUA pemanggil notify() di
+      // file ini (22 tempat, termasuk warning kritikal spt "update
+      // realtime dari judge diabaikan") diam2 tidak pernah tampil apa pun
+      // ke operator. Pakai `ipcRenderer` yg sudah di-import module-level.
+      ipcRenderer.send("get-alert", { type, detail, message });
       this.lastErrorMessage = `${message}: ${detail}`;
     },
     notifyError(err, message = "Error") {

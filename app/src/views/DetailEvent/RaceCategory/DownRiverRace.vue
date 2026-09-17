@@ -1639,10 +1639,12 @@ export default {
     },
     // === NOTIFY ===
     notify(type, detail, message = "Info") {
-      if (this.$ipc || (window && window.ipcRenderer)) {
-        const ir = this.$ipc || window.ipcRenderer;
-        ir.send && ir.send("get-alert", { type, detail, message });
-      }
+      // BUG FIX: sebelumnya cuma jalan kalau `window.ipcRenderer`/`this.$ipc`
+      // ada — keduanya TIDAK PERNAH di-set di aplikasi ini, jadi kondisinya
+      // selalu false dan semua pemanggil notify()/notifyError() di file ini
+      // diam2 tidak pernah menampilkan apa pun ke operator. Pakai
+      // `ipcRenderer` yg sudah di-import module-level di atas.
+      ipcRenderer.send("get-alert", { type, detail, message });
     },
 
     notifyError(err, message = "Error") {

@@ -1119,12 +1119,18 @@ export default {
       if (!res) return;
 
       if (title === "start") res.startTime = val;
-      if (title === "finish") {
-        res.finishTime = val;
-        if (res.startTime && res.finishTime) {
-          res.raceTime = this.hitungSelisihWaktu(res.startTime, res.finishTime);
-          this.recalcTeamResult(heat, visItem._slotIdx);
-        }
+      if (title === "finish") res.finishTime = val;
+      // BUG FIX: sebelumnya raceTime cuma dihitung di branch "finish" — kalau
+      // operator klik tombol Finish SEBELUM Start, finishTime kecatat tapi
+      // raceTime tidak pernah dihitung; giliran Start diklik setelahnya,
+      // branch "start" tidak pernah cek/hitung ulang, dan tombol Finish
+      // sudah keburu ke-disable (finishTime sudah terisi) jadi tidak ada
+      // cara memicu ulang selain reset. Cek di luar kedua branch supaya
+      // urutan klik Start/Finish tidak lagi masalah (sama pola fix dgn
+      // Slalom/DRR/Sprint).
+      if (res.startTime && res.finishTime) {
+        res.raceTime = this.hitungSelisihWaktu(res.startTime, res.finishTime);
+        this.recalcTeamResult(heat, visItem._slotIdx);
       }
 
       if (this.selectedRxKey) {

@@ -25,11 +25,19 @@
               <Icon icon="mdi:gavel" width="18" height="18" />
             </div>
             <div class="jah-item-main">
-              <div class="jah-item-text">{{ item.text || item.type }}</div>
+              <div class="jah-item-text">
+                {{ item.text || item.type }}
+                <span v-if="item.type" class="jah-badge">{{ item.type }}</span>
+                <span v-if="item.value !== null && item.value !== undefined" class="jah-badge jah-badge--value">
+                  Penalty {{ item.value }}
+                </span>
+              </div>
               <div class="jah-item-meta">
-                <span v-if="item.teamName">{{ item.teamName }}</span>
+                <span v-if="categoryLabelFor(item)">{{ categoryLabelFor(item) }}</span>
+                <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
                 <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
-                <span v-if="item.from"> &middot; {{ item.from }}</span>
+                <span v-if="item.judge"> &middot; Juri: {{ item.judge }}</span>
+                <span v-else-if="item.from"> &middot; {{ item.from }}</span>
               </div>
             </div>
             <div class="jah-item-time">{{ formatTime(item.receivedAt) }}</div>
@@ -69,6 +77,12 @@ export default {
     open() {
       this.isOpen = true;
       this.fetchLogs();
+    },
+    categoryLabelFor(item) {
+      var parts = [item.initialName, item.divisionName, item.raceName].filter(
+        Boolean
+      );
+      return parts.join(" - ");
     },
     formatTime(v) {
       if (!v) return "-";
@@ -178,6 +192,21 @@ export default {
   color: #64748b;
   font-size: 12px;
   margin-top: 2px;
+}
+.jah-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1874a5;
+  vertical-align: middle;
+}
+.jah-badge--value {
+  background: #fef2f2;
+  color: #dc2626;
 }
 .jah-item-time {
   flex-shrink: 0;

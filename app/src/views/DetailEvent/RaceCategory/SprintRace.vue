@@ -1021,6 +1021,7 @@ export default {
 
       // audit trail — catat tindakan judge ini, tidak menunggu balasan
       if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        const bucket = getBucket();
         ipcRenderer.send("judgeLog:send", {
           eventId: this.currentEventId,
           raceCategory: "sprint",
@@ -1031,6 +1032,13 @@ export default {
           bibTeam: local.bibTeam,
           value: payload.value,
           from: payload.from,
+          judge: payload.judge || "",
+          initialId: bucket.initialId,
+          divisionId: bucket.divisionId,
+          raceId: bucket.raceId,
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
           sourceTs: payload.ts,
           raw: payload,
         });

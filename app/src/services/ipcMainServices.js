@@ -109,6 +109,7 @@ const {
   upsertRaceSettingsByEventId,
 } = require("../controllers/UPDATE/editRaceSettings");
 
+const { notifyTeamStarted } = require("../controllers/socketBroadcast");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -585,6 +586,15 @@ function setupIPCMainHandlers() {
         error: err.message || String(err),
       });
     }
+  });
+
+  // Broadcast LIVE (bukan tunggu "Save Result") begitu operator mengisi
+  // Start Time satu baris Sprint — dipakai sts-jurysystem utk validasi
+  // "team belum Start" sebelum juri boleh submit penalty. Fire-and-forget,
+  // tidak ada reply karena kegagalan broadcast tidak boleh mengganggu
+  // input operator yang sedang berjalan.
+  ipcMain.on("sprint:team-started", (_event, payload) => {
+    notifyTeamStarted(payload || {});
   });
 
   // LOAD SPRINT RESULT

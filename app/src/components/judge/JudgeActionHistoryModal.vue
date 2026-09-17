@@ -12,6 +12,45 @@
 
     <b-modal v-model="isOpen" hide-footer size="lg" :title="modalTitle">
       <div class="jah-body">
+        <div v-if="items.length && !loading && !confirmingDelete" class="jah-toolbar">
+          <button
+            type="button"
+            class="jah-delete-trigger"
+            :disabled="deleting"
+            @click="confirmingDelete = true"
+          >
+            <Icon icon="mdi:trash-can-outline" width="16" height="16" />
+            Hapus Riwayat
+          </button>
+        </div>
+
+        <div v-if="confirmingDelete" class="jah-confirm">
+          <p class="jah-confirm-text">
+            Yakin ingin menghapus <strong>seluruh</strong> riwayat judge
+            kategori <strong>{{ categoryLabel || raceCategory }}</strong>
+            untuk event ini? Ini menghapus riwayat SEMUA juri (bukan cuma
+            satu) dan tidak bisa dibatalkan.
+          </p>
+          <div class="jah-confirm-actions">
+            <button
+              type="button"
+              class="jah-btn jah-btn--ghost"
+              :disabled="deleting"
+              @click="confirmingDelete = false"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              class="jah-btn jah-btn--danger"
+              :disabled="deleting"
+              @click="deleteHistory"
+            >
+              {{ deleting ? "Menghapus…" : "Ya, Hapus Semua Riwayat" }}
+            </button>
+          </div>
+        </div>
+
         <div v-if="loading" class="jah-state">Memuat riwayat…</div>
         <div v-else-if="error" class="jah-state jah-state--error">
           Gagal memuat riwayat: {{ error }}
@@ -19,7 +58,7 @@
         <div v-else-if="!items.length" class="jah-state">
           Belum ada tindakan judge untuk kategori ini.
         </div>
-        <ul v-else class="jah-list">
+        <ul v-else-if="!confirmingDelete" class="jah-list">
           <li v-for="item in items" :key="item._id" class="jah-item">
             <div class="jah-item-icon">
               <Icon icon="mdi:gavel" width="18" height="18" />
@@ -65,6 +104,8 @@ export default {
       loading: false,
       error: null,
       items: [],
+      confirmingDelete: false,
+      deleting: false,
     };
   },
   computed: {
@@ -76,7 +117,42 @@ export default {
   methods: {
     open() {
       this.isOpen = true;
+      this.confirmingDelete = false;
       this.fetchLogs();
+    },
+    deleteHistory() {
+      if (typeof ipcRenderer === "undefined" || !this.eventId || this.deleting)
+        return;
+      this.deleting = true;
+
+      ipcRenderer.removeAllListeners("judgeLog:deleteHistory:reply");
+      ipcRenderer.send("judgeLog:deleteHistory", {
+        eventId: this.eventId,
+        raceCategory: this.raceCategory,
+      });
+      ipcRenderer.once("judgeLog:deleteHistory:reply", (_e, res) => {
+        this.deleting = false;
+        this.confirmingDelete = false;
+        if (res && res.ok) {
+          this.items = [];
+          ipcRenderer.send("get-alert-saved", {
+            type: "info",
+            message: "Riwayat Judge dihapus",
+            detail:
+              "Riwayat (" +
+              (res.deletedDetails || 0) +
+              " entri) untuk kategori " +
+              (this.categoryLabel || this.raceCategory) +
+              " sudah dikosongkan.",
+          });
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Gagal menghapus riwayat",
+            detail: (res && res.error) || "unknown error",
+          });
+        }
+      });
     },
     categoryLabelFor(item) {
       var parts = [item.initialName, item.divisionName, item.raceName].filter(
@@ -141,6 +217,73 @@ export default {
 .jah-body {
   max-height: 60vh;
   overflow-y: auto;
+}
+.jah-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.jah-delete-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jah-delete-trigger:hover {
+  background: #fee2e2;
+}
+.jah-delete-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.jah-confirm {
+  padding: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.jah-confirm-text {
+  color: #7f1d1d;
+  font-size: 13px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.jah-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.jah-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.jah-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.jah-btn--ghost {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+.jah-btn--danger {
+  background: #dc2626;
+  color: #fff;
+}
+.jah-btn--danger:hover {
+  background: #b91c1c;
 }
 .jah-state {
   padding: 24px 8px;

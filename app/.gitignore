@@ -30,3 +30,8 @@ yarn-error.log*
 
 # internal dev notes (SI card reader decode logic recap)
 src/utils/sportIdentReader.md
+
+MEMORY-SPRINT.md
+MEMORY-H2H.md
+MEMORY-SLALOM.md
+MEMORY-DRR.md

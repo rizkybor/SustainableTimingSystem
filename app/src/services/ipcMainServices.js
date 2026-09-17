@@ -131,6 +131,9 @@ const {
   insertJudgeActionLog,
   listJudgeActionLogsByEvent,
 } = require("../controllers/INSERT/insertJudgeActionLog");
+const {
+  deleteJudgeActionHistory,
+} = require("../controllers/DELETE/deleteJudgeActionHistory");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -281,6 +284,22 @@ function setupIPCMainHandlers() {
       event.reply("judgeLog:listByEvent:reply", {
         ok: false,
         items: [],
+        error: err.message,
+      });
+    }
+  });
+
+  // Hapus SELURUH "Riwayat Judge" (log lokal + riwayat penalty milik
+  // sts-jurysystem, SEMUA juri) utk satu event + satu kategori race saja
+  // — lihat catatan lengkap di deleteJudgeActionHistory.js.
+  ipcMain.on("judgeLog:deleteHistory", async (event, payload) => {
+    try {
+      const { eventId, raceCategory } = payload || {};
+      const result = await deleteJudgeActionHistory(eventId, raceCategory);
+      event.reply("judgeLog:deleteHistory:reply", result);
+    } catch (err) {
+      event.reply("judgeLog:deleteHistory:reply", {
+        ok: false,
         error: err.message,
       });
     }

@@ -34,6 +34,15 @@ const RESET_COLLECTIONS = [
   // atas — eventId di sini disimpan sbg ObjectId (bukan string), jadi
   // butuh konversi filter tersendiri (lihat eventIdType di bawah).
   { name: "judgereports", label: "Riwayat Penalty Juri (rekap per-juri)", byBucket: false, eventIdType: "objectId" },
+  // BUG FIX: flag "team sudah Start" (dipakai jurysystem utk menolak
+  // submit penalty Start/Finish sebelum team benar-benar mulai) tersimpan
+  // permanen di sini (eventId sbg STRING, lihat
+  // models/SprintTeamStatus.js di jurysystem) dan sebelumnya TIDAK
+  // pernah ikut dihapus Reset Data. Akibatnya, team yang pernah "Start"
+  // di sesi testing/race SEBELUMNYA tetap tampak sudah Start selamanya
+  // walau race sudah di-reset — jurysystem salah meloloskan submit utk
+  // team itu padahal race yang baru belum benar-benar mulai.
+  { name: "sprintteamstatuses", label: "Status Start Team (Sprint)", byBucket: false },
 ];
 
 async function deleteOneCollectionForEvent(eventId, collectionName) {

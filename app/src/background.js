@@ -2,7 +2,6 @@
 
 import { app, protocol, BrowserWindow, ipcMain, nativeImage, screen } from "electron";
 import createProtocol from "vue-cli-plugin-electron-builder/lib/createProtocol";
-import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 import path from "path";
 import { pathToFileURL } from "url";
 
@@ -163,6 +162,16 @@ app.on("activate", function () {
 app.on("ready", async function () {
   if (isDev && !process.env.IS_TEST) {
     try {
+      // BUG FIX: "electron-devtools-installer" menjalankan
+      // electron.app.getPath("userData") di level TOP MODULE (bukan di
+      // dalam function-nya) — kalau di-import statis di atas, side-effect
+      // itu jalan begitu file ini di-load, SEBELUM app benar-benar ready,
+      // dan crash dgn "Cannot read property 'getPath' of undefined" di
+      // bundling dev (`electron:serve`) — production build (`electron:
+      // build`) tidak kena krn cara webpack membungkusnya beda. require()
+      // lazy di sini (di dalam app.on("ready"), cuma saat isDev) supaya
+      // top-level side-effect itu baru jalan setelah app benar2 ready.
+      const { default: installExtension, VUEJS_DEVTOOLS } = require("electron-devtools-installer");
       await installExtension(VUEJS_DEVTOOLS);
     } catch (e) {
       console.error("Vue Devtools failed to install:", e.toString());

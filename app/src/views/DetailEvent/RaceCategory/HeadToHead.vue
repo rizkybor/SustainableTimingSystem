@@ -2118,6 +2118,7 @@ export default {
       this.computePodium();
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat(); // << tambah
+      this.broadcastActiveRound();
     },
     showBracket(val) {
       localStorage.setItem(SHOW_BRACKET_KEY, val ? "1" : "0");
@@ -5013,6 +5014,71 @@ export default {
     /* =========================================================
      * SOCKET / IPC (Judges Dashboard realtime)
      * =======================================================*/
+
+    // Broadcast LIVE begitu operator pindah/buka babak (round) lain — H2H
+    // tidak punya "Start Time" per tim seperti Sprint, jadi ini pengganti
+    // sinyal "tim mana yang sekarang aktif/boleh dinilai juri". Dipakai
+    // sts-jurysystem utk filter dropdown Team + label babak aktif.
+    // Fire-and-forget: kegagalan broadcast tidak boleh mengganggu
+    // perpindahan babak operator.
+    broadcastActiveRound() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const r = this.currentRound;
+        if (!r) return;
+
+        // team1/team2 di match cuma simpan {name, bibTeam} — teamId
+        // dicari lewat participantArr (pola sama dgn applyPenaltyFromSocketH2H).
+        const findTeamId = (nameUp) => {
+          const p = (this.participantArr || []).find(
+            (x) =>
+              String(x.nameTeam || x.teamName || "").toUpperCase() ===
+              nameUp
+          );
+          return p ? String(p.teamId || "") : "";
+        };
+
+        const teams = [];
+        const seen = new Set();
+        const addTeam = (t) => {
+          if (!t || !t.name) return;
+          const nameUp = String(t.name).toUpperCase();
+          if (seen.has(nameUp)) return;
+          seen.add(nameUp);
+          teams.push({
+            teamId: findTeamId(nameUp),
+            bibTeam: String(t.bibTeam || ""),
+            nameTeam: String(t.name || ""),
+          });
+        };
+        (r.matches || []).forEach((m) => {
+          addTeam(m.team1);
+          addTeam(m.team2);
+        });
+        (r.pool || []).forEach((t) =>
+          addTeam({ name: t && (t.name || t.nameTeam || t.teamName), bibTeam: t && t.bibTeam })
+        );
+
+        if (!teams.length) return;
+
+        const bucket = getBucket();
+        ipcRenderer.send("h2h:round-active", {
+          eventId: bucket.eventId,
+          initialId: bucket.initialId,
+          divisionId: bucket.divisionId,
+          raceId: bucket.raceId,
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
+          roundId: String(r.id || ""),
+          roundName: r.bronze ? "Final B" : String(r.name || ""),
+          teams,
+        });
+      } catch (_e) {
+        // non-critical
+      }
+    },
+
     async applyPenaltyFromSocketH2H(msg = {}) {
       // resolve tim: teamId/bib/nama -> index di this.participant
       // (pola sama seperti updateTime: cocokkan lewat participantArr lalu
@@ -5108,6 +5174,7 @@ export default {
 
       // audit trail — catat tindakan judge ini, tidak menunggu balasan
       if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        const bucket = getBucket();
         ipcRenderer.send("judgeLog:send", {
           eventId: this.currentEventId,
           raceCategory: "h2h",
@@ -5116,6 +5183,13 @@ export default {
           teamId: target.teamId,
           teamName: target.nameTeam || target.teamName,
           bibTeam: target.bibTeam,
+          judge: msg.judge || "",
+          initialId: bucket.initialId,
+          divisionId: bucket.divisionId,
+          raceId: bucket.raceId,
+          initialName: bucket.initialName,
+          divisionName: bucket.divisionName,
+          raceName: bucket.raceName,
           value:
             kind === "BooyanCorner"
               ? msg.touched

@@ -25,9 +25,18 @@ async function insertH2HFoulsReport(payload) {
     positionLabel: p.positionLabel ? String(p.positionLabel) : "",
     detail: p.detail ? String(p.detail) : "",
     detailLabel: p.detailLabel ? String(p.detailLabel) : "",
-    penaltySecondsLabel: Number.isFinite(Number(p.penaltySecondsLabel))
-      ? Number(p.penaltySecondsLabel)
-      : null,
+    // Angka detik utk sebagian besar jenis (Hand Push/Foot Kick/Punch/
+    // Touch Gate), TAPI "Outside" pakai label non-angka "DQ" — jangan
+    // dipaksa jadi Number (akan jadi NaN → hilang jadi null & info DQ
+    // hilang di viewer/PDF operator).
+    penaltySecondsLabel:
+      p.penaltySecondsLabel === undefined ||
+      p.penaltySecondsLabel === null ||
+      p.penaltySecondsLabel === ""
+        ? null
+        : Number.isFinite(Number(p.penaltySecondsLabel))
+        ? Number(p.penaltySecondsLabel)
+        : String(p.penaltySecondsLabel),
     remarks: p.remarks ? String(p.remarks) : "",
     judge: p.judge ? String(p.judge) : "",
     sourceTs: p.sourceTs ? String(p.sourceTs) : "",

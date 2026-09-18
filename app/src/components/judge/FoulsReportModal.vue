@@ -50,7 +50,7 @@
                 <span v-if="item.detailLabel" class="frm-badge frm-badge--detail">
                   {{ item.detailLabel }}
                   <template v-if="item.penaltySecondsLabel !== null && item.penaltySecondsLabel !== undefined">
-                    ({{ item.penaltySecondsLabel }}s)
+                    ({{ item.penaltySecondsLabel === "DQ" ? "DQ" : item.penaltySecondsLabel + "s" }})
                   </template>
                 </span>
                 <span v-if="item.positionLabel" class="frm-badge frm-badge--position">

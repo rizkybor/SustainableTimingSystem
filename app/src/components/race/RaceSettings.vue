@@ -427,6 +427,80 @@
 
             <hr class="rs-divider" />
 
+            <!-- FOULS DETAILS (PEN DETAIL) -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="font-weight-bold">Fouls Details (Pen Detail)</div>
+              <b-button
+                size="sm"
+                variant="outline-primary"
+                style="border-radius: 8px"
+                :disabled="draft.h2h.foulsDetails.length >= maxFoulDetails"
+                @click="addFoulDetailRow()"
+              >
+                + Tambah
+              </b-button>
+            </div>
+            <small class="text-muted d-block mb-2">
+              Daftar pilihan "Pen Detail" pada form Fouls Report juri
+              (sts-jurysystem). Fouls Report murni informasi ke operator —
+              TIDAK PERNAH mengubah nilai penalty resmi.
+            </small>
+            <div
+              v-if="draft.h2h.foulsDetails.length"
+              class="d-flex mb-1"
+              style="gap: 10px"
+            >
+              <small class="text-muted flex-grow-1">Label</small>
+              <small class="text-muted" style="width: 60px; flex: 0 0 60px"
+                >DQ?</small
+              >
+              <small class="text-muted" style="width: 90px; flex: 0 0 90px"
+                >Detik</small
+              >
+              <span style="width: 32px; flex: 0 0 32px"></span>
+            </div>
+            <div
+              v-for="(p, idx) in draft.h2h.foulsDetails"
+              :key="'fouldetail-' + idx"
+              class="d-flex align-items-center mb-2"
+              style="gap: 10px"
+            >
+              <b-form-input
+                v-model="p.label"
+                placeholder="Label"
+                style="border-radius: 10px"
+                class="flex-grow-1"
+              />
+              <b-form-checkbox
+                class="rs-switch"
+                switch
+                style="width: 60px; flex: 0 0 60px"
+                :checked="p.seconds === 'DQ'"
+                @change="(val) => onToggleFoulDQ(idx, val)"
+              />
+              <b-form-input
+                :value="p.seconds === 'DQ' ? '' : p.seconds"
+                @input="(val) => onFoulSecondsInput(idx, val)"
+                type="number"
+                min="0"
+                max="600"
+                placeholder="Detik"
+                :disabled="p.seconds === 'DQ'"
+                style="border-radius: 10px; width: 90px; flex: 0 0 90px"
+              />
+              <b-button
+                size="sm"
+                variant="outline-danger"
+                style="border-radius: 8px"
+                :disabled="draft.h2h.foulsDetails.length <= 1"
+                @click="removeFoulDetailRow(idx)"
+              >
+                ✕
+              </b-button>
+            </div>
+
+            <hr class="rs-divider" />
+
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div class="font-weight-bold">Score by Rank</div>
@@ -1341,6 +1415,20 @@ const DEFAULT_H2H_PENALTIES = [
   { label: "50", value: 50 },
 ];
 
+// Default Pen Detail Fouls Report H2H — sebelumnya HARDCODED tetap di
+// sts-jurysystem (`FOUL_DETAILS` di `FoulsReportModal.jsx`), sekarang
+// bisa dikustomisasi operator per-event lewat Race Settings. "seconds"
+// cuma LABEL informatif (Fouls Report tidak pernah mengubah penalty
+// resmi) — bisa angka detik ATAU string "DQ" (Diskualifikasi, mis. utk
+// pelanggaran "Outside").
+const DEFAULT_H2H_FOUL_DETAILS = [
+  { key: "hand_push", label: "Hand Push", seconds: 5 },
+  { key: "foot_kick", label: "Foot Kick", seconds: 5 },
+  { key: "punch", label: "Punch", seconds: 10 },
+  { key: "touch_gate", label: "Touch Gate", seconds: 50 },
+  { key: "outside", label: "Outside", seconds: "DQ" },
+];
+
 // Default Pilihan Pen. Start (PS) / Pen. Finish (PF) / Pen. Gates (PG)
 // Slalom — sebelumnya hardcoded & TIDAK bisa dikustomisasi sama sekali
 // (PS/PF berbagi {0,10,50}, Gate {0,5,50} tetap di kode SlalomRace.vue).
@@ -1513,6 +1601,7 @@ const DEFAULT_SETTINGS = {
     startPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
     cutLinePenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
     finishPenalties: DEFAULT_H2H_PENALTIES.map((p) => ({ ...p })),
+    foulsDetails: DEFAULT_H2H_FOUL_DETAILS.map((p) => ({ ...p })),
     scoreByRank: DEFAULT_H2H_SCORE_BY_RANK.map((p) => ({ ...p })),
     defaultScoreBeyondRank: 0,
     ...DEFAULT_PDF_SIGNATURE_TOGGLES,
@@ -1565,6 +1654,7 @@ export default {
     minTeamsPerHeat: { type: Number, default: 3 },
     maxTeamsPerHeat: { type: Number, default: 8 },
     maxSprintPenalties: { type: Number, default: 8 },
+    maxFoulDetails: { type: Number, default: 12 },
     maxSprintScoreRows: { type: Number, default: 64 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
@@ -1743,6 +1833,42 @@ export default {
         return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
       };
 
+      const slugifyFoulKey = (s) =>
+        String(s || "")
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "") || "detail";
+
+      // key di-slug-kan dari label & dipastikan unik dalam satu list —
+      // dipakai sts-jurysystem utk mencocokkan icon & sbg identitas stabil
+      // tiap opsi Pen Detail, beda dari list penalty lain yg tidak butuh
+      // `key`. `seconds` cuma LABEL informatif — bisa angka detik ATAU
+      // string "DQ" (mis. utk pelanggaran "Outside").
+      const cleanFoulDetailsList = (raw, fallback) => {
+        const arr = Array.isArray(raw) && raw.length > 0 ? raw : fallback;
+        const usedKeys = new Set();
+        const clean = arr.slice(0, this.maxFoulDetails).map((p, idx) => {
+          const label =
+            String((p && p.label) || "").slice(0, 40) || `Detail ${idx + 1}`;
+          const baseKey = slugifyFoulKey((p && p.key) || label);
+          let finalKey = baseKey;
+          let n = 2;
+          while (usedKeys.has(finalKey)) {
+            finalKey = `${baseKey}_${n++}`;
+          }
+          usedKeys.add(finalKey);
+          const rawSeconds = p && p.seconds;
+          const seconds =
+            typeof rawSeconds === "string" &&
+            rawSeconds.trim().toUpperCase() === "DQ"
+              ? "DQ"
+              : Math.max(0, Math.min(600, toInt(rawSeconds, 0)));
+          return { key: finalKey, label, seconds };
+        });
+        return clean.length > 0 ? clean : fallback.map((p) => ({ ...p }));
+      };
+
       const cleanScoreList = (raw, fallback) => {
         const arr =
           Array.isArray(raw) && raw.length > 0 ? raw : fallback;
@@ -1812,6 +1938,10 @@ export default {
           finishPenalties: cleanList(
             src.h2h && src.h2h.finishPenalties,
             DEFAULT_H2H_PENALTIES
+          ),
+          foulsDetails: cleanFoulDetailsList(
+            src.h2h && src.h2h.foulsDetails,
+            DEFAULT_H2H_FOUL_DETAILS
           ),
           scoreByRank: cleanScoreList(
             src.h2h && src.h2h.scoreByRank,
@@ -1978,6 +2108,40 @@ export default {
       list.splice(idx, 1);
     },
 
+    // Fouls Details (Pen Detail) — daftar pilihan di form Fouls Report
+    // juri (sts-jurysystem). Beda dari addPenaltyRow/removePenaltyRow
+    // karena tiap baris punya `seconds` yang bisa berupa angka ATAU
+    // string "DQ" (Diskualifikasi), bukan cuma angka detik biasa.
+    addFoulDetailRow() {
+      const list = this.draft.h2h.foulsDetails;
+      if (!list || list.length >= this.maxFoulDetails) return;
+      list.push({ key: "", label: "", seconds: 0 });
+    },
+
+    removeFoulDetailRow(idx) {
+      const list = this.draft.h2h.foulsDetails;
+      if (!list || list.length <= 1) return;
+      list.splice(idx, 1);
+    },
+
+    onToggleFoulDQ(idx, checked) {
+      const row = this.draft.h2h.foulsDetails[idx];
+      if (!row) return;
+      if (checked) {
+        row._prevSeconds = typeof row.seconds === "number" ? row.seconds : 0;
+        row.seconds = "DQ";
+      } else {
+        row.seconds = typeof row._prevSeconds === "number" ? row._prevSeconds : 0;
+      }
+    },
+
+    onFoulSecondsInput(idx, val) {
+      const row = this.draft.h2h.foulsDetails[idx];
+      if (!row) return;
+      const n = parseInt(val, 10);
+      row.seconds = Number.isFinite(n) ? Math.max(0, Math.min(600, n)) : 0;
+    },
+
     // Rank di list "Score by Rank" selalu berurutan 1..N mengikuti posisi
     // baris (bukan input bebas) — supaya tidak ada rank ganda/bolong.
     // scope: "sprint" | "h2h" — generik supaya editor Score by Rank tidak
@@ -2026,6 +2190,36 @@ export default {
       this.draft.h2h.finishPenalties = cleanPenaltyList(
         this.draft.h2h.finishPenalties
       );
+
+      const slugifyFoulKeyOnConfirm = (s) =>
+        String(s || "")
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "") || "detail";
+      const cleanFoulDetailsListOnConfirm = (list) => {
+        const usedKeys = new Set();
+        return (list || []).map((p, idx) => {
+          const label =
+            String(p.label || "").trim() || `Detail ${idx + 1}`;
+          const baseKey = slugifyFoulKeyOnConfirm(p.key || label);
+          let finalKey = baseKey;
+          let n = 2;
+          while (usedKeys.has(finalKey)) {
+            finalKey = `${baseKey}_${n++}`;
+          }
+          usedKeys.add(finalKey);
+          const seconds =
+            p.seconds === "DQ"
+              ? "DQ"
+              : Math.max(0, Math.min(600, parseInt(p.seconds, 10) || 0));
+          return { key: finalKey, label, seconds };
+        });
+      };
+      this.draft.h2h.foulsDetails = cleanFoulDetailsListOnConfirm(
+        this.draft.h2h.foulsDetails
+      );
+
       this.draft.slalom.startPenalties = cleanPenaltyList(
         this.draft.slalom.startPenalties
       );

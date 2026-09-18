@@ -5346,10 +5346,21 @@ export default {
     // sts-jurysystem utk filter dropdown Team + label babak aktif.
     // Fire-and-forget: kegagalan broadcast tidak boleh mengganggu
     // perpindahan babak operator.
-    broadcastActiveRound() {
+    // `silent`: true kalau dipanggil dari edit bracket (assign/lepas tim,
+    // ubah Heat) — bukan dari perpindahan babak. BUG FIX: sebelumnya toast
+    // "Babak Aktif" per-tim di jurysystem ikut fire ULANG utk SEMUA tim di
+    // babak itu setiap kali broadcast ini terpanggil — begitu
+    // broadcastActiveRound() mulai dipanggil dari 3 titik edit bracket
+    // (bukan cuma watcher currentRoundIndex), operator yang sedang
+    // menyusun Heat satu-per-satu bikin juri di-spam toast berulang utk
+    // tim yang datanya sama sekali tidak berubah. `silent` diteruskan ke
+    // payload socket (`silent: true`) supaya jurysystem tahu: cukup
+    // update data (filter Team/label babak) diam-diam, JANGAN tampilkan
+    // toast "Babak Aktif" lagi.
+    broadcastActiveRound(roundOverride, silent = false) {
       try {
         if (typeof ipcRenderer === "undefined") return;
-        const r = this.currentRound;
+        const r = roundOverride || this.currentRound;
         if (!r) return;
 
         // team1/team2 di match cuma simpan {name, bibTeam} — teamId
@@ -5424,6 +5435,7 @@ export default {
           roundName: r.bronze ? "Final B" : String(r.name || ""),
           teams,
           matches,
+          silent,
         });
       } catch (_e) {
         // non-critical
@@ -6520,6 +6532,11 @@ export default {
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
       this._bumpParticipantReactivity();
+
+      // Broadcast ulang — pasangan match di `round` ini berubah (tim baru
+      // ter-assign ke slot), jurysystem perlu tahu tim mana yang sekarang
+      // aktif/pasangannya siapa (fitur filter Team & Fouls Report).
+      this.broadcastActiveRound(round, true);
     },
 
     // Reset live `p.result` ke kosong HANYA kalau babak `round` ini belum
@@ -6647,6 +6664,11 @@ export default {
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
       this._bumpParticipantReactivity();
+
+      // Broadcast ulang — tim dilepas dari slot match `round` ini,
+      // jurysystem perlu tahu supaya tidak salah menganggap tim itu masih
+      // aktif/berpasangan (fitur filter Team & Fouls Report).
+      this.broadcastActiveRound(round, true);
     },
 
     // Klik badge Heat (atau "+ Tentukan Heat") di footer match riil (2 tim,
@@ -6719,6 +6741,17 @@ export default {
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
       this._bumpParticipantReactivity();
+
+      // BUG FIX: broadcastActiveRound() sebelumnya CUMA dipanggil dari
+      // watcher currentRoundIndex() (saat operator pindah babak) — kalau
+      // operator "Tentukan Heat" SETELAH babak itu sudah aktif (kasus
+      // paling umum: babak dibuka dulu, baru heat dipasangkan satu-satu),
+      // jurysystem TIDAK PERNAH tahu ada Heat baru, jadi dropdown "Heat"
+      // di halaman juri tidak pernah muncul. Broadcast ulang di sini,
+      // utk `round` yang benar-benar diedit (BUKAN this.currentRound —
+      // operator bisa mengubah Heat babak lain sambil menampilkan babak
+      // yg berbeda, lihat catatan _persistAfterCrossRoundEdit() di atas).
+      this.broadcastActiveRound(round, true);
     },
 
     /** Pindahkan semua pemenang babak aktif ke pool babak kompetitif berikutnya */

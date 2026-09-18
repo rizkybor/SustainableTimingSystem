@@ -113,6 +113,10 @@ const {
   notifyTeamStarted,
   notifyH2HRoundActive,
 } = require("../controllers/socketBroadcast");
+const {
+  insertH2HFoulsReport,
+  listH2HFoulsReports,
+} = require("../controllers/INSERT/insertH2HFoulsReport");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -624,6 +628,37 @@ function setupIPCMainHandlers() {
   // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
   ipcMain.on("h2h:round-active", (_event, payload) => {
     notifyH2HRoundActive(payload || {});
+  });
+
+  // Simpan Fouls Report (murni informasi, TIDAK mengubah penalty resmi)
+  // yang diterima HeadToHead.vue::receiveFoulsReport() dari juri.
+  ipcMain.on("h2hFouls:send", async (event, payload) => {
+    try {
+      const log = await insertH2HFoulsReport(payload);
+      event.reply("h2hFouls:send:reply", { ok: true, log });
+    } catch (err) {
+      event.reply("h2hFouls:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // List Fouls Report utk modal "Fouls Report" di toolbar H2H.
+  ipcMain.on("h2hFouls:list", async (event, payload) => {
+    try {
+      const { eventId, divisionId, raceId, roundId, limit } = payload || {};
+      const items = await listH2HFoulsReports(eventId, {
+        divisionId,
+        raceId,
+        roundId,
+        limit,
+      });
+      event.reply("h2hFouls:list:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("h2hFouls:list:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
+    }
   });
 
   // LOAD SPRINT RESULT

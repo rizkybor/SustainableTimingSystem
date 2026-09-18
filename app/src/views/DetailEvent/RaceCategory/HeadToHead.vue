@@ -273,6 +273,29 @@
               race-category="h2h"
               category-label="Head to Head"
             />
+
+            <FoulsReportModal
+              v-if="currentEventId && currentRound"
+              class="h2h-judge-trigger"
+              :event-id="String(currentEventId)"
+              :division-id="foulsBucketInfo.divisionId"
+              :race-id="foulsBucketInfo.raceId"
+              :round-id="String(currentRound.id || '')"
+              :round-label="currentRound.bronze ? 'Final B' : currentRound.name"
+              :refresh-tick="foulsRefreshTick"
+            />
+
+            <button
+              type="button"
+              class="h2h-action-btn"
+              :disabled="isDownloadingFoulsPdf"
+              @click="downloadAllRoundFoulsPdf"
+              v-b-tooltip.hover="'Cetak seluruh Fouls Report dari semua babak yang sudah dipertandingkan di kategori ini'"
+            >
+              <b-spinner v-if="isDownloadingFoulsPdf" small class="mr-1" />
+              <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+              {{ isDownloadingFoulsPdf ? "Menyiapkan PDF…" : "Cetak Fouls (Semua Babak)" }}
+            </button>
           </div>
 
           <!-- Bracket: export & tampilan -->
@@ -1497,6 +1520,7 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
+import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
 // html2canvas + jspdf: sudah pasti ada di node_modules krn jadi dependency
 // transitif vue-html2pdf (lewat html2pdf.js) yang sudah dipakai project ini —
 // dipakai langsung (bukan lewat vue-html2pdf) krn kita mau capture bagan
@@ -1642,6 +1666,7 @@ export default {
     CountryFlag,
     Bracket,
     JudgeActionHistoryModal,
+    FoulsReportModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
@@ -1666,6 +1691,7 @@ export default {
       // di-minimize — klik header "Penalties Group" utk toggle.
       penaltiesCollapsed: false,
       isDownloadingBracketPdf: false,
+      isDownloadingFoulsPdf: false,
       isOpeningGuidePdf: false,
       showGuidePdfModal: false,
       guidePdfDataUrl: "",
@@ -1718,6 +1744,7 @@ export default {
         fourth: null, // Juara 4
       },
       currentRoundIndex: -1,
+      foulsRefreshTick: 0,
       rounds: [],
       showBronze: true,
       editForm: "",
@@ -1940,6 +1967,13 @@ export default {
       return Array.isArray(this.participant)
         ? this.participant
         : Object.values(this.participant || {});
+    },
+    // Wrapper reaktif utk getBucket() (fungsi module-scope, tidak bisa
+    // dipanggil langsung dari template) — dipakai props FoulsReportModal.
+    // BUKAN `currentBucket` — nama itu sudah dipakai data() utk state lain
+    // (bucket "aggregate" hasil, lihat _currentBucketOrThrow()).
+    foulsBucketInfo() {
+      return getBucket();
     },
     // Label "BAGAN X TIM" sesuai jumlah tim terdaftar di kategori aktif —
     // mengikuti penamaan resmi di app/BAGAN HEAD TO HEAD CLEAR.pdf.
@@ -2237,6 +2271,14 @@ export default {
               solid: true,
             }
           );
+        }
+
+        // Fouls Report murni informasi juri ke operator — TIDAK pernah
+        // menyentuh result/penalty sungguhan, jadi ditangani terpisah dari
+        // applyPenaltyFromSocketH2H (yang isinya semua utk penalty resmi).
+        if (msg.type === "FoulsReport") {
+          await this.receiveFoulsReport(msg);
+          return;
         }
 
         await this.applyPenaltyFromSocketH2H(msg);
@@ -4690,6 +4732,211 @@ export default {
       }
     },
 
+    // Ambil SEMUA Fouls Report utk kategori ini (divisionId+raceId),
+    // LINTAS BABAK — sengaja TIDAK kirim roundId spy backend
+    // (listH2HFoulsReports) tidak memfilter per-babak, beda dgn
+    // FoulsReportModal (modal viewer) yang memang scoped ke babak aktif.
+    _fetchAllFoulsForCategory(bucket) {
+      return new Promise((resolve) => {
+        if (typeof ipcRenderer === "undefined" || !this.currentEventId) {
+          resolve([]);
+          return;
+        }
+        ipcRenderer.removeAllListeners("h2hFouls:list:reply");
+        ipcRenderer.send("h2hFouls:list", {
+          eventId: this.currentEventId,
+          divisionId: bucket.divisionId,
+          raceId: bucket.raceId,
+          limit: 500,
+        });
+        ipcRenderer.once("h2hFouls:list:reply", (_e, res) => {
+          resolve(res && res.ok ? res.items || [] : []);
+        });
+      });
+    },
+
+    _formatFoulsTimeForPdf(v) {
+      if (!v) return "-";
+      try {
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch (e) {
+        return "-";
+      }
+    },
+
+    // Gambar tabel Fouls Report (semua babak) — text-based (bukan capture
+    // gambar) krn datanya tabular, beda pola dgn downloadBracketPdf/
+    // downloadHeatAssignmentPdf yang meng-capture DOM. Handle page-break
+    // manual: kalau baris berikutnya tidak muat, halaman baru + header
+    // kolom digambar ulang.
+    _drawFoulsTable(pdf, items) {
+      const { pageMargin } = this._pdfLayout();
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const startY = 44; // mm — di bawah kop logo/keterangan
+      const lineH = 4; // mm per baris teks (font 8)
+      const cellPad = 1.5;
+
+      const columns = [
+        { key: "roundName", label: "Round", width: 22 },
+        { key: "foulTeam", label: "Foul Team", width: 38 },
+        { key: "unfoulTeam", label: "Unfouls Team", width: 38 },
+        { key: "positionLabel", label: "Posisi", width: 22 },
+        { key: "detail", label: "Detail", width: 32 },
+        { key: "remarks", label: "Catatan", width: 55 },
+        { key: "judge", label: "Juri", width: 26 },
+        { key: "time", label: "Waktu", width: 26 },
+      ];
+      const tableW = columns.reduce((s, c) => s + c.width, 0);
+      const tableX = (pageW - tableW) / 2;
+
+      const drawHeaderRow = (y) => {
+        pdf.setFillColor(30, 116, 165); // sts blue
+        pdf.rect(tableX, y, tableW, 6, "F");
+        pdf.setFont(undefined, "bold");
+        pdf.setFontSize(8);
+        pdf.setTextColor(255, 255, 255);
+        let x = tableX;
+        columns.forEach((c) => {
+          pdf.text(this._sanitizePdfText(c.label), x + cellPad, y + 4);
+          x += c.width;
+        });
+        return y + 6;
+      };
+
+      const cellValue = (item, col) => {
+        if (col.key === "foulTeam") {
+          const t = item.foulTeam || {};
+          return `${t.nameTeam || "-"}${t.bibTeam ? " (" + t.bibTeam + ")" : ""}`;
+        }
+        if (col.key === "unfoulTeam") {
+          const t = item.unfoulTeam || {};
+          return t.nameTeam
+            ? `${t.nameTeam}${t.bibTeam ? " (" + t.bibTeam + ")" : ""}`
+            : "-";
+        }
+        if (col.key === "detail") {
+          const secs =
+            item.penaltySecondsLabel !== null &&
+            item.penaltySecondsLabel !== undefined
+              ? ` (${item.penaltySecondsLabel}s)`
+              : "";
+          return `${item.detailLabel || "-"}${secs}`;
+        }
+        if (col.key === "time") return this._formatFoulsTimeForPdf(item.receivedAt);
+        return item[col.key] || "-";
+      };
+
+      let y = drawHeaderRow(startY);
+      pdf.setFont(undefined, "normal");
+      pdf.setTextColor(30, 41, 59);
+
+      items.forEach((item, idx) => {
+        const wrapped = columns.map((c) =>
+          pdf.splitTextToSize(
+            this._sanitizePdfText(String(cellValue(item, c))),
+            c.width - cellPad * 2
+          )
+        );
+        const rowLines = Math.max(...wrapped.map((w) => w.length), 1);
+        const rowH = rowLines * lineH + 2;
+
+        if (y + rowH > pageH - pageMargin) {
+          pdf.addPage();
+          y = drawHeaderRow(pageMargin);
+          pdf.setFont(undefined, "normal");
+          pdf.setTextColor(30, 41, 59);
+        }
+
+        if (idx % 2 === 1) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(tableX, y, tableW, rowH, "F");
+        }
+
+        let x = tableX;
+        columns.forEach((c, ci) => {
+          pdf.text(wrapped[ci], x + cellPad, y + lineH - 1);
+          x += c.width;
+        });
+        y += rowH;
+      });
+
+      // border luar tabel (kosmetik, biar rapi)
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(tableX, startY, tableW, y - startY);
+    },
+
+    async downloadAllRoundFoulsPdf() {
+      if (this.isDownloadingFoulsPdf) return;
+      this.isDownloadingFoulsPdf = true;
+      try {
+        const bucket = getBucket();
+        const items = await this._fetchAllFoulsForCategory(bucket);
+        if (!items.length) {
+          this.notify(
+            "warning",
+            "Belum ada Fouls Report untuk kategori ini di babak manapun.",
+            "Cetak Fouls"
+          );
+          return;
+        }
+
+        // urut: babak dulu (round yang lebih dulu dipertandingkan di
+        // atas), lalu waktu lapor — supaya mudah ditelusuri operator.
+        const roundOrder = {};
+        (this.rounds || []).forEach((r, i) => {
+          roundOrder[String(r.id)] = i;
+        });
+        const sorted = [...items].sort((a, b) => {
+          const ra = roundOrder[String(a.roundId)] ?? 999;
+          const rb = roundOrder[String(b.roundId)] ?? 999;
+          if (ra !== rb) return ra - rb;
+          return new Date(a.receivedAt) - new Date(b.receivedAt);
+        });
+
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+        });
+
+        await this._addLogoToPdf(pdf);
+        const eventLogoH = await this._addEventLogoToPdf(pdf);
+        this._addInfoBlockToPdf(
+          pdf,
+          [
+            "Fouls Report - Semua Babak",
+            { label: "Event", value: (this.dataEventSafe || {}).eventName },
+            {
+              label: "Kategori",
+              value: `${bucket.initialName} - ${bucket.divisionName} - ${bucket.raceName}`,
+            },
+            { label: "Tanggal", value: this._formatEventDateForPdf() },
+            { label: "Total Laporan", value: String(sorted.length) },
+          ],
+          eventLogoH
+        );
+
+        this._drawFoulsTable(pdf, sorted);
+        pdf.save("Fouls Report - All Round.pdf");
+      } catch (err) {
+        this.notify(
+          "error",
+          String((err && err.message) || err),
+          "Cetak Fouls Gagal"
+        );
+      } finally {
+        this.isDownloadingFoulsPdf = false;
+      }
+    },
+
     async downloadBracketPdf() {
       const el = this.$refs.bracketCaptureArea;
       if (!el) {
@@ -5015,6 +5262,47 @@ export default {
      * SOCKET / IPC (Judges Dashboard realtime)
      * =======================================================*/
 
+    // Terima Fouls Report dari juri (sts-jurysystem) — MURNI informasi,
+    // TIDAK pernah mengubah result/penalty tim manapun. Cuma disimpan
+    // (audit trail, dilihat lewat modal "Fouls Report" di toolbar) dan
+    // memberi notifikasi ke operator. Diterima apa pun babak yang sedang
+    // ditampilkan di layar (beda dgn applyPenaltyFromSocketH2H yang
+    // menolak update di luar babak aktif) — karena tidak ada state
+    // in-memory yang dimutasi di sini, tidak ada risiko silent data loss.
+    async receiveFoulsReport(msg = {}) {
+      if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+
+      ipcRenderer.send("h2hFouls:send", {
+        eventId: this.currentEventId,
+        initialId: msg.initialId,
+        divisionId: msg.divisionId,
+        raceId: msg.raceId,
+        roundId: msg.roundId,
+        roundName: msg.roundName,
+        foulTeam: msg.foulTeam,
+        unfoulTeam: msg.unfoulTeam,
+        position: msg.position,
+        positionLabel: msg.positionLabel,
+        detail: msg.detail,
+        detailLabel: msg.detailLabel,
+        penaltySecondsLabel: msg.penaltySecondsLabel,
+        remarks: msg.remarks,
+        judge: msg.judge,
+        sourceTs: msg.ts,
+      });
+
+      this.notify(
+        "warning",
+        `${(msg.foulTeam && msg.foulTeam.nameTeam) || "Team"} — ${
+          msg.detailLabel || "Fouls"
+        } (Babak ${msg.roundName || "-"}). Oleh: ${msg.judge || "Juri"}.`,
+        "Fouls Report Diterima"
+      );
+
+      // trigger refetch di FoulsReportModal (lihat prop refreshTick)
+      this.foulsRefreshTick += 1;
+    },
+
     // Broadcast LIVE begitu operator pindah/buka babak (round) lain — H2H
     // tidak punya "Start Time" per tim seperti Sprint, jadi ini pengganti
     // sinyal "tim mana yang sekarang aktif/boleh dinilai juri". Dipakai
@@ -5061,6 +5349,26 @@ export default {
 
         if (!teams.length) return;
 
+        // Pasangan match (team1 vs team2) — dipakai jurysystem utk fitur
+        // Fouls Report: begitu juri pilih "Foul Team", "Unfouls Team"
+        // otomatis diambil dari lawan tim itu di match yang sama, tanpa
+        // juri perlu pilih manual. Match tanpa kedua sisi terisi (bye/
+        // belum dipasangkan) dilewati.
+        const matches = (r.matches || [])
+          .filter((m) => m.team1 && m.team1.name && m.team2 && m.team2.name)
+          .map((m) => ({
+            team1: {
+              teamId: findTeamId(String(m.team1.name).toUpperCase()),
+              bibTeam: String(m.team1.bibTeam || ""),
+              nameTeam: String(m.team1.name || ""),
+            },
+            team2: {
+              teamId: findTeamId(String(m.team2.name).toUpperCase()),
+              bibTeam: String(m.team2.bibTeam || ""),
+              nameTeam: String(m.team2.name || ""),
+            },
+          }));
+
         const bucket = getBucket();
         ipcRenderer.send("h2h:round-active", {
           eventId: bucket.eventId,
@@ -5073,6 +5381,7 @@ export default {
           roundId: String(r.id || ""),
           roundName: r.bronze ? "Final B" : String(r.name || ""),
           teams,
+          matches,
         });
       } catch (_e) {
         // non-critical

@@ -6,7 +6,7 @@
       title="Riwayat tindakan judge"
       @click="open"
     >
-      <Icon icon="mdi:history" width="16" height="16" />
+      <Icon icon="mdi:history" class="mr-1" />
       Riwayat Judge
     </button>
 
@@ -64,9 +64,18 @@
               <Icon icon="mdi:gavel" width="18" height="18" />
             </div>
             <div class="jah-item-main">
+              <!-- Judge + Task — paling utama supaya operator langsung tau
+                   SIAPA yang memberi penalty & TUGAS/posisinya apa, tanpa
+                   perlu menebak dari teks aksi. -->
+              <div class="jah-item-judge">
+                <Icon icon="mdi:account-circle-outline" class="mr-1" />
+                <span class="jah-judge-name">{{ item.judge || (item.from || "Juri tidak diketahui") }}</span>
+                <span v-if="taskLabel(item)" class="jah-badge jah-badge--task">
+                  {{ taskLabel(item) }}
+                </span>
+              </div>
               <div class="jah-item-text">
                 {{ item.text || item.type }}
-                <span v-if="item.type" class="jah-badge">{{ item.type }}</span>
                 <span v-if="item.value !== null && item.value !== undefined" class="jah-badge jah-badge--value">
                   Penalty {{ item.value }}
                 </span>
@@ -75,8 +84,6 @@
                 <span v-if="categoryLabelFor(item)">{{ categoryLabelFor(item) }}</span>
                 <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
                 <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
-                <span v-if="item.judge"> &middot; Juri: {{ item.judge }}</span>
-                <span v-else-if="item.from"> &middot; {{ item.from }}</span>
               </div>
             </div>
             <div class="jah-item-time">{{ formatTime(item.receivedAt) }}</div>
@@ -201,7 +208,6 @@ export default {
 .jah-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid #cbd5e1;

@@ -109,7 +109,10 @@ const {
   upsertRaceSettingsByEventId,
 } = require("../controllers/UPDATE/editRaceSettings");
 
-const { notifyTeamStarted } = require("../controllers/socketBroadcast");
+const {
+  notifyTeamStarted,
+  notifyH2HRoundActive,
+} = require("../controllers/socketBroadcast");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -614,6 +617,13 @@ function setupIPCMainHandlers() {
   // input operator yang sedang berjalan.
   ipcMain.on("sprint:team-started", (_event, payload) => {
     notifyTeamStarted(payload || {});
+  });
+
+  // Broadcast LIVE begitu operator H2H pindah/buka babak (round) lain —
+  // dipakai sts-jurysystem utk label "babak aktif" + filter dropdown
+  // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
+  ipcMain.on("h2h:round-active", (_event, payload) => {
+    notifyH2HRoundActive(payload || {});
   });
 
   // LOAD SPRINT RESULT

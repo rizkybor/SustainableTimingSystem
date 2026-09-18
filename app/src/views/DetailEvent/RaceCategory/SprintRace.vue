@@ -1575,8 +1575,12 @@ export default {
               initialId: bucket.initialId,
               divisionId: bucket.divisionId,
               raceId: bucket.raceId,
+              initialName: bucket.initialName,
+              divisionName: bucket.divisionName,
+              raceName: bucket.raceName,
               teamId: String(row.teamId || ""),
               bibTeam: String(row.bibTeam || ""),
+              teamName: String(row.nameTeam || ""),
               startTime: String(val),
             });
           } catch (_e) {

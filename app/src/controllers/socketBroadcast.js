@@ -45,4 +45,23 @@ function notifyTeamStarted(payload) {
   }
 }
 
-module.exports = { notifyResultsUpdated, notifyTeamStarted };
+// Beritahu sts-jurysystem bahwa operator baru saja membuka/pindah ke
+// babak (round) tertentu di H2H — H2H tidak punya "Start Time" per tim
+// seperti Sprint, jadi ini pengganti sinyal live "tim mana yang sekarang
+// boleh dinilai juri" (dipakai utk filter dropdown Team + label babak
+// aktif di jurysystem).
+function notifyH2HRoundActive(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "h2h:round-active",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, roundId, roundName, teams: [{teamId, bibTeam, nameTeam}] }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan perpindahan babak operator
+  }
+}
+
+module.exports = { notifyResultsUpdated, notifyTeamStarted, notifyH2HRoundActive };

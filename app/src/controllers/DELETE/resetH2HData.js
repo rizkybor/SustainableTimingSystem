@@ -11,10 +11,17 @@ async function resetH2HDataForEvent(eventId) {
 
   const db = await getDb();
 
-  const [bracketsRes, resultsRes, overallRes] = await Promise.all([
+  const [bracketsRes, resultsRes, overallRes, foulsRes] = await Promise.all([
     db.collection("h2h_brackets").deleteMany({ "bucket.eventId": id }),
     db.collection("h2h_results").deleteMany({ "bucket.eventId": id }),
     db.collection("h2h_overall").deleteMany({ "bucket.eventId": id }),
+    // Fouls Report (lihat MEMORY-H2H.md) — murni informasi juri, tapi
+    // tetap terikat ke bracket/babak H2H yang baru saja dihapus di atas,
+    // jadi ikut dibersihkan supaya tidak ada laporan "nyasar" merujuk ke
+    // babak/tim yang sudah tidak ada lagi. Field-nya eventId LANGSUNG
+    // (bukan bucket.eventId — lihat insertH2HFoulsReport.js), scope
+    // SELURUH kategori H2H event ini, sama dgn 3 koleksi di atas.
+    db.collection("h2hFoulsReports").deleteMany({ eventId: id }),
   ]);
 
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
@@ -71,6 +78,7 @@ async function resetH2HDataForEvent(eventId) {
       h2h_brackets: bracketsRes.deletedCount || 0,
       h2h_results: resultsRes.deletedCount || 0,
       h2h_overall: overallRes.deletedCount || 0,
+      h2hFoulsReports: foulsRes.deletedCount || 0,
     },
     overallDocsTouched,
   };

@@ -167,6 +167,23 @@ export default {
       );
       return parts.join(" - ");
     },
+    // "Task" judge = item.type mentah dari sts-jurysystem (beda format per
+    // kategori: Sprint "Start"/"Finish", H2H "PenaltyStart"/"BooyanCorner",
+    // Slalom/DRR "start"/"gate"/"section", RX "PenaltyGate1"/"RaceTime") —
+    // di-humanize jadi label yang enak dibaca ("Penalty Gate 1", "Booyan
+    // Corner", dst) tanpa perlu tabel mapping per kategori.
+    taskLabel(item) {
+      var raw = item && item.type ? String(item.type) : "";
+      if (!raw) return "";
+      var spaced = raw
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/([a-zA-Z])([0-9])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .trim();
+      return spaced.replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    },
     formatTime(v) {
       if (!v) return "-";
       try {
@@ -332,6 +349,18 @@ export default {
   flex: 1;
   min-width: 0;
 }
+.jah-item-judge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #1c4c7a;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.jah-judge-name {
+  margin-right: 2px;
+}
 .jah-item-text {
   font-weight: 600;
   color: #0f172a;
@@ -356,6 +385,10 @@ export default {
 .jah-badge--value {
   background: #fef2f2;
   color: #dc2626;
+}
+.jah-badge--task {
+  background: #f3ecff;
+  color: #7c3aed;
 }
 .jah-item-time {
   flex-shrink: 0;

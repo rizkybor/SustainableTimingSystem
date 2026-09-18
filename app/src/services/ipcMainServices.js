@@ -112,6 +112,7 @@ const {
 const {
   notifyTeamStarted,
   notifyH2HRoundActive,
+  notifySlalomTeamStarted,
 } = require("../controllers/socketBroadcast");
 const {
   insertH2HFoulsReport,
@@ -629,6 +630,14 @@ function setupIPCMainHandlers() {
   // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
   ipcMain.on("h2h:round-active", (_event, payload) => {
     notifyH2HRoundActive(payload || {});
+  });
+
+  // Broadcast LIVE begitu operator mengisi Start Time satu baris Slalom
+  // (utk run tertentu) — dipakai sts-jurysystem utk validasi "team belum
+  // Start di run ini" sebelum juri boleh submit penalty. Fire-and-forget,
+  // sama pola dgn sprint:team-started.
+  ipcMain.on("slalom:team-started", (_event, payload) => {
+    notifySlalomTeamStarted(payload || {});
   });
 
   // Simpan Fouls Report (murni informasi, TIDAK mengubah penalty resmi)

@@ -2650,7 +2650,34 @@ export default {
       const team = this.teams[idx];
       if (!team) return;
       const s = this.currentSession(team);
-      if (title === "start") s.startTime = val;
+      if (title === "start") {
+        s.startTime = val;
+        // Broadcast LIVE begitu Start Time diisi — TIDAK menunggu "Save"
+        // (yang cuma bulk-save di akhir). sts-jurysystem dengar event ini
+        // utk validasi "team belum Start di run ini" sebelum juri submit
+        // penalty. Fire-and-forget, pola sama persis dgn Sprint.
+        if (val && String(val).trim() && typeof ipcRenderer !== "undefined") {
+          try {
+            const runIdx =
+              this.selectedSession[String(team._id)] != null
+                ? this.selectedSession[String(team._id)]
+                : 0;
+            const bucket = getBucket();
+            ipcRenderer.send("slalom:team-started", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(team.teamId || ""),
+              bibTeam: String(team.bibNumber || ""),
+              runNumber: runIdx + 1,
+              startTime: String(val),
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
+      }
       if (title === "finish") s.finishTime = val;
       // BUG FIX: sebelumnya raceTime cuma dihitung di branch "finish" — kalau
       // operator klik tombol Finish SEBELUM Start (mis. antrian BIB ramai),

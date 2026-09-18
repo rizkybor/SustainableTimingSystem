@@ -64,4 +64,29 @@ function notifyH2HRoundActive(payload) {
   }
 }
 
-module.exports = { notifyResultsUpdated, notifyTeamStarted, notifyH2HRoundActive };
+// Beritahu sts-jurysystem bahwa satu team Slalom baru saja diisi Start
+// Time-nya oleh operator utk SATU RUN tertentu (Run 1/Run 2 py startTime
+// sendiri-sendiri, lihat updateTime() di SlalomRace.vue) — dipakai
+// jurysystem utk validasi "team belum Start di run ini" pada submit
+// penalty juri. Pola sama persis dgn notifyTeamStarted() Sprint, cuma
+// ditambah `runNumber` krn Slalom py 2 run independen per team.
+function notifySlalomTeamStarted(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "slalom:team-started",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, teamId, bibTeam, runNumber, startTime }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan input operator
+  }
+}
+
+module.exports = {
+  notifyResultsUpdated,
+  notifyTeamStarted,
+  notifyH2HRoundActive,
+  notifySlalomTeamStarted,
+};

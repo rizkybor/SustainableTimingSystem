@@ -4826,7 +4826,11 @@ export default {
           const secs =
             item.penaltySecondsLabel !== null &&
             item.penaltySecondsLabel !== undefined
-              ? ` (${item.penaltySecondsLabel}s)`
+              ? ` (${
+                  item.penaltySecondsLabel === "DQ"
+                    ? "DQ"
+                    : item.penaltySecondsLabel + "s"
+                })`
               : "";
           return `${item.detailLabel || "-"}${secs}`;
         }

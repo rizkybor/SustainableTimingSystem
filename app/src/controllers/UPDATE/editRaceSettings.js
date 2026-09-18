@@ -36,7 +36,57 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   ];
   const MAX_SPRINT_PENALTIES = 8;
   const MAX_H2H_PENALTIES = 8;
+  const MAX_H2H_FOUL_DETAILS = 12;
   const MAX_SPRINT_SCORE_ROWS = 64;
+
+  // Default Pen Detail Fouls Report H2H — sebelumnya HARDCODED tetap di
+  // sts-jurysystem (`FOUL_DETAILS` di `FoulsReportModal.jsx`), sekarang
+  // bisa dikustomisasi operator per-event lewat Race Settings. "seconds"
+  // cuma LABEL informatif (Fouls Report tidak pernah mengubah penalty
+  // resmi) — bisa angka detik ATAU string "DQ" (Diskualifikasi, mis. utk
+  // pelanggaran "Outside").
+  const DEFAULT_H2H_FOUL_DETAILS = [
+    { key: "hand_push", label: "Hand Push", seconds: 5 },
+    { key: "foot_kick", label: "Foot Kick", seconds: 5 },
+    { key: "punch", label: "Punch", seconds: 10 },
+    { key: "touch_gate", label: "Touch Gate", seconds: 50 },
+    { key: "outside", label: "Outside", seconds: "DQ" },
+  ];
+
+  const slugifyFoulKey = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "detail";
+
+  // key di-slug-kan dari label & dipastikan unik dalam satu list — dipakai
+  // sts-jurysystem utk mencocokkan icon (DETAIL_ICON_SRC) & sbg identitas
+  // stabil tiap opsi, beda dari list penalty lain yang tidak butuh `key`.
+  const cleanFoulDetailsList = (raw, fallback, max) => {
+    const arr = Array.isArray(raw) && raw.length > 0 ? raw : fallback;
+    const usedKeys = new Set();
+    const clean = arr.slice(0, max || MAX_H2H_FOUL_DETAILS).map((p, idx) => {
+      const label =
+        String((p && p.label) || "").trim().slice(0, 40) ||
+        `Detail ${idx + 1}`;
+      const baseKey = slugifyFoulKey((p && p.key) || label);
+      let finalKey = baseKey;
+      let n = 2;
+      while (usedKeys.has(finalKey)) {
+        finalKey = `${baseKey}_${n++}`;
+      }
+      usedKeys.add(finalKey);
+      const rawSeconds = p && p.seconds;
+      const seconds =
+        typeof rawSeconds === "string" &&
+        rawSeconds.trim().toUpperCase() === "DQ"
+          ? "DQ"
+          : Math.max(0, Math.min(600, parseInt(rawSeconds, 10) || 0));
+      return { key: finalKey, label, seconds };
+    });
+    return clean.length > 0 ? clean : fallback;
+  };
 
   // Default tabel Rank -> Score Sprint, dulunya global/hardcoded lewat
   // koleksi optionRanked (type "SPRINT") — sekarang bisa dikustomisasi
@@ -314,6 +364,11 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
         incoming.h2h && incoming.h2h.finishPenalties,
         DEFAULT_H2H_PENALTIES,
         MAX_H2H_PENALTIES
+      ),
+      foulsDetails: cleanFoulDetailsList(
+        incoming.h2h && incoming.h2h.foulsDetails,
+        DEFAULT_H2H_FOUL_DETAILS,
+        MAX_H2H_FOUL_DETAILS
       ),
       scoreByRank: cleanScoreByRank(
         incoming.h2h && incoming.h2h.scoreByRank,

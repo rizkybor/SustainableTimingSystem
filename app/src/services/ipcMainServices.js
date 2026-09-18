@@ -113,6 +113,8 @@ const {
   notifyTeamStarted,
   notifyH2HRoundActive,
   notifySlalomTeamStarted,
+  notifyOfficialStatusChanged,
+  notifySprintTeamFinished,
 } = require("../controllers/socketBroadcast");
 const {
   insertH2HFoulsReport,
@@ -594,6 +596,15 @@ function setupIPCMainHandlers() {
       const category = payload && payload.category;
       const value = payload && payload.value;
       const resp = await setResultsOfficial(eventId, category, value);
+      // BUG FIX: sebelumnya toggle Official/Unofficial TIDAK PERNAH
+      // broadcast apa pun ke sts-jurysystem — Live Result cuma bisa
+      // "kebetulan" ikut update kalau ada aksi lain (mis. Save Result)
+      // yang trigger fetchResults() bersamaan, atau menunggu poll 20
+      // detik. Broadcast di sini supaya badge Official/Unofficial di
+      // Live Result berubah SEKETIKA, bukan menunggu.
+      if (resp && resp.ok) {
+        notifyOfficialStatusChanged({ eventId, category, value: !!value });
+      }
       evt.reply("event:set-official-reply", resp);
     } catch (e) {
       evt.reply("event:set-official-reply", {
@@ -623,6 +634,15 @@ function setupIPCMainHandlers() {
   // input operator yang sedang berjalan.
   ipcMain.on("sprint:team-started", (_event, payload) => {
     notifyTeamStarted(payload || {});
+  });
+
+  // Broadcast LIVE PREVIEW begitu satu team Sprint genuinely selesai
+  // (Start & Finish Time terisi) — dipakai sts-jurysystem utk
+  // menampilkan Live Result yang benar-benar reaktif per-tim, tidak
+  // menunggu "Save Result". Fire-and-forget, sama pola dgn
+  // sprint:team-started.
+  ipcMain.on("sprint:team-finished", (_event, payload) => {
+    notifySprintTeamFinished(payload || {});
   });
 
   // Broadcast LIVE begitu operator H2H pindah/buka babak (round) lain —

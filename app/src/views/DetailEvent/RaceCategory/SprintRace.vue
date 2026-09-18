@@ -1599,6 +1599,39 @@ export default {
         );
 
         await this.recalcPenalties(row);
+
+        // Broadcast LIVE PREVIEW begitu tim ini genuinely selesai (Start
+        // & Finish Time terisi) — TIDAK menunggu "Save Result". Ini murni
+        // pratinjau tambahan (dibaca /api/events/[eventId]/live-results
+        // di jurysystem, digabung dgn hasil resmi dari
+        // temporarySprintResult) — TIDAK mengubah kapan/bagaimana
+        // operator menyimpan hasil resmi. Rank final tetap menunggu Save
+        // Result (butuh SEMUA tim utk hitung ranking akurat); baris
+        // preview ini tampil tanpa rank pasti (rankIsFinal: false).
+        // Fire-and-forget, sama pola dgn sprint:team-started.
+        if (typeof ipcRenderer !== "undefined") {
+          try {
+            const bucket = getBucket();
+            ipcRenderer.send("sprint:team-finished", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(row.teamId || ""),
+              bibTeam: String(row.bibTeam || ""),
+              nameTeam: String(row.nameTeam || ""),
+              startTime: row.result.startTime,
+              finishTime: row.result.finishTime,
+              raceTime: row.result.raceTime,
+              startPenalty: row.result.startPenalty,
+              finishPenalty: row.result.finishPenalty,
+              penaltyTime: row.result.totalPenaltyTime || row.result.penaltyTime,
+              totalTime: row.result.totalTime,
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
       }
 
       if (this.selectedSprintKey) {

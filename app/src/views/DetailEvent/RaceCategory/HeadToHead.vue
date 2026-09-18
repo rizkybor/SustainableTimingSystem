@@ -241,162 +241,165 @@
           </div>
         </div>
         <div class="toolbar-actions">
-          <!-- Info & docs: view-only, tidak mengubah data -->
-          <div class="h2h-action-group h2h-action-group--info">
-            <span class="h2h-action-group__label">Info</span>
-            <button
-              type="button"
-              class="h2h-action-btn"
-              @click="openHeatModal"
-              v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
-            >
-              <Icon icon="mdi:view-grid-outline" class="mr-1" />
-              Lihat Heat
-            </button>
+          <!-- Baris atas: aksi view-only (tidak mengubah data) -->
+          <div class="toolbar-actions-row toolbar-actions-row--top">
+            <!-- Info & docs -->
+            <div class="h2h-action-group h2h-action-group--info">
+              <span class="h2h-action-group__label">Info</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                @click="openHeatModal"
+                v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
+              >
+                <Icon icon="mdi:view-grid-outline" class="mr-1" />
+                Lihat Heat
+              </button>
 
-            <button
-              type="button"
-              class="h2h-action-btn"
-              :disabled="isOpeningGuidePdf"
-              @click="openH2HGuidePdf"
-              v-b-tooltip.hover="'Buka panduan cara mengisi bagan Head to Head (PDF)'"
-            >
-              <b-spinner v-if="isOpeningGuidePdf" small class="mr-1" />
-              <Icon v-else icon="mdi:file-question-outline" class="mr-1" />
-              Panduan Bagan (PDF)
-            </button>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isOpeningGuidePdf"
+                @click="openH2HGuidePdf"
+                v-b-tooltip.hover="'Buka panduan cara mengisi bagan Head to Head (PDF)'"
+              >
+                <b-spinner v-if="isOpeningGuidePdf" small class="mr-1" />
+                <Icon v-else icon="mdi:file-question-outline" class="mr-1" />
+                Panduan Bagan (PDF)
+              </button>
 
-            <JudgeActionHistoryModal
-              v-if="currentEventId"
-              class="h2h-judge-trigger"
-              :event-id="String(currentEventId)"
-              race-category="h2h"
-              category-label="Head to Head"
-            />
-
-            <FoulsReportModal
-              v-if="currentEventId && currentRound"
-              class="h2h-judge-trigger"
-              :event-id="String(currentEventId)"
-              :division-id="foulsBucketInfo.divisionId"
-              :race-id="foulsBucketInfo.raceId"
-              :round-id="String(currentRound.id || '')"
-              :round-label="currentRound.bronze ? 'Final B' : currentRound.name"
-              :refresh-tick="foulsRefreshTick"
-            />
-
-            <button
-              type="button"
-              class="h2h-action-btn"
-              :disabled="isDownloadingFoulsPdf"
-              @click="downloadAllRoundFoulsPdf"
-              v-b-tooltip.hover="'Cetak seluruh Fouls Report dari semua babak yang sudah dipertandingkan di kategori ini'"
-            >
-              <b-spinner v-if="isDownloadingFoulsPdf" small class="mr-1" />
-              <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
-              {{ isDownloadingFoulsPdf ? "Menyiapkan PDF…" : "Cetak Fouls (Semua Babak)" }}
-            </button>
-          </div>
-
-          <!-- Bracket: export & tampilan -->
-          <div class="h2h-action-group h2h-action-group--bracket">
-            <span class="h2h-action-group__label">Bracket</span>
-            <button
-              type="button"
-              class="h2h-action-btn"
-              :disabled="isDownloadingBracketPdf"
-              @click="downloadBracketPdf"
-              v-b-tooltip.hover="'Download tampilan bagan saat ini sebagai PDF'"
-            >
-              <b-spinner v-if="isDownloadingBracketPdf" small class="mr-1" />
-              <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
-              {{ isDownloadingBracketPdf ? "Menyiapkan PDF…" : "Download Bracket (PDF)" }}
-            </button>
-
-            <button
-              v-if="visibleParticipants && visibleParticipants.length"
-              type="button"
-              class="h2h-action-btn"
-              @click="toggleBracket"
-              v-b-tooltip.hover="
-                showBracket ? 'Sembunyikan bracket' : 'Tampilkan bracket'
-              "
-              aria-controls="h2h-bracket"
-              :aria-expanded="showBracket ? 'true' : 'false'"
-            >
-              <Icon
-                :icon="
-                  showBracket ? 'mdi:eye-off-outline' : 'mdi:eye-outline'
-                "
-                class="mr-1"
+              <JudgeActionHistoryModal
+                v-if="currentEventId"
+                class="h2h-judge-trigger"
+                :event-id="String(currentEventId)"
+                race-category="h2h"
+                category-label="Head to Head"
               />
-              {{ showBracket ? "Hide Bracket" : "Show Bracket" }}
-            </button>
+
+              <FoulsReportModal
+                v-if="currentEventId && currentRound"
+                class="h2h-judge-trigger"
+                :event-id="String(currentEventId)"
+                :division-id="foulsBucketInfo.divisionId"
+                :race-id="foulsBucketInfo.raceId"
+                :round-id="String(currentRound.id || '')"
+                :round-label="currentRound.bronze ? 'Final B' : currentRound.name"
+                :refresh-tick="foulsRefreshTick"
+              />
+
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isDownloadingFoulsPdf"
+                @click="downloadAllRoundFoulsPdf"
+                v-b-tooltip.hover="'Cetak seluruh Fouls Report dari semua babak yang sudah dipertandingkan di kategori ini'"
+              >
+                <b-spinner v-if="isDownloadingFoulsPdf" small class="mr-1" />
+                <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+                {{ isDownloadingFoulsPdf ? "Menyiapkan PDF…" : "Cetak Fouls (Semua Babak)" }}
+              </button>
+            </div>
+
+            <!-- Bracket: export & tampilan -->
+            <div class="h2h-action-group h2h-action-group--bracket">
+              <span class="h2h-action-group__label">Bracket</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isDownloadingBracketPdf"
+                @click="downloadBracketPdf"
+                v-b-tooltip.hover="'Download tampilan bagan saat ini sebagai PDF'"
+              >
+                <b-spinner v-if="isDownloadingBracketPdf" small class="mr-1" />
+                <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
+                {{ isDownloadingBracketPdf ? "Menyiapkan PDF…" : "Download Bracket (PDF)" }}
+              </button>
+
+              <button
+                v-if="visibleParticipants && visibleParticipants.length"
+                type="button"
+                class="h2h-action-btn"
+                @click="toggleBracket"
+                v-b-tooltip.hover="
+                  showBracket ? 'Sembunyikan bracket' : 'Tampilkan bracket'
+                "
+                aria-controls="h2h-bracket"
+                :aria-expanded="showBracket ? 'true' : 'false'"
+              >
+                <Icon
+                  :icon="
+                    showBracket ? 'mdi:eye-off-outline' : 'mdi:eye-outline'
+                  "
+                  class="mr-1"
+                />
+                {{ showBracket ? "Hide Bracket" : "Show Bracket" }}
+              </button>
+            </div>
           </div>
 
-          <!-- Divider -->
-          <div class="toolbar-divider d-none d-md-block"></div>
-
-          <!-- Aksi utama: mengubah state babak — dipisah & ditonjolkan
-               supaya jelas beda bobot drpd tombol view-only di atas -->
-          <button
-            v-if="currentRound && !currentRound.bronze"
-            type="button"
-            class="h2h-advance-btn"
-            @click="advanceToNextRound"
-            v-b-tooltip.hover="
-              currentRound && currentRound.size === 4
-                ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
-                : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
-            "
-          >
-            <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
-            Advance to Next Round
-          </button>
-
-          <!-- Divider -->
-          <div class="toolbar-divider d-none d-md-block"></div>
-
-          <!-- Navigation -->
-          <div class="round-nav ml-md-3">
+          <!-- Baris bawah: aksi yang mengubah state babak + navigasi —
+               dipisah baris supaya jelas beda bobot drpd tombol view-only
+               di baris atas, dan toolbar tidak melebar/kepanjangan. -->
+          <div class="toolbar-actions-row toolbar-actions-row--bottom">
             <button
-              class="btn-action btn-outline-secondary"
-              @click="prevRound"
-              v-b-tooltip.hover="'Ronde sebelumnya'"
+              v-if="currentRound && !currentRound.bronze"
+              type="button"
+              class="h2h-advance-btn"
+              @click="advanceToNextRound"
+              v-b-tooltip.hover="
+                currentRound && currentRound.size === 4
+                  ? 'Pemenang lanjut ke Final A, yang kalah otomatis diarahkan ke Final B'
+                  : 'Pindahkan semua pemenang babak ini ke babak berikutnya'
+              "
             >
-              Prev
+              <Icon icon="mdi:arrow-right-bold-circle-outline" class="mr-1" />
+              Advance to Next Round
             </button>
 
-            <b-form-select
-              v-model="currentRoundIndex"
-              :options="roundOptions"
-              class="round-select mx-2"
-              v-b-tooltip.hover="'Select Round'"
-            />
+            <!-- Divider -->
+            <div class="toolbar-divider d-none d-md-block"></div>
 
+            <!-- Navigation -->
+            <div class="round-nav">
+              <button
+                class="btn-action btn-outline-secondary"
+                @click="prevRound"
+                v-b-tooltip.hover="'Ronde sebelumnya'"
+              >
+                Prev
+              </button>
+
+              <b-form-select
+                v-model="currentRoundIndex"
+                :options="roundOptions"
+                class="round-select mx-2"
+                v-b-tooltip.hover="'Select Round'"
+              />
+
+              <button
+                class="btn-action btn-outline-secondary"
+                @click="nextRound"
+                v-b-tooltip.hover="'Ronde berikutnya'"
+              >
+                Next
+              </button>
+            </div>
+
+            <!-- Divider -->
+            <div class="toolbar-divider d-none d-md-block"></div>
+
+            <!-- Reset All — dipojok paling kanan, terpisah dari aksi build/edit
+                 lain krn ini destruktif (hapus SEMUA kategori H2H event ini) -->
             <button
-              class="btn-action btn-outline-secondary"
-              @click="nextRound"
-              v-b-tooltip.hover="'Ronde berikutnya'"
+              type="button"
+              class="btn-action btn-outline-danger"
+              @click="openResetAllModal"
+              v-b-tooltip.hover="'Hapus semua data kompetisi H2H (semua kategori) pada event ini'"
             >
-              Next
+              <Icon icon="mdi:restore-alert" class="mr-1" />
+              Reset All
             </button>
           </div>
-
-          <!-- Divider -->
-          <div class="toolbar-divider d-none d-md-block"></div>
-
-          <!-- Reset All — dipojok paling kanan, terpisah dari aksi build/edit
-               lain krn ini destruktif (hapus SEMUA kategori H2H event ini) -->
-          <button
-            type="button"
-            class="btn-action btn-outline-danger ml-md-3"
-            @click="openResetAllModal"
-            v-b-tooltip.hover="'Hapus semua data kompetisi H2H (semua kategori) pada event ini'"
-          >
-            <Icon icon="mdi:restore-alert" class="mr-1" />
-            Reset All
-          </button>
         </div>
       </div>
 
@@ -4659,8 +4662,18 @@ export default {
           }
         });
         pdf.setFont(undefined, "normal");
+        // BUG FIX: dulu tidak return apa-apa, pemanggil (mis. _drawFoulsTable
+        // via downloadAllRoundFoulsPdf) pakai startY tabel yg di-HARDCODE —
+        // begitu jumlah baris keterangan lebih banyak dari kasus lain
+        // (Fouls Report ada 5 baris: judul+Event+Kategori+Tanggal+Total,
+        // bukan cuma judul+2 baris spt kop biasa) atau ada eventLogoH extra
+        // (topOffsetMm), blok teks jadi lebih panjang dari startY tetap itu
+        // dan numpuk sama header tabel di bawahnya. Return posisi Y terakhir
+        // supaya pemanggil bisa hitung startY tabel secara dinamis.
+        return y;
       } catch (infoErr) {
         // gagal nulis keterangan — lanjut simpan PDF apa adanya
+        return this._pdfLayout().headerHeight;
       }
     },
 
@@ -4776,11 +4789,16 @@ export default {
     // downloadHeatAssignmentPdf yang meng-capture DOM. Handle page-break
     // manual: kalau baris berikutnya tidak muat, halaman baru + header
     // kolom digambar ulang.
-    _drawFoulsTable(pdf, items) {
+    _drawFoulsTable(pdf, items, startY) {
       const { pageMargin } = this._pdfLayout();
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const startY = 44; // mm — di bawah kop logo/keterangan
+      // startY: mm — di bawah kop logo/keterangan. Dulu HARDCODE 44mm,
+      // sekarang WAJIB dihitung dinamis oleh pemanggil dari nilai balik
+      // _addInfoBlockToPdf() + jarak aman, supaya tidak numpuk sama blok
+      // keterangan di atasnya kalau jumlah barisnya beda-beda (lihat
+      // catatan BUG FIX di _addInfoBlockToPdf). Fallback 44 kalau lupa.
+      startY = typeof startY === "number" ? startY : 44;
       const lineH = 4; // mm per baris teks (font 8)
       const cellPad = 1.5;
 
@@ -4921,7 +4939,7 @@ export default {
 
         await this._addLogoToPdf(pdf);
         const eventLogoH = await this._addEventLogoToPdf(pdf);
-        this._addInfoBlockToPdf(
+        const infoBlockEndY = this._addInfoBlockToPdf(
           pdf,
           [
             "Fouls Report - Semua Babak",
@@ -4936,7 +4954,7 @@ export default {
           eventLogoH
         );
 
-        this._drawFoulsTable(pdf, sorted);
+        this._drawFoulsTable(pdf, sorted, infoBlockEndY + 4);
         pdf.save("Fouls Report - All Round.pdf");
       } catch (err) {
         this.notify(
@@ -8112,8 +8130,15 @@ thead th[colspan="8"] {
   font-weight: 800;
   letter-spacing: 0.2px;
 }
-/* Bar aksi kanan: select + tombol sejajar rapi */
+/* Bar aksi kanan: dibagi 2 baris (atas = view-only, bawah = ubah state +
+   navigasi) supaya tidak jadi satu baris super panjang di layar biasa. */
 .toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.toolbar-actions-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -8210,7 +8235,11 @@ thead th[colspan="8"] {
   }
   .toolbar-actions {
     width: 100%;
+    align-items: stretch;
     gap: 8px;
+  }
+  .toolbar-actions-row {
+    justify-content: flex-start;
   }
   .round-nav {
     width: 100%;

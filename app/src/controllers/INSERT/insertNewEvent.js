@@ -288,15 +288,33 @@ async function updateAssets(payload) {
   };
 }
 
-async function setResultsOfficial(eventId, value) {
+// Kategori valid utk flag Official/Unofficial per-kategori. "overall" =
+// Event Overall Result (bukan bagian dari race category manapun).
+const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "overall"];
+
+// BUG FIX: sebelumnya SEMUA kategori (Sprint/H2H/Slalom/DRR/RaftingCross/
+// Overall) berbagi satu field `resultsOfficial` di eventsCollection —
+// meng-Official-kan Sprint otomatis ikut meng-Official-kan kategori lain.
+// Sekarang disimpan per-kategori di `resultsOfficialByCategory.<category>`,
+// field lama `resultsOfficial` dibiarkan (dead data) demi kompatibilitas
+// data lama, tidak dipakai lagi oleh renderer.
+async function setResultsOfficial(eventId, category, value) {
   const id = toObjectId(eventId);
   if (!id) return { ok: false, error: "invalid eventId" };
+  if (!OFFICIAL_CATEGORIES.includes(category)) {
+    return { ok: false, error: "invalid category" };
+  }
 
   var db = await getDb();
   const coll = db.collection("eventsCollection");
   const resp = await coll.updateOne(
     { _id: id },
-    { $set: { resultsOfficial: !!value, updatedAt: new Date() } },
+    {
+      $set: {
+        [`resultsOfficialByCategory.${category}`]: !!value,
+        updatedAt: new Date(),
+      },
+    },
     { upsert: false }
   );
   return {

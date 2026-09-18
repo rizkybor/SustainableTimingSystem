@@ -936,7 +936,10 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res; // langsung simpan hasil ke data
-              this.isOfficial = !!this.eventInfo.resultsOfficial;
+              this.isOfficial = !!(
+                this.eventInfo.resultsOfficialByCategory &&
+                this.eventInfo.resultsOfficialByCategory.sprint
+              );
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -1107,7 +1110,13 @@ export default {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
             this.isOfficial = nextValue;
-            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+            this.eventInfo = {
+              ...this.eventInfo,
+              resultsOfficialByCategory: {
+                ...(this.eventInfo.resultsOfficialByCategory || {}),
+                sprint: nextValue,
+              },
+            };
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
@@ -1120,7 +1129,7 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+        ipcRenderer.send("event:set-official", { eventId, category: "sprint", value: nextValue });
       });
     },
 

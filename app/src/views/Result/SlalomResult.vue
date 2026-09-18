@@ -1523,7 +1523,10 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!this.eventInfo.resultsOfficial;
+            this.isOfficial = !!(
+              this.eventInfo.resultsOfficialByCategory &&
+              this.eventInfo.resultsOfficialByCategory.slalom
+            );
             if (!this.eventInfo.eventName) this.error = this.error || "";
             resolve();
           });
@@ -1545,7 +1548,13 @@ export default {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
             this.isOfficial = nextValue;
-            this.eventInfo = { ...this.eventInfo, resultsOfficial: nextValue };
+            this.eventInfo = {
+              ...this.eventInfo,
+              resultsOfficialByCategory: {
+                ...(this.eventInfo.resultsOfficialByCategory || {}),
+                slalom: nextValue,
+              },
+            };
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
@@ -1558,7 +1567,7 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+        ipcRenderer.send("event:set-official", { eventId, category: "slalom", value: nextValue });
       });
     },
     getScoreByRanked(ranked) {

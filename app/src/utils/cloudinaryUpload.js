@@ -48,11 +48,19 @@ export async function uploadOne(fileObj, folder, resourceType) {
       if (up && up.ok === true && up.result) {
         return { ok: true, result: toCloudMeta(up.result) };
       }
+      // BUG FIX: sebelumnya error dari bridge cuma balik ke pemanggil,
+      // tidak pernah di-log ke console — kalau gagal, satu-satunya jejak
+      // cuma toast singkat yang hilang 4 detik kemudian, tidak ada apa pun
+      // di DevTools utk ditelusuri lain kali kejadian lagi.
+      // eslint-disable-next-line no-console
+      console.error("[cloudinaryUpload] bridge upload gagal:", up);
       return {
         ok: false,
         error: up && up.error ? String(up.error) : "upload-failed",
       };
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[cloudinaryUpload] bridge upload throw:", e);
       return { ok: false, error: e && e.message ? e.message : String(e) };
     }
   }
@@ -78,11 +86,43 @@ export async function uploadOne(fileObj, folder, resourceType) {
       var det =
         json && json.error && json.error.message
           ? json.error.message
-          : "upload-failed";
+          : "upload-failed (HTTP " + res.status + ")";
+      // BUG FIX: sebelumnya kegagalan unsigned upload (status non-2xx,
+      // atau response bukan JSON valid) tidak pernah di-log — cuma
+      // "upload-failed" generik yang tampil sebentar di toast lalu
+      // hilang, tanpa jejak status HTTP/response body utk didiagnosis.
+      // eslint-disable-next-line no-console
+      console.error("[cloudinaryUpload] unsigned upload gagal:", {
+        status: res.status,
+        statusText: res.statusText,
+        url: url,
+        kind: kind,
+        folder: folder,
+        fileSize: size,
+        fileType: fileObj && fileObj.type,
+        responseJson: json,
+      });
       return { ok: false, error: det, raw: json };
     }
     return { ok: true, result: toCloudMeta(json) };
   } catch (err) {
+    // BUG FIX: fetch() yang throw (network error, CORS, dsb) sebelumnya
+    // juga tidak pernah di-log — inilah kandidat paling mungkin utk kasus
+    // Electron (app:// origin ke domain eksternal): kalau ini yang
+    // ternyata terjadi, err.message browser biasanya cuma "Failed to
+    // fetch"/"NetworkError" tanpa detail lebih lanjut, tapi minimal
+    // sekarang KETAHUAN bahwa fetch()-nya sendiri yang gagal (bukan
+    // response error biasa dari Cloudinary).
+    // eslint-disable-next-line no-console
+    console.error("[cloudinaryUpload] fetch() throw (network/CORS?):", {
+      url:
+        "https://api.cloudinary.com/v1_1/" + CLOUD_NAME + "/" + kind + "/upload",
+      kind: kind,
+      folder: folder,
+      fileSize: size,
+      fileType: fileObj && fileObj.type,
+      err: err,
+    });
     return { ok: false, error: err && err.message ? err.message : String(err) };
   }
 }

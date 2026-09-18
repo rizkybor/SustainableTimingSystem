@@ -1,11 +1,16 @@
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
 
-// Daftar koleksi yang dihapus oleh fitur "Reset Data" di Event Detail, TANPA
-// menyentuh master data tim (teamsCollection) maupun pengaturan event
-// (raceSettings, userJudgeAssignments, eventsCollection).
+// Daftar koleksi/reset yang dijalankan oleh fitur "Reset Data" di Event
+// Detail. TIDAK menyentuh master data tim (teamsCollection) maupun
+// eventsCollection — tapi SEKARANG juga mereset Race Settings & Judges
+// Settings kembali ke default (lihat mode: "deleteOneDoc" / "pullJudgesArray"
+// di bawah), plus riwayat judge (judgeActionLogs) dan chat widget
+// (chatMessages).
 // `byBucket: true` berarti eventId disimpan di dalam field `bucket.eventId`
 // (skema H2H/RX), selain itu eventId ada di field top-level `eventId`.
+// `mode` (opsional) menandai entry yang butuh strategi reset khusus,
+// bukan deleteMany({eventId}) generik — lihat deleteOneCollectionForEvent.
 const RESET_COLLECTIONS = [
   { name: "temporaryOverallEventResults", label: "Event Overall Result", byBucket: false },
   { name: "temporarySprintResult", label: "Sprint", byBucket: false },
@@ -43,6 +48,21 @@ const RESET_COLLECTIONS = [
   // walau race sudah di-reset — jurysystem salah meloloskan submit utk
   // team itu padahal race yang baru belum benar-benar mulai.
   { name: "sprintteamstatuses", label: "Status Start Team (Sprint)", byBucket: false },
+  // Riwayat Judge (History) per kategori — ditampilkan di JudgeActionHistoryModal.
+  // eventId disimpan sbg STRING top-level (lihat insertJudgeActionLog.js).
+  { name: "judgeActionLogs", label: "Riwayat Judge (History)", byBucket: false },
+  // Pesan chat widget event — eventId disimpan sbg STRING top-level
+  // (lihat insertChatMessage.js).
+  { name: "chatMessages", label: "Chat Widget (pesan)", byBucket: false },
+  // Judges Settings: SATU dokumen per USER (keyed by email) dengan field
+  // `judges` array berisi assignment per-event yg pernah dia pegang.
+  // TIDAK BOLEH deleteMany dokumen (akan menghapus assignment user itu utk
+  // event LAIN juga) — harus $pull entry yg eventId-nya cocok saja.
+  { name: "userJudgeAssignments", label: "Judges Settings (assignment juri)", mode: "pullJudgesArray" },
+  // Race Settings: SATU dokumen per event — reset ke default = hapus
+  // dokumennya, komponen sudah otomatis fallback ke DEFAULT_SETTINGS lewat
+  // mergeWithDefaults({}) yang sudah ada.
+  { name: "raceSettings", label: "Race Settings", mode: "deleteOneDoc" },
 ];
 
 async function deleteOneCollectionForEvent(eventId, collectionName) {
@@ -53,6 +73,19 @@ async function deleteOneCollectionForEvent(eventId, collectionName) {
   }
 
   const db = await getDb();
+
+  if (cfg.mode === "pullJudgesArray") {
+    const res = await db
+      .collection(cfg.name)
+      .updateMany({ "judges.eventId": id }, { $pull: { judges: { eventId: id } } });
+    return { ok: true, collection: cfg.name, deletedCount: res.modifiedCount || 0 };
+  }
+
+  if (cfg.mode === "deleteOneDoc") {
+    const res = await db.collection(cfg.name).deleteOne({ eventId: id });
+    return { ok: true, collection: cfg.name, deletedCount: res.deletedCount || 0 };
+  }
+
   let filter;
   if (cfg.byBucket) {
     filter = { "bucket.eventId": id };

@@ -590,8 +590,9 @@ function setupIPCMainHandlers() {
   ipcMain.on("event:set-official", async (evt, payload) => {
     try {
       const eventId = payload && payload.eventId;
+      const category = payload && payload.category;
       const value = payload && payload.value;
-      const resp = await setResultsOfficial(eventId, value);
+      const resp = await setResultsOfficial(eventId, category, value);
       evt.reply("event:set-official-reply", resp);
     } catch (e) {
       evt.reply("event:set-official-reply", {

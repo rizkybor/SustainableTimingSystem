@@ -382,7 +382,10 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!this.eventInfo.resultsOfficial;
+            this.isOfficial = !!(
+              this.eventInfo.resultsOfficialByCategory &&
+              this.eventInfo.resultsOfficialByCategory.overall
+            );
             resolve();
           });
         });
@@ -404,7 +407,10 @@ export default {
             self.isOfficial = nextValue;
             self.eventInfo = {
               ...self.eventInfo,
-              resultsOfficial: nextValue,
+              resultsOfficialByCategory: {
+                ...(self.eventInfo.resultsOfficialByCategory || {}),
+                overall: nextValue,
+              },
             };
           } else {
             ipcRenderer.send("get-alert", {
@@ -418,7 +424,7 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, value: nextValue });
+        ipcRenderer.send("event:set-official", { eventId, category: "overall", value: nextValue });
       });
     },
 

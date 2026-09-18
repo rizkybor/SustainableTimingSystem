@@ -6,7 +6,7 @@
       title="Riwayat tindakan judge"
       @click="open"
     >
-      <Icon icon="mdi:history" width="16" height="16" />
+      <Icon icon="mdi:history" class="mr-1" />
       Riwayat Judge
     </button>
 
@@ -64,9 +64,18 @@
               <Icon icon="mdi:gavel" width="18" height="18" />
             </div>
             <div class="jah-item-main">
+              <!-- Judge + Task — paling utama supaya operator langsung tau
+                   SIAPA yang memberi penalty & TUGAS/posisinya apa, tanpa
+                   perlu menebak dari teks aksi. -->
+              <div class="jah-item-judge">
+                <Icon icon="mdi:account-circle-outline" class="mr-1" />
+                <span class="jah-judge-name">{{ item.judge || (item.from || "Juri tidak diketahui") }}</span>
+                <span v-if="taskLabel(item)" class="jah-badge jah-badge--task">
+                  {{ taskLabel(item) }}
+                </span>
+              </div>
               <div class="jah-item-text">
                 {{ item.text || item.type }}
-                <span v-if="item.type" class="jah-badge">{{ item.type }}</span>
                 <span v-if="item.value !== null && item.value !== undefined" class="jah-badge jah-badge--value">
                   Penalty {{ item.value }}
                 </span>
@@ -75,8 +84,6 @@
                 <span v-if="categoryLabelFor(item)">{{ categoryLabelFor(item) }}</span>
                 <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
                 <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
-                <span v-if="item.judge"> &middot; Juri: {{ item.judge }}</span>
-                <span v-else-if="item.from"> &middot; {{ item.from }}</span>
               </div>
             </div>
             <div class="jah-item-time">{{ formatTime(item.receivedAt) }}</div>
@@ -160,6 +167,23 @@ export default {
       );
       return parts.join(" - ");
     },
+    // "Task" judge = item.type mentah dari sts-jurysystem (beda format per
+    // kategori: Sprint "Start"/"Finish", H2H "PenaltyStart"/"BooyanCorner",
+    // Slalom/DRR "start"/"gate"/"section", RX "PenaltyGate1"/"RaceTime") —
+    // di-humanize jadi label yang enak dibaca ("Penalty Gate 1", "Booyan
+    // Corner", dst) tanpa perlu tabel mapping per kategori.
+    taskLabel(item) {
+      var raw = item && item.type ? String(item.type) : "";
+      if (!raw) return "";
+      var spaced = raw
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/([a-zA-Z])([0-9])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .trim();
+      return spaced.replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    },
     formatTime(v) {
       if (!v) return "-";
       try {
@@ -201,7 +225,6 @@ export default {
 .jah-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
@@ -326,6 +349,18 @@ export default {
   flex: 1;
   min-width: 0;
 }
+.jah-item-judge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #1c4c7a;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.jah-judge-name {
+  margin-right: 2px;
+}
 .jah-item-text {
   font-weight: 600;
   color: #0f172a;
@@ -350,6 +385,10 @@ export default {
 .jah-badge--value {
   background: #fef2f2;
   color: #dc2626;
+}
+.jah-badge--task {
+  background: #f3ecff;
+  color: #7c3aed;
 }
 .jah-item-time {
   flex-shrink: 0;

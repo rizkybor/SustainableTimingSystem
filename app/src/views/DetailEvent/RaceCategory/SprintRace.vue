@@ -253,7 +253,7 @@
 
             <JudgeActionHistoryModal
               v-if="currentEventId"
-              class="mr-2"
+              class="mr-2 sprint-judge-trigger"
               :event-id="String(currentEventId)"
               race-category="sprint"
               category-label="Sprint"
@@ -2199,6 +2199,24 @@ td {
   font-weight: 700;
   border-radius: 10px;
   padding: 8px 14px;
+}
+
+/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
+   disamakan dgn .btn-action di sini supaya tidak njomplang saat sejajar
+   dgn Sort Ranked/Save di toolbar Output Racetime. Class pembeda
+   (.sprint-judge-trigger) dipakai spy specificity-nya pasti menang lawan
+   .jah-trigger bawaan komponen, bukan cuma menang urutan compile CSS. */
+.sprint-judge-trigger ::v-deep .jah-trigger {
+  background: #ffffff;
+  border: 1px solid #cfd8e6;
+  color: #1c4c7a;
+  font-weight: 700;
+  font-size: inherit;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+.sprint-judge-trigger ::v-deep .jah-trigger:hover {
+  background: #eef4ff;
 }
 
 /* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-danger/

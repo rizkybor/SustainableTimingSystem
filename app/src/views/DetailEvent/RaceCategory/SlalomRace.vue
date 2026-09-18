@@ -226,7 +226,14 @@
     <!-- RACETIME OUTPUT -->
     <div class="px-4 mt-4">
       <div class="card-body">
-        <div class="table-responsive">
+        <!-- BUG FIX: dulu class ini "table-responsive" (overflow-x: auto)
+             membungkus session tabs + action bar (7 tombol) SEKALIGUS
+             tabelnya — jadi waktu tabel lebar (banyak kolom penalty) di-
+             geser horizontal, tombol2 di atasnya ikut tergeser & terlihat
+             aneh posisinya. Scroll horizontal sekarang dibatasi HANYA ke
+             pembungkus <table> di bawah (lihat v-else-if), bukan ke blok
+             ini. -->
+        <div class="slalom-output-body">
           <div
             class="d-flex justify-content-start mb-2"
             v-if="visibleTeams && visibleTeams.length"
@@ -266,6 +273,7 @@
               <div class="slalom-actionbar__buttons">
                 <JudgeActionHistoryModal
                   v-if="currentSlalomEventId"
+                  class="slalom-judge-trigger"
                   :event-id="String(currentSlalomEventId)"
                   race-category="slalom"
                   category-label="Slalom"
@@ -361,7 +369,11 @@
             </div>
           </div>
 
-          <table v-else-if="visibleTeams && visibleTeams.length" class="table">
+          <div
+            v-else-if="visibleTeams && visibleTeams.length"
+            class="table-responsive"
+          >
+          <table class="table">
             <thead>
               <tr>
                 <th class="text-center" rowspan="2">No</th>
@@ -610,6 +622,7 @@
               </tr>
             </tbody>
           </table>
+          </div>
 
           <!-- EMPTY STATE -->
           <EmptyCard v-else />
@@ -4159,6 +4172,29 @@ td {
   border-color: #dbe0e8;
 }
 .action-pill--sort:hover:not(:disabled) {
+  border-color: #1c6fb0;
+  color: #1c6fb0;
+  background: #f2f9fd;
+}
+
+/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
+   disamakan dgn .action-pill--sort (varian netral) di sini supaya tidak
+   njomplang di antara pill Save/View/PDF berwarna. Class pembeda
+   (.slalom-judge-trigger) dipakai spy specificity-nya pasti menang lawan
+   .jah-trigger bawaan komponen, bukan cuma menang urutan compile CSS. */
+.slalom-judge-trigger ::v-deep .jah-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: #37475a;
+  border: 1.5px solid #dbe0e8;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 9px 16px;
+}
+.slalom-judge-trigger ::v-deep .jah-trigger:hover {
   border-color: #1c6fb0;
   color: #1c6fb0;
   background: #f2f9fd;

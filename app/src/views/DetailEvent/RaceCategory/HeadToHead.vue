@@ -4895,8 +4895,16 @@ export default {
           roundOrder[String(r.id)] = i;
         });
         const sorted = [...items].sort((a, b) => {
-          const ra = roundOrder[String(a.roundId)] ?? 999;
-          const rb = roundOrder[String(b.roundId)] ?? 999;
+          // BUG FIX: `??` (nullish coalescing) tidak didukung babel/vue-cli
+          // versi proyek ini (gagal parse, bukan cuma warning — build dev
+          // & production sama2 gagal total). roundOrder[...] valid mulai
+          // dari 0 (babak pertama), jadi TIDAK BOLEH pakai `||` (0 falsy,
+          // akan salah dianggap "tidak ketemu"/999) — cek eksplisit
+          // undefined saja, persis semantik `??`.
+          const raRaw = roundOrder[String(a.roundId)];
+          const rbRaw = roundOrder[String(b.roundId)];
+          const ra = raRaw === undefined ? 999 : raRaw;
+          const rb = rbRaw === undefined ? 999 : rbRaw;
           if (ra !== rb) return ra - rb;
           return new Date(a.receivedAt) - new Date(b.receivedAt);
         });

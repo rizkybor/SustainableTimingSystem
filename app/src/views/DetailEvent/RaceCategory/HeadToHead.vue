@@ -5280,6 +5280,11 @@ export default {
     async receiveFoulsReport(msg = {}) {
       if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
 
+      const teamLabel = (msg.foulTeam && msg.foulTeam.nameTeam) || "Team";
+      const detailLabel = msg.detailLabel || "Fouls";
+      const judgeLabel = msg.judge || "Juri";
+
+      ipcRenderer.removeAllListeners("h2hFouls:send:reply");
       ipcRenderer.send("h2hFouls:send", {
         eventId: this.currentEventId,
         initialId: msg.initialId,
@@ -5299,16 +5304,40 @@ export default {
         sourceTs: msg.ts,
       });
 
-      this.notify(
-        "warning",
-        `${(msg.foulTeam && msg.foulTeam.nameTeam) || "Team"} — ${
-          msg.detailLabel || "Fouls"
-        } (Babak ${msg.roundName || "-"}). Oleh: ${msg.judge || "Juri"}.`,
-        "Fouls Report Diterima"
-      );
+      ipcRenderer.once("h2hFouls:send:reply", (_e, res) => {
+        if (!res || !res.ok) {
+          this.notify(
+            "error",
+            `Gagal menyimpan Fouls Report dari ${judgeLabel}: ${
+              (res && res.error) || "unknown error"
+            }`,
+            "Fouls Report Gagal Disimpan"
+          );
+          return;
+        }
 
-      // trigger refetch di FoulsReportModal (lihat prop refreshTick)
-      this.foulsRefreshTick += 1;
+        if (res.log && res.log.duplicate) {
+          this.notify(
+            "warning",
+            `${teamLabel} — ${detailLabel} (Babak ${
+              msg.roundName || "-"
+            }) SUDAH PERNAH dilaporkan sebelumnya — laporan baru ini diabaikan (bukan duplikat data).`,
+            "Fouls Report Duplikat Diabaikan"
+          );
+          return;
+        }
+
+        this.notify(
+          "warning",
+          `${teamLabel} — ${detailLabel} (Babak ${
+            msg.roundName || "-"
+          }). Oleh: ${judgeLabel}.`,
+          "Fouls Report Diterima"
+        );
+
+        // trigger refetch di FoulsReportModal (lihat prop refreshTick)
+        this.foulsRefreshTick += 1;
+      });
     },
 
     // Broadcast LIVE begitu operator pindah/buka babak (round) lain — H2H
@@ -5365,6 +5394,11 @@ export default {
         const matches = (r.matches || [])
           .filter((m) => m.team1 && m.team1.name && m.team2 && m.team2.name)
           .map((m) => ({
+            // Nomor Heat yang sudah ditentukan operator (openHeatEditor) —
+            // dipakai jurysystem utk filter Team per Heat, bukan cuma per
+            // babak. null kalau operator belum "Tentukan Heat" utk match
+            // ini.
+            heat: m.heat != null ? Number(m.heat) : null,
             team1: {
               teamId: findTeamId(String(m.team1.name).toUpperCase()),
               bibTeam: String(m.team1.bibTeam || ""),

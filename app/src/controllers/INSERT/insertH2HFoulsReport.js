@@ -36,9 +36,29 @@ async function insertH2HFoulsReport(payload) {
 
   const db = await getDb();
   const col = db.collection("h2hFoulsReports");
+
+  // Lapisan pertahanan KEDUA thd duplikat (lapisan pertama: cek sesi
+  // lokal di sts-jurysystem sebelum kirim) — kalau kebetulan ada 2 juri/
+  // device berbeda kirim kombinasi identik (team+babak+posisi+detail),
+  // atau retry socket bikin pesan yang sama terkirim 2x, JANGAN simpan
+  // dobel. Bukan error keras (fouls cuma informasi) — cukup skip insert
+  // & tandai `duplicate: true` di return value.
+  const existing = await col.findOne({
+    eventId: doc.eventId,
+    divisionId: doc.divisionId,
+    raceId: doc.raceId,
+    roundId: doc.roundId,
+    "foulTeam.teamId": doc.foulTeam.teamId,
+    position: doc.position,
+    detail: doc.detail,
+  });
+  if (existing) {
+    return { ...existing, _id: String(existing._id), duplicate: true };
+  }
+
   const res = await col.insertOne(doc);
 
-  return { ...doc, _id: String(res.insertedId) };
+  return { ...doc, _id: String(res.insertedId), duplicate: false };
 }
 
 function normalizeTeamRef(t) {

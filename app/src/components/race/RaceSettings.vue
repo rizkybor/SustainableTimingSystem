@@ -428,18 +428,12 @@
             <hr class="rs-divider" />
 
             <!-- FOULS DETAILS (PEN DETAIL) -->
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Fouls Details (Pen Detail)</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.h2h.foulsDetails.length >= maxFoulDetails"
-                @click="addFoulDetailRow()"
-              >
-                + Tambah
-              </b-button>
-            </div>
+            <!-- Daftar TETAP (bukan editable-count seperti daftar penalty
+                 lain) — jenis pelanggaran fisik di lapangan (Hand Push,
+                 Foot Kick, dst) jumlahnya sudah baku, operator hanya boleh
+                 mengubah label & nilai (DQ?/Detik) tiap baris, tidak
+                 menambah/menghapus baris. -->
+            <div class="font-weight-bold mb-2">Fouls Details (Pen Detail)</div>
             <small class="text-muted d-block mb-2">
               Daftar pilihan "Pen Detail" pada form Fouls Report juri
               (sts-jurysystem). Fouls Report murni informasi ke operator —
@@ -457,7 +451,6 @@
               <small class="text-muted" style="width: 90px; flex: 0 0 90px"
                 >Detik</small
               >
-              <span style="width: 32px; flex: 0 0 32px"></span>
             </div>
             <div
               v-for="(p, idx) in draft.h2h.foulsDetails"
@@ -488,15 +481,6 @@
                 :disabled="p.seconds === 'DQ'"
                 style="border-radius: 10px; width: 90px; flex: 0 0 90px"
               />
-              <b-button
-                size="sm"
-                variant="outline-danger"
-                style="border-radius: 8px"
-                :disabled="draft.h2h.foulsDetails.length <= 1"
-                @click="removeFoulDetailRow(idx)"
-              >
-                ✕
-              </b-button>
             </div>
 
             <hr class="rs-divider" />
@@ -2108,22 +2092,10 @@ export default {
       list.splice(idx, 1);
     },
 
-    // Fouls Details (Pen Detail) — daftar pilihan di form Fouls Report
-    // juri (sts-jurysystem). Beda dari addPenaltyRow/removePenaltyRow
-    // karena tiap baris punya `seconds` yang bisa berupa angka ATAU
-    // string "DQ" (Diskualifikasi), bukan cuma angka detik biasa.
-    addFoulDetailRow() {
-      const list = this.draft.h2h.foulsDetails;
-      if (!list || list.length >= this.maxFoulDetails) return;
-      list.push({ key: "", label: "", seconds: 0 });
-    },
-
-    removeFoulDetailRow(idx) {
-      const list = this.draft.h2h.foulsDetails;
-      if (!list || list.length <= 1) return;
-      list.splice(idx, 1);
-    },
-
+    // Fouls Details (Pen Detail) — daftar pilihan TETAP di form Fouls
+    // Report juri (sts-jurysystem), operator hanya mengubah label &
+    // `seconds` (angka detik ATAU string "DQ") tiap baris, tidak
+    // menambah/menghapus baris (lihat komentar di markup).
     onToggleFoulDQ(idx, checked) {
       const row = this.draft.h2h.foulsDetails[idx];
       if (!row) return;
@@ -2394,7 +2366,7 @@ export default {
 .rs-divider {
   border: none;
   border-top: 1px dashed #d9dee6;
-  margin: 4px 0 16px;
+  margin: 20px 0 24px;
 }
 
 

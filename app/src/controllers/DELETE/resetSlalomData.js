@@ -26,6 +26,51 @@ async function resetSlalomDataForEvent(eventId) {
     .collection("judgeActionLogs")
     .deleteMany({ eventId: id, raceCategory: "slalom" });
 
+  // BUG FIX (root cause "Reset All tidak bersih"): teamsRegisteredCollection
+  // (roster) ternyata JUGA menyimpan salinan `result` (termasuk
+  // penaltyTotal.gates, judgesBy, judgesTime) langsung di tiap tim —
+  // terbukti lewat inspeksi data langsung: walau temporarySlalomResult
+  // sudah 0 dokumen, tim tertentu masih punya gate penalty tersimpan di
+  // sini, dan Reset All sebelumnya SAMA SEKALI tidak menyentuh koleksi
+  // ini. Karena roster-lah yang dibaca ulang tiap kali bucket dimuat
+  // (teams-slalom-registered:find -> normalizeTeamFromBucketForSlalom di
+  // SlalomRace.vue, yang MEMBACA field `result` ini kalau ada), penalty
+  // lama selalu "hidup lagi" walau tabel hasil sudah kosong. Nolkan
+  // `result` tiap tim kembali ke bentuk default kosong (sama persis dgn
+  // _buildTeamRecord() SLALOM di Details/index.vue).
+  const registeredCol = db.collection("teamsRegisteredCollection");
+  const registeredDocs = await registeredCol
+    .find({ eventId: id, eventName: "SLALOM" })
+    .toArray();
+  let registeredDocsTouched = 0;
+  const defaultSlalomResult = () => [
+    {
+      session: "",
+      startTime: "",
+      finishTime: "",
+      raceTime: "",
+      penaltyTime: "",
+      penaltyTotal: { start: null, finish: null, gates: [] },
+      totalTime: "",
+      ranked: null,
+      score: null,
+      judgesBy: "",
+      judgesTime: "",
+    },
+  ];
+  for (const doc of registeredDocs) {
+    const teams = Array.isArray(doc.teams) ? doc.teams : [];
+    const nextTeams = teams.map((t) => ({
+      ...t,
+      result: defaultSlalomResult(),
+    }));
+    registeredDocsTouched++;
+    await registeredCol.updateOne(
+      { _id: doc._id },
+      { $set: { teams: nextTeams } }
+    );
+  }
+
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
   // (Sprint/H2H/Slalom/DRR/RX) untuk kombinasi eventId/initialId/raceId/
   // divisionId yang sama — jadi di sini HANYA entri kategori "SLALOM" di
@@ -81,6 +126,7 @@ async function resetSlalomDataForEvent(eventId) {
       judgeActionLogs: judgeLogsRes.deletedCount || 0,
     },
     overallDocsTouched,
+    registeredDocsTouched,
   };
 }
 

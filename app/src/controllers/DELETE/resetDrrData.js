@@ -27,6 +27,54 @@ async function resetDrrDataForEvent(eventId) {
     .collection("judgeActionLogs")
     .deleteMany({ eventId: id, raceCategory: "drr" });
 
+  // BUG FIX (root cause "Reset All tidak bersih", sama kelas bug dgn
+  // resetSlalomDataForEvent): teamsRegisteredCollection (roster) JUGA
+  // menyimpan salinan `result` (start/finish/section penalty, judgesBy,
+  // judgesTime) langsung di tiap tim — terbukti lewat inspeksi data
+  // langsung, walau temporaryDrrResult sudah 0 dokumen, tim tertentu
+  // masih punya penalty tersimpan di sini. Karena roster-lah yang dibaca
+  // ulang tiap kali bucket dimuat, penalty lama selalu "hidup lagi" walau
+  // tabel hasil sudah kosong. Nolkan `result` tiap tim kembali ke bentuk
+  // default kosong (sama persis dgn _buildTeamRecord() DRR di
+  // Details/index.vue).
+  const registeredCol = db.collection("teamsRegisteredCollection");
+  const registeredDocs = await registeredCol
+    .find({ eventId: id, eventName: "DRR" })
+    .toArray();
+  let registeredDocsTouched = 0;
+  const defaultDrrResult = () => [
+    {
+      startTime: "",
+      finishTime: "",
+      raceTime: "",
+      startPenalty: null,
+      finishPenalty: null,
+      sectionPenalty: null,
+      totalPenalty: null,
+      startPenaltyTime: "",
+      finishPenaltyTime: "",
+      sectionPenaltyTime: [],
+      totalPenaltyTime: "",
+      totalTime: "",
+      ranked: null,
+      score: null,
+      judgesBy: "",
+      judgesTime: "",
+    },
+  ];
+  for (const doc of registeredDocs) {
+    const teams = Array.isArray(doc.teams) ? doc.teams : [];
+    const nextTeams = teams.map((t) => ({
+      ...t,
+      result: defaultDrrResult(),
+    }));
+    registeredDocsTouched++;
+    await registeredCol.updateOne(
+      { _id: doc._id },
+      { $set: { teams: nextTeams } }
+    );
+  }
+
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
   // (Sprint/H2H/Slalom/DRR/RX) untuk kombinasi eventId/initialId/raceId/
   // divisionId yang sama — jadi di sini HANYA entri kategori "DRR" di
@@ -82,6 +130,7 @@ async function resetDrrDataForEvent(eventId) {
       judgeActionLogs: judgeLogsRes.deletedCount || 0,
     },
     overallDocsTouched,
+    registeredDocsTouched,
   };
 }
 

@@ -3502,6 +3502,43 @@ export default {
       }
     },
 
+    // Nolkan SEMUA sesi (Run 1 & Run 2) tim yang sedang dimuat di memori —
+    // dipanggil oleh confirmResetAll() sesaat sebelum reload, sebagai
+    // jaminan tampilan langsung bersih tanpa menunggu reload selesai.
+    // Pola nolkan-tiap-field sama seperti resetRow(), cuma diterapkan ke
+    // seluruh tim & kedua sesi sekaligus (bukan cuma sesi aktif 1 tim).
+    _zeroAllSlalomTeamsInMemory() {
+      try {
+        const gatesCount = Array.isArray(this.SLALOM_GATES)
+          ? this.SLALOM_GATES.length
+          : 14;
+        const zeroSession = function () {
+          return {
+            startPenalty: 0,
+            penalties: Array.from({ length: gatesCount }, function () {
+              return 0;
+            }),
+            finishPenalty: 0,
+            totalPenalty: 0,
+            penaltyTime: "00:00:00.000",
+            startTime: "",
+            finishTime: "",
+            raceTime: "",
+            totalTime: "",
+            ranked: 0,
+            score: 0,
+          };
+        };
+
+        (this.teams || []).forEach((team) => {
+          if (!team) return;
+          this.$set(team, "sessions", [zeroSession(), zeroSession()]);
+        });
+      } catch (e) {
+        /* noop */
+      }
+    },
+
     async confirmResetAll() {
       if (this.resetAllConfirmText !== this.RESET_ALL_CONFIRM_PHRASE) return;
       const eventId = this.currentSlalomEventId
@@ -3518,6 +3555,16 @@ export default {
 
         if (res && res.ok) {
           this._clearAllSlalomLocalCachesForEvent(eventId);
+          // BUG FIX: sebelum ini hanya mengandalkan window.location.reload()
+          // utk "mengosongkan" tampilan — kalau reload gagal/telat (mis.
+          // ada input yg baru diketik operator SETELAH reset selesai tapi
+          // SEBELUM reload benar2 jalan, atau ada gate penalty yg sedang
+          // ditulis oleh applyPenaltyFromSocketDirect() di detik yg sama),
+          // tabel yang sedang tampil tetap menunjukkan angka lama sesaat.
+          // Nolkan langsung SEMUA sesi tim yang sedang dimuat di memori
+          // (start/finish/gate penalty, waktu, ranked, score) supaya
+          // tampilan pasti bersih walau reload belum/tidak sempat terjadi.
+          this._zeroAllSlalomTeamsInMemory();
           ipcRenderer.send("get-alert-saved", {
             type: "question",
             detail: "Semua waktu Slalom pada event ini sudah dikosongkan.",

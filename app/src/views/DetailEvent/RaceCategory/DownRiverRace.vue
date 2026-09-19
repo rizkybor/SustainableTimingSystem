@@ -1971,6 +1971,46 @@ export default {
       }
     },
 
+    // Nolkan `result` SEMUA tim yang sedang dimuat di memori — dipanggil
+    // oleh confirmResetAll() sesaat sebelum reload, sbg jaminan tampilan
+    // langsung bersih tanpa menunggu reload selesai (mis. kalau ada input
+    // yg baru diketik operator persis sesaat sebelum reload jalan). Field
+    // yang dinolkan sama persis dgn resetRow(), cuma diterapkan ke SEMUA
+    // tim sekaligus (bukan cuma 1 baris).
+    _zeroAllDrrTeamsInMemory() {
+      try {
+        var secLen =
+          Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+            ? this.drrSectionsCount
+            : 3;
+        var emptySections = function () {
+          return Array.from({ length: secLen }, function () {
+            return "";
+          });
+        };
+
+        (this.participant || []).forEach((item) => {
+          if (!item || !item.result) return;
+          item.result.startTime = "";
+          item.result.finishTime = "";
+          item.result.raceTime = "";
+          item.result.startPenalty = 0;
+          item.result.finishPenalty = 0;
+          item.result.sectionPenalty = 0;
+          item.result.totalPenalty = 0;
+          item.result.penaltyStartTime = "";
+          item.result.penaltyFinishTime = "";
+          this.$set(item.result, "penaltySection", emptySections());
+          item.result.penaltyTime = "";
+          item.result.totalTime = "";
+          item.result.ranked = "";
+          item.result.score = "";
+        });
+      } catch (e) {
+        /* noop */
+      }
+    },
+
     async confirmResetAll() {
       if (this.resetAllConfirmText !== this.RESET_ALL_CONFIRM_PHRASE) return;
       const eventId = this.currentEventId ? String(this.currentEventId) : "";
@@ -1985,6 +2025,7 @@ export default {
 
         if (res && res.ok) {
           this._clearAllDrrLocalCachesForEvent(eventId);
+          this._zeroAllDrrTeamsInMemory();
           ipcRenderer.send("get-alert-saved", {
             type: "question",
             detail: "Semua waktu DRR pada event ini sudah dikosongkan.",

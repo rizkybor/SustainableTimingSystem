@@ -16,6 +16,17 @@ async function resetDrrDataForEvent(eventId) {
     .collection("temporaryDrrResult")
     .deleteMany({ eventId: id });
 
+  // BUG FIX: "Reset All" sebelumnya cuma menghapus temporaryDrrResult
+  // (hasil tersimpan) — Riwayat Judge (judgeActionLogs) TIDAK ikut
+  // terhapus, jadi entri penalty lama dari juri (termasuk nilai
+  // penaltynya) masih tetap tampil di modal "Riwayat Judge" walau
+  // tabelnya sendiri sudah kosong, terlihat seperti "data penalty belum
+  // terhapus". Scope ke raceCategory "drr" saja spy tidak menyentuh
+  // riwayat kategori lain.
+  const judgeLogsRes = await db
+    .collection("judgeActionLogs")
+    .deleteMany({ eventId: id, raceCategory: "drr" });
+
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
   // (Sprint/H2H/Slalom/DRR/RX) untuk kombinasi eventId/initialId/raceId/
   // divisionId yang sama — jadi di sini HANYA entri kategori "DRR" di
@@ -68,6 +79,7 @@ async function resetDrrDataForEvent(eventId) {
     ok: true,
     deletedCounts: {
       temporaryDrrResult: drrRes.deletedCount || 0,
+      judgeActionLogs: judgeLogsRes.deletedCount || 0,
     },
     overallDocsTouched,
   };

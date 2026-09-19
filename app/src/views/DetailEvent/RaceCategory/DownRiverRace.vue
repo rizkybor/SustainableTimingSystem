@@ -2181,12 +2181,77 @@ export default {
 
         // sesuaikan jumlah section penalty ke setting
         this.applyDrrSectionCount(this.drrSectionsCount);
+
+        // BUG FIX: root cause "Result/Ranked/Scored tidak tampil & hilang
+        // saat switch category/refresh" — teamsRegisteredCollection (roster,
+        // dibaca di atas via teams-registered:find) TIDAK bisa diandalkan
+        // menyimpan raceTime/totalTime/ranked/score tim; hanya
+        // temporaryDrrResult (diisi lewat saveResult(), lihat
+        // buildResultDocs()) yang benar-benar punya nilai ranked/score
+        // ter-hitung. Tanpa hydrate ini, assignRanks() di bawah selalu
+        // skip tim yg raceTime/totalTime-nya kosong di roster — walau
+        // hasilnya SUDAH pernah disimpan — sama pola fix dgn
+        // hydrateTeamsFromResult() di SlalomRace.vue.
+        await this.hydrateTeamsFromDrrResult();
         await this.assignRanks(this.participant);
         if (this.$forceUpdate) this.$forceUpdate();
       } catch (err) {
         logger.warn("❌ Failed to update race settings:", err);
       }
       this.isLoading = false;
+    },
+    // Ambil hasil TERSIMPAN (temporaryDrrResult, sumber otoritatif setelah
+    // Save Result — punya raceTime/totalTime/ranked/score yang benar) dan
+    // timpakan ke tim yang sedang dimuat, dicocokkan lewat bibTeam (sama
+    // pola matching dgn hydrateTeamsFromResult() Slalom — buildResultDocs()
+    // tidak menyimpan teamId, jadi bib adalah kunci paling andal).
+    async hydrateTeamsFromDrrResult() {
+      try {
+        if (!this.currentBucket || typeof ipcRenderer === "undefined") return;
+        const filters = {
+          eventId: String(this.currentBucket.eventId || ""),
+          initialId: String(this.currentBucket.initialId || ""),
+          raceId: String(this.currentBucket.raceId || ""),
+          divisionId: String(this.currentBucket.divisionId || ""),
+        };
+
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once("get-drr-result-reply", (_e, payload) => {
+            resolve(payload);
+          });
+          ipcRenderer.send("get-drr-result", filters);
+        });
+
+        if (!res || !res.ok) return;
+        if (!Array.isArray(res.items) || res.items.length === 0) return;
+
+        const doc = res.items[0];
+        // BUG FIX: temporaryDrrResult menyimpan array timnya di field
+        // `result` (lihat insertDrrResult() -> `result: mergedArray`),
+        // BEDA dari temporarySlalomResult yang pakai `teams` — sempat
+        // salah asumsi field ini `doc.teams` (selalu undefined utk DRR),
+        // membuat hydrate ini SELALU no-op walau data tersimpan sudah benar.
+        if (!doc || !Array.isArray(doc.result)) return;
+
+        const byBib = {};
+        doc.result.forEach((dt) => {
+          const bib = String((dt && dt.bibTeam) || "");
+          if (bib) byBib[bib] = dt;
+        });
+
+        (this.participant || []).forEach((uiTeam) => {
+          const bibKey = String((uiTeam && uiTeam.bibTeam) || "");
+          const serverTeam = bibKey ? byBib[bibKey] : null;
+          if (serverTeam && serverTeam.result) {
+            this.$set(uiTeam, "result", {
+              ...uiTeam.result,
+              ...serverTeam.result,
+            });
+          }
+        });
+      } catch (e) {
+        /* noop */
+      }
     },
     _bucketKey(b) {
       // pakai ID kalau ada, fallback ke nama (UPPER) agar stabil

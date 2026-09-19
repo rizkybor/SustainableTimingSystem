@@ -104,6 +104,12 @@ export default {
     // "sprint" | "slalom" | "drr" | "h2h" | "rx"
     raceCategory: { type: String, required: true },
     categoryLabel: { type: String, default: "" },
+    // Opsional — dinaikkan pemanggil (mis. HeadToHead.vue) tiap kali ada
+    // tindakan judge baru masuk lewat socket, supaya "Riwayat Judge"
+    // auto-refresh tanpa perlu operator tutup-buka modalnya manual. Sama
+    // pola dgn refreshTick di FoulsReportModal.vue. Default 0 = tidak
+    // dipakai, tidak mengubah perilaku pemanggil lama yang belum diwire.
+    refreshTick: { type: Number, default: 0 },
   },
   data() {
     return {
@@ -114,6 +120,11 @@ export default {
       confirmingDelete: false,
       deleting: false,
     };
+  },
+  watch: {
+    refreshTick() {
+      this.fetchLogs();
+    },
   },
   computed: {
     modalTitle() {

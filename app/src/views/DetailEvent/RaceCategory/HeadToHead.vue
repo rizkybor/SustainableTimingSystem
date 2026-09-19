@@ -274,6 +274,7 @@
                 :event-id="String(currentEventId)"
                 race-category="h2h"
                 category-label="Head to Head"
+                :refresh-tick="judgeLogRefreshTick"
               />
 
               <FoulsReportModal
@@ -1748,6 +1749,7 @@ export default {
       },
       currentRoundIndex: -1,
       foulsRefreshTick: 0,
+      judgeLogRefreshTick: 0,
       rounds: [],
       showBronze: true,
       editForm: "",
@@ -5585,6 +5587,11 @@ export default {
           sourceTs: msg.ts,
           raw: msg,
         });
+        // trigger refetch di JudgeActionHistoryModal (lihat prop refreshTick)
+        // — sama pola dgn foulsRefreshTick, supaya "Riwayat Judge" auto-
+        // update begitu ada penalty/booyan baru dari juri, tanpa perlu
+        // operator tutup-buka modalnya manual.
+        this.judgeLogRefreshTick += 1;
       }
 
       await this.onPenaltyChange(target);

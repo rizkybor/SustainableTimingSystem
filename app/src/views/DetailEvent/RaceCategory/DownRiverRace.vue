@@ -2242,7 +2242,19 @@ export default {
         (this.participant || []).forEach((uiTeam) => {
           const bibKey = String((uiTeam && uiTeam.bibTeam) || "");
           const serverTeam = bibKey ? byBib[bibKey] : null;
-          if (serverTeam && serverTeam.result) {
+          // BUG FIX: buildResultDocs() (saveResult()) SELALU memaksa
+          // totalTime jadi "00:00:00.000" via timeOrZero() walau tim itu
+          // belum pernah bertanding sama sekali (raceTime/startTime tetap
+          // "" asli, cuma totalTime yg dipaksa default) — tim lain yg ikut
+          // ke-save dalam batch yang sama (mis. klik Save Result sebelum
+          // semua tim selesai) jadi punya totalTime "palsu" ini di DB.
+          // Merge polos sebelumnya membawa totalTime palsu itu ke UI, bikin
+          // assignRanks() menganggap SEMUA tim yg belum bertanding itu
+          // "seri" di waktu 0ms -> ranked 1 & score 100 utk semuanya.
+          // raceTime TIDAK pernah di-default (lihat buildResultDocs()),
+          // jadi itu sinyal paling akurat "tim ini sungguh sudah
+          // bertanding" — cuma merge kalau raceTime asli terisi.
+          if (serverTeam && serverTeam.result && serverTeam.result.raceTime) {
             this.$set(uiTeam, "result", {
               ...uiTeam.result,
               ...serverTeam.result,
@@ -2687,6 +2699,21 @@ export default {
           this.participant[id].result.startTime,
           this.participant[id].result.finishTime
         );
+
+        // BUG FIX: dulu Result/Ranked/Scored tetap kosong walau Start/Finish/
+        // Race Time sudah terisi — cukup mengisi Start+Finish (tanpa pernah
+        // menyentuh dropdown penalty) tidak pernah memicu totalTime
+        // (dihitung ulang) maupun assignRanks() sama sekali, KARENA
+        // keduanya sebelumnya cuma dipanggil dari updateTimePen(). Sekarang
+        // totalTime dihitung ulang di sini juga (pakai penaltyTime yg
+        // sudah ada, default "00:00:00.000" kalau belum ada penalty sama
+        // sekali) dan assignRanks() dipanggil, sama pola dgn
+        // updateTimePen().
+        this.participant[id].result.totalTime = this._combineRaceAndPenaltyTime(
+          this.participant[id].result.raceTime,
+          this.participant[id].result.penaltyTime || "00:00:00.000"
+        );
+        await this.assignRanks(this.participant);
       }
 
       if (this.selectedDrrKey) {

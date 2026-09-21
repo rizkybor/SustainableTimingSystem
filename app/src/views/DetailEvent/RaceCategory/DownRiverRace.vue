@@ -243,6 +243,7 @@
                 :event-id="String(currentEventId)"
                 race-category="drr"
                 category-label="Down River Race"
+                :refresh-tick="judgeLogRefreshTick"
               />
 
               <!-- === NEW: Preview JSON Button (TAMBAHAN) === -->
@@ -868,6 +869,7 @@ export default {
       selfSocketId: null,
       isLoading: false,
       defaultImg,
+      judgeLogRefreshTick: 0,
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
       selectedDrrKey: "",
@@ -1528,6 +1530,12 @@ export default {
             sourceTs: msg.ts,
             raw: msg,
           });
+          // trigger refetch di JudgeActionHistoryModal (lihat prop
+          // refreshTick) — sama pola dgn fix di HeadToHead.vue/SprintRace.vue/
+          // SlalomRace.vue, supaya "Riwayat Judge" auto-update begitu ada
+          // penalty baru dari juri, tanpa perlu operator tutup-buka
+          // modalnya manual.
+          this.judgeLogRefreshTick += 1;
         }
 
         return true;

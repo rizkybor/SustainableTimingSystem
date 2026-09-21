@@ -277,6 +277,7 @@
                   :event-id="String(currentSlalomEventId)"
                   race-category="slalom"
                   category-label="Slalom"
+                  :refresh-tick="judgeLogRefreshTick"
                 />
 
                 <!-- SAVE ONLY SESSION 1 -->
@@ -1061,6 +1062,7 @@ export default {
   data() {
     return {
       slalomCats: { initial: "-", race: "-", division: "-" },
+      judgeLogRefreshTick: 0,
       pdfParticipantsSession1: [],
       showSession1Modal: false,
       loadingSession1: false,
@@ -1750,6 +1752,11 @@ export default {
             sourceTs: msg.ts,
             raw: msg,
           });
+          // trigger refetch di JudgeActionHistoryModal (lihat prop
+          // refreshTick) — sama pola dgn fix di HeadToHead.vue/SprintRace.vue,
+          // supaya "Riwayat Judge" auto-update begitu ada penalty baru dari
+          // juri, tanpa perlu operator tutup-buka modalnya manual.
+          this.judgeLogRefreshTick += 1;
         }
 
         // feedback (opsional)

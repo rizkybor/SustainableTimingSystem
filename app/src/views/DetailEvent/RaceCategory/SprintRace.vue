@@ -257,6 +257,7 @@
               :event-id="String(currentEventId)"
               race-category="sprint"
               category-label="Sprint"
+              :refresh-tick="judgeLogRefreshTick"
             />
 
             <button
@@ -662,6 +663,7 @@ export default {
       endGame: false,
       isScrolled: false,
       penTeam: "",
+      judgeLogRefreshTick: 0,
       // key bucket yang SEDANG ditampilkan — dipakai (bukan selectedSprintKey)
       // untuk flush cache saat pindah kategori, karena v-model pada
       // b-form-select sudah menimpa selectedSprintKey ke nilai baru sebelum
@@ -1054,6 +1056,11 @@ export default {
           sourceTs: payload.ts,
           raw: payload,
         });
+        // trigger refetch di JudgeActionHistoryModal (lihat prop refreshTick)
+        // — sama pola dgn fix di HeadToHead.vue, supaya "Riwayat Judge"
+        // auto-update begitu ada penalty baru dari juri, tanpa perlu
+        // operator tutup-buka modalnya manual.
+        this.judgeLogRefreshTick += 1;
       }
     },
     /* =========================================================*/

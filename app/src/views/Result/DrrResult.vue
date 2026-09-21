@@ -123,17 +123,12 @@
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-          @click="toggleOfficial"
-          title="Klik untuk toggle OFFICIAL/UNOFFICIAL"
-          role="button"
-          tabindex="0"
-          @keyup.enter="toggleOfficial"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
+        <OfficialStampToggle
+          :is-official="isOfficial"
+          :set-at="officialSetAt"
+          @toggle="toggleOfficial"
+          @set-manual="setOfficialManualTime"
+        />
       </div>
 
       <!-- EVENT HEADER -->
@@ -388,6 +383,7 @@
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
           :isOfficial="isOfficial"
+          :officialSetAt="officialSetAt"
           :drrCats="drrCats"
         />
       </section>
@@ -424,6 +420,7 @@ import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
+import OfficialStampToggle from "@/components/result/OfficialStampToggle.vue";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -493,6 +490,7 @@ export default {
     VueHtml2pdf,
     PrintOverallModal,
     CountryFlag,
+    OfficialStampToggle,
   },
   mixins: [teamFlagMixin],
 
@@ -589,6 +587,10 @@ export default {
   },
 
   computed: {
+    officialSetAt() {
+      const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
+      return (m && m.drr) || "";
+    },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
     },
@@ -1267,12 +1269,17 @@ export default {
       }
     },
 
-    async toggleOfficial() {
+    toggleOfficial() {
+      return this._setOfficialStatus(!this.isOfficial, null);
+    },
+    setOfficialManualTime(isoTimestamp) {
+      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+    },
+    async _setOfficialStatus(nextValue, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
 
-      const nextValue = !this.isOfficial;
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
@@ -1282,6 +1289,10 @@ export default {
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
                 drr: nextValue,
+              },
+              resultsOfficialSetAt: {
+                ...(this.eventInfo.resultsOfficialSetAt || {}),
+                drr: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -1296,7 +1307,12 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, category: "drr", value: nextValue });
+        ipcRenderer.send("event:set-official", {
+          eventId,
+          category: "drr",
+          value: nextValue,
+          timestamp: timestamp || undefined,
+        });
       });
     },
 

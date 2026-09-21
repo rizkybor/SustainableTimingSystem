@@ -595,7 +595,11 @@ function setupIPCMainHandlers() {
       const eventId = payload && payload.eventId;
       const category = payload && payload.category;
       const value = payload && payload.value;
-      const resp = await setResultsOfficial(eventId, category, value);
+      // Opsional — ISO string (sudah dikonversi dari WIB ke UTC di
+      // renderer) kalau operator set waktu manual; kosong = otomatis
+      // pakai waktu server saat ini (lihat setResultsOfficial()).
+      const timestamp = payload && payload.timestamp;
+      const resp = await setResultsOfficial(eventId, category, value, timestamp);
       // BUG FIX: sebelumnya toggle Official/Unofficial TIDAK PERNAH
       // broadcast apa pun ke sts-jurysystem — Live Result cuma bisa
       // "kebetulan" ikut update kalau ada aksi lain (mis. Save Result)
@@ -603,7 +607,12 @@ function setupIPCMainHandlers() {
       // detik. Broadcast di sini supaya badge Official/Unofficial di
       // Live Result berubah SEKETIKA, bukan menunggu.
       if (resp && resp.ok) {
-        notifyOfficialStatusChanged({ eventId, category, value: !!value });
+        notifyOfficialStatusChanged({
+          eventId,
+          category,
+          value: !!value,
+          setAt: resp.setAt || null,
+        });
       }
       evt.reply("event:set-official-reply", resp);
     } catch (e) {

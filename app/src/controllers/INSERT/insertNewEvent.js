@@ -298,11 +298,32 @@ const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "
 // Sekarang disimpan per-kategori di `resultsOfficialByCategory.<category>`,
 // field lama `resultsOfficial` dibiarkan (dead data) demi kompatibilitas
 // data lama, tidak dipakai lagi oleh renderer.
-async function setResultsOfficial(eventId, category, value) {
+//
+// `resultsOfficialByCategory.<category>` SENGAJA tetap boolean polos
+// (BUKAN diubah jadi object {value,setAt}) — sts-jurysystem's
+// LiveEventDetail.jsx sudah membaca field ini LANGSUNG sbg boolean
+// (poll + socket "official:changed", lihat komentar di sana yg merujuk
+// balik ke fungsi ini) utk badge Live Result; mengubah bentuknya jadi
+// object akan mematahkan semua truthy-check di sana. Timestamp kapan
+// status diset (otomatis = waktu submit, atau override manual operator)
+// disimpan di field TERPISAH `resultsOfficialSetAt.<category>` (ISO
+// string UTC) supaya kompatibel mundur — konsumen lama yg belum tau
+// field baru ini tetap jalan normal, cuma tidak menampilkan stempel
+// waktunya.
+async function setResultsOfficial(eventId, category, value, timestamp) {
   const id = toObjectId(eventId);
   if (!id) return { ok: false, error: "invalid eventId" };
   if (!OFFICIAL_CATEGORIES.includes(category)) {
     return { ok: false, error: "invalid category" };
+  }
+
+  // Terima timestamp manual (ISO string dari operator, sudah dikonversi
+  // dari WIB ke UTC di sisi renderer) kalau valid; kalau tidak
+  // dikirim/tidak valid, pakai waktu server SEKARANG (otomatis).
+  let setAt = new Date();
+  if (timestamp) {
+    const parsed = new Date(timestamp);
+    if (!isNaN(parsed.getTime())) setAt = parsed;
   }
 
   var db = await getDb();
@@ -312,6 +333,7 @@ async function setResultsOfficial(eventId, category, value) {
     {
       $set: {
         [`resultsOfficialByCategory.${category}`]: !!value,
+        [`resultsOfficialSetAt.${category}`]: setAt,
         updatedAt: new Date(),
       },
     },
@@ -321,6 +343,7 @@ async function setResultsOfficial(eventId, category, value) {
     ok: true,
     matchedCount: resp.matchedCount,
     modifiedCount: resp.modifiedCount,
+    setAt: setAt.toISOString(),
   };
 }
 

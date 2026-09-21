@@ -217,6 +217,7 @@
             {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small>
+          <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
         </span>
       </div>
     </footer>
@@ -239,6 +240,7 @@
 
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { formatOfficialSetAt } from "@/utils/officialStamp";
 
 export default {
   name: "DrrPdfResult",
@@ -248,9 +250,13 @@ export default {
     dataParticipant: { type: Array, required: true },
     categories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
+    officialSetAt: { type: String, default: "" },
     drrCats: { type: Object, required: true },
   },
   computed: {
+    formattedOfficialSetAt() {
+      return formatOfficialSetAt(this.officialSetAt);
+    },
     rows() {
       return Array.isArray(this.dataParticipant) ? this.dataParticipant : [];
     },

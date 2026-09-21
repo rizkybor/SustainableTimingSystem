@@ -224,6 +224,7 @@
             {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small>
+          <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
         </span>
       </div>
     </footer>
@@ -246,6 +247,7 @@
 
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { formatOfficialSetAt } from "@/utils/officialStamp";
 
 export default {
   name: "SlalomPdfResult",
@@ -260,9 +262,13 @@ export default {
     pdfParticipantsSession1: { type: Array, required: true },
     titleCategories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
+    officialSetAt: { type: String, default: "" },
     slalomCats: { type: Object, required: false },
   },
   computed: {
+    formattedOfficialSetAt() {
+      return formatOfficialSetAt(this.officialSetAt);
+    },
     isFinal() {
       const arr = this.pdfParticipantsSession1 || [];
       if (!arr.length) return false;

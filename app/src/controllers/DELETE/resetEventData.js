@@ -5,8 +5,12 @@ const { ObjectId } = require("mongodb");
 // Detail. TIDAK menyentuh master data tim (teamsCollection) maupun
 // eventsCollection — tapi SEKARANG juga mereset Race Settings & Judges
 // Settings kembali ke default (lihat mode: "deleteOneDoc" / "pullJudgesArray"
-// di bawah), plus riwayat judge (judgeActionLogs) dan chat widget
-// (chatMessages).
+// di bawah), riwayat judge (judgeActionLogs), chat widget (chatMessages),
+// Fouls Report H2H (h2hFoulsReports), status Start Team Slalom
+// (slalomteamstatuses), dan state live sisi juri (sprintlivepreviews,
+// h2hactiverounds) — beberapa di antaranya cuma ada di database sts-
+// jurysystem (koleksi bersama, model Mongoose-nya ada di repo itu, bukan
+// di repo ini), jadi tidak akan ketemu lewat grep di sini kalau dicari.
 // `byBucket: true` berarti eventId disimpan di dalam field `bucket.eventId`
 // (skema H2H/RX), selain itu eventId ada di field top-level `eventId`.
 // `mode` (opsional) menandai entry yang butuh strategi reset khusus,
@@ -48,6 +52,32 @@ const RESET_COLLECTIONS = [
   // walau race sudah di-reset — jurysystem salah meloloskan submit utk
   // team itu padahal race yang baru belum benar-benar mulai.
   { name: "sprintteamstatuses", label: "Status Start Team (Sprint)", byBucket: false },
+  // BUG FIX: kelas bug yang SAMA persis dgn sprintteamstatuses di atas,
+  // cuma utk Slalom — models/SlalomTeamStatus.js di sts-jurysystem (flag
+  // "team sudah Start" PER RUN, dipakai jurysystem utk validasi submit
+  // penalty). eventId disimpan sbg STRING. Ketinggalan sebelumnya karena
+  // baru ketahuan saat audit lanjutan — dikonfirmasi lewat inspeksi
+  // langsung nama koleksi di database (`slalomteamstatuses`).
+  { name: "slalomteamstatuses", label: "Status Start Team (Slalom)", byBucket: false },
+  // Fouls Report H2H (laporan pelanggaran fisik dari juri, murni
+  // informasi — lihat MEMORY-H2H.md) — eventId disimpan sbg STRING
+  // top-level (lihat insertH2HFoulsReport.js). Reset All per-kategori
+  // H2H (resetH2HData.js) SUDAH menghapus ini, tapi Reset Data Event yg
+  // lebih besar ini sebelumnya TIDAK — terkonfirmasi lewat inspeksi
+  // langsung koleksi di database.
+  { name: "h2hFoulsReports", label: "Fouls Report (Head to Head)", byBucket: false },
+  // Live preview hasil Sprint SEBELUM operator klik "Save Result" —
+  // models/SprintLivePreview.js di sts-jurysystem, diisi lewat relay
+  // socket dari juri yang online. eventId disimpan sbg STRING. Kalau
+  // tidak dihapus, juri masih bisa melihat preview hasil SESI LAMA
+  // (sebelum reset) sampai ada tim baru yang genuinely Start+Finish lagi.
+  { name: "sprintlivepreviews", label: "Live Preview (Sprint, sisi juri)", byBucket: false },
+  // Babak H2H yang sedang aktif/dibuka operator — models/H2HActiveRound.js
+  // di sts-jurysystem, diisi lewat relay socket "h2h:round-active".
+  // eventId disimpan sbg STRING. Kalau tidak dihapus, dropdown Team &
+  // label babak di sisi juri masih menunjuk ke babak/heat LAMA (sebelum
+  // reset) sampai operator pindah babak lagi di layar H2H.
+  { name: "h2hactiverounds", label: "Babak Aktif H2H (sisi juri)", byBucket: false },
   // Riwayat Judge (History) per kategori — ditampilkan di JudgeActionHistoryModal.
   // eventId disimpan sbg STRING top-level (lihat insertJudgeActionLog.js).
   { name: "judgeActionLogs", label: "Riwayat Judge (History)", byBucket: false },

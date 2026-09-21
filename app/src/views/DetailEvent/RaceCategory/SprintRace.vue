@@ -835,8 +835,6 @@ export default {
   },
 
   async mounted() {
-    var audio = new Audio(tone);
-
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -884,7 +882,21 @@ export default {
 
         // tampilkan toast (opsional)
         if (this.$bvToast && msg.text) {
-          audio.play();
+          // BUG FIX: dulu pakai satu instance Audio yg dibuat sekali di
+          // mounted() lalu di-.play() ulang tanpa reset currentTime dan
+          // tanpa try/catch — beda dari 3 kategori race lain (Slalom/DRR/
+          // H2H/RX) yang semuanya bikin instance Audio BARU tiap notifikasi
+          // masuk (dibungkus try/catch). Akibatnya kalau ada 2 penalty
+          // masuk berdekatan, nada kedua tidak restart dari awal (nada
+          // pertama masih jalan), dan kalau .play() gagal (mis. dibatasi
+          // autoplay policy) errornya jadi unhandled promise rejection
+          // yang tidak pernah ketahuan operatornya. Samakan pola dgn
+          // kategori lain: instance baru tiap notifikasi + try/catch.
+          try {
+            new Audio(tone).play();
+          } catch {
+            /* noop */
+          }
           this.$bvToast.toast(`${msg.from || "Realtime"}: ${msg.text}`, {
             title: "Pesan Realtime",
             variant: "success",

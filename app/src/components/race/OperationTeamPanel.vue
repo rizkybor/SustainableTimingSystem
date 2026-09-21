@@ -65,15 +65,12 @@
                         <div class="input-group mb-3">
                           <input
                             :value="digitTimeStart"
-                            @input="
-                              $emit(
-                                'update:digitTimeStart',
-                                $event.target.value
-                              )
-                            "
+                            @input="onTimerInput($event, 'digitTimeStart')"
                             type="text"
+                            inputmode="numeric"
+                            maxlength="12"
                             class="form-control"
-                            placeholder="Timer"
+                            placeholder="00:00:00.000"
                           />
                         </div>
                       </b-col>
@@ -138,15 +135,12 @@
                         <div class="input-group mb-3">
                           <input
                             :value="digitTimeFinish"
-                            @input="
-                              $emit(
-                                'update:digitTimeFinish',
-                                $event.target.value
-                              )
-                            "
+                            @input="onTimerInput($event, 'digitTimeFinish')"
                             type="text"
+                            inputmode="numeric"
+                            maxlength="12"
                             class="form-control"
-                            placeholder="Timer"
+                            placeholder="00:00:00.000"
                           />
                         </div>
                       </b-col>
@@ -227,6 +221,27 @@ export default {
   },
   computed: {},
   methods: {
+    // Buffer-Timer-Start / Buffer-Timer-Finish HANYA boleh diisi format
+    // HH:MM:SS.mmm — operator cuma ketik angkanya (mis. dari hasil baca
+    // stopwatch manual), ":" dan "." disisipkan otomatis, karakter selain
+    // digit dibuang, dan input dipotong maks 9 digit (2+2+2+3).
+    maskTimerInput(raw) {
+      const digits = String(raw || "")
+        .replace(/\D/g, "")
+        .slice(0, 9);
+      let out = "";
+      for (let i = 0; i < digits.length; i++) {
+        if (i === 2 || i === 4) out += ":";
+        else if (i === 6) out += ".";
+        out += digits[i];
+      }
+      return out;
+    },
+    onTimerInput(event, propName) {
+      const masked = this.maskTimerInput(event.target.value);
+      if (event.target.value !== masked) event.target.value = masked;
+      this.$emit(`update:${propName}`, masked);
+    },
     formatTime(v) {
       if (v === null || v === undefined) return "—";
       let raw = typeof v === "number" ? String(Math.trunc(v)) : String(v);

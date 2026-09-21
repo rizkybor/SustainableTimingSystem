@@ -136,18 +136,13 @@
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <!-- Stamp di kanan: klik untuk toggle -->
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-          @click="toggleOfficial"
-          title="Klik untuk toggle OFFICIAL/UNOFFICIAL"
-          role="button"
-          tabindex="0"
-          @keyup.enter="toggleOfficial"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
+        <!-- Stamp di kanan: klik untuk toggle, plus atur waktu manual -->
+        <OfficialStampToggle
+          :is-official="isOfficial"
+          :set-at="officialSetAt"
+          @toggle="toggleOfficial"
+          @set-manual="setOfficialManualTime"
+        />
       </div>
 
       <!-- EVENT HEADER -->
@@ -325,6 +320,7 @@
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
           :isOfficial="isOfficial"
+          :officialSetAt="officialSetAt"
           :sprintCats="sprintCats"
         />
       </section>
@@ -351,6 +347,7 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
+import OfficialStampToggle from "@/components/result/OfficialStampToggle.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -423,6 +420,7 @@ export default {
     VueHtml2pdf,
     PrintOverallModal,
     CountryFlag,
+    OfficialStampToggle,
   },
   mixins: [teamFlagMixin],
   data() {
@@ -510,6 +508,13 @@ export default {
   },
 
   computed: {
+    // ISO string (UTC) kapan status Official/Unofficial Sprint di-set —
+    // field TERPISAH dari boolean-nya sendiri (lihat setResultsOfficial()
+    // di insertNewEvent.js), null kalau belum pernah di-set sama sekali.
+    officialSetAt() {
+      const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
+      return (m && m.sprint) || "";
+    },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
     },
@@ -1100,12 +1105,22 @@ export default {
       this.saveResultsToDb();
     },
 
-    async toggleOfficial() {
+    toggleOfficial() {
+      // Klik stempel = toggle status, waktu OTOMATIS (server pakai
+      // waktu saat ini kalau timestamp tidak dikirim — lihat
+      // setResultsOfficial() di insertNewEvent.js).
+      return this._setOfficialStatus(!this.isOfficial, null);
+    },
+    setOfficialManualTime(isoTimestamp) {
+      // Dari modal "Atur Waktu Manual" — status TIDAK berubah, cuma
+      // timestamp-nya yang dikoreksi manual operator.
+      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+    },
+    async _setOfficialStatus(nextValue, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
 
-      const nextValue = !this.isOfficial;
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
@@ -1115,6 +1130,10 @@ export default {
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
                 sprint: nextValue,
+              },
+              resultsOfficialSetAt: {
+                ...(this.eventInfo.resultsOfficialSetAt || {}),
+                sprint: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -1129,7 +1148,12 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, category: "sprint", value: nextValue });
+        ipcRenderer.send("event:set-official", {
+          eventId,
+          category: "sprint",
+          value: nextValue,
+          timestamp: timestamp || undefined,
+        });
       });
     },
 

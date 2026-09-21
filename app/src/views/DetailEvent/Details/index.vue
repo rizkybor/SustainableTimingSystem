@@ -87,6 +87,11 @@
           Judges Settings
         </b-button>
 
+        <b-button class="btn-race-settings mr-2" @click="goToJudgeActivityHistory">
+          <Icon icon="mdi:history" class="mr-1" />
+          Judges Activity History
+        </b-button>
+
         <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
           Race Settings
         </b-button>
@@ -1248,6 +1253,12 @@ export default {
     goToEventOverallResult() {
       this.$router.push(
         `/event-detail/${this.$route.params.id}/event-overall-result`
+      );
+    },
+
+    goToJudgeActivityHistory() {
+      this.$router.push(
+        `/event-detail/${this.$route.params.id}/judge-activity-history`
       );
     },
 

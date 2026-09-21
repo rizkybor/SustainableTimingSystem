@@ -176,6 +176,7 @@
           <small v-if="!isOfficial" style="font-size: 8px"
             >Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small
           >
+          <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block">{{ formattedOfficialSetAt }}</small>
         </span>
       </div>
     </div>
@@ -198,6 +199,7 @@
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
+import { formatOfficialSetAt } from "@/utils/officialStamp";
 
 export default {
   name: "EventOverallPdfResult",
@@ -207,8 +209,12 @@ export default {
     buckets: { type: Array, default: () => [] },
     categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
+    officialSetAt: { type: String, default: "" },
   },
   computed: {
+    formattedOfficialSetAt() {
+      return formatOfficialSetAt(this.officialSetAt);
+    },
     today() {
       const d = new Date();
       const dd = String(d.getDate()).padStart(2, "0");

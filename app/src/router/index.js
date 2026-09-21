@@ -13,6 +13,7 @@ import CreateTeam from "@/views/CreateTeam/index.vue";
 import TeamDetail from "@/views/TeamDetail/index.vue";
 import SprintResult from "@/views/Result/SprintResult.vue";
 import HeadToHeadResult from "@/views/Result/HeadToHeadResult.vue";
+import JudgeActivityHistory from "@/views/DetailEvent/JudgeActivityHistory/index.vue";
 import SlalomResult from "@/views/Result/SlalomResult.vue";
 import DrrResult from "@/views/Result/DrrResult.vue";
 import RaftingCrossResult from "@/views/Result/RaftingCrossResult.vue";
@@ -59,6 +60,7 @@ const routes = [
       { path: "headtohead-result", name: "HeadToHeadResult", component: HeadToHeadResult, props: true },
       { path: "rx-result", name: "RxResult", component: RaftingCrossResult, props: true },
       { path: "event-overall-result", name: "EventOverallResult", component: EventOverallResult, props: true },
+      { path: "judge-activity-history", name: "JudgeActivityHistory", component: JudgeActivityHistory, props: true },
     ],
   },
 

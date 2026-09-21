@@ -126,18 +126,13 @@
           <Icon icon="mdi:chevron-left" /> Back
         </b-button>
 
-        <!-- Stamp di kanan: klik untuk toggle -->
-        <span
-          class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
-          @click="toggleOfficial"
-          title="Klik untuk toggle OFFICIAL/UNOFFICIAL"
-          role="button"
-          tabindex="0"
-          @keyup.enter="toggleOfficial"
-        >
-          {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
-        </span>
+        <!-- Stamp di kanan: klik untuk toggle, plus atur waktu manual -->
+        <OfficialStampToggle
+          :is-official="isOfficial"
+          :set-at="officialSetAt"
+          @toggle="toggleOfficial"
+          @set-manual="setOfficialManualTime"
+        />
       </div>
 
       <!-- EVENT HEADER -->
@@ -437,6 +432,7 @@
           pdfMode="allround"
           :pdfOverallPkg="pdfOverallPkg"
           :isOfficial="isOfficial"
+          :officialSetAt="officialSetAt"
           :headToHeadCats="h2hCats"
           :countryMap="_teamCountryMap"
         />
@@ -464,6 +460,7 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
+import OfficialStampToggle from "@/components/result/OfficialStampToggle.vue";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -495,6 +492,7 @@ export default {
     VueHtml2pdf,
     PrintOverallModal,
     CountryFlag,
+    OfficialStampToggle,
   },
   mixins: [teamFlagMixin],
 
@@ -543,6 +541,10 @@ export default {
   },
 
   computed: {
+    officialSetAt() {
+      const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
+      return (m && m.h2h) || "";
+    },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
     },
@@ -827,12 +829,17 @@ export default {
       }
     },
 
-    async toggleOfficial() {
+    toggleOfficial() {
+      return this._setOfficialStatus(!this.isOfficial, null);
+    },
+    setOfficialManualTime(isoTimestamp) {
+      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+    },
+    async _setOfficialStatus(nextValue, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
 
-      const nextValue = !this.isOfficial;
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
@@ -842,6 +849,10 @@ export default {
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
                 h2h: nextValue,
+              },
+              resultsOfficialSetAt: {
+                ...(this.eventInfo.resultsOfficialSetAt || {}),
+                h2h: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -856,7 +867,12 @@ export default {
           }
           resolve();
         });
-        ipcRenderer.send("event:set-official", { eventId, category: "h2h", value: nextValue });
+        ipcRenderer.send("event:set-official", {
+          eventId,
+          category: "h2h",
+          value: nextValue,
+          timestamp: timestamp || undefined,
+        });
       });
     },
 

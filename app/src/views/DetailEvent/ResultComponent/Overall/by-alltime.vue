@@ -149,6 +149,7 @@
               {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
             </div>
             <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:00:05.000" }} min</small>
+            <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
           </span>
         </div>
       </div>
@@ -176,6 +177,7 @@
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
+import { formatOfficialSetAt } from "@/utils/officialStamp";
 
 export default {
   name: "OverallResult",
@@ -189,6 +191,17 @@ export default {
     },
     categories: { type: Array, default: () => ALL_CATEGORY_META },
     isOfficial: { type: Boolean, default: false },
+  },
+  computed: {
+    // Print "Overall" ini menampilkan aggregate SEMUA kategori, jadi
+    // timestamp yang relevan adalah punya kategori "overall" — dibaca
+    // langsung dari dataEvent (sudah membawa resultsOfficialSetAt penuh,
+    // di-spread dari eventInfo oleh pemanggil), bukan lewat prop baru
+    // yang perlu diteruskan manual lewat PrintOverallModal.
+    formattedOfficialSetAt() {
+      const m = this.dataEvent && this.dataEvent.resultsOfficialSetAt;
+      return formatOfficialSetAt((m && m.overall) || "");
+    },
   },
   data() {
     return { pageSize: 10 };

@@ -258,6 +258,7 @@
               {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
             </div>
             <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
+            <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
           </span>
         </div>
       </footer>
@@ -465,6 +466,7 @@
                 {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
               </div>
               <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
+              <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
             </span>
           </div>
         </footer>
@@ -707,6 +709,7 @@
                 {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
               </div>
               <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
+              <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
             </span>
           </div>
         </footer>
@@ -733,6 +736,7 @@
 
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import { formatOfficialSetAt } from "@/utils/officialStamp";
 
 export default {
   name: "HeadToHeadPdfResult",
@@ -747,10 +751,14 @@ export default {
     categories: { type: String, default: "" },
     titleCategories: { type: String, default: "" },
     isOfficial: { type: Boolean, default: false },
+    officialSetAt: { type: String, default: "" },
     headToHeadCats: { type: Object, default: () => ({}) },
     countryMap: { type: Object, default: () => ({}) },
   },
   computed: {
+    formattedOfficialSetAt() {
+      return formatOfficialSetAt(this.officialSetAt);
+    },
     eventData() {
       if (this.data) return this.data;
       if (this.dataEventSafe) return this.dataEventSafe;

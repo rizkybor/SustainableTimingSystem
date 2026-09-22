@@ -71,6 +71,16 @@
 
     <b-container class="mt-4 mb-5">
       <div class="mb-2 d-flex justify-content-md-end">
+        <b-button class="btn-race-settings mr-2" @click="showTeamRosterModal = true">
+          <Icon icon="mdi:account-group-outline" class="mr-1" />
+          Team Roster
+        </b-button>
+
+        <b-button class="btn-race-settings mr-2" @click="goToJudgeActivityHistory">
+          <Icon icon="mdi:history" class="mr-1" />
+          Judges Activity History
+        </b-button>
+        
         <b-button
           class="btn-race-settings mr-2"
           @click="goToEventOverallResult"
@@ -85,16 +95,6 @@
 
         <b-button class="btn-race-settings mr-2" @click="openJudgeSettings">
           Judges Settings
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="goToJudgeActivityHistory">
-          <Icon icon="mdi:history" class="mr-1" />
-          Judges Activity History
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="showTeamRosterModal = true">
-          <Icon icon="mdi:account-group-outline" class="mr-1" />
-          Team Roster
         </b-button>
 
         <b-button class="btn-race-settings mr-2" @click="openRaceSettings">

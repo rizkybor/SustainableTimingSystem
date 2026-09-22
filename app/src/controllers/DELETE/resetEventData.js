@@ -59,6 +59,11 @@ const RESET_COLLECTIONS = [
   // baru ketahuan saat audit lanjutan — dikonfirmasi lewat inspeksi
   // langsung nama koleksi di database (`slalomteamstatuses`).
   { name: "slalomteamstatuses", label: "Status Start Team (Slalom)", byBucket: false },
+  // Kelas bug yang SAMA persis dgn sprintteamstatuses/slalomteamstatuses
+  // di atas, utk DRR — models/DRRTeamStatus.js di sts-jurysystem (flag
+  // "team sudah Start", diimplementasikan 2026-09-23 sekalian dgn
+  // direct-write, lihat MEMORY-DRR.md). eventId disimpan sbg STRING.
+  { name: "drrteamstatuses", label: "Status Start Team (DRR)", byBucket: false },
   // Fouls Report H2H (laporan pelanggaran fisik dari juri, murni
   // informasi — lihat MEMORY-H2H.md) — eventId disimpan sbg STRING
   // top-level (lihat insertH2HFoulsReport.js). Reset All per-kategori

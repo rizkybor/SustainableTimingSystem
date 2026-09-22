@@ -144,11 +144,11 @@
         </div>
 
         <div class="sign-right">
-          <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial }">
+          <span class="unofficial-stamp" :class="{ 'official-stamp': isDerivedOfficial, 'provisional-stamp': isProvisional }">
             <div style="font-size: 14px; display: flex; justify-content: center;">
-              {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+              {{ isDerivedOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
             </div>
-            <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:00:05.000" }} min</small>
+            <small v-if="!isDerivedOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:00:05.000" }} min</small>
             <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
           </span>
         </div>
@@ -177,7 +177,7 @@
 <script>
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import { ALL_CATEGORY_META } from "@/utils/overallCategoryMeta";
-import { formatOfficialSetAt } from "@/utils/officialStamp";
+import { formatOfficialSetAt, deriveResultStatus } from "@/utils/officialStamp";
 
 export default {
   name: "OverallResult",
@@ -190,7 +190,16 @@ export default {
       default: () => ({ initial: "-", division: "-", race: "-" }),
     },
     categories: { type: Array, default: () => ALL_CATEGORY_META },
+    // NOTE: prop lama, TIDAK PERNAH diisi oleh pemanggil manapun (semua 6
+    // Result page tidak meneruskan prop ini lewat PrintOverallModal) — dulu
+    // menyebabkan stamp selalu tampil UNOFFICIAL apa pun status event yang
+    // sebenarnya. Dibiarkan di sini (harmless) tapi TIDAK dipakai lagi di
+    // template; derivedStatus() di bawah menggantikannya dengan menurunkan
+    // status langsung dari dataEvent, sama seperti formattedOfficialSetAt.
     isOfficial: { type: Boolean, default: false },
+  },
+  data() {
+    return { pageSize: 10 };
   },
   computed: {
     // Print "Overall" ini menampilkan aggregate SEMUA kategori, jadi
@@ -202,11 +211,21 @@ export default {
       const m = this.dataEvent && this.dataEvent.resultsOfficialSetAt;
       return formatOfficialSetAt((m && m.overall) || "");
     },
-  },
-  data() {
-    return { pageSize: 10 };
-  },
-  computed: {
+    // Sama pola dgn formattedOfficialSetAt di atas: turunkan status
+    // Provisional/Unofficial/Official langsung dari dataEvent (kategori
+    // "overall"), BUKAN dari prop isOfficial yang tidak pernah diisi.
+    derivedStatus() {
+      return deriveResultStatus(this.dataEvent, "overall");
+    },
+    // Nama sengaja BEDA dari prop "isOfficial" (Vue melarang computed
+    // bentrok nama dgn prop) — prop lama tsb memang tidak pernah diisi
+    // pemanggil, computed ini yang benar-benar dipakai di template.
+    isDerivedOfficial() {
+      return this.derivedStatus === "official";
+    },
+    isProvisional() {
+      return this.derivedStatus === "provisional";
+    },
     todayStr() {
       const d = new Date();
       const dd = String(d.getDate()).padStart(2, "0");
@@ -503,6 +522,10 @@ export default {
 .official-stamp {
   color: #148a3b;
   border-color: #148a3b;
+}
+.provisional-stamp {
+  color: #d97706;
+  border-color: #d97706;
 }
 
 /* ==== LOGO ATAS & SPONSOR ==== */

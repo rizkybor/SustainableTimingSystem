@@ -140,9 +140,9 @@
         </b-button>
 
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -256,7 +256,7 @@
           :data="pdfEventData"
           :dataParticipant="pdfRows"
           :categories="pdfCategories"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :rxCats="rxCats"
         />
@@ -291,7 +291,7 @@
         <RaftingCrossByBracketPdf
           :data="pdfEventData"
           :bracket="bracketDoc"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :rxCats="rxCats"
           :countryMap="_teamCountryMap"
@@ -327,7 +327,7 @@
         <RaftingCrossOverallPdf
           :data="pdfEventData"
           :categories="allCategoriesOverall"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
         />
       </section>
@@ -368,6 +368,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel, exportSheetsToExcel } from "@/utils/exportExcel";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -396,7 +397,8 @@ export default {
   data() {
     return {
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       // semua bucket registrasi (lintas race category) utk event ini,
@@ -430,6 +432,9 @@ export default {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.raftingcross) || "";
+    },
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
@@ -623,13 +628,13 @@ export default {
         },
       });
     },
-    toggleOfficial() {
-      return this._setOfficialStatus(!this.isOfficial, null);
+    setResultStatus(newStatus) {
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -637,12 +642,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
+            this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultsStatusByCategory: {
+                ...(this.eventInfo.resultsStatusByCategory || {}),
+                raftingcross: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                raftingcross: nextValue,
+                raftingcross: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
@@ -656,7 +665,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -664,7 +673,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "raftingcross",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });
@@ -677,10 +686,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!(
-              this.eventInfo.resultsOfficialByCategory &&
-              this.eventInfo.resultsOfficialByCategory.raftingcross
-            );
+            this.resultStatus = deriveResultStatus(this.eventInfo, "raftingcross");
             resolve();
           });
         });

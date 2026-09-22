@@ -121,7 +121,14 @@ async function upsertRoundRows(bucket, roundId, roundName, rows = []) {
             ranked: r.ranked || null,
             winLose: r.winLose || null,
             heat: r.heat != null ? r.heat : null,
-            penalties: r.penalties || {}
+            penalties: r.penalties || {},
+            // BUG FIX: dulu field ini tidak pernah ditulis ke DB — row dari
+            // buildRoundRows() di HeadToHead.vue SUDAH menyertakan flag
+            // (DNF/DNS/DSQ, di-set via markFlag()), tapi hilang di sini
+            // sebelum masuk ke $set, jadi Result page (yang baca dari DB
+            // lewat h2h:results:getAll) selalu melihat flag: null walau
+            // operator sudah menandai tim itu DNF/DNS/DSQ dan menyimpannya.
+            flag: r.flag || null
           },
           updatedAt: new Date()
         }
@@ -179,7 +186,11 @@ async function upsertAllRounds(bucket, roundsSheets = []) {
                 ranked: r.ranked || null,
                 winLose: r.winLose || null,
                 heat: r.heat != null ? r.heat : null,
-                penalties: r.penalties || {}
+                penalties: r.penalties || {},
+                // BUG FIX: sama seperti upsertRoundRows() di atas — flag
+                // (DNF/DNS/DSQ) dari buildRoundRows() hilang sebelum sampai
+                // ke DB lewat "Save All Rounds".
+                flag: r.flag || null
               },
               updatedAt: new Date()
             }

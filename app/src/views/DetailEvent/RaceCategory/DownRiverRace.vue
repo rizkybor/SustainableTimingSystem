@@ -333,6 +333,26 @@
 
                     <!-- TEAM NAME  -->
                     <td class="large-bold text-strong max-char text-left">
+                      <div class="mb-1">
+                        <span
+                          v-if="item.result.flag === 'DNF'"
+                          class="badge badge-danger badge-pill"
+                        >
+                          Did Not Finish
+                        </span>
+                        <span
+                          v-if="item.result.flag === 'DNS'"
+                          class="badge badge-secondary badge-pill"
+                        >
+                          Did Not Start
+                        </span>
+                        <span
+                          v-if="item.result.flag === 'DSQ'"
+                          class="badge badge-dark badge-pill"
+                        >
+                          Disqualified
+                        </span>
+                      </div>
                       {{ item.nameTeam }}
                       <CountryFlag :code="flagFor(item.nameTeam)" />
                     </td>
@@ -467,6 +487,30 @@
                     </td>
 
                     <td v-if="editResult">
+                      <b-button
+                        size="sm"
+                        class="btn-action mr-1"
+                        variant="outline-danger"
+                        @click="markFlag(item, 'DNF')"
+                      >
+                        DNF
+                      </b-button>
+                      <b-button
+                        size="sm"
+                        class="btn-action mr-1"
+                        variant="outline-secondary"
+                        @click="markFlag(item, 'DNS')"
+                      >
+                        DNS
+                      </b-button>
+                      <b-button
+                        size="sm"
+                        class="btn-action mr-1"
+                        variant="outline-dark"
+                        @click="markFlag(item, 'DSQ')"
+                      >
+                        DSQ
+                      </b-button>
                       <b-button
                         size="sm"
                         class="btn-action"
@@ -719,7 +763,14 @@ function buildResultDocs(participantArr, bucket) {
 
     // total penalty time (bisa dihitung otomatis atau pakai field dari UI)
     const totalPenaltyTime = timeOrZero(r.penaltyTime || r.totalPenaltyTime);
-    const totalTime = timeOrZero(r.totalTime || r.raceTime);
+    // BUG FIX: dulu totalTime di-default ke "00:00:00.000" via timeOrZero()
+    // kalau kosong — utk tim DNF/DNS/DSQ (totalTime memang sengaja dikosongkan
+    // oleh markFlag()) ini bikin server (insertDrrResult, lihat
+    // insertResultEventByCategories.js) menganggap "00:00:00.000" sbg waktu
+    // VALID tercepat dan me-ranking tim yg harusnya DISKUALIFIKASI/DNF/DNS
+    // sbg Rank #1. totalTime harus tetap string kosong kalau memang belum
+    // ada hasil, sama seperti pola Sprint/Slalom.
+    const totalTime = asStr(r.totalTime || r.raceTime);
 
     const result = {
       startTime: asStr(r.startTime),
@@ -741,6 +792,13 @@ function buildResultDocs(participantArr, bucket) {
       score: asNum(r.score, 0),
       judgesBy: asStr(r.judgesBy),
       judgesTime: asStr(r.judgesTime),
+      // BUG FIX: `flag` (DNF/DNS/DSQ, di-set via markFlag()) tidak pernah
+      // disalin ke payload yang dikirim ke server — server-side whitelist
+      // di insertResultEventByCategories.js SUDAH benar menerima `flag`,
+      // tapi karena client tidak pernah mengirimnya sama sekali, flag selalu
+      // hilang sebelum sampai ke DB. Sama pola akar masalah dgn bug
+      // upsertHeadToHead.js, tapi di sisi client utk DRR.
+      flag: ["DNF", "DNS", "DSQ"].includes(r.flag) ? r.flag : null,
     };
 
     const otr = {
@@ -1743,10 +1801,48 @@ export default {
       if (typeof item.result.totalPenalty !== "undefined")
         item.result.totalPenalty = 0;
 
+      // Reset juga menghapus flag DNF/DNS/DSQ kalau ada.
+      item.result.flag = null;
+
       // re-assign ranking setelah reset
       this.assignRanks(this.participant);
 
       // paksa re-render jika diperlukan
+      if (this.$forceUpdate) this.$forceUpdate();
+    },
+
+    // Tandai tim DNF/DNS/DSQ — kosongkan waktu & penalti (biar tidak ikut
+    // dihitung ranking, sama pola dgn assignRanks() yg cuma memberi rank ke
+    // item dgn totalTime/raceTime terisi) lalu recompute ranking sisanya.
+    // TIDAK auto-save ke DB — operator tetap harus klik Save Result.
+    markFlag(item, type) {
+      if (!item || !item.result) return;
+      item.result.flag = type;
+
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+      item.result.startPenalty = 0;
+      item.result.finishPenalty = 0;
+      item.result.sectionPenalty = 0;
+      item.result.totalPenalty = 0;
+      item.result.penaltyStartTime = "";
+      item.result.penaltyFinishTime = "";
+      const secLen =
+        Number.isFinite(this.drrSectionsCount) && this.drrSectionsCount > 0
+          ? this.drrSectionsCount
+          : 3;
+      const emptySections = Array.from({ length: secLen }, function () {
+        return "";
+      });
+      if (this.$set) this.$set(item.result, "penaltySection", emptySections);
+      else item.result.penaltySection = emptySections;
+      item.result.penaltyTime = "";
+      item.result.totalTime = "";
+      item.result.ranked = "";
+      item.result.score = "";
+
+      this.assignRanks(this.participant);
       if (this.$forceUpdate) this.$forceUpdate();
     },
     buildStaticDrrOptions() {

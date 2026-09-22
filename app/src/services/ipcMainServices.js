@@ -56,7 +56,7 @@ const {
   updateEventPoster,
   updateBasic,
   updateAssets,
-  setResultsOfficial,
+  setResultsStatus,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -594,23 +594,31 @@ function setupIPCMainHandlers() {
     try {
       const eventId = payload && payload.eventId;
       const category = payload && payload.category;
-      const value = payload && payload.value;
+      // Status: "provisional" | "unofficial" | "official". Payload lama
+      // hanya mengirim `value` (boolean) — dipetakan ke "official"/
+      // "unofficial" demi kompatibilitas kalau ada caller lama yg belum
+      // sempat di-update.
+      let status = payload && payload.status;
+      if (!status) {
+        status = payload && payload.value ? "official" : "unofficial";
+      }
       // Opsional — ISO string (sudah dikonversi dari WIB ke UTC di
       // renderer) kalau operator set waktu manual; kosong = otomatis
-      // pakai waktu server saat ini (lihat setResultsOfficial()).
+      // pakai waktu server saat ini (lihat setResultsStatus()).
       const timestamp = payload && payload.timestamp;
-      const resp = await setResultsOfficial(eventId, category, value, timestamp);
+      const resp = await setResultsStatus(eventId, category, status, timestamp);
       // BUG FIX: sebelumnya toggle Official/Unofficial TIDAK PERNAH
       // broadcast apa pun ke sts-jurysystem — Live Result cuma bisa
       // "kebetulan" ikut update kalau ada aksi lain (mis. Save Result)
       // yang trigger fetchResults() bersamaan, atau menunggu poll 20
-      // detik. Broadcast di sini supaya badge Official/Unofficial di
-      // Live Result berubah SEKETIKA, bukan menunggu.
+      // detik. Broadcast di sini supaya badge Provisional/Official/
+      // Unofficial di Live Result berubah SEKETIKA, bukan menunggu.
       if (resp && resp.ok) {
         notifyOfficialStatusChanged({
           eventId,
           category,
-          value: !!value,
+          status,
+          value: status === "official",
           setAt: resp.setAt || null,
         });
       }

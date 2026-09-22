@@ -82,9 +82,9 @@
         </b-button>
 
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -214,7 +214,7 @@
           :data="pdfEventData"
           :buckets="buckets"
           :categories="visibleCategories"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
         />
       </section>
@@ -241,6 +241,7 @@ import {
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { exportSheetsToExcel } from "@/utils/exportExcel";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 export default {
   name: "EventOverallResult",
@@ -256,7 +257,8 @@ export default {
   data() {
     return {
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       eventInfo: {},
@@ -278,6 +280,9 @@ export default {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.overall) || "";
+    },
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     // kolom kategori yang benar-benar ditampilkan di tabel Overall,
     // dipakai baik di layar maupun diteruskan ke komponen PDF
@@ -384,10 +389,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!(
-              this.eventInfo.resultsOfficialByCategory &&
-              this.eventInfo.resultsOfficialByCategory.overall
-            );
+            this.resultStatus = deriveResultStatus(this.eventInfo, "overall");
             resolve();
           });
         });
@@ -397,13 +399,13 @@ export default {
       }
     },
 
-    toggleOfficial() {
-      return this._setOfficialStatus(!this.isOfficial, null);
+    setResultStatus(newStatus) {
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       var eventId = String(this.$route.params.id || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
 
@@ -411,12 +413,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            self.isOfficial = nextValue;
+            self.resultStatus = nextStatus;
             self.eventInfo = {
               ...self.eventInfo,
+              resultsStatusByCategory: {
+                ...(self.eventInfo.resultsStatusByCategory || {}),
+                overall: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(self.eventInfo.resultsOfficialByCategory || {}),
-                overall: nextValue,
+                overall: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(self.eventInfo.resultsOfficialSetAt || {}),
@@ -430,7 +436,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -438,7 +444,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "overall",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });

@@ -172,9 +172,9 @@
       </div>
 
       <div class="sign-right">
-        <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial }">
+        <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }">
           <div style="font-size: 14px; display: flex; justify-content: center">
-            {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+            {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px"
             >Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small
@@ -209,12 +209,18 @@ export default {
   props: {
     data: { type: Object, required: true },
     bracket: { type: Array, default: () => [] },
-    isOfficial: { type: Boolean, default: false },
+    status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     rxCats: { type: Object, required: true },
     countryMap: { type: Object, default: () => ({}) },
   },
   computed: {
+    isOfficial() {
+      return this.status === "official";
+    },
+    isProvisional() {
+      return this.status === "provisional";
+    },
     formattedOfficialSetAt() {
       return formatOfficialSetAt(this.officialSetAt);
     },
@@ -459,6 +465,10 @@ export default {
 .official-stamp {
   color: #148a3b;
   border-color: #148a3b;
+}
+.provisional-stamp {
+  color: #d97706;
+  border-color: #d97706;
 }
 
 .mid-image-row,

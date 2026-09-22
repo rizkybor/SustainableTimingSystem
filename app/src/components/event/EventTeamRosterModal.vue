@@ -165,7 +165,7 @@ export default {
       teams: [],
       totalTeams: 0,
       query: "",
-      _loadedForEventId: "",
+      loadedForEventId: "",
       showPdf: false,
       printing: false,
     };
@@ -201,17 +201,17 @@ export default {
     },
     pdfFilename() {
       const name = (this.eventInfo && this.eventInfo.eventName) || "Event";
-      const safe = String(name).replace(/[^\w\-]+/g, "_");
+      const safe = String(name).replace(/[^\w-]+/g, "_");
       return `Team-Roster-${safe}`;
     },
   },
   watch: {
     show(val) {
       // Muat data cuma sekali per eventId (bukan tiap kali modal dibuka) —
-      // cache ringan di _loadedForEventId, biar buka-tutup modal berulang
+      // cache ringan di loadedForEventId, biar buka-tutup modal berulang
       // tidak spam IPC. Refresh manual belum diperlukan (data registrasi
       // jarang berubah selagi modal ini terbuka).
-      if (val && this.eventId && this._loadedForEventId !== this.eventId) {
+      if (val && this.eventId && this.loadedForEventId !== this.eventId) {
         this.fetchTeams();
       }
     },
@@ -220,7 +220,7 @@ export default {
     fetchTeams() {
       if (typeof ipcRenderer === "undefined" || !this.eventId) return;
       this.loading = true;
-      this._loadedForEventId = this.eventId;
+      this.loadedForEventId = this.eventId;
       ipcRenderer.removeAllListeners("teams-registered:detail-by-event-reply");
       ipcRenderer.once("teams-registered:detail-by-event-reply", (_e, res) => {
         this.loading = false;
@@ -230,7 +230,7 @@ export default {
         } else {
           this.teams = [];
           this.totalTeams = 0;
-          this._loadedForEventId = "";
+          this.loadedForEventId = "";
           ipcRenderer.send("get-alert", {
             type: "error",
             message: "Gagal memuat Team Roster",

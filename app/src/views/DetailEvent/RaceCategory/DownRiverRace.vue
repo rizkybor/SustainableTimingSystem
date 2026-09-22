@@ -2872,7 +2872,34 @@ export default {
 
     async updateTime(val, id, title) {
       if (!Array.isArray(this.participant) || !this.participant[id]) return;
-      if (title === "start") this.participant[id].result.startTime = val;
+      if (title === "start") {
+        this.participant[id].result.startTime = val;
+        // Kirim IPC "drr:team-started" begitu Start Time diisi — dipakai
+        // sts-jurysystem utk validasi "team belum Start" sebelum juri
+        // boleh submit penalty Start/Finish/Section. Fire-and-forget:
+        // kosongkan/salah isi Start Time tidak boleh gagalkan input
+        // operator. Pola sama persis dgn sprint:team-started, TAPI di sini
+        // ditulis LANGSUNG ke DB oleh proses Electron (lihat
+        // upsertDRRTeamStatus.js), bukan lewat relay browser juri —
+        // menghindari bug relay-only yang sudah ditemukan di Sprint/Slalom.
+        if (val && String(val).trim()) {
+          try {
+            const row = this.participant[id];
+            const bucket = getBucket();
+            ipcRenderer.send("drr:team-started", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(row.teamId || ""),
+              bibTeam: String(row.bibTeam || ""),
+              startTime: String(val),
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
+      }
       if (title === "finish") this.participant[id].result.finishTime = val;
       // BUG FIX: sebelumnya raceTime cuma dihitung di branch "finish" — kalau
       // operator klik tombol Finish SEBELUM Start, finishTime kecatat tapi

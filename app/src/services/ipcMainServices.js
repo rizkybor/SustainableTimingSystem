@@ -126,6 +126,15 @@ const {
   insertFieldNotesReport,
   listFieldNotesReports,
 } = require("../controllers/INSERT/insertFieldNotesReport");
+const {
+  upsertSprintTeamStatus,
+} = require("../controllers/INSERT/upsertSprintTeamStatus");
+const {
+  upsertSlalomTeamStatus,
+} = require("../controllers/INSERT/upsertSlalomTeamStatus");
+const {
+  upsertDRRTeamStatus,
+} = require("../controllers/INSERT/upsertDRRTeamStatus");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -691,6 +700,13 @@ function setupIPCMainHandlers() {
   // input operator yang sedang berjalan.
   ipcMain.on("sprint:team-started", (_event, payload) => {
     notifyTeamStarted(payload || {});
+    // BUG FIX (2026-09-23): tulis LANGSUNG ke sprintteamstatuses (bukan
+    // cuma broadcast socket) supaya flag "sudah Start" tetap tersimpan
+    // walau tidak ada tab juri Sprint yang online saat ini. Lihat
+    // upsertSprintTeamStatus.js.
+    upsertSprintTeamStatus(payload || {}).catch((err) => {
+      console.error("⚠️ [sprint:team-started] gagal upsert langsung:", err);
+    });
   });
 
   // Broadcast LIVE PREVIEW begitu satu team Sprint genuinely selesai
@@ -715,6 +731,21 @@ function setupIPCMainHandlers() {
   // sama pola dgn sprint:team-started.
   ipcMain.on("slalom:team-started", (_event, payload) => {
     notifySlalomTeamStarted(payload || {});
+    // BUG FIX (2026-09-23): tulis LANGSUNG ke slalomteamstatuses (bukan
+    // cuma broadcast socket) supaya flag "sudah Start" tetap tersimpan
+    // walau tidak ada tab juri Slalom yang online saat ini. Lihat
+    // upsertSlalomTeamStatus.js.
+    upsertSlalomTeamStatus(payload || {}).catch((err) => {
+      console.error("⚠️ [slalom:team-started] gagal upsert langsung:", err);
+    });
+  });
+
+  // Flag "team sudah Start" DRR — dibangun LANGSUNG dgn direct-write ke
+  // drrteamstatuses (bukan relay browser juri), lihat upsertDRRTeamStatus.js.
+  ipcMain.on("drr:team-started", (_event, payload) => {
+    upsertDRRTeamStatus(payload || {}).catch((err) => {
+      console.error("⚠️ [drr:team-started] gagal upsert langsung:", err);
+    });
   });
 
   // Simpan Fouls Report (murni informasi, TIDAK mengubah penalty resmi)

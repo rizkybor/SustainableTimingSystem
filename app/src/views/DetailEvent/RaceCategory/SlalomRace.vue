@@ -1053,22 +1053,6 @@ function penaltyMsFromValues(start, gates, finish) {
   return toMs(start) + core + toMs(finish);
 }
 
-// 1/2 atau 0/1 → 0-based 0|1; fallback ke active run
-function toRunIdx(msg, fallbackIdx) {
-  var v = null;
-  if (msg && msg.runNumber != null) v = msg.runNumber;
-  else if (msg && msg.run != null) v = msg.run;
-
-  var n = parseInt(v, 10);
-  if (!isNaN(n)) {
-    if (n >= 1 && n <= 2) return n - 1; // human 1/2
-    if (n === 0 || n === 1) return n; // already 0/1
-  }
-  return typeof fallbackIdx === "number" && isFinite(fallbackIdx)
-    ? fallbackIdx
-    : 0;
-}
-
 function recomputeSessionFields(session) {
   const sVal = Number(session.startPenalty) || 0;
   const fVal = Number(session.finishPenalty) || 0;
@@ -1409,7 +1393,6 @@ export default {
     },
   },
   async mounted() {
-    var audio = new Audio(tone);
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -1490,7 +1473,9 @@ export default {
         if (this.$bvToast && msg.text) {
           try {
             new Audio(tone).play();
-          } catch {}
+          } catch (e) {
+            /* noop */
+          }
           this.$bvToast.toast(
             (msg.from ? msg.from : "Realtime") + ": " + msg.text,
             {

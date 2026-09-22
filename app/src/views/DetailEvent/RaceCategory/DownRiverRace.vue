@@ -1185,7 +1185,9 @@ export default {
           try {
             audio.currentTime = 0;
             audio.play();
-          } catch {}
+          } catch (e) {
+            /* noop */
+          }
           this.$bvToast.toast(
             (msg.from ? msg.from : "Realtime") + ": " + msg.text,
             {
@@ -1327,9 +1329,6 @@ export default {
         );
 
         var team = resolved && resolved.team ? resolved.team : null;
-        var teamIndex = Number.isFinite(resolved && resolved.index)
-          ? resolved.index
-          : -1;
 
         // fallback: cari di this.participant (by _id/teamId) jika helper gagal
         if (!team && Array.isArray(this.participant)) {
@@ -1340,7 +1339,6 @@ export default {
               String(p.teamId || "") === String(key)
             ) {
               team = p;
-              teamIndex = pi;
               break;
             }
           }
@@ -2484,9 +2482,6 @@ export default {
       try {
         if (typeof ipcRenderer === "undefined") return;
 
-        const bucket = getBucket();
-
-        // const eventId = String(bucket.eventId || "");
         const eventId = this.currentEventId;
 
         if (!eventId) return;

@@ -1,55 +1,78 @@
 <template>
   <div class="jah-page">
-    <b-container class="mt-3">
-      <!-- HEADER -->
-      <div class="d-flex align-items-center justify-content-between flex-wrap mb-3" style="gap: 10px">
-        <div>
-          <b-button variant="outline-secondary" size="sm" class="mb-2" @click="goBack">
-            <Icon icon="mdi:arrow-left" class="mr-1" />
-            Kembali ke Event Detail
-          </b-button>
-          <h3 class="font-weight-bold mb-0">Judges Activity History</h3>
-          <small class="text-muted">{{ eventInfo.eventName || "-" }}</small>
+    <div class="jah-hero">
+      <b-container class="jah-hero__inner">
+        <button type="button" class="jah-back" @click="goBack">
+          <Icon icon="mdi:arrow-left" width="15" height="15" />
+          Kembali ke Event Detail
+        </button>
+        <div class="jah-hero__row">
+          <div class="jah-hero__title">
+            <div class="jah-hero__icon">
+              <Icon icon="mdi:gavel" width="22" height="22" />
+            </div>
+            <div>
+              <h3>Judges Activity History</h3>
+              <p>{{ eventInfo.eventName || "Event" }}</p>
+            </div>
+          </div>
+          <button type="button" class="jah-refresh-btn" :disabled="loading" @click="fetchAll">
+            <b-spinner v-if="loading" small />
+            <Icon v-else icon="mdi:refresh" width="16" height="16" />
+            Refresh
+          </button>
         </div>
-        <b-button variant="outline-primary" :disabled="loading" @click="fetchAll">
-          <b-spinner v-if="loading" small class="mr-1" />
-          <Icon v-else icon="mdi:refresh" class="mr-1" />
-          Refresh
-        </b-button>
-      </div>
+      </b-container>
+    </div>
 
+    <b-container class="jah-body">
       <!-- SUMMARY -->
-      <b-row class="mb-3">
-        <b-col cols="6" md="3" class="mb-2">
-          <div class="jah-stat">
+      <div class="jah-stat-grid">
+        <div class="jah-stat">
+          <div class="jah-stat__icon jah-stat__icon--blue">
+            <Icon icon="mdi:account-group-outline" width="18" height="18" />
+          </div>
+          <div>
             <div class="jah-stat__value">{{ judgeProfiles.length }}</div>
             <div class="jah-stat__label">Judges Ditugaskan</div>
           </div>
-        </b-col>
-        <b-col cols="6" md="3" class="mb-2">
-          <div class="jah-stat">
+        </div>
+        <div class="jah-stat">
+          <div class="jah-stat__icon jah-stat__icon--violet">
+            <Icon icon="mdi:format-list-bulleted" width="18" height="18" />
+          </div>
+          <div>
             <div class="jah-stat__value">{{ activityItems.length }}</div>
             <div class="jah-stat__label">Total Aktivitas</div>
           </div>
-        </b-col>
-        <b-col cols="6" md="3" class="mb-2">
-          <div class="jah-stat">
+        </div>
+        <div class="jah-stat">
+          <div class="jah-stat__icon jah-stat__icon--cyan">
+            <Icon icon="mdi:filter-variant" width="18" height="18" />
+          </div>
+          <div>
             <div class="jah-stat__value">{{ filteredItems.length }}</div>
             <div class="jah-stat__label">Sesuai Filter</div>
           </div>
-        </b-col>
-        <b-col cols="6" md="3" class="mb-2">
-          <div class="jah-stat">
+        </div>
+        <div class="jah-stat">
+          <div class="jah-stat__icon jah-stat__icon--amber">
+            <Icon icon="mdi:pulse" width="18" height="18" />
+          </div>
+          <div>
             <div class="jah-stat__value">{{ distinctJudgeNames.length }}</div>
             <div class="jah-stat__label">Juri Aktif Mencatat</div>
           </div>
-        </b-col>
-      </b-row>
+        </div>
+      </div>
 
       <!-- PROFILE JUDGES -->
-      <div class="mb-4">
-        <h5 class="font-weight-bold mb-2">Profile Judges</h5>
-        <div v-if="!judgeProfiles.length && !loading" class="text-muted small">
+      <section class="jah-section">
+        <div class="jah-section__head">
+          <h5>Profile Judges</h5>
+          <span class="jah-section__hint">Klik kartu untuk filter aktivitas per juri</span>
+        </div>
+        <div v-if="!judgeProfiles.length && !loading" class="jah-note">
           Belum ada juri yang ditugaskan untuk event ini (atur lewat "Judges Settings" di Event Detail).
         </div>
         <div class="jah-profile-grid">
@@ -64,11 +87,13 @@
               <div class="jah-profile-avatar">
                 {{ (p.username || p.email || "?").charAt(0).toUpperCase() }}
               </div>
-              <div class="min-w-0">
+              <div class="jah-profile-card__id">
                 <div class="jah-profile-name">{{ p.username || "-" }}</div>
                 <div class="jah-profile-email">{{ p.email }}</div>
               </div>
-              <div class="jah-profile-count">{{ activityCountFor(p.username) }}</div>
+              <div class="jah-profile-count" :title="`${activityCountFor(p.username)} aktivitas`">
+                {{ activityCountFor(p.username) }}
+              </div>
             </div>
             <div class="jah-profile-tasks">
               <span
@@ -79,78 +104,107 @@
               >
                 {{ task.category }} · {{ task.label }}
               </span>
-              <span v-if="!tasksFor(p).length" class="text-muted small">
+              <span v-if="!tasksFor(p).length" class="jah-note jah-note--inline">
                 Belum ada tugas di-assign
               </span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- FILTERS -->
-      <div class="jah-filter-bar mb-3">
+      <section class="jah-filter-bar">
         <div class="jah-filter-item">
-          <label>Race Category</label>
+          <label><Icon icon="mdi:flag-checkered" width="12" height="12" /> Race Category</label>
           <b-form-select v-model="filters.category" :options="categoryOptions" size="sm" />
         </div>
         <div class="jah-filter-item">
-          <label>Initial</label>
+          <label><Icon icon="mdi:tag-outline" width="12" height="12" /> Initial</label>
           <b-form-select v-model="filters.initial" :options="initialOptions" size="sm" />
         </div>
         <div class="jah-filter-item">
-          <label>Judge</label>
+          <label><Icon icon="mdi:account-outline" width="12" height="12" /> Judge</label>
           <b-form-select v-model="filters.judge" :options="judgeOptions" size="sm" />
         </div>
         <div class="jah-filter-item jah-filter-item--grow">
-          <label>Cari Task (mis. Start, Gate 2, Booyan)</label>
+          <label><Icon icon="mdi:magnify" width="12" height="12" /> Cari Task (mis. Start, Gate 2, Booyan)</label>
           <b-form-input v-model="filters.taskSearch" size="sm" placeholder="Ketik untuk cari task..." />
         </div>
-        <div class="jah-filter-item">
-          <label>&nbsp;</label>
-          <b-button variant="outline-secondary" size="sm" block @click="resetFilters">
+        <div class="jah-filter-item jah-filter-item--reset">
+          <button type="button" class="jah-reset-btn" @click="resetFilters">
+            <Icon icon="mdi:filter-remove-outline" width="14" height="14" />
             Reset Filter
-          </b-button>
+          </button>
         </div>
-      </div>
+      </section>
 
-      <!-- ACTIVITY LIST -->
-      <div class="jah-list-wrap">
-        <div v-if="loading" class="jah-empty">Memuat aktivitas…</div>
-        <div v-else-if="!filteredItems.length" class="jah-empty">
-          Tidak ada aktivitas yang cocok dengan filter saat ini.
+      <!-- ACTIVITY TABLE -->
+      <section class="jah-table-card">
+        <div v-if="loading" class="jah-empty">
+          <b-spinner small class="mr-2" />Memuat aktivitas…
         </div>
-        <ul v-else class="jah-list">
-          <li v-for="item in filteredItems" :key="item._id" class="jah-item">
-            <div class="jah-item-icon">
-              <Icon icon="mdi:gavel" width="18" height="18" />
-            </div>
-            <div class="jah-item-main">
-              <div class="jah-item-judge">
-                <Icon icon="mdi:account-circle-outline" class="mr-1" />
-                <span class="jah-judge-name">{{ item.judge || "Juri tidak diketahui" }}</span>
-                <span class="jah-badge jah-badge--category" :class="'jah-badge--cat-' + String(item.raceCategory).toLowerCase()">
-                  {{ categoryLabel(item.raceCategory) }}
-                </span>
-                <span v-if="taskLabel(item)" class="jah-badge jah-badge--task">
-                  {{ taskLabel(item) }}
-                </span>
-              </div>
-              <div class="jah-item-text">
-                {{ item.text || item.type }}
-                <span v-if="item.value !== null && item.value !== undefined" class="jah-badge jah-badge--value">
-                  Penalty {{ item.value }}
-                </span>
-              </div>
-              <div class="jah-item-meta">
-                <span v-if="categoryContextFor(item)">{{ categoryContextFor(item) }}</span>
-                <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
-                <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
-              </div>
-            </div>
-            <div class="jah-item-time">{{ formatTime(item.receivedAt) }}</div>
-          </li>
-        </ul>
-      </div>
+        <div v-else-if="!filteredItems.length" class="jah-empty">
+          <Icon icon="mdi:inbox-outline" width="28" height="28" class="mb-2" />
+          <div>Tidak ada aktivitas yang cocok dengan filter saat ini.</div>
+        </div>
+        <div v-else class="jah-table-wrap">
+          <table class="jah-table">
+            <thead>
+              <tr>
+                <th class="jah-col-time">Waktu</th>
+                <th class="jah-col-judge">Juri</th>
+                <th class="jah-col-cat">Kategori</th>
+                <th class="jah-col-task">Task</th>
+                <th class="jah-col-detail">Detail</th>
+                <th class="jah-col-team">Tim</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in filteredItems" :key="item._id" class="jah-row">
+                <td class="jah-col-time">
+                  <span class="jah-time">{{ formatTime(item.receivedAt) }}</span>
+                </td>
+                <td class="jah-col-judge">
+                  <span class="jah-judge">
+                    <Icon icon="mdi:account-circle-outline" width="15" height="15" />
+                    {{ item.judge || "Juri tidak diketahui" }}
+                  </span>
+                </td>
+                <td class="jah-col-cat">
+                  <span
+                    class="jah-badge jah-badge--category"
+                    :class="'jah-badge--cat-' + String(item.raceCategory).toLowerCase()"
+                  >
+                    {{ categoryLabel(item.raceCategory) }}
+                  </span>
+                  <div v-if="categoryContextFor(item)" class="jah-subtext">
+                    {{ categoryContextFor(item) }}
+                  </div>
+                </td>
+                <td class="jah-col-task">
+                  <span v-if="taskLabel(item)" class="jah-badge jah-badge--task">
+                    {{ taskLabel(item) }}
+                  </span>
+                  <span v-else>-</span>
+                </td>
+                <td class="jah-col-detail">
+                  {{ item.text || item.type || "-" }}
+                  <span v-if="item.value !== null && item.value !== undefined" class="jah-badge jah-badge--value">
+                    Penalty {{ item.value }}
+                  </span>
+                </td>
+                <td class="jah-col-team">
+                  <template v-if="item.teamName || item.bibTeam">
+                    <div v-if="item.teamName">{{ item.teamName }}</div>
+                    <div v-if="item.bibTeam" class="jah-subtext">BIB {{ item.bibTeam }}</div>
+                  </template>
+                  <span v-else>-</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </b-container>
   </div>
 </template>
@@ -396,41 +450,208 @@ export default {
 
 <style scoped>
 .jah-page {
-  padding-bottom: 40px;
+  background: #f6f8fb;
+  /* BUG FIX: `.app-main` (App.vue) meregang penuh layar lewat flexbox
+     (flex: 1 0 auto), BUKAN lewat tinggi eksplisit — jadi `min-height:
+     100%` di sini tidak bisa "mewarisi" tinggi itu (persentase height
+     butuh parent dengan tinggi eksplisit, bukan hasil hitungan flexbox),
+     dan background abu-abu ini cuma setinggi konten, nyisain celah putih
+     polos di bawahnya saat konten pendek (mis. state kosong). Pakai
+     viewport-relative + kurangi tinggi Navbar/Footer (var css global dari
+     App.vue) supaya pas mengisi area konten tanpa lebih. */
+  min-height: calc(100vh - var(--nav-h, 64px) - var(--footer-h, 56px));
+  padding-bottom: 48px;
+}
+
+/* ===== HERO HEADER ===== */
+.jah-hero {
+  background: linear-gradient(135deg, #163a5c 0%, #1c4c7a 55%, #2a6099 100%);
+  padding: 18px 0 26px;
+  margin-bottom: -18px;
+}
+.jah-hero__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jah-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.jah-back:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.jah-hero__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.jah-hero__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.jah-hero__icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jah-hero__title h3 {
+  color: #fff;
+  font-weight: 800;
+  font-size: 19px;
+  margin: 0;
+  line-height: 1.2;
+}
+.jah-hero__title p {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12.5px;
+  margin: 2px 0 0;
+}
+.jah-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: #1c4c7a;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+.jah-refresh-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
+}
+.jah-refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.jah-body {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== STAT CARDS ===== */
+.jah-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
 }
 .jah-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
   padding: 14px 16px;
-  text-align: center;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
+.jah-stat__icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jah-stat__icon--blue { background: #e8f1fa; color: #1c4c7a; }
+.jah-stat__icon--violet { background: #eef0fe; color: #6366f1; }
+.jah-stat__icon--cyan { background: #e3f6fe; color: #0ea5e9; }
+.jah-stat__icon--amber { background: #fef3e0; color: #d9860f; }
 .jah-stat__value {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
-  color: #1c4c7a;
+  color: #0f172a;
+  line-height: 1.1;
 }
 .jah-stat__label {
-  font-size: 11px;
+  font-size: 11.5px;
   color: #64748b;
   margin-top: 2px;
 }
 
+/* ===== SECTIONS ===== */
+.jah-section {
+  margin-bottom: 22px;
+}
+.jah-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.jah-section__head h5 {
+  font-weight: 800;
+  font-size: 15px;
+  color: #0f172a;
+  margin: 0;
+}
+.jah-section__hint {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.jah-note {
+  font-size: 12.5px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+}
+.jah-note--inline {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* ===== PROFILE JUDGES ===== */
 .jah-profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 10px;
 }
 .jah-profile-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
+  padding: 13px 15px;
   background: #fff;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 .jah-profile-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 .jah-profile-card--active {
   border-color: #1c4c7a;
@@ -441,12 +662,15 @@ export default {
   align-items: center;
   gap: 10px;
 }
+.jah-profile-card__id {
+  min-width: 0;
+}
 .jah-profile-avatar {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #eef4ff;
+  background: linear-gradient(135deg, #e8f1fa, #dbe9fb);
   color: #1c4c7a;
   font-weight: 800;
   display: flex;
@@ -467,16 +691,21 @@ export default {
 }
 .jah-profile-count {
   margin-left: auto;
+  min-width: 26px;
+  text-align: center;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 13px;
   color: #1c4c7a;
+  background: #eef4ff;
+  border-radius: 999px;
+  padding: 3px 8px;
   flex-shrink: 0;
 }
 .jah-profile-tasks {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 10px;
+  margin-top: 11px;
 }
 .jah-task-chip {
   font-size: 10.5px;
@@ -492,15 +721,18 @@ export default {
 .jah-task-chip--drr { background: #fdf1de; color: #d9860f; }
 .jah-task-chip--rx { background: #fde7ec; color: #e11d48; }
 
+/* ===== FILTER BAR ===== */
 .jah-filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: end;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px;
+  background: #fff;
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 .jah-filter-item {
   min-width: 160px;
@@ -508,92 +740,130 @@ export default {
 .jah-filter-item--grow {
   flex: 1 1 240px;
 }
+.jah-filter-item--reset {
+  min-width: auto;
+}
 .jah-filter-item label {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  margin-bottom: 4px;
-}
-
-.jah-list-wrap {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-.jah-empty {
-  padding: 40px 16px;
-  text-align: center;
-  color: #64748b;
-}
-.jah-list {
-  list-style: none;
-  margin: 0;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.jah-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-}
-.jah-item-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #1874a5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.jah-item-main {
-  flex: 1;
-  min-width: 0;
-}
-.jah-item-judge {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
-  color: #1c4c7a;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  margin-bottom: 3px;
+  color: #64748b;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
-.jah-judge-name {
-  margin-right: 2px;
+.jah-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #dde3ea;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  height: 31px;
+  transition: background 0.15s ease;
 }
-.jah-item-text {
-  font-weight: 600;
-  color: #0f172a;
-  font-size: 14px;
+.jah-reset-btn:hover {
+  background: #eef2f6;
 }
-.jah-item-meta {
+
+/* ===== ACTIVITY TABLE ===== */
+.jah-table-card {
+  background: #fff;
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.jah-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+.jah-table-wrap {
+  overflow-x: auto;
+}
+.jah-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.jah-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  padding: 11px 14px;
+  border-bottom: 1px solid #e6ebf1;
+  white-space: nowrap;
+}
+.jah-row td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #eef1f5;
+  vertical-align: top;
+  color: #1e293b;
+}
+.jah-row:last-child td {
+  border-bottom: none;
+}
+.jah-row:hover td {
+  background: #f8fafc;
+}
+.jah-col-time { white-space: nowrap; }
+.jah-time {
   color: #64748b;
   font-size: 12px;
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
+.jah-col-judge { white-space: nowrap; }
+.jah-judge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #1c4c7a;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.jah-col-cat { white-space: nowrap; }
+.jah-subtext {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 3px;
+}
+.jah-col-detail {
+  font-weight: 600;
+  color: #0f172a;
+  min-width: 200px;
+}
+.jah-col-team { white-space: nowrap; }
+
 .jah-badge {
   display: inline-block;
-  margin-left: 6px;
-  padding: 1px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   background: #eff6ff;
   color: #1874a5;
   vertical-align: middle;
 }
 .jah-badge--value {
+  margin-left: 6px;
   background: #fef2f2;
   color: #dc2626;
 }
@@ -601,16 +871,20 @@ export default {
   background: #f3ecff;
   color: #7c3aed;
 }
-.jah-badge--category { margin-left: 0; }
 .jah-badge--cat-sprint { background: #e8f1fa; color: #1c4c7a; }
 .jah-badge--cat-h2h { background: #eef0fe; color: #6366f1; }
 .jah-badge--cat-slalom { background: #e3f6fe; color: #0ea5e9; }
 .jah-badge--cat-drr { background: #fdf1de; color: #d9860f; }
 .jah-badge--cat-rx { background: #fde7ec; color: #e11d48; }
-.jah-item-time {
-  flex-shrink: 0;
-  color: #94a3b8;
-  font-size: 12px;
-  white-space: nowrap;
+
+@media (max-width: 576px) {
+  .jah-hero__row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .jah-refresh-btn {
+    align-self: stretch;
+    justify-content: center;
+  }
 }
 </style>

@@ -1054,6 +1054,34 @@ export default {
       this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
     },
     async applyPenaltyFromSocket(payload = {}) {
+      // BUG FIX (2026-09-23): sebelumnya cuma cocokkan teamId/bibTeam/
+      // nameTeam TANPA cek kategori (initialId/raceId/divisionId) sama
+      // sekali — kalau teamId yang sama dipakai ulang di Initial lain
+      // (mis. tim yang sama tampil di SENIOR & U23, lihat
+      // MEMORY-SPRINT.md), penalty yg sebenarnya utk kategori LAIN bisa
+      // salah tertempel ke baris kategori yg SEDANG DIBUKA operator kalau
+      // teamId-nya kebetulan cocok. Verifikasi kategori aktif dulu — kalau
+      // payload bawa initialId/raceId/divisionId (jurysystem versi baru)
+      // dan tidak cocok dgn bucket aktif, abaikan pesan ini (bukan utk
+      // view yg sedang dibuka). Kalau payload TIDAK bawa field ini sama
+      // sekali (jurysystem versi lama, belum redeploy), lanjut spt biasa
+      // demi backward-compat.
+      if (payload.initialId != null || payload.raceId != null || payload.divisionId != null) {
+        // BUG FIX: `??` tidak didukung babel/vue-cli versi proyek ini
+        // (gagal parse saat build) — pakai `!= null ? ... : ...` eksplisit.
+        const bucket = getBucket();
+        const evId = payload.eventId != null ? payload.eventId : bucket.eventId;
+        const inId = payload.initialId != null ? payload.initialId : bucket.initialId;
+        const rcId = payload.raceId != null ? payload.raceId : bucket.raceId;
+        const dvId = payload.divisionId != null ? payload.divisionId : bucket.divisionId;
+        const sameCategory =
+          String(evId) === String(bucket.eventId) &&
+          String(inId) === String(bucket.initialId) &&
+          String(rcId) === String(bucket.raceId) &&
+          String(dvId) === String(bucket.divisionId);
+        if (!sameCategory) return;
+      }
+
       // cari tim lokal: teamId -> bibTeam -> nameTeam (case-insensitive)
       const items = this.participantArr;
       let idx = -1;

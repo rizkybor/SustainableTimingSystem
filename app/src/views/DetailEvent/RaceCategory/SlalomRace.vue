@@ -1638,6 +1638,29 @@ export default {
 
     async applyPenaltyFromSocketDirect(msg) {
       try {
+        // BUG FIX (2026-09-23): sama pola dgn Sprint (MEMORY-SPRINT.md) —
+        // verifikasi kategori aktif dulu sebelum mencocokkan teamId, krn
+        // teamId bisa dipakai ulang lintas Initial (tim yg sama tampil di
+        // SENIOR & U23 dgn BIB berbeda). Kalau msg bawa initialId/raceId/
+        // divisionId (jurysystem versi baru) dan tidak cocok bucket aktif,
+        // abaikan. Kalau msg TIDAK bawa field ini sama sekali (jurysystem
+        // versi lama), lanjut spt biasa demi backward-compat.
+        if (msg && (msg.initialId != null || msg.raceId != null || msg.divisionId != null)) {
+          // BUG FIX: `??` tidak didukung babel/vue-cli versi proyek ini
+          // (gagal parse saat build) — pakai `!= null ? ... : ...` eksplisit.
+          const bucket = getBucket();
+          const evId = msg.eventId != null ? msg.eventId : bucket.eventId;
+          const inId = msg.initialId != null ? msg.initialId : bucket.initialId;
+          const rcId = msg.raceId != null ? msg.raceId : bucket.raceId;
+          const dvId = msg.divisionId != null ? msg.divisionId : bucket.divisionId;
+          const sameCategory =
+            String(evId) === String(bucket.eventId) &&
+            String(inId) === String(bucket.initialId) &&
+            String(rcId) === String(bucket.raceId) &&
+            String(dvId) === String(bucket.divisionId);
+          if (!sameCategory) return false;
+        }
+
         // --- identifikasi tim (teamId/bib/name) ---
         let key = "";
         if (msg && msg.teamId != null) key = String(msg.teamId);

@@ -252,10 +252,10 @@
         <div class="sign-col stamp-col">
           <span
             class="unofficial-stamp"
-            :class="{ 'official-stamp': isOfficial }"
+            :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }"
           >
             <div style="font-size: 14px; display: flex; justify-content: center;">
-              {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+              {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
             </div>
             <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
             <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
@@ -460,10 +460,10 @@
           <div class="sign-col stamp-col">
             <span
               class="unofficial-stamp"
-              :class="{ 'official-stamp': isOfficial }"
+              :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }"
             >
               <div style="font-size: 14px; display: flex; justify-content: center;">
-                {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+                {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
               </div>
               <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
               <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
@@ -627,6 +627,7 @@
                 <td class="text-strong">
                   {{ row.team }}
                   <CountryFlag :code="flagFor(row.team)" />
+                  <span v-if="row.flag" class="flag-badge">{{ row.flag }}</span>
                 </td>
                 <td class="text-center">{{ row.bib }}</td>
                 <td class="pen-col text-center">{{ penVal(row, "s") }}</td>
@@ -703,10 +704,10 @@
           <div class="sign-col stamp-col">
             <span
               class="unofficial-stamp"
-              :class="{ 'official-stamp': isOfficial }"
+              :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }"
             >
               <div style="font-size: 14px; display: flex; justify-content: center;">
-                {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+                {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
               </div>
               <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ (eventData && eventData.protestTime) || "00:00:05.000" }} min</small>
               <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
@@ -750,12 +751,18 @@ export default {
     pdfOverallPkg: { type: Object, default: null },
     categories: { type: String, default: "" },
     titleCategories: { type: String, default: "" },
-    isOfficial: { type: Boolean, default: false },
+    status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     headToHeadCats: { type: Object, default: () => ({}) },
     countryMap: { type: Object, default: () => ({}) },
   },
   computed: {
+    isOfficial() {
+      return this.status === "official";
+    },
+    isProvisional() {
+      return this.status === "provisional";
+    },
     formattedOfficialSetAt() {
       return formatOfficialSetAt(this.officialSetAt);
     },
@@ -1049,6 +1056,10 @@ export default {
   transform: rotate(0deg);
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
+}
+.provisional-stamp {
+  color: #d97706;
+  border-color: #d97706;
 }
 
 /* ===== LOGOS ===== */

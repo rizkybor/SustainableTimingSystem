@@ -96,6 +96,11 @@ async function insertSprintResult(payload) {
         score: toInt(r.score, 0),
         judgesBy: toStr(r.judgesBy, ""),
         judgesTime: toStr(r.judgesTime, ""),
+        // BUG FIX (pola sama spt upsertHeadToHead.js): field `flag`
+        // (DNF/DNS/DSQ, di-set via markFlag() di SprintRace.vue) dulu tidak
+        // ada di whitelist ini, jadi selalu ke-strip diam-diam tiap kali
+        // hasil disimpan — flag tidak pernah benar2 tersimpan ke DB.
+        flag: ["DNF", "DNS", "DSQ"].includes(r.flag) ? r.flag : null,
       };
     }
 
@@ -484,6 +489,11 @@ async function insertSlalomResult(payload) {
           : Number(run.ranked) || 0,
         judgesBy: String(run.judgesBy || ""),
         judgesTime: String(run.judgesTime || ""),
+        // BUG FIX (pola sama spt upsertHeadToHead.js/insertSprintResult):
+        // `flag` (DNF/DNS/DSQ per Run, di-set via markFlag() di
+        // SlalomRace.vue) dulu tidak ada di whitelist ini, ke-strip diam2
+        // tiap kali hasil disimpan.
+        flag: ["DNF", "DNS", "DSQ"].includes(run.flag) ? run.flag : null,
       };
     }
 
@@ -727,10 +737,22 @@ async function insertSlalomResult(payload) {
             : [];
           const ntRes = Array.isArray(nt.result) ? nt.result : [];
 
-          // outRes: pertahankan run-1 lama; gunakan run-2 dari nt jika ada
+          // BUG FIX: outRes utk Run 1 (index 0) dulu SELALU pertahankan data
+          // lama kalau ada ("if (exRes[0]) outRes[0] = exRes[0]"), TERLEPAS
+          // dari incoming punya data Run 1 yang valid atau tidak. Ini
+          // mematikan fitur edit Start/Finish Time Run 1 di SlalomResult.vue
+          // (Result page kirim ULANG seluruh rawResultItems yg sudah
+          // dimutasi lokal termasuk Run 1 yg diedit, tapi merge ini selalu
+          // membuang edit itu & pakai data DB lama). Run 2 (index 1) sudah
+          // benar sejak awal — prioritaskan incoming, fallback ke lama kalau
+          // incoming tidak membawa slot itu sama sekali. Samakan kebijakan
+          // Run 1 dgn Run 2 (simetris) supaya edit Run 1 juga tersimpan,
+          // sambil tetap melindungi Run 1 lama kalau incoming payload
+          // memang tidak menyertakan Run 1 sama sekali (mis. submit parsial
+          // dari SlalomRace.vue yg cuma kirim Run 2).
           const outRes = [];
-          if (exRes[0]) outRes[0] = exRes[0];
-          else if (ntRes[0]) outRes[0] = ntRes[0];
+          if (ntRes[0]) outRes[0] = ntRes[0];
+          else if (exRes[0]) outRes[0] = exRes[0];
 
           if (ntRes[1]) outRes[1] = ntRes[1];
           else if (exRes[1]) outRes[1] = exRes[1];
@@ -1027,6 +1049,11 @@ async function insertDrrResult(payload) {
         score: toInt(r.score, 0),
         judgesBy: toStr(r.judgesBy, ""),
         judgesTime: toStr(r.judgesTime, ""),
+        // BUG FIX (pola sama spt upsertHeadToHead.js/insertSprintResult/
+        // insertSlalomResult): `flag` (DNF/DNS/DSQ, di-set via markFlag()
+        // di DownRiverRace.vue) dulu tidak ada di whitelist ini, ke-strip
+        // diam2 tiap kali hasil disimpan.
+        flag: ["DNF", "DNS", "DSQ"].includes(r.flag) ? r.flag : null,
       };
       return res;
     }

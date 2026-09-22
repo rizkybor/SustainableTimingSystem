@@ -1,15 +1,16 @@
 <template>
   <span class="ost-wrap">
-    <span
-      class="unofficial-stamp"
-      :class="{ 'official-stamp': isOfficial }"
-      @click="$emit('toggle')"
-      role="button"
-      tabindex="0"
-      title="Klik untuk toggle OFFICIAL/UNOFFICIAL"
-      @keyup.enter="$emit('toggle')"
-    >
-      {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+    <span class="ost-stamp" :class="'ost-stamp--' + status">
+      <select
+        class="ost-select"
+        :value="status"
+        title="Pilih status result"
+        @change="$emit('set-status', $event.target.value)"
+      >
+        <option value="provisional">PROVISIONAL</option>
+        <option value="unofficial">UNOFFICIAL</option>
+        <option value="official">OFFICIAL</option>
+      </select>
     </span>
 
     <span v-if="formattedSetAt" class="ost-time">
@@ -42,9 +43,9 @@
       centered
     >
       <p class="small text-muted mb-3">
-        Waktu ditetapkannya status <strong>{{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}</strong>
+        Waktu ditetapkannya status <strong>{{ statusLabel }}</strong>
         untuk kategori ini — ditampilkan di stempel PDF &amp; Live Result. Default otomatis
-        mengikuti waktu saat status diklik; ubah di sini kalau perlu koreksi manual.
+        mengikuti waktu saat status dipilih; ubah di sini kalau perlu koreksi manual.
       </p>
       <b-form-group label="Tanggal &amp; Waktu (WIB / Asia-Jakarta)">
         <b-form-input type="datetime-local" v-model="manualDateTime" />
@@ -62,10 +63,13 @@
 </template>
 
 <script>
+import { RESULT_STATUS_LABELS } from "@/utils/officialStamp";
+
 export default {
   name: "OfficialStampToggle",
   props: {
-    isOfficial: { type: Boolean, default: false },
+    // "provisional" | "unofficial" | "official"
+    status: { type: String, default: "provisional" },
     // ISO string (UTC) atau null/kosong kalau belum pernah di-set.
     setAt: { type: String, default: "" },
   },
@@ -76,6 +80,9 @@ export default {
     };
   },
   computed: {
+    statusLabel() {
+      return RESULT_STATUS_LABELS[this.status] || RESULT_STATUS_LABELS.provisional;
+    },
     formattedSetAt() {
       if (!this.setAt) return "";
       const d = new Date(this.setAt);
@@ -142,6 +149,60 @@ export default {
   align-items: flex-end;
   gap: 3px;
 }
+
+/* Visual "cap/stempel" — dipindah ke sini (self-contained) dari style
+   scoped tiap halaman Result, karena scoped CSS induk TIDAK PERNAH
+   menjangkau elemen di dalam template komponen anak ini walau nama
+   class-nya sama; stempel Official/Unofficial jadi tanpa warna/border
+   sebelum fix ini. */
+.ost-stamp {
+  display: inline-flex;
+  font-weight: bold;
+  text-transform: uppercase;
+  border: 2px solid #d9534f;
+  border-radius: 4px;
+  transform: rotate(5deg);
+  opacity: 0.85;
+}
+.ost-stamp--provisional {
+  border-color: #d97706;
+  transform: rotate(3deg);
+}
+.ost-stamp--unofficial {
+  border-color: #d9534f;
+}
+.ost-stamp--official {
+  border-color: #148a3b;
+  transform: rotate(0deg);
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
+}
+
+.ost-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 4px 22px 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23999'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.ost-stamp--provisional .ost-select {
+  color: #d97706;
+}
+.ost-stamp--unofficial .ost-select {
+  color: #d9534f;
+}
+.ost-stamp--official .ost-select {
+  color: #148a3b;
+}
+
 .ost-time {
   display: inline-flex;
   align-items: center;

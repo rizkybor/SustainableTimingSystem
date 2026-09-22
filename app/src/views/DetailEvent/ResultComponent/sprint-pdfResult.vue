@@ -83,6 +83,7 @@
             <td class="text-strong">
               {{ row && row.nameTeam ? row.nameTeam : "-" }}
               <CountryFlag :code="row && row.countryCode" />
+              <span v-if="row && row.flag" class="flag-badge">{{ row.flag }}</span>
             </td>
             <td class="text-center">
               {{ row && row.bibTeam ? row.bibTeam : "-" }}
@@ -188,9 +189,9 @@
 
   <!-- Kolom kanan: stamp -->
   <div class="sign-right">
-    <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial }">
+    <span class="unofficial-stamp" :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }">
       <div style="font-size: 14px; display: flex; justify-content: center;">
-        {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+        {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
       </div>
       <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small>
       <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
@@ -224,11 +225,17 @@ export default {
     data: { type: Object, required: true },
     dataParticipant: { type: Array, required: true },
     categories: { type: String, default: "" },
-    isOfficial: { type: Boolean, default: false },
+    status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     sprintCats: { type: Object, required: true },
   },
   computed: {
+    isOfficial() {
+      return this.status === "official";
+    },
+    isProvisional() {
+      return this.status === "provisional";
+    },
     formattedOfficialSetAt() {
       return formatOfficialSetAt(this.officialSetAt);
     },
@@ -269,6 +276,15 @@ export default {
 * {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
+}
+
+.flag-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  margin-left: 6px;
+  font-size: 11px;
 }
 
 /* ==== PAGE CONTAINER ==== */
@@ -418,6 +434,10 @@ export default {
 .official-stamp {
   color: #148a3b;
   border-color: #148a3b;
+}
+.provisional-stamp {
+  color: #d97706;
+  border-color: #d97706;
 }
 
 /* ==== LOGO ATAS & SPONSOR ==== */

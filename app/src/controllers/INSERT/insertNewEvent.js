@@ -288,9 +288,14 @@ async function updateAssets(payload) {
   };
 }
 
-// Kategori valid utk flag Official/Unofficial per-kategori. "overall" =
-// Event Overall Result (bukan bagian dari race category manapun).
+// Kategori valid utk status Provisional/Unofficial/Official per-kategori.
+// "overall" = Event Overall Result (bukan bagian dari race category manapun).
 const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "overall"];
+
+// 3 status result yg valid. "provisional" = default (hasil masih berjalan/
+// sementara, belum ada keputusan), "unofficial" = draft/belum final,
+// "official" = final & terkunci.
+const RESULT_STATUSES = ["provisional", "unofficial", "official"];
 
 // BUG FIX: sebelumnya SEMUA kategori (Sprint/H2H/Slalom/DRR/RaftingCross/
 // Overall) berbagi satu field `resultsOfficial` di eventsCollection —
@@ -302,19 +307,25 @@ const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "
 // `resultsOfficialByCategory.<category>` SENGAJA tetap boolean polos
 // (BUKAN diubah jadi object {value,setAt}) — sts-jurysystem's
 // LiveEventDetail.jsx sudah membaca field ini LANGSUNG sbg boolean
-// (poll + socket "official:changed", lihat komentar di sana yg merujuk
-// balik ke fungsi ini) utk badge Live Result; mengubah bentuknya jadi
-// object akan mematahkan semua truthy-check di sana. Timestamp kapan
-// status diset (otomatis = waktu submit, atau override manual operator)
-// disimpan di field TERPISAH `resultsOfficialSetAt.<category>` (ISO
-// string UTC) supaya kompatibel mundur — konsumen lama yg belum tau
-// field baru ini tetap jalan normal, cuma tidak menampilkan stempel
-// waktunya.
-async function setResultsOfficial(eventId, category, value, timestamp) {
+// (poll + socket "official:changed") utk badge Live Result & gating lock
+// edit di banyak halaman Result timingsystem; mengubah bentuknya jadi
+// object akan mematahkan semua truthy-check itu. Status 3-pilihan
+// (Provisional/Unofficial/Official) disimpan di field BARU
+// `resultsStatusByCategory.<category>` (string) — boolean lama tetap
+// ditulis SELARAS (true hanya kalau status === "official") supaya semua
+// konsumen lama (lock-edit di Result pages, badge boolean di jurysystem)
+// tetap jalan tanpa perubahan. Timestamp kapan status terakhir diset
+// (otomatis = waktu submit, atau override manual operator) tetap di
+// `resultsOfficialSetAt.<category>` (ISO string UTC), sekarang berlaku
+// utk perubahan ke status manapun (bukan cuma ke Official).
+async function setResultsStatus(eventId, category, status, timestamp) {
   const id = toObjectId(eventId);
   if (!id) return { ok: false, error: "invalid eventId" };
   if (!OFFICIAL_CATEGORIES.includes(category)) {
     return { ok: false, error: "invalid category" };
+  }
+  if (!RESULT_STATUSES.includes(status)) {
+    return { ok: false, error: "invalid status" };
   }
 
   // Terima timestamp manual (ISO string dari operator, sudah dikonversi
@@ -332,7 +343,8 @@ async function setResultsOfficial(eventId, category, value, timestamp) {
     { _id: id },
     {
       $set: {
-        [`resultsOfficialByCategory.${category}`]: !!value,
+        [`resultsStatusByCategory.${category}`]: status,
+        [`resultsOfficialByCategory.${category}`]: status === "official",
         [`resultsOfficialSetAt.${category}`]: setAt,
         updatedAt: new Date(),
       },
@@ -343,6 +355,7 @@ async function setResultsOfficial(eventId, category, value, timestamp) {
     ok: true,
     matchedCount: resp.matchedCount,
     modifiedCount: resp.modifiedCount,
+    status,
     setAt: setAt.toISOString(),
   };
 }
@@ -352,5 +365,5 @@ module.exports = {
   updateEventPoster,
   updateBasic,
   updateAssets,
-  setResultsOfficial,
+  setResultsStatus,
 };

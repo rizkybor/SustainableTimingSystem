@@ -138,9 +138,9 @@
 
         <!-- Stamp di kanan: klik untuk toggle, plus atur waktu manual -->
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -196,6 +196,26 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
+                <div class="mb-1">
+                  <span
+                    v-if="r.flag === 'DNF'"
+                    class="badge badge-danger badge-pill"
+                  >
+                    Did Not Finish
+                  </span>
+                  <span
+                    v-if="r.flag === 'DNS'"
+                    class="badge badge-secondary badge-pill"
+                  >
+                    Did Not Start
+                  </span>
+                  <span
+                    v-if="r.flag === 'DSQ'"
+                    class="badge badge-dark badge-pill"
+                  >
+                    Disqualified
+                  </span>
+                </div>
                 <div class="team">
                   {{ r.nameTeam || "-" }}
                   <CountryFlag :code="flagFor(r.nameTeam)" />
@@ -319,7 +339,7 @@
           :data="pdfEventData"
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :sprintCats="sprintCats"
         />
@@ -359,6 +379,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -426,7 +447,8 @@ export default {
   data() {
     return {
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       results: [],
@@ -508,12 +530,18 @@ export default {
   },
 
   computed: {
-    // ISO string (UTC) kapan status Official/Unofficial Sprint di-set —
-    // field TERPISAH dari boolean-nya sendiri (lihat setResultsOfficial()
-    // di insertNewEvent.js), null kalau belum pernah di-set sama sekali.
+    // ISO string (UTC) kapan status result Sprint terakhir di-set — field
+    // TERPISAH dari status-nya sendiri (lihat setResultsStatus() di
+    // insertNewEvent.js), null kalau belum pernah di-set sama sekali.
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.sprint) || "";
+    },
+    // Dipertahankan sbg computed (bukan data) supaya semua v-if/:disabled
+    // yg sudah ada tetap terkunci HANYA saat status === "official";
+    // Provisional & Unofficial sama-sama tetap bisa diedit.
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
@@ -661,6 +689,7 @@ export default {
         nameTeam: r.nameTeam,
         bibTeam: r.bibTeam,
         countryCode: this.flagFor(r.nameTeam),
+        flag: r.flag || null,
         result: {
           startTime: r.startTime || "",
           finishTime: r.finishTime || "",
@@ -941,10 +970,7 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res; // langsung simpan hasil ke data
-              this.isOfficial = !!(
-                this.eventInfo.resultsOfficialByCategory &&
-                this.eventInfo.resultsOfficialByCategory.sprint
-              );
+              this.resultStatus = deriveResultStatus(this.eventInfo, "sprint");
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -1105,18 +1131,18 @@ export default {
       this.saveResultsToDb();
     },
 
-    toggleOfficial() {
-      // Klik stempel = toggle status, waktu OTOMATIS (server pakai
+    setResultStatus(newStatus) {
+      // Pilih status baru dari dropdown, waktu OTOMATIS (server pakai
       // waktu saat ini kalau timestamp tidak dikirim — lihat
-      // setResultsOfficial() di insertNewEvent.js).
-      return this._setOfficialStatus(!this.isOfficial, null);
+      // setResultsStatus() di insertNewEvent.js).
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
       // Dari modal "Atur Waktu Manual" — status TIDAK berubah, cuma
       // timestamp-nya yang dikoreksi manual operator.
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -1124,12 +1150,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
+            this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultsStatusByCategory: {
+                ...(this.eventInfo.resultsStatusByCategory || {}),
+                sprint: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                sprint: nextValue,
+                sprint: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
@@ -1143,7 +1173,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -1151,7 +1181,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "sprint",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });
@@ -1218,6 +1248,11 @@ export default {
           src.ranked === 0 || src.ranked === "0" ? 0 : Number(src.ranked) || "",
         score:
           src.score === 0 || src.score === "0" ? 0 : Number(src.score) || "",
+        // BUG FIX: flag (DNF/DNS/DSQ) hidup di raw.result.flag — kena
+        // flatten ke `src.flag` di atas, tapi sebelumnya tidak pernah
+        // disalin ke `merged`, jadi R.flag selalu undefined dan badge di
+        // Result page tidak pernah muncul walau data tersimpan benar di DB.
+        flag: ["DNF", "DNS", "DSQ"].includes(src.flag) ? src.flag : null,
       };
 
       // hitung totalPenalty jika belum ada
@@ -1670,6 +1705,14 @@ export default {
                     finishPenalty: Number(R.finishPenalty) || 0,
                     judgesBy: (r.result && r.result.judgesBy) || "",
                     judgesTime: (r.result && r.result.judgesTime) || "",
+                    // BUG FIX: flag hidup di r.result.flag (bukan r.flag
+                    // langsung) — dulu dibaca dari `r.flag` yg selalu
+                    // undefined, jadi badge DNF/DNS/DSQ yg di-set via
+                    // markFlag() di SprintRace.vue tidak pernah terlihat
+                    // lagi begitu masuk ke Result page walau data DB benar.
+                    // Sekarang dibaca dari R (hasil normalizeResult, yg
+                    // sudah di-flatten dari r.result).
+                    flag: R.flag || null,
                   });
                 });
               });

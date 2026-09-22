@@ -150,9 +150,9 @@
         </b-button>
 
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -246,7 +246,29 @@
               </td>
 
               <!-- Session-specific columns (tetap per baris) -->
-              <td class="text-center">{{ r.session || "-" }}</td>
+              <td class="text-center">
+                {{ r.session || "-" }}
+                <div v-if="r.flag">
+                  <span
+                    v-if="r.flag === 'DNF'"
+                    class="badge badge-danger badge-pill"
+                  >
+                    DNF
+                  </span>
+                  <span
+                    v-if="r.flag === 'DNS'"
+                    class="badge badge-secondary badge-pill"
+                  >
+                    DNS
+                  </span>
+                  <span
+                    v-if="r.flag === 'DSQ'"
+                    class="badge badge-dark badge-pill"
+                  >
+                    DSQ
+                  </span>
+                </div>
+              </td>
               <td class="text-center" style="color: red">
                 <b-form-select
                   v-if="!isOfficial"
@@ -453,7 +475,7 @@
           :data="pdfEventData"
           :pdfParticipantsSession1="pdfParticipants"
           :titleCategories="pdfCategories"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :slalomCats="slalomCats"
         />
@@ -492,6 +514,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 /* ========= Helpers ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -538,7 +561,8 @@ export default {
       sessionMode: "all", // nilai default
       rawResultItems: [],
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       results: [],
@@ -618,6 +642,9 @@ export default {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.slalom) || "";
+    },
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
@@ -840,6 +867,7 @@ export default {
               ranked: Number(r.ranked) || 0,
               judgesBy: String(r.judgesBy || ""),
               judgesTime: String(r.judgesTime || ""),
+              flag: r.flag || null,
             };
 
             // merge ke slot idx (pilih yang lebih baik)
@@ -1283,6 +1311,11 @@ export default {
                 run.penaltyTotal && Array.isArray(run.penaltyTotal.gates)
                   ? run.penaltyTotal.gates
                   : [],
+              // BUG FIX: dulu tidak pernah dibawa dari `run` (raw run
+              // tersimpan) — badge DNF/DNS/DSQ per-Run yg di-set via
+              // markFlag() di SlalomRace.vue jadi tidak pernah terlihat
+              // lagi begitu masuk ke Result page.
+              flag: run.flag || null,
             };
 
             // jika slot kosong → isi; jika sudah ada → pilih yang lebih baik
@@ -1385,6 +1418,7 @@ export default {
               resultTime: rrow.resultTime,
               isBest: rrow.isBest,
               gatesDetail: rrow.gatesDetail,
+              flag: rrow.flag || null,
               ranked: rrow.isBest ? rrow.ranked || "-" : "-",
               score: rrow.isBest ? rrow.score || 0 : 0,
               teamIndex: teamCounter,
@@ -1455,6 +1489,7 @@ export default {
             resultTime: rrow.resultTime,
             isBest: rrow.isBest, // tidak dipakai di UI run-only
             gatesDetail: rrow.gatesDetail,
+            flag: rrow.flag || null,
             ranked: "-", // kolom ini di UI run-only menampilkan teamIndex
             score: 0, // tidak dipakai di UI run-only
             teamIndex: i + 1, // <- ini yang jadi “urutan tercepat” untuk run tsb
@@ -1525,10 +1560,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!(
-              this.eventInfo.resultsOfficialByCategory &&
-              this.eventInfo.resultsOfficialByCategory.slalom
-            );
+            this.resultStatus = deriveResultStatus(this.eventInfo, "slalom");
             if (!this.eventInfo.eventName) this.error = this.error || "";
             resolve();
           });
@@ -1540,13 +1572,13 @@ export default {
       }
     },
 
-    toggleOfficial() {
-      return this._setOfficialStatus(!this.isOfficial, null);
+    setResultStatus(newStatus) {
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -1554,12 +1586,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
+            this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultsStatusByCategory: {
+                ...(this.eventInfo.resultsStatusByCategory || {}),
+                slalom: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                slalom: nextValue,
+                slalom: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
@@ -1573,7 +1609,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -1581,7 +1617,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "slalom",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });

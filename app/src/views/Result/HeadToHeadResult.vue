@@ -128,9 +128,9 @@
 
         <!-- Stamp di kanan: klik untuk toggle, plus atur waktu manual -->
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -289,6 +289,26 @@
               <tr v-for="(r, idx) in editRows" :key="r.name + '-' + r.bib">
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td>
+                  <div class="mb-1">
+                    <span
+                      v-if="r.flag === 'DNF'"
+                      class="badge badge-danger badge-pill"
+                    >
+                      Did Not Finish
+                    </span>
+                    <span
+                      v-if="r.flag === 'DNS'"
+                      class="badge badge-secondary badge-pill"
+                    >
+                      Did Not Start
+                    </span>
+                    <span
+                      v-if="r.flag === 'DSQ'"
+                      class="badge badge-dark badge-pill"
+                    >
+                      Disqualified
+                    </span>
+                  </div>
                   <div class="team">
                     {{ r.name || "-" }}
                     <CountryFlag :code="flagFor(r.name)" />
@@ -431,7 +451,7 @@
           :data="pdfEventData"
           pdfMode="allround"
           :pdfOverallPkg="pdfOverallPkg"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :headToHeadCats="h2hCats"
           :countryMap="_teamCountryMap"
@@ -472,6 +492,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportSheetsToExcel } from "@/utils/exportExcel";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -499,7 +520,8 @@ export default {
   data() {
     return {
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       // semua bucket registrasi (lintas race category) utk event ini,
@@ -544,6 +566,9 @@ export default {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.h2h) || "";
+    },
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
@@ -714,6 +739,9 @@ export default {
               race: sr.raceTime || "",
               total: sr.totalTime || "",
               winLose: sr.winLose || "",
+              // BUG FIX: sama spt buildEditRowsForRound() — dulu tidak
+              // pernah dibawa, badge DNF/DNS/DSQ tidak pernah muncul di PDF.
+              flag: sr.flag || null,
             });
           });
         });
@@ -816,10 +844,7 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.isOfficial = !!(
-              this.eventInfo.resultsOfficialByCategory &&
-              this.eventInfo.resultsOfficialByCategory.h2h
-            );
+            this.resultStatus = deriveResultStatus(this.eventInfo, "h2h");
             resolve();
           });
         });
@@ -829,13 +854,13 @@ export default {
       }
     },
 
-    toggleOfficial() {
-      return this._setOfficialStatus(!this.isOfficial, null);
+    setResultStatus(newStatus) {
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -843,12 +868,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
+            this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultsStatusByCategory: {
+                ...(this.eventInfo.resultsStatusByCategory || {}),
+                h2h: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                h2h: nextValue,
+                h2h: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
@@ -862,7 +891,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -870,7 +899,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "h2h",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });
@@ -1055,6 +1084,10 @@ export default {
             penaltyTime: sr.penaltyTime || "00:00:00.000",
             totalTime: sr.totalTime || "",
             winLose: sr.winLose || "",
+            // BUG FIX: dulu tidak pernah dibawa dari `sr` (result tersimpan)
+            // — badge DNF/DNS/DSQ yg di-set via markFlag() di HeadToHead.vue
+            // jadi tidak pernah terlihat lagi begitu masuk ke Result page.
+            flag: sr.flag || null,
           });
         });
       });
@@ -1133,6 +1166,30 @@ export default {
         const row1 = this.editRows.find((r) => r.name === n1);
         const row2 = this.editRows.find((r) => r.name === n2);
         if (!row1 || !row2) return;
+
+        // BUG FIX: tim yg di-flag DNF/DNS/DSQ (markFlag() di HeadToHead.vue)
+        // sengaja punya totalTime kosong, jadi tanpa penanganan khusus di
+        // sini Win/Lose yg SUDAH BENAR tersimpan di DB (auto-win utk lawan)
+        // langsung ke-reset jadi kosong tiap kali editRows dibangun ulang —
+        // sama pola dgn BAD_FLAGS di HeadToHead.vue (computeWinLoseByHeat/
+        // evaluateHeatWinnersForCurrentRound).
+        const BAD_FLAGS = ["DNF", "DNS", "DSQ"];
+        const bad1 = BAD_FLAGS.includes(row1.flag);
+        const bad2 = BAD_FLAGS.includes(row2.flag);
+        if (bad1 || bad2) {
+          if (bad1 && bad2) {
+            row1.winLose = "";
+            row2.winLose = "";
+          } else if (bad1) {
+            row1.winLose = "Lose";
+            row2.winLose = "Win";
+          } else {
+            row1.winLose = "Win";
+            row2.winLose = "Lose";
+          }
+          return;
+        }
+
         const t1 = this._parseHmsToMs(row1.totalTime);
         const t2 = this._parseHmsToMs(row2.totalTime);
         if (!Number.isFinite(t1) || !Number.isFinite(t2)) {

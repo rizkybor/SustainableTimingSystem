@@ -321,6 +321,26 @@
                     style="text-align: start"
                     class="large-bold text-strong max-char"
                   >
+                    <div class="mb-1">
+                      <span
+                        v-if="item.result.flag === 'DNF'"
+                        class="badge badge-danger badge-pill"
+                      >
+                        Did Not Finish
+                      </span>
+                      <span
+                        v-if="item.result.flag === 'DNS'"
+                        class="badge badge-secondary badge-pill"
+                      >
+                        Did Not Start
+                      </span>
+                      <span
+                        v-if="item.result.flag === 'DSQ'"
+                        class="badge badge-dark badge-pill"
+                      >
+                        Disqualified
+                      </span>
+                    </div>
                     {{ item.nameTeam }}
                     <CountryFlag :code="flagFor(item.nameTeam)" />
                   </td>
@@ -426,6 +446,27 @@
                     }}
                   </td>
                   <td v-if="endGame">
+                    <button
+                      type="button"
+                      class="btn-action btn-outline-danger mr-1"
+                      @click="markFlag(item, 'DNF')"
+                    >
+                      DNF
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-action btn-outline-secondary mr-1"
+                      @click="markFlag(item, 'DNS')"
+                    >
+                      DNS
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-action btn-outline-dark mr-1"
+                      @click="markFlag(item, 'DSQ')"
+                    >
+                      DSQ
+                    </button>
                     <button
                       type="button"
                       class="btn-action btn-danger"
@@ -1482,8 +1523,35 @@ export default {
       item.result.totalTime = "";
       item.result.ranked = "";
       item.result.score = "";
+      // Reset juga menghapus flag DNF/DNS/DSQ kalau ada, kembalikan baris
+      // ke kondisi kosong yg bisa diisi ulang normal.
+      item.result.flag = null;
       this.assignRanks(this.participantArr);
 
+      this.$forceUpdate();
+    },
+
+    // Tandai tim DNF/DNS/DSQ — kosongkan waktu & penalti (biar tidak ikut
+    // dihitung ranking, sama pola dgn assignRanks() yg cuma memberi rank ke
+    // item dgn totalTime terisi) lalu recompute ranking sisanya. TIDAK
+    // auto-save ke DB — operator tetap harus klik "Save Result" spt biasa
+    // (sama seperti resetRow() di atas, konsisten dgn pola halaman ini).
+    markFlag(item, type) {
+      if (!item || !item.result) return;
+      item.result.flag = type;
+
+      item.result.startTime = "";
+      item.result.finishTime = "";
+      item.result.raceTime = "";
+      item.result.startPenalty = 0;
+      item.result.finishPenalty = 0;
+      item.result.totalPenalty = 0;
+      item.result.penaltyTime = "";
+      item.result.totalTime = "";
+      item.result.ranked = "";
+      item.result.score = "";
+
+      this.assignRanks(this.participantArr);
       this.$forceUpdate();
     },
 

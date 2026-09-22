@@ -111,7 +111,10 @@
             <td class="center" :rowspan="2">{{ firstRunRank(t) }}</td>
             <td class="center" :rowspan="2">{{ bib(t) }}</td>
 
-            <td class="center">1</td>
+            <td class="center">
+              1
+              <span v-if="flagAt(t, 0)" class="flag-badge">{{ flagAt(t, 0) }}</span>
+            </td>
 
             <td class="right">{{ startAt(t, 0) }}</td>
             <td
@@ -136,7 +139,10 @@
 
           <!-- RUN 2 -->
           <tr>
-            <td class="center">2</td>
+            <td class="center">
+              2
+              <span v-if="flagAt(t, 1)" class="flag-badge">{{ flagAt(t, 1) }}</span>
+            </td>
 
             <td class="right">{{ startAt(t, 1) }}</td>
             <td
@@ -218,10 +224,10 @@
       <div class="sign-col stamp-col">
         <span
           class="unofficial-stamp"
-          :class="{ 'official-stamp': isOfficial }"
+          :class="{ 'official-stamp': isOfficial, 'provisional-stamp': isProvisional }"
         >
           <div style="font-size: 14px; display: flex; justify-content: center;">
-            {{ isOfficial ? "OFFICIAL" : "UNOFFICIAL" }}
+            {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small>
           <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
@@ -261,11 +267,17 @@ export default {
     },
     pdfParticipantsSession1: { type: Array, required: true },
     titleCategories: { type: String, default: "" },
-    isOfficial: { type: Boolean, default: false },
+    status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     slalomCats: { type: Object, required: false },
   },
   computed: {
+    isOfficial() {
+      return this.status === "official";
+    },
+    isProvisional() {
+      return this.status === "provisional";
+    },
     formattedOfficialSetAt() {
       return formatOfficialSetAt(this.officialSetAt);
     },
@@ -473,6 +485,12 @@ export default {
       const v = r && r[key];
       return v || (key === "penaltyTime" ? "00:00:00.000" : "-");
     },
+
+    // DNF/DNS/DSQ per Run — di-set via markFlag() di SlalomRace.vue.
+    flagAt(t, idx) {
+      const r = this.run(t, idx);
+      return (r && r.flag) || "";
+    },
   },
 };
 </script>
@@ -499,6 +517,14 @@ export default {
 * {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
+}
+.flag-badge {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  margin-left: 3px;
+  font-size: 8px;
 }
 .page {
   position: relative;
@@ -644,6 +670,10 @@ export default {
   transform: rotate(0);
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(20, 138, 59, 0.12) inset;
+}
+.provisional-stamp {
+  color: #d97706;
+  border-color: #d97706;
 }
 
 .mid-image-row,

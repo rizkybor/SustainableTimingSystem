@@ -124,9 +124,9 @@
         </b-button>
 
         <OfficialStampToggle
-          :is-official="isOfficial"
+          :status="resultStatus"
           :set-at="officialSetAt"
-          @toggle="toggleOfficial"
+          @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />
       </div>
@@ -184,6 +184,26 @@
             <tr v-for="(r, idx) in results" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>
+                <div class="mb-1">
+                  <span
+                    v-if="r.flag === 'DNF'"
+                    class="badge badge-danger badge-pill"
+                  >
+                    Did Not Finish
+                  </span>
+                  <span
+                    v-if="r.flag === 'DNS'"
+                    class="badge badge-secondary badge-pill"
+                  >
+                    Did Not Start
+                  </span>
+                  <span
+                    v-if="r.flag === 'DSQ'"
+                    class="badge badge-dark badge-pill"
+                  >
+                    Disqualified
+                  </span>
+                </div>
                 <div class="team">
                   {{ r.nameTeam || "-" }}
                   <CountryFlag :code="flagFor(r.nameTeam)" />
@@ -382,7 +402,7 @@
           :data="pdfEventData"
           :dataParticipant="pdfParticipants"
           :categories="pdfCategories"
-          :isOfficial="isOfficial"
+          :status="resultStatus"
           :officialSetAt="officialSetAt"
           :drrCats="drrCats"
         />
@@ -421,6 +441,7 @@ import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import OfficialStampToggle from "@/components/result/OfficialStampToggle.vue";
+import { deriveResultStatus } from "@/utils/officialStamp";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -523,7 +544,8 @@ export default {
       // (insert-drr-result), sama pola dgn rawResultItems di SlalomResult.vue.
       rawResultDocs: [],
       defaultImg,
-      isOfficial: false,
+      // "provisional" | "unofficial" | "official"
+      resultStatus: "provisional",
       loading: false,
       error: "",
       results: [],
@@ -590,6 +612,9 @@ export default {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m.drr) || "";
+    },
+    isOfficial() {
+      return this.resultStatus === "official";
     },
     visibleCategories() {
       return getVisibleCategoryMeta(this.enabledCategoryKeys);
@@ -731,6 +756,7 @@ export default {
           nameTeam: r.nameTeam || "",
           bibTeam: r.bibTeam || "",
           countryCode: this.flagFor(r.nameTeam),
+          flag: r.flag || null,
           result: {
             startTime: rr.startTime || "",
             finishTime: rr.finishTime || "",
@@ -813,10 +839,7 @@ export default {
         chiefJudge: ev.chiefJudge || "",
         event_logo: ev.event_logo || [],
       };
-      this.isOfficial = !!(
-        this.eventInfo.resultsOfficialByCategory &&
-        this.eventInfo.resultsOfficialByCategory.drr
-      );
+      this.resultStatus = deriveResultStatus(this.eventInfo, "drr");
     }
 
     this.loadDrrResult();
@@ -1251,10 +1274,7 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res;
-              this.isOfficial = !!(
-                this.eventInfo.resultsOfficialByCategory &&
-                this.eventInfo.resultsOfficialByCategory.drr
-              );
+              this.resultStatus = deriveResultStatus(this.eventInfo, "drr");
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -1269,13 +1289,13 @@ export default {
       }
     },
 
-    toggleOfficial() {
-      return this._setOfficialStatus(!this.isOfficial, null);
+    setResultStatus(newStatus) {
+      return this._setResultStatus(newStatus, null);
     },
     setOfficialManualTime(isoTimestamp) {
-      return this._setOfficialStatus(this.isOfficial, isoTimestamp);
+      return this._setResultStatus(this.resultStatus, isoTimestamp);
     },
-    async _setOfficialStatus(nextValue, timestamp) {
+    async _setResultStatus(nextStatus, timestamp) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -1283,12 +1303,16 @@ export default {
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
           if (res && res.ok) {
-            this.isOfficial = nextValue;
+            this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultsStatusByCategory: {
+                ...(this.eventInfo.resultsStatusByCategory || {}),
+                drr: nextStatus,
+              },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                drr: nextValue,
+                drr: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
@@ -1302,7 +1326,7 @@ export default {
               detail:
                 res && res.error
                   ? res.error
-                  : "Gagal mengubah status OFFICIAL/UNOFFICIAL.",
+                  : "Gagal mengubah status Provisional/Unofficial/Official.",
             });
           }
           resolve();
@@ -1310,7 +1334,7 @@ export default {
         ipcRenderer.send("event:set-official", {
           eventId,
           category: "drr",
-          value: nextValue,
+          status: nextStatus,
           timestamp: timestamp || undefined,
         });
       });
@@ -1749,6 +1773,10 @@ export default {
                 score: asNum(rIn.score, 0),
                 judgesBy: asStr(rIn.judgesBy, ""),
                 judgesTime: asStr(rIn.judgesTime, ""),
+                // BUG FIX: dulu tidak pernah dibawa dari `rIn` — badge
+                // DNF/DNS/DSQ yg di-set via markFlag() di DownRiverRace.vue
+                // jadi tidak pernah terlihat lagi begitu masuk Result page.
+                flag: rIn.flag || null,
                 __resultTime: resultTime,
                 __resultMs: this.timeToMs(resultTime), // langsung pakai this
               };
@@ -1819,6 +1847,7 @@ export default {
                 ranked: flat.ranked,
                 score: flat.score,
                 sectionPenaltyTime: resultObj.sectionPenaltyTime,
+                flag: resultObj.flag,
               };
             };
 

@@ -431,6 +431,26 @@
 
                 <!-- TEAM NAME  -->
                 <td class="large-bold text-strong max-char text-left">
+                  <div class="mb-1">
+                    <span
+                      v-if="currentSession(team).flag === 'DNF'"
+                      class="badge badge-danger badge-pill"
+                    >
+                      Did Not Finish (Run {{ activeRun + 1 }})
+                    </span>
+                    <span
+                      v-if="currentSession(team).flag === 'DNS'"
+                      class="badge badge-secondary badge-pill"
+                    >
+                      Did Not Start (Run {{ activeRun + 1 }})
+                    </span>
+                    <span
+                      v-if="currentSession(team).flag === 'DSQ'"
+                      class="badge badge-dark badge-pill"
+                    >
+                      Disqualified (Run {{ activeRun + 1 }})
+                    </span>
+                  </div>
                   {{ team.nameTeam }}
                   <CountryFlag :code="flagFor(team.nameTeam)" />
                 </td>
@@ -604,13 +624,30 @@
                   {{ scoreOfTeam(team) }}
                 </td>
                 <td v-if="endGame">
-                  <!-- <button
+                  <button
                     type="button"
-                    class="btn btn-warning btn-sm"
-                    @click="openEdit(team)"
+                    class="btn-action btn-outline-danger mr-1"
+                    @click="markFlag(team, 'DNF')"
+                    :title="`Tandai DNF untuk Run ${activeRun + 1}`"
                   >
-                    Edit
-                  </button> -->
+                    DNF
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-action btn-outline-secondary mr-1"
+                    @click="markFlag(team, 'DNS')"
+                    :title="`Tandai DNS untuk Run ${activeRun + 1}`"
+                  >
+                    DNS
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-action btn-outline-dark mr-1"
+                    @click="markFlag(team, 'DSQ')"
+                    :title="`Tandai DSQ untuk Run ${activeRun + 1}`"
+                  >
+                    DSQ
+                  </button>
                   <button
                     type="button"
                     class="btn-action btn-danger"
@@ -2406,8 +2443,17 @@ export default {
         this.teams.length > 0 &&
         this.teams.every((t) => {
           const s = this.currentSession(t);
+          if (!s) return false;
+          // BUG FIX: tim yg di-flag DNF/DNS/DSQ (markFlag()) sengaja punya
+          // finishTime kosong (tidak akan pernah difinish) — tanpa
+          // pengecualian ini, meng-flag SATU tim membuat endGame langsung
+          // balik ke false dan menyembunyikan kolom Action (tombol
+          // DNF/DNS/DSQ/Reset) utk SEMUA tim sampai semua finishTime
+          // terisi ulang, padahal tim yg di-flag itu memang sudah "selesai"
+          // (statusnya final, bukan menunggu waktu).
+          if (["DNF", "DNS", "DSQ"].includes(s.flag)) return true;
           return (
-            s && typeof s.finishTime === "string" && s.finishTime.trim() !== ""
+            typeof s.finishTime === "string" && s.finishTime.trim() !== ""
           );
         });
 
@@ -2440,6 +2486,8 @@ export default {
       this.$set(s, "totalTime", "");
       this.$set(s, "ranked", 0);
       this.$set(s, "score", 0);
+      // Reset juga menghapus flag DNF/DNS/DSQ run aktif kalau ada.
+      this.$set(s, "flag", null);
 
       try {
         if (ipcRenderer) {
@@ -2457,6 +2505,34 @@ export default {
       } catch (e) {
         /* no-op */
       }
+      this.checkEndGameStatus();
+    },
+
+    // Tandai run AKTIF (session yg sedang dipilih via tab Run Switch) suatu
+    // tim sbg DNF/DNS/DSQ — kosongkan waktu & penalti run itu saja (run
+    // lainnya tidak terpengaruh, best-time tetap bisa diambil dari run yg
+    // masih valid). TIDAK auto-save, operator tetap klik Save spt biasa.
+    markFlag(team, type) {
+      const s = this.currentSession(team);
+      if (!s) return;
+
+      this.$set(s, "flag", type);
+      this.$set(s, "startTime", "");
+      this.$set(s, "finishTime", "");
+      this.$set(s, "raceTime", "");
+      this.$set(s, "startPenalty", 0);
+      this.$set(s, "finishPenalty", 0);
+      const need = this.SLALOM_GATES.length;
+      const zeros = Array.from({ length: need }, function () {
+        return 0;
+      });
+      this.$set(s, "penalties", zeros);
+      this.$set(s, "totalPenalty", 0);
+      this.$set(s, "penaltyTime", "00:00:00.000");
+      this.$set(s, "totalTime", "");
+      this.$set(s, "ranked", 0);
+      this.$set(s, "score", 0);
+
       this.checkEndGameStatus();
     },
 
@@ -2845,6 +2921,8 @@ export default {
           score: Number(s1.score || 0),
           judgesBy: String(s1.judgesBy || ""),
           judgesTime: String(s1.judgesTime || ""),
+          // DNF/DNS/DSQ (per Run) — di-set via markFlag() di sesi aktif.
+          flag: ["DNF", "DNS", "DSQ"].includes(s1.flag) ? s1.flag : null,
         };
         results.push(r1);
 
@@ -2864,6 +2942,7 @@ export default {
           score: Number(s2.score || 0),
           judgesBy: String(s2.judgesBy || ""),
           judgesTime: String(s2.judgesTime || ""),
+          flag: ["DNF", "DNS", "DSQ"].includes(s2.flag) ? s2.flag : null,
         };
         results.push(r2);
 
@@ -3012,6 +3091,7 @@ export default {
           score: Number(s1.score || 0),
           judgesBy: String(s1.judgesBy || ""),
           judgesTime: String(s1.judgesTime || ""),
+          flag: ["DNF", "DNS", "DSQ"].includes(s1.flag) ? s1.flag : null,
         };
 
         out.teams.push({

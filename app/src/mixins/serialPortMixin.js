@@ -105,6 +105,13 @@ export default {
           onFinish: (formatted) => {
             this.digitTimeFinish = formatted;
           },
+          // LAP frame (a[11]="0" + a[13]="1", lihat komentar
+          // createMicroGateReader() di microGateReader.js) — per instruksi
+          // operator, waktunya masuk ke field yang SAMA dgn Finish (bukan
+          // Start), jadi disamakan persis dgn handler onFinish di atas.
+          onLap: (formatted) => {
+            this.digitTimeFinish = formatted;
+          },
           onClose: () => {
             this.isPortConnected = false;
             this.serialCtrl = null;

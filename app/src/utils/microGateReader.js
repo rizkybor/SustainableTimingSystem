@@ -57,8 +57,22 @@ function formatTime(raw = "") {
  *     serialConnection.js's onData — `a` is the header up to and including
  *     the 'M'/'R' marker, `b` is the remaining payload.
  *   - onStart(formattedTime, a, b): called when the header's flag byte
- *     (`a[11]`) is "0". `formattedTime` is `b` run through formatTime().
+ *     (`a[11]`) is "0" AND `a[13]` is "0". `formattedTime` is `b` run
+ *     through formatTime().
  *   - onFinish(formattedTime, a, b): called when the flag byte is "2".
+ *   - onLap(formattedTime, a, b): called when `a[11]` is "0" AND `a[13]`
+ *     is "1" — a LAP button press. LAP frames share the SAME `a[11]="0"`
+ *     as a genuine Start frame (confirmed live: 17 captured Start frames
+ *     and 20 captured Lap frames, `a[11]` is "0" in every single one of
+ *     both groups — NOT a usable discriminator on its own), so `a[13]`
+ *     is the byte that actually tells them apart: "0" for Start, "1" for
+ *     Lap, confirmed consistent across every captured frame of each type
+ *     including the occasional corrupted trailing digit ("...1ZM" instead
+ *     of "...10M") some frames arrive with — that corruption only ever
+ *     hits the LAST digit before the marker, never a[11]/a[13]. Per
+ *     operator instruction, LAP time is meant to land in the same place
+ *     as a Finish reading (Buffer-Timer-Finish) — wire onLap the same way
+ *     onFinish is wired, not onStart.
  *   - onRawChunk(hex): every raw chunk exactly as received off the wire,
  *     before marker-splitting — kept for debugging/verifying new frame
  *     shapes against real button presses.
@@ -72,6 +86,7 @@ export function createMicroGateReader(options) {
   const onData = options.onData;
   const onStart = options.onStart;
   const onFinish = options.onFinish;
+  const onLap = options.onLap;
   const onRawChunk = options.onRawChunk;
   const onNotify = options.onNotify;
   const onClose = options.onClose;
@@ -113,7 +128,15 @@ export function createMicroGateReader(options) {
       if (typeof onData === "function") onData(a, b);
 
       const flag = a && a.length > 11 ? a[11] : undefined;
-      if (flag === "0") {
+      // LAP frame: shares a[11]="0" with a genuine Start frame — a[13]
+      // ("0" for Start, "1" for Lap) is what actually tells them apart,
+      // confirmed against real captured Start/Lap/Finish frames. Checked
+      // BEFORE the plain flag==="0" branch so Lap doesn't fall into onStart.
+      const subFlag = a && a.length > 13 ? a[13] : undefined;
+      if (flag === "0" && subFlag === "1") {
+        const vLap = formatTime(b);
+        if (typeof onLap === "function") onLap(vLap, a, b);
+      } else if (flag === "0") {
         const vStart = formatTime(b);
         if (typeof onStart === "function") onStart(vStart, a, b);
       } else if (flag === "2") {

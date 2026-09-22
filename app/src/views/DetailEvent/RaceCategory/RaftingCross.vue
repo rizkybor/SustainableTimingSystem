@@ -1073,6 +1073,27 @@ export default {
      * SOCKET / IPC (Judges Dashboard realtime)
      * =======================================================*/
     async applyPenaltyFromSocketRX(msg = {}) {
+      // BUG FIX (2026-09-23): sama pola dgn Sprint/Slalom/DRR/H2H
+      // (MEMORY-SPRINT.md) — verifikasi kategori aktif dulu sebelum
+      // mencocokkan teamId, krn teamId bisa dipakai ulang lintas Initial.
+      // Backward-compat: kalau msg tidak bawa initialId/raceId/divisionId
+      // sama sekali (jurysystem versi lama), lanjut spt biasa.
+      if (msg && (msg.initialId != null || msg.raceId != null || msg.divisionId != null)) {
+        // BUG FIX: `??` tidak didukung babel/vue-cli versi proyek ini
+        // (gagal parse saat build) — pakai `!= null ? ... : ...` eksplisit.
+        const bucket = this.currentBucket();
+        const evId = msg.eventId != null ? msg.eventId : bucket.eventId;
+        const inId = msg.initialId != null ? msg.initialId : bucket.initialId;
+        const rcId = msg.raceId != null ? msg.raceId : bucket.raceId;
+        const dvId = msg.divisionId != null ? msg.divisionId : bucket.divisionId;
+        const sameCategory =
+          String(evId) === String(bucket.eventId) &&
+          String(inId) === String(bucket.initialId) &&
+          String(rcId) === String(bucket.raceId) &&
+          String(dvId) === String(bucket.divisionId);
+        if (!sameCategory) return;
+      }
+
       // resolve tim: teamId/bib/nama -> (heat, slotIdx) via roundParticipants
       // (pola sama seperti updateTime, ~890-897)
       const nameLC = String(msg.name || msg.nameTeam || "").toLowerCase();

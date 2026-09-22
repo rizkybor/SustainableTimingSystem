@@ -1305,6 +1305,21 @@ export default {
     // ===== SOCKET: handler utama (langsung konsumsi format "custom:event") =====
     async applyPenaltyFromSocketDirect(msg) {
       try {
+        // BUG FIX (2026-09-23): sama pola dgn Sprint/Slalom (MEMORY-SPRINT.md)
+        // — verifikasi kategori aktif dulu sebelum mencocokkan teamId, krn
+        // teamId bisa dipakai ulang lintas Initial. Backward-compat: kalau
+        // msg tidak bawa initialId/raceId/divisionId sama sekali (jurysystem
+        // versi lama), lanjut spt biasa.
+        if (msg && (msg.initialId != null || msg.raceId != null || msg.divisionId != null)) {
+          var bucket = getBucket();
+          var sameCategory =
+            String(msg.eventId != null ? msg.eventId : bucket.eventId) === String(bucket.eventId) &&
+            String(msg.initialId != null ? msg.initialId : bucket.initialId) === String(bucket.initialId) &&
+            String(msg.raceId != null ? msg.raceId : bucket.raceId) === String(bucket.raceId) &&
+            String(msg.divisionId != null ? msg.divisionId : bucket.divisionId) === String(bucket.divisionId);
+          if (!sameCategory) return false;
+        }
+
         // --- identifikasi kunci tim ---
         var key = "";
         if (msg && msg.teamId != null) {

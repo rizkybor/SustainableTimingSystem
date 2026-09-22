@@ -38,12 +38,8 @@
 
       <div class="summary-row">
         <div class="summary-chip">
-          <div class="summary-chip__value">{{ totalTeams }}</div>
-          <div class="summary-chip__label">Total Tim</div>
-        </div>
-        <div class="summary-chip">
           <div class="summary-chip__value">{{ totalAssignments }}</div>
-          <div class="summary-chip__label">Baris Registrasi</div>
+          <div class="summary-chip__label">Total Tim</div>
         </div>
         <div class="summary-chip">
           <div class="summary-chip__value">{{ categoryCount }}</div>
@@ -70,7 +66,9 @@
               {{ t.nameTeam }}
               <CountryFlag v-if="t.countryCode" :code="t.countryCode" />
             </td>
-            <td class="text-center">{{ t.bibTeam || "-" }}</td>
+            <td class="text-center">
+              {{ (t.bibList && t.bibList.length ? t.bibList.join(", ") : t.bibTeam) || "-" }}
+            </td>
             <td class="text-center">{{ t.typeTeam || "-" }}</td>
             <td>
               <span v-for="(a, ai) in t.assignments" :key="ai" class="assign-chip">
@@ -78,6 +76,7 @@
                 <template v-if="a.initialName || a.divisionName || a.raceName">
                   ({{ [a.initialName, a.divisionName, a.raceName].filter(Boolean).join(" / ") }})
                 </template>
+                <template v-if="a.bibTeam"> — BIB {{ a.bibTeam }}</template>
               </span>
             </td>
           </tr>
@@ -114,9 +113,6 @@ export default {
     teams: { type: Array, default: () => [] },
   },
   computed: {
-    totalTeams() {
-      return this.teams.length;
-    },
     totalAssignments() {
       return this.teams.reduce(
         (sum, t) => sum + (Array.isArray(t.assignments) ? t.assignments.length : 0),

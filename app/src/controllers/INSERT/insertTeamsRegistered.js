@@ -237,6 +237,13 @@ async function findRegisteredTeamsDetailByEvent(eventId) {
         byIdentity.set(key, {
           teamId: t.teamId ? String(t.teamId) : "",
           nameTeam: t.nameTeam || nameUpper,
+          // BUG FIX: satu tim bisa punya BIB BERBEDA di tiap kategori (mis.
+          // BIB 1001 di SENIOR, 1005 di U23) — sebelumnya cuma BIB dari
+          // bucket PERTAMA yang tersimpan di sini & dipakai utk SEMUA
+          // assignment, jadi BIB kategori lain hilang dari tampilan. Field
+          // ini dipertahankan sbg fallback tampilan lama (BIB pertama
+          // ditemukan); nilai per-kategori yang benar ada di
+          // assignments[].bibTeam & bibList di bawah.
           bibTeam: bib,
           countryCode: master ? String(master.countryCode || "") : "",
           typeTeam: master ? String(master.typeTeam || "") : "",
@@ -250,13 +257,27 @@ async function findRegisteredTeamsDetailByEvent(eventId) {
         initialName: String(doc.initialName || ""),
         raceName: String(doc.raceName || ""),
         divisionName: String(doc.divisionName || ""),
+        bibTeam: bib,
       });
     });
   });
 
-  const teams = Array.from(byIdentity.values()).sort((a, b) =>
-    a.nameTeam.localeCompare(b.nameTeam)
-  );
+  const teams = Array.from(byIdentity.values())
+    .map((t) => {
+      // Daftar SEMUA bib unik yg pernah dipakai tim ini lintas kategori,
+      // urut sesuai kemunculan — dipakai kolom BIB di UI supaya operator
+      // langsung lihat semua nomor BIB tim ini tanpa buka detail assignment.
+      const seen = new Set();
+      const bibList = [];
+      t.assignments.forEach((a) => {
+        if (a.bibTeam && !seen.has(a.bibTeam)) {
+          seen.add(a.bibTeam);
+          bibList.push(a.bibTeam);
+        }
+      });
+      return { ...t, bibList };
+    })
+    .sort((a, b) => a.nameTeam.localeCompare(b.nameTeam));
 
   return { ok: true, totalTeams: teams.length, teams };
 }

@@ -12,12 +12,8 @@
       <!-- SUMMARY -->
       <div class="etr-summary">
         <div class="etr-stat">
-          <div class="etr-stat__value">{{ totalTeams }}</div>
-          <div class="etr-stat__label">Total Tim Terdaftar</div>
-        </div>
-        <div class="etr-stat">
           <div class="etr-stat__value">{{ totalAssignments }}</div>
-          <div class="etr-stat__label">Total Baris Registrasi (lintas kategori)</div>
+          <div class="etr-stat__label">Total Tim Terdaftar</div>
         </div>
         <div class="etr-stat">
           <div class="etr-stat__value">{{ categoryCount }}</div>
@@ -74,7 +70,15 @@
                     {{ t.nameTeam }}
                   </span>
                 </td>
-                <td>{{ t.bibTeam || "-" }}</td>
+                <td class="etr-bib-list">
+                  <span v-if="!(t.bibList && t.bibList.length)">-</span>
+                  <span
+                    v-for="(b, bi) in t.bibList"
+                    :key="bi"
+                    class="etr-bib-chip"
+                    >{{ b }}</span
+                  >
+                </td>
                 <td>{{ t.typeTeam || "-" }}</td>
                 <td>
                   <div class="etr-assign-list">
@@ -89,6 +93,7 @@
                       <small v-if="a.initialName || a.divisionName || a.raceName">
                         &middot; {{ [a.initialName, a.divisionName, a.raceName].filter(Boolean).join(" / ") }}
                       </small>
+                      <small v-if="a.bibTeam">&middot; BIB {{ a.bibTeam }}</small>
                     </span>
                   </div>
                 </td>
@@ -163,7 +168,6 @@ export default {
     return {
       loading: false,
       teams: [],
-      totalTeams: 0,
       query: "",
       loadedForEventId: "",
       showPdf: false,
@@ -191,6 +195,7 @@ export default {
         const hay = [
           t.nameTeam,
           t.bibTeam,
+          ...(t.bibList || []),
           t.typeTeam,
           ...(t.assignments || []).map((a) => this.categoryLabel(a.raceCategory)),
         ]
@@ -226,10 +231,8 @@ export default {
         this.loading = false;
         if (res && res.ok) {
           this.teams = Array.isArray(res.teams) ? res.teams : [];
-          this.totalTeams = res.totalTeams || this.teams.length;
         } else {
           this.teams = [];
-          this.totalTeams = 0;
           this.loadedForEventId = "";
           ipcRenderer.send("get-alert", {
             type: "error",
@@ -436,4 +439,20 @@ export default {
 .etr-badge--slalom { background: #e3f6fe; color: #0ea5e9; }
 .etr-badge--drr { background: #fdf1de; color: #d9860f; }
 .etr-badge--rx { background: #fde7ec; color: #e11d48; }
+
+.etr-bib-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.etr-bib-chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  white-space: nowrap;
+}
 </style>

@@ -1,17 +1,52 @@
 const { getDb } = require("../index");
+const { ObjectId } = require("mongodb");
 
 // "Reset All" di halaman Head to Head — menghapus SEMUA data kompetisi H2H
 // (bracket, hasil per-babak, overall H2H) untuk SELURUH kategori H2H
 // (kombinasi divisi/race/initial) pada satu event, mengembalikan tim ke
 // pool Round 1 tanpa Heat. Kategori lain (Sprint/Slalom/DRR/RX) TIDAK
 // tersentuh, termasuk kontribusi mereka di dokumen Overall bersama.
+//
+// BUG FIX (2026-09-22): sebelumnya tombol ini TIDAK menghapus riwayat
+// aktivitas juri H2H (judgereportdetails/judgereports — dipakai jurysystem
+// utk validasi anti-duplikat "1x submit per tipe penalty per babak", lihat
+// judge-reports/detail/route.js) maupun h2hactiverounds (Babak Aktif sisi
+// juri, dipakai filter dropdown Team per Heat). Operator yang pakai tombol
+// "Reset All" H2H ini (BUKAN "Reset Data" event-wide yang sudah menghapus
+// semuanya) akan mendapati juri masih diblokir submit ulang ("sudah pernah
+// diberi penalty...") walau bracket/babak sudah kosong lagi — krn riwayat
+// lama itu tetap ada. Scope tetap H2H-only (eventType: "H2H"), TIDAK
+// menyentuh riwayat Sprint/Slalom/DRR/RX punya event yang sama.
 async function resetH2HDataForEvent(eventId) {
   const id = String(eventId || "");
   if (!id) return { ok: false, error: "eventId kosong" };
 
   const db = await getDb();
 
-  const [bracketsRes, resultsRes, overallRes, foulsRes] = await Promise.all([
+  const judgeReportDetailsCol = db.collection("judgereportdetails");
+  const judgeReportsCol = db.collection("judgereports");
+
+  // judgereports.eventId disimpan sbg ObjectId (beda dari kebanyakan
+  // koleksi lain di reset ini yang pakai String) — lihat catatan yang
+  // sama di resetEventData.js. Field `judges` array-nya sendiri BUKAN
+  // dipakai di sini (itu utk userJudgeAssignments) — dokumen
+  // JudgeReport di jurysystem SATU per (event, juri), array
+  // `reportHeadToHead` isinya referensi id ke judgereportdetails, jadi
+  // yang perlu di-reset cukup array itu ($set: []), bukan hapus
+  // dokumennya (dokumen tetap dipakai kategori lain milik juri yang sama).
+  const judgeReportsFilter = ObjectId.isValid(id)
+    ? { eventId: new ObjectId(id) }
+    : { eventId: id };
+
+  const [
+    bracketsRes,
+    resultsRes,
+    overallRes,
+    foulsRes,
+    judgeDetailsRes,
+    judgeReportsPullRes,
+    activeRoundsRes,
+  ] = await Promise.all([
     db.collection("h2h_brackets").deleteMany({ "bucket.eventId": id }),
     db.collection("h2h_results").deleteMany({ "bucket.eventId": id }),
     db.collection("h2h_overall").deleteMany({ "bucket.eventId": id }),
@@ -22,6 +57,19 @@ async function resetH2HDataForEvent(eventId) {
     // (bukan bucket.eventId — lihat insertH2HFoulsReport.js), scope
     // SELURUH kategori H2H event ini, sama dgn 3 koleksi di atas.
     db.collection("h2hFoulsReports").deleteMany({ eventId: id }),
+    // Riwayat penalty H2H per-team (dipakai validasi anti-duplikat) —
+    // eventType: "H2H" supaya TIDAK ikut menghapus riwayat kategori lain
+    // punya event yang sama.
+    judgeReportDetailsCol.deleteMany({ eventId: id, eventType: "H2H" }),
+    // Kosongkan array referensi `reportHeadToHead` di tiap dokumen
+    // JudgeReport milik event ini — dokumennya sendiri TIDAK dihapus
+    // (masih dipakai kategori lain punya juri yang sama).
+    judgeReportsCol.updateMany(judgeReportsFilter, {
+      $set: { reportHeadToHead: [] },
+    }),
+    // Babak Aktif H2H sisi juri (filter dropdown Team per Heat) —
+    // eventId String top-level, lihat models/H2HActiveRound.js.
+    db.collection("h2hactiverounds").deleteMany({ eventId: id }),
   ]);
 
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
@@ -79,6 +127,9 @@ async function resetH2HDataForEvent(eventId) {
       h2h_results: resultsRes.deletedCount || 0,
       h2h_overall: overallRes.deletedCount || 0,
       h2hFoulsReports: foulsRes.deletedCount || 0,
+      judgereportdetails: judgeDetailsRes.deletedCount || 0,
+      judgereports: judgeReportsPullRes.modifiedCount || 0,
+      h2hactiverounds: activeRoundsRes.deletedCount || 0,
     },
     overallDocsTouched,
   };

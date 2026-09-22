@@ -2158,6 +2158,10 @@ export default {
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat(); // << tambah
       this.broadcastActiveRound();
+      // Isi celah dari DB utk ROUND YANG BARU DIPILIH — lihat komentar
+      // lengkap di hydrateRoundResultsFromDb() (gap-fill only, aman
+      // dipanggil tiap pindah tab Round).
+      this.hydrateRoundResultsFromDb();
     },
     showBracket(val) {
       localStorage.setItem(SHOW_BRACKET_KEY, val ? "1" : "0");
@@ -2232,6 +2236,20 @@ export default {
     this.roundResultsRootKey = getResultsRootKey();
     this.loadRoundResultsForCurrentRound();
     this.computeWinLoseByHeat();
+    // BUG FIX: loadRoundResultsForCurrentRound() (dipanggil di atas dan di
+    // banyak tempat lain) HANYA baca dari localStorage (roundResultsRootKey)
+    // — TIDAK PERNAH fallback ke DB (h2h_results, sumber otoritatif setelah
+    // "Save Round"/"Save All Rounds"). Sama root cause dgn bug Sprint yg
+    // dilaporkan operator (Start/Finish Time hilang begitu balik ke halaman
+    // padahal datanya aman tersimpan) — kalau localStorage sempat kosong
+    // (mis. race condition koneksi terputus di tengah proses, atau device
+    // baru/profile browser lain), tabel per-Heat/Round tampil kosong walau
+    // hasil sesungguhnya aman di DB. hydrateRoundResultsFromDb() cuma
+    // MENGISI CELAH (field yg MASIH kosong stlh baris di atas) — TIDAK
+    // PERNAH menimpa nilai yg sudah ada (mis. dari cache lokal yg masih
+    // valid / edit yg belum sempat di-Save) — demi kehati-hatian di kode
+    // bracket/Heat yang sudah hardened ini.
+    this.hydrateRoundResultsFromDb();
 
     this.fetchBooyanActiveFromSettings();
 
@@ -3911,6 +3929,9 @@ export default {
 
       this.loadRoundResultsForCurrentRound();
       this.computeWinLoseByHeat();
+      // Isi celah dari DB utk BUCKET yang baru dipilih — lihat komentar
+      // lengkap di hydrateRoundResultsFromDb().
+      this.hydrateRoundResultsFromDb();
     },
 
     // --- handler perubahan select ---
@@ -4133,6 +4154,39 @@ export default {
       this.computeWinLoseByHeat();
       this.evaluateHeatWinnersForCurrentRound();
       this.assignRanks(this.visibleParticipants);
+
+      // BUG FIX: Reset row sebelumnya cuma menghapus state lokal — riwayat
+      // penalty yg sudah disubmit juri (sts-jurysystem) tetap ada utk
+      // babak ini, jadi validasi duplikat di sana terus memblokir juri
+      // submit ulang walau waktunya sudah direset operator. Sama fix
+      // pattern dgn SprintRace.vue/DownRiverRace.vue/SlalomRace.vue,
+      // scoped ke babak (round) aktif saja — reset Final A TIDAK ikut
+      // menghapus riwayat Semifinal tim yg sama.
+      this._deleteJudgeReportsForRow(item);
+    },
+
+    // Hapus riwayat penalty juri utk SATU tim + babak aktif di bucket ini
+    // — fire-and-forget, kegagalan hapus riwayat juri tidak boleh
+    // mengganggu reset lokal yg sudah berhasil.
+    _deleteJudgeReportsForRow(item) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !item) return;
+        const b = getBucket();
+        const teamId = item.teamId || "";
+        const r = this.currentRound;
+        if (!b || !b.eventId || !teamId || !r) return;
+        ipcRenderer.send("judgeReports:deleteForRow", {
+          category: "h2h",
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+          teamId: String(teamId),
+          roundId: String(r.id),
+        });
+      } catch (e) {
+        /* noop */
+      }
     },
     // FUNCTION OTHERS PENALTY
     getOthersValue(item) {
@@ -5868,6 +5922,116 @@ export default {
       this.evaluateHeatWinnersForCurrentRound();
       this.syncWinLoseFromBracketToParticipants();
       this.computeWinLoseByHeat();
+    },
+
+    // Isi CELAH hasil round aktif dari h2h_results (DB, sumber otoritatif
+    // setelah "Save Round"/"Save All Rounds") — dipanggil SETELAH
+    // loadRoundResultsForCurrentRound() (localStorage-only, lihat komentar
+    // di mounted()). Sengaja HANYA mengisi field yg masih kosong per tim
+    // (startTime/finishTime/raceTime/totalTime/penaltyTime/winLose/flag),
+    // TIDAK PERNAH menimpa nilai yg sudah ada — supaya edit yg baru saja
+    // dilakukan operator (belum sempat di-Save, tapi sudah ke-cache lokal)
+    // tidak keburu ketimpa data DB yg lebih lama. Aman dipanggil berulang
+    // (mis. tiap pindah tab Round) krn no-op kalau tidak ada celah.
+    async hydrateRoundResultsFromDb() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const r = this.currentRound;
+        if (!r) return;
+
+        const bucket = getBucket();
+        if (
+          !bucket ||
+          !bucket.eventId ||
+          !bucket.initialId ||
+          !bucket.raceId ||
+          !bucket.divisionId
+        )
+          return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 6000);
+          ipcRenderer.once("h2h:results:getAll-reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("h2h:results:getAll", bucket);
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
+          return;
+
+        const roundKey = String(r.id);
+        const byName = new Map();
+        res.items.forEach((row) => {
+          if (String(row && row.roundId) === roundKey) {
+            byName.set(String((row && row.nameTeam) || "").toUpperCase(), row);
+          }
+        });
+        if (!byName.size) return;
+
+        // Semua field hasil yg benar-benar dipersist ke h2h_results (lihat
+        // upsertHeadToHead.js) — bukan cuma startTime, biar tim yg sudah
+        // bertanding tapi cache localStorage-nya hilang/stale tetap dapat
+        // SELURUH datanya kembali (termasuk breakdown penalty per-jenis
+        // foul), bukan cuma waktu start-nya.
+        const fillableKeys = [
+          "startTime",
+          "finishTime",
+          "raceTime",
+          "totalTime",
+          "penaltyTime",
+          "penalty",
+          "penalties",
+          "winLose",
+          "flag",
+        ];
+        let changedAny = false;
+
+        // `penalty`/`penalties` defaultnya angka 0 / objek nol (bukan
+        // undefined/null/""), jadi cek "kosong" biasa tidak menangkapnya —
+        // tanpa ini breakdown penalty asli dari DB tidak akan pernah
+        // ter-hydrate krn selalu dianggap "sudah terisi" (padahal cuma nol).
+        const isEmptyVal = (v) => {
+          if (v === undefined || v === null || v === "") return true;
+          if (typeof v === "object" && !Array.isArray(v)) {
+            return Object.values(v).every((x) => !x);
+          }
+          return false;
+        };
+        const hasFillableVal = (v) => {
+          if (v === undefined || v === null || v === "") return false;
+          if (typeof v === "object" && !Array.isArray(v)) {
+            return Object.values(v).some((x) => !!x);
+          }
+          return !!v;
+        };
+
+        (this.participantArr || []).forEach((p) => {
+          const key = String(p.nameTeam || p.teamName || "").toUpperCase();
+          const saved = byName.get(key);
+          if (!saved || !saved.result || !p.result) return;
+
+          const cur = p.result;
+          fillableKeys.forEach((k) => {
+            if (isEmptyVal(cur[k]) && hasFillableVal(saved.result[k])) {
+              this.$set(cur, k, saved.result[k]);
+              changedAny = true;
+            }
+          });
+        });
+
+        if (changedAny) {
+          this.assignRanks(this.visibleParticipants);
+          this.evaluateHeatWinnersForCurrentRound();
+          this.syncWinLoseFromBracketToParticipants();
+          this.computeWinLoseByHeat();
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("hydrateRoundResultsFromDb failed:", err);
+        }
+      }
     },
 
     // NEW: bersihkan seluruh hasil per-babak (dipakai saat pindah halaman)

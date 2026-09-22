@@ -1419,7 +1419,7 @@ export default {
       ).toUpperCase();
       return `${div} ${rac} – ${ini}`;
     },
-    _useSprintBucket(key) {
+    async _useSprintBucket(key) {
       const b = this.sprintBucketMap[key];
       if (!b) return;
       // sinkronkan tab Initial yg aktif dgn bucket yg benar-benar dimuat —
@@ -1451,7 +1451,81 @@ export default {
         logger.warn("❌ Failed to update race settings:", err);
       }
       this.lastSprintKey = key;
+      // BUG FIX: root cause "Start/Finish Time hilang begitu balik lagi ke
+      // Sprint Details, padahal status Registered Teams tetap 'Sudah
+      // Bertanding'" — sebelum ini, sumber satu-satunya utk
+      // this.participant di sini adalah roster kosong (teamsRegisteredCollection)
+      // + cache lokal opsional (loadLocalResults(), localStorage
+      // "sprintLocal:<bucketKey>"). Cache itu di-debounce-save 250ms tiap
+      // `participant` berubah — kalau ada event LAIN yg sempat mengosongkan
+      // `participant` sesaat (mis. socket/bucket switch) tepat sebelum
+      // operator pindah halaman, cache lokal ikut tersimpan kosong, dan
+      // TIDAK ADA fallback ke DB sama sekali. temporarySprintResult
+      // (diisi lewat saveResult(), lihat buildResultDocs()) adalah sumber
+      // otoritatif yg sebenarnya masih benar — hydrate di sini sebelum
+      // assignRanks(), sama pola dgn hydrateTeamsFromDrrResult() di
+      // DownRiverRace.vue.
+      await this.hydrateTeamsFromSprintResult(key);
       this.assignRanks(this.participantArr);
+    },
+    async hydrateTeamsFromSprintResult(key) {
+      try {
+        const b = this.sprintBucketMap[key];
+        if (!b || typeof ipcRenderer === "undefined") return;
+        const filters = {
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+        };
+        if (
+          !filters.eventId ||
+          !filters.initialId ||
+          !filters.raceId ||
+          !filters.divisionId
+        )
+          return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 6000);
+          ipcRenderer.once("get-sprint-result-reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("get-sprint-result", filters);
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
+          return;
+
+        const byBib = {};
+        res.items.forEach((doc) => {
+          const rows = Array.isArray(doc && doc.result) ? doc.result : [];
+          rows.forEach((dt) => {
+            const bib = String((dt && dt.bibTeam) || "");
+            if (bib) byBib[bib] = dt;
+          });
+        });
+
+        (this.participant || []).forEach((uiTeam) => {
+          const bibKey = String((uiTeam && uiTeam.bibTeam) || "");
+          const serverTeam = bibKey ? byBib[bibKey] : null;
+          // Sama pola gate dgn DRR: buildResultDocs() TIDAK PERNAH memaksa
+          // default utk startTime (beda dari penaltyTime dkk yg didefault
+          // "00:00:00.000") — startTime terisi asli = sinyal paling akurat
+          // "tim ini sungguh sudah bertanding", aman dipakai gate supaya
+          // tim yg belum pernah start tidak ikut ke-assign ranked/score
+          // palsu dari hydrate ini.
+          if (serverTeam && serverTeam.result && serverTeam.result.startTime) {
+            this.$set(uiTeam, "result", {
+              ...uiTeam.result,
+              ...serverTeam.result,
+            });
+          }
+        });
+      } catch (err) {
+        logger.warn("❌ hydrateTeamsFromSprintResult failed:", err);
+      }
     },
 
     buildStaticSprintOptions() {
@@ -1529,6 +1603,36 @@ export default {
       this.assignRanks(this.participantArr);
 
       this.$forceUpdate();
+
+      // BUG FIX: Reset row sebelumnya cuma menghapus state lokal — riwayat
+      // penalty yg sudah disubmit juri (sts-jurysystem) tetap ada, jadi
+      // validasi duplikat di sana ("sudah pernah diberi penalty") terus
+      // memblokir juri submit ulang walau waktunya sudah direset operator.
+      this._deleteJudgeReportsForRow(item);
+    },
+
+    // Hapus riwayat penalty juri utk SATU tim di bucket ini — dipanggil
+    // dari resetRow()/resetByRow() setiap kategori race. Fire-and-forget:
+    // kegagalan hapus riwayat juri tidak boleh mengganggu reset lokal yg
+    // sudah berhasil.
+    _deleteJudgeReportsForRow(item, extra) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !item) return;
+        const b = this.sprintBucketMap[this.selectedSprintKey] || {};
+        const teamId = item.teamId || "";
+        if (!b.eventId || !teamId) return;
+        ipcRenderer.send("judgeReports:deleteForRow", {
+          category: "sprint",
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+          teamId: String(teamId),
+          ...(extra || {}),
+        });
+      } catch (e) {
+        /* noop */
+      }
     },
 
     // Tandai tim DNF/DNS/DSQ — kosongkan waktu & penalti (biar tidak ikut

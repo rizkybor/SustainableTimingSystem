@@ -107,6 +107,8 @@
               class="um-table mt-3"
               :per-page="perPage"
               :current-page="currentPage"
+              sort-by="createdAt"
+              sort-desc
               show-empty
               empty-text=""
             >
@@ -166,6 +168,20 @@
                     -
                   </div>
                 </div>
+              </template>
+
+              <!-- Created At -->
+              <template #cell(createdAt)="row">
+                <span class="text-muted">{{
+                  _formatDateTime(row.item.createdAt)
+                }}</span>
+              </template>
+
+              <!-- Updated At -->
+              <template #cell(updatedAt)="row">
+                <span class="text-muted">{{
+                  _formatDateTime(row.item.updatedAt)
+                }}</span>
               </template>
 
               <!-- Actions -->
@@ -337,6 +353,18 @@ export default {
         { key: "email", label: "Email", class: "align-middle" }, // 🔑 Tambah email
         { key: "mainEvents", label: "Main Events", class: "align-middle" },
         {
+          key: "createdAt",
+          label: "Created At",
+          class: "align-middle text-nowrap",
+          sortable: true,
+        },
+        {
+          key: "updatedAt",
+          label: "Updated At",
+          class: "align-middle text-nowrap",
+          sortable: true,
+        },
+        {
           key: "actions",
           label: "Actions",
           class: "text-center align-middle",
@@ -485,6 +513,28 @@ export default {
         e = fmt(end);
       if (s && e) return `${s} - ${e}`;
       return s || e || "";
+    },
+
+    // Format createdAt/updatedAt (Mongoose timestamps) utk kolom tabel User
+    // Management — contoh output: "25 Sep 2025, 14:30".
+    _formatDateTime(v) {
+      if (!v) return "-";
+      try {
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "-";
+        const datePart = d.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+        const timePart = d.toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `${datePart}, ${timePart}`;
+      } catch {
+        return "-";
+      }
     },
     addEvent() {
       this.editForm.mainEvents.push({

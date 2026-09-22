@@ -1809,6 +1809,34 @@ export default {
 
       // paksa re-render jika diperlukan
       if (this.$forceUpdate) this.$forceUpdate();
+
+      // BUG FIX: Reset row sebelumnya cuma menghapus state lokal — riwayat
+      // penalty yg sudah disubmit juri (sts-jurysystem) tetap ada, jadi
+      // validasi duplikat di sana terus memblokir juri submit ulang walau
+      // waktunya sudah direset operator. Sama fix pattern dgn SprintRace.vue.
+      this._deleteJudgeReportsForRow(item);
+    },
+
+    // Hapus riwayat penalty juri utk SATU tim di bucket ini — fire-and-
+    // forget, kegagalan hapus riwayat juri tidak boleh mengganggu reset
+    // lokal yg sudah berhasil.
+    _deleteJudgeReportsForRow(item) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !item) return;
+        const b = this.currentBucket || {};
+        const teamId = item.teamId || "";
+        if (!b.eventId || !teamId) return;
+        ipcRenderer.send("judgeReports:deleteForRow", {
+          category: "drr",
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+          teamId: String(teamId),
+        });
+      } catch (e) {
+        /* noop */
+      }
     },
 
     // Tandai tim DNF/DNS/DSQ — kosongkan waktu & penalti (biar tidak ikut
@@ -1995,7 +2023,7 @@ export default {
       this.isLoading = false;
     },
 
-    _useDrrBucket(key) {
+    async _useDrrBucket(key) {
       const b = this.drrBucketMap[key];
       if (!b) return;
 
@@ -2043,6 +2071,18 @@ export default {
           this.applyDrrSectionCount(count);
         });
       }
+
+      // BUG FIX: jalur ini (fallback loadAllDrrBucketsFromEvent(), dipakai
+      // saat drrBucketOptions kosong) TIDAK PERNAH hydrate dari
+      // temporaryDrrResult sama sekali — beda dari jalur normal
+      // (fetchBucketTeamsByKey(), lihat hydrateTeamsFromDrrResult() di
+      // situ) yg sudah benar. Tanpa ini, tim yg datanya cuma bisa dipulihkan
+      // lewat jalur fallback ini (mis. drrBucketOptions kosong krn
+      // buildStaticDrrOptions() gagal) akan tampil kosong walau hasil
+      // sesungguhnya aman di DB — sama root cause dgn bug Sprint yg
+      // dilaporkan operator.
+      await this.hydrateTeamsFromDrrResult();
+      await this.assignRanks(this.participant);
     },
 
     openResetAllModal() {

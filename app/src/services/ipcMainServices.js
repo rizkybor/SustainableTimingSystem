@@ -146,6 +146,9 @@ const {
 const {
   deleteJudgeActionHistory,
 } = require("../controllers/DELETE/deleteJudgeActionHistory");
+const {
+  deleteJudgeReportsForRow,
+} = require("../controllers/DELETE/deleteJudgeReportsForRow");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -311,6 +314,21 @@ function setupIPCMainHandlers() {
       event.reply("judgeLog:deleteHistory:reply", result);
     } catch (err) {
       event.reply("judgeLog:deleteHistory:reply", {
+        ok: false,
+        error: err.message,
+      });
+    }
+  });
+
+  // Hapus riwayat penalty juri + audit log lokal utk SATU baris/tim saja
+  // (dipanggil dari tombol "Reset" per-row/heat/run) — lihat catatan
+  // lengkap di deleteJudgeReportsForRow.js.
+  ipcMain.on("judgeReports:deleteForRow", async (event, payload) => {
+    try {
+      const result = await deleteJudgeReportsForRow(payload);
+      event.reply("judgeReports:deleteForRow:reply", result);
+    } catch (err) {
+      event.reply("judgeReports:deleteForRow:reply", {
         ok: false,
         error: err.message,
       });

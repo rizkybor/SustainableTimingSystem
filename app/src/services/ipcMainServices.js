@@ -57,6 +57,7 @@ const {
   updateBasic,
   updateAssets,
   setResultsStatus,
+  setEventStatus,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -380,6 +381,22 @@ function setupIPCMainHandlers() {
       event.reply("delete-event-reply", { ok });
     } catch (error) {
       event.reply("delete-event-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // Toggle Active/Inactive event di All Events (lihat setEventStatus() di
+  // insertNewEvent.js) — sebelumnya tidak ada jalur IPC utk ini sama sekali.
+  ipcMain.on("event:set-status", async (event, payload) => {
+    try {
+      const eventId = payload && payload.eventId;
+      const status = payload && payload.status;
+      const resp = await setEventStatus(eventId, status);
+      event.reply("event:set-status-reply", resp);
+    } catch (error) {
+      event.reply("event:set-status-reply", {
         ok: false,
         error: error && error.message ? error.message : String(error),
       });

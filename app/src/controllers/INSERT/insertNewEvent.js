@@ -297,6 +297,38 @@ const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "
 // "official" = final & terkunci.
 const RESULT_STATUSES = ["provisional", "unofficial", "official"];
 
+// Status aktif/tidaknya EVENT itu sendiri (`statusEvent`, dibaca All
+// Events -> AllEvent.vue). Sebelumnya field ini HANYA ditulis sekali saat
+// event dibuat (selalu "Activated", lihat CreateEvent.vue), tidak pernah
+// ada UI untuk mengubahnya lagi — status "Inactive" ditampilkan sbg pill
+// read-only tapi TIDAK PERNAH bisa benar2 dicapai lewat aplikasi. Fungsi
+// ini menambahkan cara mengubahnya, toggle sederhana Active <-> Inactive
+// dari kolom Action di All Events, sama pola dgn setResultsStatus() di
+// bawah (validasi + $set + updatedAt).
+const EVENT_STATUSES = ["Activated", "Inactive"];
+
+async function setEventStatus(eventId, status) {
+  const id = toObjectId(eventId);
+  if (!id) return { ok: false, error: "invalid eventId" };
+  if (!EVENT_STATUSES.includes(status)) {
+    return { ok: false, error: "invalid status" };
+  }
+
+  var db = await getDb();
+  const coll = db.collection("eventsCollection");
+  const resp = await coll.updateOne(
+    { _id: id },
+    { $set: { statusEvent: status, updatedAt: new Date() } },
+    { upsert: false }
+  );
+  return {
+    ok: true,
+    matchedCount: resp.matchedCount,
+    modifiedCount: resp.modifiedCount,
+    status,
+  };
+}
+
 // BUG FIX: sebelumnya SEMUA kategori (Sprint/H2H/Slalom/DRR/RaftingCross/
 // Overall) berbagi satu field `resultsOfficial` di eventsCollection —
 // meng-Official-kan Sprint otomatis ikut meng-Official-kan kategori lain.
@@ -366,4 +398,5 @@ module.exports = {
   updateBasic,
   updateAssets,
   setResultsStatus,
+  setEventStatus,
 };

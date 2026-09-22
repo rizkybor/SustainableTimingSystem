@@ -222,14 +222,24 @@
 
               <!-- Actions -->
               <template #cell(actions)="row">
-                <b-button
-                  size="sm"
-                  variant="outline-danger"
-                  class="btn-icon"
-                  @click="confirmDeleteEvent(row.item)"
-                >
-                  <Icon icon="mdi:delete" width="16" height="16" />
-                </b-button>
+                <div class="d-flex align-items-center justify-content-center" style="gap: 8px">
+                  <b-form-checkbox
+                    switch
+                    size="lg"
+                    :checked="row.item.status === 'activated'"
+                    :disabled="togglingId === String(row.item._id)"
+                    :title="row.item.status === 'activated' ? 'Klik utk set Inactive' : 'Klik utk set Active'"
+                    @change="toggleEventStatus(row.item)"
+                  />
+                  <b-button
+                    size="sm"
+                    variant="outline-danger"
+                    class="btn-icon"
+                    @click="confirmDeleteEvent(row.item)"
+                  >
+                    <Icon icon="mdi:delete" width="16" height="16" />
+                  </b-button>
+                </div>
               </template>
             </b-table>
 
@@ -285,6 +295,9 @@ export default {
   data() {
     return {
       loading: false,
+      // _id (string) event yg lagi diproses toggle status-nya — dipakai
+      // disable switch itu doang selama IPC round-trip, bukan seluruh tabel.
+      togglingId: "",
       events: [],
       query: "",
       statusFilter: "",
@@ -306,7 +319,7 @@ export default {
           key: "actions",
           label: "Action",
           class: "text-center align-middle",
-          thStyle: { width: "110px" },
+          thStyle: { width: "150px" },
         },
       ],
       levelOptionsUI: [
@@ -487,6 +500,35 @@ export default {
           });
         }
       });
+    },
+
+    // Toggle Active <-> Inactive dari switch di kolom Action — lihat
+    // setEventStatus() di insertNewEvent.js. Update optimistik field
+    // statusEvent di array lokal on success (tanpa reload penuh via
+    // getEvents()), sama pola ringan dgn toggle Official/Provisional di
+    // Result pages.
+    toggleEventStatus(item) {
+      const id = item && item._id ? String(item._id) : "";
+      if (!id || typeof ipcRenderer === "undefined") return;
+
+      const nextStatus = item.status === "activated" ? "Inactive" : "Activated";
+
+      this.togglingId = id;
+      ipcRenderer.removeAllListeners("event:set-status-reply");
+      ipcRenderer.once("event:set-status-reply", (_e, res) => {
+        this.togglingId = "";
+        if (res && res.ok) {
+          const target = this.events.find((e) => String(e._id) === id);
+          if (target) target.statusEvent = res.status;
+        } else {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Gagal mengubah status event",
+            detail: res && res.error ? res.error : "Terjadi kesalahan.",
+          });
+        }
+      });
+      ipcRenderer.send("event:set-status", { eventId: id, status: nextStatus });
     },
   },
 };

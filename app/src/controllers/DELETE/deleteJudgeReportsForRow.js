@@ -98,11 +98,46 @@ async function deleteJudgeReportsForRow(filter) {
   if (f.initialId) logQuery.initialId = String(f.initialId);
   const logRes = await db.collection("judgeActionLogs").deleteMany(logQuery);
 
+  // 3) BUG FIX (2026-09-23): flag "team sudah Start" (sprintteamstatuses/
+  //    slalomteamstatuses/drrteamstatuses — lihat MEMORY-SPRINT.md bug #6)
+  //    sebelumnya TIDAK ikut dihapus Reset per-baris. Operator reset baris
+  //    (mis. salah isi Start Time) tapi flag "sudah Start" itu tetap
+  //    tersimpan permanen — juri masih bisa submit penalty Finish utk tim
+  //    itu padahal baris race-nya baru saja dikosongkan & belum di-Start
+  //    ulang. Scope filter-nya SAMA PERSIS dgn unique index model masing2
+  //    (models/SprintTeamStatus.js / SlalomTeamStatus.js / DRRTeamStatus.js
+  //    di sts-jurysystem) — H2H & RX tidak punya koleksi TeamStatus, jadi
+  //    dilewati.
+  const TEAM_STATUS_COLLECTION = {
+    sprint: "sprintteamstatuses",
+    slalom: "slalomteamstatuses",
+    drr: "drrteamstatuses",
+  };
+  let deletedTeamStatus = 0;
+  const teamStatusCollection = TEAM_STATUS_COLLECTION[category];
+  if (teamStatusCollection) {
+    const statusQuery = {
+      eventId,
+      initialId: String(f.initialId || ""),
+      raceId: String(f.raceId || ""),
+      divisionId: String(f.divisionId || ""),
+      teamId,
+    };
+    if (category === "slalom" && f.runNumber != null && f.runNumber !== "") {
+      statusQuery.runNumber = Number(f.runNumber);
+    }
+    const statusRes = await db
+      .collection(teamStatusCollection)
+      .deleteMany(statusQuery);
+    deletedTeamStatus = statusRes.deletedCount || 0;
+  }
+
   return {
     ok: true,
     deletedDetails,
     updatedReports,
     deletedLogs: logRes.deletedCount || 0,
+    deletedTeamStatus,
   };
 }
 

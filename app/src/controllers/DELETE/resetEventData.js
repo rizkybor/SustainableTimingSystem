@@ -66,6 +66,11 @@ const RESET_COLLECTIONS = [
   // lebih besar ini sebelumnya TIDAK — terkonfirmasi lewat inspeksi
   // langsung koleksi di database.
   { name: "h2hFoulsReports", label: "Fouls Report (Head to Head)", byBucket: false },
+  // Field Notes (2026-09-22) — versi ringan Fouls Report tanpa Pen
+  // Position/Detail/Unfouls Team, dipakai Sprint/Slalom/DRR/RX (lihat
+  // insertFieldNotesReport.js). eventId STRING top-level, sama pola dgn
+  // h2hFoulsReports di atas.
+  { name: "judgeFieldNotes", label: "Field Notes (Sprint/Slalom/DRR/RX)", byBucket: false },
   // Live preview hasil Sprint SEBELUM operator klik "Save Result" —
   // models/SprintLivePreview.js di sts-jurysystem, diisi lewat relay
   // socket dari juri yang online. eventId disimpan sbg STRING. Kalau

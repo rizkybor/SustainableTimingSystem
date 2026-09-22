@@ -260,6 +260,14 @@
               :refresh-tick="judgeLogRefreshTick"
             />
 
+            <FieldNotesModal
+              v-if="currentEventId"
+              class="mr-2"
+              :event-id="String(currentEventId)"
+              category="SPRINT"
+              :refresh-tick="fieldNotesRefreshTick"
+            />
+
             <button
               type="button"
               class="btn-action btn-info mr-2"
@@ -513,6 +521,7 @@ import {
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
+import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 
@@ -687,12 +696,14 @@ export default {
     Icon,
     CountryFlag,
     JudgeActionHistoryModal,
+    FieldNotesModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       isLoading: false,
       defaultImg,
+      fieldNotesRefreshTick: 0,
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
       selectedSprintKey: "",
@@ -958,6 +969,15 @@ export default {
           return;
         }
 
+        // Field Notes — catatan bebas juri (murni informasi, tidak
+        // menyentuh penalty resmi), lihat insertFieldNotesReport.js.
+        // Filter category supaya Field Notes kategori LAIN (Slalom/DRR/
+        // RX) punya event yang sama tidak ikut nyasar ke sini.
+        if (msg && msg.type === "FieldNotes" && msg.category === "SPRINT") {
+          this.receiveFieldNotes(msg);
+          return;
+        }
+
         // fallback lain (abaikan / logic lainmu)
       };
 
@@ -1001,6 +1021,38 @@ export default {
     /* =========================================================
      * SOCKET / IPC
      * =======================================================*/
+    // Field Notes — catatan bebas juri (murni informasi, tidak
+    // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
+    // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.
+    receiveFieldNotes(msg = {}) {
+      if (typeof ipcRenderer === "undefined") return;
+
+      const teamLabel = (msg.team && msg.team.nameTeam) || "Team";
+      const judgeLabel = msg.judge || "Juri";
+
+      ipcRenderer.send("fieldNotes:send", {
+        eventId: msg.eventId,
+        category: "SPRINT",
+        initialId: msg.initialId,
+        divisionId: msg.divisionId,
+        raceId: msg.raceId,
+        team: msg.team,
+        remarks: msg.remarks,
+        judge: msg.judge,
+        sourceTs: msg.ts,
+      });
+
+      if (this.$bvToast) {
+        this.$bvToast.toast(`${teamLabel} — Oleh: ${judgeLabel}.`, {
+          title: "Field Notes Diterima",
+          variant: "info",
+          solid: true,
+        });
+      }
+
+      // trigger refetch di FieldNotesModal (lihat prop refreshTick)
+      this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
+    },
     async applyPenaltyFromSocket(payload = {}) {
       // cari tim lokal: teamId -> bibTeam -> nameTeam (case-insensitive)
       const items = this.participantArr;

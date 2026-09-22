@@ -271,6 +271,14 @@
             category-label="Rafting Cross"
           />
 
+          <FieldNotesModal
+            v-if="currentEventId"
+            class="mr-2"
+            :event-id="String(currentEventId)"
+            category="RX"
+            :refresh-tick="fieldNotesRefreshTick"
+          />
+
           <button
             type="button"
             class="btn-action btn-secondary"
@@ -479,6 +487,7 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
+import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
 
 const rxBucketCache = createBucketCache("rxLocal");
 
@@ -492,12 +501,14 @@ export default {
     OperationTimePanel,
     CountryFlag,
     JudgeActionHistoryModal,
+    FieldNotesModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
       isLoading: false,
       defaultImg,
+      fieldNotesRefreshTick: 0,
       dataEvent: {},
       titleCategories: "",
       selfSocketId: null,
@@ -705,6 +716,15 @@ export default {
           );
         }
 
+        // Field Notes — catatan bebas juri (murni informasi, tidak
+        // menyentuh penalty resmi), lihat insertFieldNotesReport.js.
+        // Filter category supaya Field Notes kategori LAIN (Sprint/
+        // Slalom/DRR) punya event yang sama tidak ikut nyasar ke sini.
+        if (msg.type === "FieldNotes" && msg.category === "RX") {
+          this.receiveFieldNotes(msg);
+          return;
+        }
+
         await this.applyPenaltyFromSocketRX(msg);
       };
 
@@ -727,6 +747,38 @@ export default {
   },
 
   methods: {
+    // Field Notes — catatan bebas juri (murni informasi, tidak
+    // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
+    // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.
+    receiveFieldNotes(msg = {}) {
+      if (typeof ipcRenderer === "undefined") return;
+
+      const teamLabel = (msg.team && msg.team.nameTeam) || "Team";
+      const judgeLabel = msg.judge || "Juri";
+
+      ipcRenderer.send("fieldNotes:send", {
+        eventId: msg.eventId,
+        category: "RX",
+        initialId: msg.initialId,
+        divisionId: msg.divisionId,
+        raceId: msg.raceId,
+        team: msg.team,
+        remarks: msg.remarks,
+        judge: msg.judge,
+        sourceTs: msg.ts,
+      });
+
+      if (this.$bvToast) {
+        this.$bvToast.toast(`${teamLabel} — Oleh: ${judgeLabel}.`, {
+          title: "Field Notes Diterima",
+          variant: "info",
+          solid: true,
+        });
+      }
+
+      // trigger refetch di FieldNotesModal (lihat prop refreshTick)
+      this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
+    },
     /* ============ OPTIONS ============ */
     async loadDataScore(type) {
       try {

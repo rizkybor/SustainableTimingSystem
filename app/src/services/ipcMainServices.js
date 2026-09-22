@@ -122,6 +122,10 @@ const {
   insertH2HFoulsReport,
   listH2HFoulsReports,
 } = require("../controllers/INSERT/insertH2HFoulsReport");
+const {
+  insertFieldNotesReport,
+  listFieldNotesReports,
+} = require("../controllers/INSERT/insertFieldNotesReport");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -737,6 +741,38 @@ function setupIPCMainHandlers() {
       event.reply("h2hFouls:list:reply", { ok: true, items });
     } catch (err) {
       event.reply("h2hFouls:list:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
+    }
+  });
+
+  // Simpan Field Notes (versi ringan Fouls Report, tanpa Pen
+  // Position/Detail) dari juri Sprint/Slalom/DRR/RX — MURNI informasi,
+  // TIDAK mengubah penalty resmi. Lihat insertFieldNotesReport.js.
+  ipcMain.on("fieldNotes:send", async (event, payload) => {
+    try {
+      const log = await insertFieldNotesReport(payload);
+      event.reply("fieldNotes:send:reply", { ok: true, log });
+    } catch (err) {
+      event.reply("fieldNotes:send:reply", { ok: false, error: err.message });
+    }
+  });
+
+  // List Field Notes utk modal "Field Notes" di toolbar masing-masing
+  // race category (Sprint/Slalom/DRR/RX).
+  ipcMain.on("fieldNotes:list", async (event, payload) => {
+    try {
+      const { eventId, category, divisionId, raceId, limit } = payload || {};
+      const items = await listFieldNotesReports(eventId, category, {
+        divisionId,
+        raceId,
+        limit,
+      });
+      event.reply("fieldNotes:list:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("fieldNotes:list:reply", {
         ok: false,
         items: [],
         error: err.message,

@@ -280,6 +280,13 @@
                   :refresh-tick="judgeLogRefreshTick"
                 />
 
+                <FieldNotesModal
+                  v-if="currentSlalomEventId"
+                  :event-id="String(currentSlalomEventId)"
+                  category="SLALOM"
+                  :refresh-tick="fieldNotesRefreshTick"
+                />
+
                 <!-- SAVE ONLY SESSION 1 -->
                 <button
                   type="button"
@@ -861,6 +868,7 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
+import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
 
 const slalomBucketCache = createBucketCache("slalomLocal");
 
@@ -1093,6 +1101,7 @@ export default {
     Icon,
     CountryFlag,
     JudgeActionHistoryModal,
+    FieldNotesModal,
   },
   mixins: [teamFlagMixin, serialPortMixin],
 
@@ -1100,6 +1109,7 @@ export default {
     return {
       slalomCats: { initial: "-", race: "-", division: "-" },
       judgeLogRefreshTick: 0,
+      fieldNotesRefreshTick: 0,
       pdfParticipantsSession1: [],
       showSession1Modal: false,
       loadingSession1: false,
@@ -1507,6 +1517,15 @@ export default {
           }
         }
 
+        // Field Notes — catatan bebas juri (murni informasi, tidak
+        // menyentuh penalty resmi), lihat insertFieldNotesReport.js.
+        // Filter category supaya Field Notes kategori LAIN (Sprint/DRR/
+        // RX) punya event yang sama tidak ikut nyasar ke sini.
+        if (msg.type === "FieldNotes" && msg.category === "SLALOM") {
+          this.receiveFieldNotes(msg);
+          return;
+        }
+
         // 4) Filter: kita cuma urus penalty
         if (
           msg.type !== "PenaltyStart" &&
@@ -1571,6 +1590,39 @@ export default {
   },
 
   methods: {
+    // Field Notes — catatan bebas juri (murni informasi, tidak
+    // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
+    // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.
+    receiveFieldNotes(msg = {}) {
+      if (typeof ipcRenderer === "undefined") return;
+
+      const teamLabel = (msg.team && msg.team.nameTeam) || "Team";
+      const judgeLabel = msg.judge || "Juri";
+
+      ipcRenderer.send("fieldNotes:send", {
+        eventId: msg.eventId,
+        category: "SLALOM",
+        initialId: msg.initialId,
+        divisionId: msg.divisionId,
+        raceId: msg.raceId,
+        runNumber: msg.runNumber,
+        team: msg.team,
+        remarks: msg.remarks,
+        judge: msg.judge,
+        sourceTs: msg.ts,
+      });
+
+      if (this.$bvToast) {
+        this.$bvToast.toast(`${teamLabel} — Oleh: ${judgeLabel}.`, {
+          title: "Field Notes Diterima",
+          variant: "info",
+          solid: true,
+        });
+      }
+
+      // trigger refetch di FieldNotesModal (lihat prop refreshTick)
+      this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
+    },
     filteredPenalties(context) {
       // context: 'START' / 'FINISH' / 'GATE' — masing2 sekarang independen,
       // dikonfigurasi lewat Race Settings (Pilihan Pen. Start/Finish/Gates).

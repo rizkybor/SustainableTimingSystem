@@ -2506,6 +2506,37 @@ export default {
         /* no-op */
       }
       this.checkEndGameStatus();
+
+      // BUG FIX: Reset row sebelumnya cuma menghapus state lokal — riwayat
+      // penalty yg sudah disubmit juri (sts-jurysystem) tetap ada utk Run
+      // ini, jadi validasi duplikat di sana terus memblokir juri submit
+      // ulang walau waktunya sudah direset operator. Sama fix pattern dgn
+      // SprintRace.vue/DownRiverRace.vue, scoped ke Run aktif saja.
+      this._deleteJudgeReportsForRow(team);
+    },
+
+    // Hapus riwayat penalty juri utk SATU tim + Run aktif di bucket ini —
+    // fire-and-forget, kegagalan hapus riwayat juri tidak boleh mengganggu
+    // reset lokal yg sudah berhasil.
+    _deleteJudgeReportsForRow(team) {
+      try {
+        if (typeof ipcRenderer === "undefined" || !team) return;
+        const b = this.slalomBucketMap[this.selectedSlalomKey] || {};
+        const teamId = team.teamId || team._id || "";
+        if (!b.eventId || !teamId) return;
+        const sessionIdx = this.selectedSession[String(team._id)] || 0;
+        ipcRenderer.send("judgeReports:deleteForRow", {
+          category: "slalom",
+          eventId: String(b.eventId || ""),
+          initialId: String(b.initialId || ""),
+          raceId: String(b.raceId || ""),
+          divisionId: String(b.divisionId || ""),
+          teamId: String(teamId),
+          runNumber: sessionIdx + 1,
+        });
+      } catch (e) {
+        /* noop */
+      }
     },
 
     // Tandai run AKTIF (session yg sedang dipilih via tab Run Switch) suatu

@@ -1,5 +1,6 @@
 // controllers/INSERT/insertTeamsRegistered.js
 const { getDb } = require("../index");
+const { ObjectId } = require("mongodb");
 
 // --- helpers ---
 function sanitizeBucket(b) {
@@ -176,10 +177,95 @@ async function findRegisteredBucketsByEventId(eventId) {
   }));
 }
 
+// --- FIND detail lengkap SEMUA tim yang terdaftar di satu event, lintas
+// race category — dipakai fitur "Team Roster" di Event Details (tombol
+// baru) utk menjawab "berapa total tim ter-registered di event ini, dan
+// tim mana saja + detailnya". Satu tim fisik bisa terdaftar di beberapa
+// kategori/kelas sekaligus (mis. sama-sama ikut Sprint & Slalom) — di-
+// dedupe by teamId (fallback nama+bib kalau teamId kosong, konsisten dgn
+// pola dedupe registeredTeamsFilter.js/CreateTeam.vue) supaya "Total Tim"
+// menghitung tim FISIK, bukan baris registrasi; daftar `assignments` per
+// tim menunjukkan SEMUA kategori/kelas yang diikutinya.
+async function findRegisteredTeamsDetailByEvent(eventId) {
+  const id = String(eventId || "");
+  if (!id) return { ok: false, error: "eventId is required", teams: [] };
+
+  const db = await getDb();
+  const bucketsCol = db.collection("teamsRegisteredCollection");
+  const teamsCol = db.collection("teamsCollection");
+
+  const docs = await bucketsCol.find({ eventId: id }).toArray();
+
+  // Perkaya dgn countryCode/typeTeam dari master roster (teamsCollection)
+  // lewat teamId — data itu TIDAK disalin ke bucket saat registrasi
+  // (lihat _buildTeamRecord() di Details/index.vue), cuma nameTeam/bibTeam.
+  const teamIds = new Set();
+  docs.forEach((doc) =>
+    (doc.teams || []).forEach((t) => {
+      if (t && t.teamId) teamIds.add(String(t.teamId));
+    })
+  );
+  let masterById = new Map();
+  if (teamIds.size) {
+    const objIds = Array.from(teamIds)
+      .map((s) => {
+        try {
+          return new ObjectId(s);
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    const masterDocs = objIds.length
+      ? await teamsCol.find({ _id: { $in: objIds } }).toArray()
+      : [];
+    masterById = new Map(masterDocs.map((d) => [String(d._id), d]));
+  }
+
+  const byIdentity = new Map();
+  docs.forEach((doc) => {
+    const raceCategory = String(doc.eventName || "");
+    (doc.teams || []).forEach((t) => {
+      if (!t) return;
+      const nameUpper = String(t.nameTeam || "").trim().toUpperCase();
+      const bib = String(t.bibTeam || "").trim();
+      if (!nameUpper) return;
+      const key = t.teamId ? `id:${t.teamId}` : `nb:${nameUpper}|${bib}`;
+
+      if (!byIdentity.has(key)) {
+        const master = t.teamId ? masterById.get(String(t.teamId)) : null;
+        byIdentity.set(key, {
+          teamId: t.teamId ? String(t.teamId) : "",
+          nameTeam: t.nameTeam || nameUpper,
+          bibTeam: bib,
+          countryCode: master ? String(master.countryCode || "") : "",
+          typeTeam: master ? String(master.typeTeam || "") : "",
+          statusId: Number.isFinite(t.statusId) ? t.statusId : 0,
+          assignments: [],
+        });
+      }
+
+      byIdentity.get(key).assignments.push({
+        raceCategory,
+        initialName: String(doc.initialName || ""),
+        raceName: String(doc.raceName || ""),
+        divisionName: String(doc.divisionName || ""),
+      });
+    });
+  });
+
+  const teams = Array.from(byIdentity.values()).sort((a, b) =>
+    a.nameTeam.localeCompare(b.nameTeam)
+  );
+
+  return { ok: true, totalTeams: teams.length, teams };
+}
+
 module.exports = {
   getTeamsRegistered,
   upsertTeamsRegistered,
   findRegisteredBucketsByEventId,
+  findRegisteredTeamsDetailByEvent,
   deleteTeamInBucket,
   findRegisteredEntriesByTeamName,
 };

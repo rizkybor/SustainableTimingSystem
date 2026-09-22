@@ -78,6 +78,7 @@ const {
   upsertTeamsRegistered,
   findRegisteredEntriesByTeamName,
   findRegisteredBucketsByEventId,
+  findRegisteredTeamsDetailByEvent,
 } = require("../controllers/INSERT/insertTeamsRegistered.js");
 
 const {
@@ -1090,6 +1091,22 @@ function setupIPCMainHandlers() {
       event.reply("teams-registered:find-by-event-reply", {
         ok: false,
         items: [],
+        error: String((error && error.message) || error),
+      });
+    }
+  });
+
+  // Detail lengkap tim ter-registered (dedupe fisik + assignment per
+  // kategori/kelas) utk fitur "Team Roster" di Event Details.
+  ipcMain.on("teams-registered:detail-by-event", async (event, eventId) => {
+    try {
+      const resp = await findRegisteredTeamsDetailByEvent(eventId);
+      event.reply("teams-registered:detail-by-event-reply", resp);
+    } catch (error) {
+      event.reply("teams-registered:detail-by-event-reply", {
+        ok: false,
+        teams: [],
+        totalTeams: 0,
         error: String((error && error.message) || error),
       });
     }

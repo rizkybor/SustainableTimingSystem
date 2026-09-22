@@ -92,6 +92,11 @@
           Judges Activity History
         </b-button>
 
+        <b-button class="btn-race-settings mr-2" @click="showTeamRosterModal = true">
+          <Icon icon="mdi:account-group-outline" class="mr-1" />
+          Team Roster
+        </b-button>
+
         <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
           Race Settings
         </b-button>
@@ -236,6 +241,12 @@
       @update-settings="handleUpdateSettings"
     />
 
+    <EventTeamRosterModal
+      :show.sync="showTeamRosterModal"
+      :event-id="eventId"
+      :event-info="events"
+    />
+
 
     <!-- MODAL: konfirmasi Reset Data -->
     <b-modal
@@ -343,6 +354,7 @@ import TeamPanel from "@/components/race/TeamPanel.vue";
 import RaceSettingsModal from "@/components/race/RaceSettings.vue";
 import JudgeSettingsModal from "@/components/race/JudgesSettings.vue";
 import EventSettingsModal from "@/components/race/EventSettings.vue";
+import EventTeamRosterModal from "@/components/event/EventTeamRosterModal.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 
 import { logger } from "@/utils/logger";
@@ -354,9 +366,11 @@ export default {
     RaceSettingsModal,
     JudgeSettingsModal,
     EventSettingsModal,
+    EventTeamRosterModal,
   },
   data() {
     return {
+      showTeamRosterModal: false,
       settingsLoading: { active: false, stage: "", percent: 0 },
       defaultImg,
       resultAvailMap: {

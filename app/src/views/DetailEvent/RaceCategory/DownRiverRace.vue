@@ -1311,7 +1311,15 @@ export default {
         // msg tidak bawa initialId/raceId/divisionId sama sekali (jurysystem
         // versi lama), lanjut spt biasa.
         if (msg && (msg.initialId != null || msg.raceId != null || msg.divisionId != null)) {
-          var bucket = getBucket();
+          // BUG FIX (2026-09-23): `getBucket()` baca localStorage
+          // `raceStartPayload` yang HANYA di-set sekali saat pertama masuk
+          // halaman ini — `_useDrrBucket()` (dipanggil setiap "Switch DRR
+          // Category" diklik) TIDAK PERNAH memperbaruinya (beda dari
+          // `_useSprintBucket()`/`_useSlalomBucket()` yang sinkronkan
+          // keduanya). Akibatnya `getBucket()` di sini bisa STALE — pakai
+          // `this.currentBucket` (disinkronkan tiap switch kategori) sbg
+          // sumber kebenaran, bukan `getBucket()`.
+          var bucket = this.currentBucket || getBucket();
           var sameCategory =
             String(msg.eventId != null ? msg.eventId : bucket.eventId) === String(bucket.eventId) &&
             String(msg.initialId != null ? msg.initialId : bucket.initialId) === String(bucket.initialId) &&
@@ -2900,7 +2908,17 @@ export default {
         if (val && String(val).trim()) {
           try {
             const row = this.participant[id];
-            const bucket = getBucket();
+            // BUG FIX (2026-09-23): sama seperti guard di
+            // applyPenaltyFromSocketDirect() — `getBucket()` bisa STALE
+            // krn `_useDrrBucket()` tidak pernah update localStorage
+            // `raceStartPayload` saat "Switch DRR Category" diklik. Pakai
+            // `this.currentBucket` (SELALU sinkron dgn kategori yang
+            // sedang aktif di layar) sbg sumber kebenaran, supaya
+            // initialId/raceId/divisionId yang dikirim ke
+            // upsertDRRTeamStatus() benar-benar sesuai kategori yang
+            // sedang dibuka operator saat klik Start — bukan kategori
+            // pertama kali halaman ini dibuka.
+            const bucket = this.currentBucket || getBucket();
             ipcRenderer.send("drr:team-started", {
               eventId: bucket.eventId,
               initialId: bucket.initialId,

@@ -425,28 +425,29 @@
           aria-label="Tournament Bracket"
         >
           <!-- Tim yang belum punya nomor Heat / belum berpasangan — per babak -->
-          <div
-            v-for="(round, rIdx) in rounds"
-            :key="'pool-' + round.id"
-            class="bracket__pool"
-            v-if="round.pool && round.pool.length"
-          >
-            <div class="bracket__pool-title">
-              <Icon icon="mdi:timer-sand" class="mr-1" />
-              {{ round.bronze ? "Final B" : round.name }} — Menunggu Heat
-              ({{ round.pool.length }})
+          <template v-for="(round, rIdx) in rounds">
+            <div
+              v-if="round.pool && round.pool.length"
+              :key="'pool-' + round.id"
+              class="bracket__pool"
+            >
+              <div class="bracket__pool-title">
+                <Icon icon="mdi:timer-sand" class="mr-1" />
+                {{ round.bronze ? "Final B" : round.name }} — Menunggu Heat
+                ({{ round.pool.length }})
+              </div>
+              <div class="bracket__pool-list">
+                <span
+                  class="bracket__pool-chip"
+                  v-for="(t, tIdx) in round.pool"
+                  :key="'pool-' + rIdx + '-' + tIdx"
+                >
+                  {{ t.name }}
+                  <CountryFlag :code="flagFor(t.name)" />
+                </span>
+              </div>
             </div>
-            <div class="bracket__pool-list">
-              <span
-                class="bracket__pool-chip"
-                v-for="(t, tIdx) in round.pool"
-                :key="'pool-' + rIdx + '-' + tIdx"
-              >
-                {{ t.name }}
-                <CountryFlag :code="flagFor(t.name)" />
-              </span>
-            </div>
-          </div>
+          </template>
 
           <bracket :rounds="vtbRounds">
             <template slot="player" slot-scope="{ player }">
@@ -4677,7 +4678,7 @@ export default {
         .replace(/[‘’]/g, "'") // smart single quotes
         .replace(/[“”]/g, '"') // smart double quotes
         .replace(/…/g, "...") // ellipsis
-        .replace(/[   ]/g, " ") // non-breaking spaces
+        .replace(/[\u00a0\u2007\u202f]/g, " ") // non-breaking spaces
         // eslint-disable-next-line no-control-regex
         .replace(/[^\x00-\x7f]/g, ""); // sisa karakter non-ASCII lain
     },

@@ -135,6 +135,9 @@ const {
 const {
   upsertDRRTeamStatus,
 } = require("../controllers/INSERT/upsertDRRTeamStatus");
+const {
+  upsertH2HActiveRound,
+} = require("../controllers/INSERT/upsertH2HActiveRound");
 const { getAllUsers } = require("../controllers/GET/getAllUsers");
 const { updateUser } = require("../controllers/UPDATE/editUser");
 const { deleteUser } = require("../controllers/DELETE/deleteUser");
@@ -723,6 +726,13 @@ function setupIPCMainHandlers() {
   // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
   ipcMain.on("h2h:round-active", (_event, payload) => {
     notifyH2HRoundActive(payload || {});
+    // BUG FIX (2026-09-23): tulis LANGSUNG ke h2hactiverounds (bukan cuma
+    // broadcast socket) supaya babak aktif/Heat tetap tersimpan walau
+    // tidak ada tab juri H2H yang online saat ini. Lihat
+    // upsertH2HActiveRound.js.
+    upsertH2HActiveRound(payload || {}).catch((err) => {
+      console.error("⚠️ [h2h:round-active] gagal upsert langsung:", err);
+    });
   });
 
   // Broadcast LIVE begitu operator mengisi Start Time satu baris Slalom

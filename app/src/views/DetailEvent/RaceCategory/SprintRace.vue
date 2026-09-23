@@ -251,6 +251,8 @@
               <Icon icon="icon-park-outline:save" /> Preview JSON
             </button> -->
 
+            <ConnectionStatusBadge class="mr-2" />
+
             <JudgeActionHistoryModal
               v-if="currentEventId"
               class="mr-2 sprint-judge-trigger"
@@ -509,7 +511,7 @@ import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
-import { getSocket } from "@/services/socket";
+import { getSocket, connectionState } from "@/services/socket";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
 import {
@@ -522,6 +524,7 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
+import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 
@@ -697,6 +700,7 @@ export default {
     CountryFlag,
     JudgeActionHistoryModal,
     FieldNotesModal,
+    ConnectionStatusBadge,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
@@ -704,6 +708,10 @@ export default {
       isLoading: false,
       defaultImg,
       fieldNotesRefreshTick: 0,
+      // singleton Vue.observable dari socket.js — dimasukkan ke data()
+      // supaya watcher string-path "connectionState.reconnectTick" di
+      // bawah bisa resolve (watch path selalu dicari relatif ke `this`).
+      connectionState,
       sprintBucketOptions: [],
       sprintBucketMap: Object.create(null),
       selectedSprintKey: "",
@@ -743,6 +751,16 @@ export default {
           saveLocalResults(this.selectedSprintKey, this.participantArr);
         }
       }, 250),
+    },
+    // Begitu socket realtime RECONNECT setelah sempat putus (bukan koneksi
+    // pertama kali — lihat connectionState.reconnectTick di socket.js),
+    // "kejar ketinggalan": penalty yg dikirim juri SAAT koneksi terputus
+    // tidak pernah sampai lewat socket, tapi TETAP tersimpan aman di
+    // judgereportdetails (jurysystem nulis langsung ke DB, tidak peduli
+    // status socket timing-system). Re-fetch & terapkan supaya operator
+    // tidak pernah kehilangan penalty yg sebenarnya sudah valid.
+    "connectionState.reconnectTick"() {
+      this.catchUpMissedPenalties();
     },
   },
 
@@ -1053,7 +1071,7 @@ export default {
       // trigger refetch di FieldNotesModal (lihat prop refreshTick)
       this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
     },
-    async applyPenaltyFromSocket(payload = {}) {
+    async applyPenaltyFromSocket(payload = {}, opts = {}) {
       // BUG FIX (2026-09-23): sebelumnya cuma cocokkan teamId/bibTeam/
       // nameTeam TANPA cek kategori (initialId/raceId/divisionId) sama
       // sekali — kalau teamId yang sama dipakai ulang di Initial lain
@@ -1154,8 +1172,11 @@ export default {
       // refresh ranking bila totalTime berubah
       await this.assignRanks(this.participantArr);
 
-      // audit trail — catat tindakan judge ini, tidak menunggu balasan
-      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan.
+      // Dilewati saat catch-up (opts.skipAudit) — replay penalty yg sudah
+      // sukses tersimpan sebelumnya BUKAN tindakan baru, jangan dicatat
+      // ulang sbg entri Riwayat Judge terpisah tiap kali socket reconnect.
+      if (!opts.skipAudit && typeof ipcRenderer !== "undefined" && this.currentEventId) {
         const bucket = getBucket();
         ipcRenderer.send("judgeLog:send", {
           eventId: this.currentEventId,
@@ -1185,6 +1206,61 @@ export default {
       }
     },
     /* =========================================================*/
+
+    // Catch-up: dipanggil watcher "connectionState.reconnectTick" begitu
+    // socket realtime reconnect setelah sempat putus. Fetch semua penalty
+    // juri yg SUKSES tersimpan (judgereportdetails) utk bucket yg SEDANG
+    // dibuka, lalu "replay" masing2 lewat applyPenaltyFromSocket() yg
+    // sudah ada — reuse validasi & merge logic yg sama persis dgn jalur
+    // socket normal, cuma audit trail-nya dilewati (opts.skipAudit) supaya
+    // tidak dobel-catat tindakan yg sebenarnya sudah lama terjadi.
+    async catchUpMissedPenalties() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const bucket = getBucket();
+        if (!bucket || !bucket.eventId) return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 8000);
+          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("judgeReports:getForBucket", {
+            category: "sprint",
+            eventId: String(bucket.eventId || ""),
+            initialId: String(bucket.initialId || ""),
+            raceId: String(bucket.raceId || ""),
+            divisionId: String(bucket.divisionId || ""),
+          });
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items)) return;
+
+        for (const rec of res.items) {
+          // rekonstruksi bentuk pesan yg diharapkan applyPenaltyFromSocket() —
+          // Sprint: `position` sudah persis "Start"/"Finish", `penalty`
+          // adalah nilainya, `team` adalah teamId.
+          await this.applyPenaltyFromSocket(
+            {
+              teamId: rec.team,
+              type: rec.position,
+              value: rec.penalty,
+              eventId: rec.eventId,
+              initialId: rec.initialId,
+              raceId: rec.raceId,
+              divisionId: rec.divisionId,
+              judge: rec.judge,
+            },
+            { skipAudit: true }
+          );
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("catchUpMissedPenalties failed:", err);
+        }
+      }
+    },
 
     // === LOAD PAYLOAD ===
     loadFromRaceStartPayload() {

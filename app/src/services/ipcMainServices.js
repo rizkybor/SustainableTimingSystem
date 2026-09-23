@@ -165,6 +165,9 @@ const {
 const {
   deleteJudgeReportsForRow,
 } = require("../controllers/DELETE/deleteJudgeReportsForRow");
+const {
+  getJudgePenaltiesForBucket,
+} = require("../controllers/GET/getJudgePenaltiesForBucket");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -346,6 +349,22 @@ function setupIPCMainHandlers() {
     } catch (err) {
       event.reply("judgeReports:deleteForRow:reply", {
         ok: false,
+        error: err.message,
+      });
+    }
+  });
+
+  // Ambil riwayat penalty juri (sukses) utk SATU bucket — dipakai fitur
+  // catch-up saat socket realtime reconnect setelah sempat putus. Lihat
+  // catatan lengkap di getJudgePenaltiesForBucket.js.
+  ipcMain.on("judgeReports:getForBucket", async (event, payload) => {
+    try {
+      const result = await getJudgePenaltiesForBucket(payload);
+      event.reply("judgeReports:getForBucket:reply", result);
+    } catch (err) {
+      event.reply("judgeReports:getForBucket:reply", {
+        ok: false,
+        items: [],
         error: err.message,
       });
     }

@@ -263,6 +263,8 @@
         />
 
         <div class="d-flex align-items-center">
+          <ConnectionStatusBadge class="mr-2" />
+
           <JudgeActionHistoryModal
             v-if="currentEventId"
             class="mr-2"
@@ -480,7 +482,7 @@ import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import { logger } from "@/utils/logger";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
-import { getSocket } from "@/services/socket";
+import { getSocket, connectionState } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -488,6 +490,7 @@ import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
+import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
 
 const rxBucketCache = createBucketCache("rxLocal");
 
@@ -502,10 +505,12 @@ export default {
     CountryFlag,
     JudgeActionHistoryModal,
     FieldNotesModal,
+    ConnectionStatusBadge,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
+      connectionState,
       isLoading: false,
       defaultImg,
       fieldNotesRefreshTick: 0,
@@ -547,6 +552,15 @@ export default {
         { key: "fourth", label: "4th" },
       ],
     };
+  },
+
+  watch: {
+    // Catch-up: begitu socket realtime reconnect setelah sempat putus,
+    // re-fetch penalty juri yg mungkin terlewat dari judgereportdetails
+    // — lihat catatan di src/services/socket.js & catchUpMissedPenaltiesRX().
+    "connectionState.reconnectTick"() {
+      this.catchUpMissedPenaltiesRX();
+    },
   },
 
   computed: {
@@ -1072,7 +1086,7 @@ export default {
     /* =========================================================
      * SOCKET / IPC (Judges Dashboard realtime)
      * =======================================================*/
-    async applyPenaltyFromSocketRX(msg = {}) {
+    async applyPenaltyFromSocketRX(msg = {}, opts = {}) {
       // BUG FIX (2026-09-23): sama pola dgn Sprint/Slalom/DRR/H2H
       // (MEMORY-SPRINT.md) — verifikasi kategori aktif dulu sebelum
       // mencocokkan teamId, krn teamId bisa dipakai ulang lintas Initial.
@@ -1148,8 +1162,10 @@ export default {
         rxBucketCache.save(this.selectedRxKey, this.rounds);
       }
 
-      // audit trail — catat tindakan judge ini, tidak menunggu balasan
-      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan.
+      // Dilewati saat catch-up (opts.skipAudit) — replay penalty yg sudah
+      // sukses tersimpan sebelumnya BUKAN tindakan baru.
+      if (!opts.skipAudit && typeof ipcRenderer !== "undefined" && this.currentEventId) {
         ipcRenderer.send("judgeLog:send", {
           eventId: this.currentEventId,
           raceCategory: "rx",
@@ -1163,6 +1179,52 @@ export default {
           sourceTs: msg.ts,
           raw: msg,
         });
+      }
+    },
+
+    // Catch-up: dipanggil watcher "connectionState.reconnectTick" begitu
+    // socket realtime reconnect setelah sempat putus. Fetch penalty juri
+    // yg SUKSES tersimpan (judgereportdetails) utk bucket yg SEDANG
+    // dibuka, lalu replay lewat applyPenaltyFromSocketRX() yg sudah ada.
+    async catchUpMissedPenaltiesRX() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const bucket = this.currentBucket();
+        if (!bucket || !bucket.eventId) return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 8000);
+          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("judgeReports:getForBucket", {
+            category: "rx",
+            eventId: String(bucket.eventId || ""),
+            initialId: String(bucket.initialId || ""),
+            raceId: String(bucket.raceId || ""),
+            divisionId: String(bucket.divisionId || ""),
+          });
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items)) return;
+
+        for (const rec of res.items) {
+          const msg = {
+            gate: String(rec.operationType || "").toLowerCase(),
+            value: rec.penalty,
+            teamId: rec.team,
+            eventId: rec.eventId,
+            initialId: rec.initialId,
+            raceId: rec.raceId,
+            divisionId: rec.divisionId,
+          };
+          await this.applyPenaltyFromSocketRX(msg, { skipAudit: true });
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("catchUpMissedPenaltiesRX failed:", err);
+        }
       }
     },
 

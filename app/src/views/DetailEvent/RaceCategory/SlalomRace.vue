@@ -271,6 +271,8 @@
             </div>
             <div class="slalom-actionbar">
               <div class="slalom-actionbar__buttons">
+                <ConnectionStatusBadge class="slalom-judge-trigger" />
+
                 <JudgeActionHistoryModal
                   v-if="currentSlalomEventId"
                   class="slalom-judge-trigger"
@@ -861,7 +863,7 @@ import EmptyCard from "@/components/cards/card-empty.vue";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
-import { getSocket } from "@/services/socket";
+import { getSocket, connectionState } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -869,6 +871,7 @@ import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
+import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
 
 const slalomBucketCache = createBucketCache("slalomLocal");
 
@@ -1086,11 +1089,13 @@ export default {
     CountryFlag,
     JudgeActionHistoryModal,
     FieldNotesModal,
+    ConnectionStatusBadge,
   },
   mixins: [teamFlagMixin, serialPortMixin],
 
   data() {
     return {
+      connectionState,
       slalomCats: { initial: "-", race: "-", division: "-" },
       judgeLogRefreshTick: 0,
       fieldNotesRefreshTick: 0,
@@ -1391,6 +1396,12 @@ export default {
     "$route.query.eventId"() {
       this.fetchSlalomGateCountFromSettings();
     },
+    // Catch-up: begitu socket realtime reconnect setelah sempat putus,
+    // re-fetch penalty juri yg mungkin terlewat dari judgereportdetails
+    // — lihat catatan di src/services/socket.js & catchUpMissedPenaltiesSlalom().
+    "connectionState.reconnectTick"() {
+      this.catchUpMissedPenaltiesSlalom();
+    },
   },
   async mounted() {
     try {
@@ -1636,7 +1647,7 @@ export default {
     },
     // helper kecil untuk memastikan panjang array penalties = jumlah gate
 
-    async applyPenaltyFromSocketDirect(msg) {
+    async applyPenaltyFromSocketDirect(msg, opts = {}) {
       try {
         // BUG FIX (2026-09-23): sama pola dgn Sprint (MEMORY-SPRINT.md) —
         // verifikasi kategori aktif dulu sebelum mencocokkan teamId, krn
@@ -1834,8 +1845,10 @@ export default {
         this.recalcSession(s);
         this.checkEndGameStatus();
 
-        // audit trail — catat tindakan judge ini, tidak menunggu balasan
-        if (typeof ipcRenderer !== "undefined" && this.currentSlalomEventId) {
+        // audit trail — catat tindakan judge ini, tidak menunggu balasan.
+        // Dilewati saat catch-up (opts.skipAudit) — replay penalty yg
+        // sudah sukses tersimpan sebelumnya BUKAN tindakan baru.
+        if (!opts.skipAudit && typeof ipcRenderer !== "undefined" && this.currentSlalomEventId) {
           ipcRenderer.send("judgeLog:send", {
             eventId: this.currentSlalomEventId,
             raceCategory: "slalom",
@@ -1856,8 +1869,9 @@ export default {
           this.judgeLogRefreshTick += 1;
         }
 
-        // feedback (opsional)
-        if (ipcRenderer) {
+        // feedback (opsional) — dilewati saat catch-up, tidak perlu toast
+        // per-penalty saat me-replay banyak record sekaligus.
+        if (!opts.skipAudit && ipcRenderer) {
           const label =
             kind === "start"
               ? "START"
@@ -1886,6 +1900,58 @@ export default {
         return false;
       }
     },
+
+    // Catch-up: dipanggil watcher "connectionState.reconnectTick" begitu
+    // socket realtime reconnect setelah sempat putus. Fetch penalty juri
+    // yg SUKSES tersimpan (judgereportdetails) utk Run yg SEDANG aktif,
+    // lalu replay lewat applyPenaltyFromSocketDirect() yg sudah ada.
+    async catchUpMissedPenaltiesSlalom() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const bucket = getBucket();
+        if (!bucket || !bucket.eventId) return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 8000);
+          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("judgeReports:getForBucket", {
+            category: "slalom",
+            eventId: String(bucket.eventId || ""),
+            initialId: String(bucket.initialId || ""),
+            raceId: String(bucket.raceId || ""),
+            divisionId: String(bucket.divisionId || ""),
+            runNumber: Number(this.activeRun) + 1,
+          });
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items)) return;
+
+        const typeMap = { start: "PenaltyStart", finish: "PenaltyFinish" };
+        for (const rec of res.items) {
+          const opType = String(rec.operationType || "").toLowerCase();
+          const msg = {
+            type: typeMap[opType] || "PenaltyGates",
+            penalty: rec.penalty,
+            teamId: rec.team,
+            runNumber: rec.runNumber,
+            gateNumber: rec.gateNumber,
+            eventId: rec.eventId,
+            initialId: rec.initialId,
+            raceId: rec.raceId,
+            divisionId: rec.divisionId,
+          };
+          await this.applyPenaltyFromSocketDirect(msg, { skipAudit: true });
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("catchUpMissedPenaltiesSlalom failed:", err);
+        }
+      }
+    },
+
     async refreshPenaltiesFromRegistered(params) {
       try {
         params = params || {};

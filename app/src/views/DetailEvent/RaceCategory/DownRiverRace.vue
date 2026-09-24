@@ -238,6 +238,8 @@
           </b-col>
           <b-col cols="6" md="6">
             <div class="drr-actionbar__buttons">
+              <ConnectionStatusBadge />
+
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 :event-id="String(currentEventId)"
@@ -688,7 +690,7 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import { logger } from "@/utils/logger";
 import { Icon } from "@iconify/vue2";
-import { getSocket } from "@/services/socket";
+import { getSocket, connectionState } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -696,6 +698,7 @@ import serialPortMixin from "@/mixins/serialPortMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
+import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
 
 const drrBucketCache = createBucketCache("drrLocal");
 
@@ -928,10 +931,12 @@ export default {
     CountryFlag,
     JudgeActionHistoryModal,
     FieldNotesModal,
+    ConnectionStatusBadge,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
+      connectionState,
       initSocket: null,
       selfSocketId: null,
       fieldNotesRefreshTick: 0,
@@ -982,6 +987,14 @@ export default {
       previewJsonText: "",
       prettyPrint: true,
     };
+  },
+  watch: {
+    // Catch-up: begitu socket realtime reconnect setelah sempat putus,
+    // re-fetch penalty juri yg mungkin terlewat dari judgereportdetails
+    // — lihat catatan di src/services/socket.js & catchUpMissedPenaltiesDrr().
+    "connectionState.reconnectTick"() {
+      this.catchUpMissedPenaltiesDrr();
+    },
   },
   computed: {
     // Opsi Pen. Start — dulu whitelist KETAT {0,10,50} thd daftar GLOBAL
@@ -1303,7 +1316,7 @@ export default {
       this.fieldNotesRefreshTick = (this.fieldNotesRefreshTick || 0) + 1;
     },
     // ===== SOCKET: handler utama (langsung konsumsi format "custom:event") =====
-    async applyPenaltyFromSocketDirect(msg) {
+    async applyPenaltyFromSocketDirect(msg, opts = {}) {
       try {
         // BUG FIX (2026-09-23): sama pola dgn Sprint/Slalom (MEMORY-SPRINT.md)
         // — verifikasi kategori aktif dulu sebelum mencocokkan teamId, krn
@@ -1645,8 +1658,10 @@ export default {
           this.checkEndGameStatus();
         if (typeof this.$forceUpdate === "function") this.$forceUpdate();
 
-        // audit trail — catat tindakan judge ini, tidak menunggu balasan
-        if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+        // audit trail — catat tindakan judge ini, tidak menunggu balasan.
+        // Dilewati saat catch-up (opts.skipAudit) — replay penalty yg
+        // sudah sukses tersimpan sebelumnya BUKAN tindakan baru.
+        if (!opts.skipAudit && typeof ipcRenderer !== "undefined" && this.currentEventId) {
           ipcRenderer.send("judgeLog:send", {
             eventId: this.currentEventId,
             raceCategory: "drr",
@@ -1674,6 +1689,57 @@ export default {
           logger.warn("applyPenaltyFromSocketDirect DRR error:", err);
         }
         return false;
+      }
+    },
+
+    // Catch-up: dipanggil watcher "connectionState.reconnectTick" begitu
+    // socket realtime reconnect setelah sempat putus. Fetch penalty juri
+    // yg SUKSES tersimpan (judgereportdetails) utk bucket yg SEDANG
+    // dibuka, lalu replay lewat applyPenaltyFromSocketDirect() yg sudah ada.
+    async catchUpMissedPenaltiesDrr() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const bucket = this.currentBucket || getBucket();
+        if (!bucket || !bucket.eventId) return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 8000);
+          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("judgeReports:getForBucket", {
+            category: "drr",
+            eventId: String(bucket.eventId || ""),
+            initialId: String(bucket.initialId || ""),
+            raceId: String(bucket.raceId || ""),
+            divisionId: String(bucket.divisionId || ""),
+          });
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items)) return;
+
+        const typeMap = { start: "PenaltyStart", finish: "PenaltyFinish" };
+        for (const rec of res.items) {
+          const opType = String(rec.operationType || "").toLowerCase();
+          const msg = {
+            type: typeMap[opType],
+            penalty: rec.penalty,
+            section: rec.section,
+            teamId: rec.team,
+            eventId: rec.eventId,
+            initialId: rec.initialId,
+            raceId: rec.raceId,
+            divisionId: rec.divisionId,
+          };
+          await this.applyPenaltyFromSocketDirect(msg, { skipAudit: true });
+        }
+        await this.assignRanks(this.participant);
+        if (typeof this.$forceUpdate === "function") this.$forceUpdate();
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("catchUpMissedPenaltiesDrr failed:", err);
+        }
       }
     },
 

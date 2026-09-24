@@ -268,6 +268,8 @@
                 Panduan Bagan (PDF)
               </button>
 
+              <ConnectionStatusBadge class="h2h-judge-trigger" />
+
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 class="h2h-judge-trigger"
@@ -1518,7 +1520,7 @@ import HeadToHeadPdfResult from "../ResultComponent/head-to-head-pdfResult.vue";
 import { logger } from "@/utils/logger";
 import VueHtml2pdf from "vue-html2pdf";
 import { Icon } from "@iconify/vue2";
-import { getSocket } from "@/services/socket";
+import { getSocket, connectionState } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
@@ -1526,6 +1528,7 @@ import serialPortMixin from "@/mixins/serialPortMixin";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
+import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
 // html2canvas + jspdf: sudah pasti ada di node_modules krn jadi dependency
 // transitif vue-html2pdf (lewat html2pdf.js) yang sudah dipakai project ini —
 // dipakai langsung (bukan lewat vue-html2pdf) krn kita mau capture bagan
@@ -1672,10 +1675,12 @@ export default {
     Bracket,
     JudgeActionHistoryModal,
     FoulsReportModal,
+    ConnectionStatusBadge,
   },
   mixins: [teamFlagMixin, serialPortMixin],
   data() {
     return {
+      connectionState,
       pdfMode: "round",
       pdfFilename: "Report.pdf",
       pdfRound: null,
@@ -2153,6 +2158,14 @@ export default {
       handler() {
         this.computePodium();
       },
+    },
+    // Catch-up: begitu socket realtime reconnect setelah sempat putus,
+    // re-fetch penalty juri yg mungkin terlewat SELAMA koneksi putus dari
+    // judgereportdetails (sumber kebenaran, ditulis jurysystem langsung
+    // ke DB terlepas status socket timing-system) — lihat catatan di
+    // src/services/socket.js & catchUpMissedPenaltiesH2H() di bawah.
+    "connectionState.reconnectTick"() {
+      this.catchUpMissedPenaltiesH2H();
     },
     currentRoundIndex() {
       this.computePodium();
@@ -5521,7 +5534,7 @@ export default {
       }
     },
 
-    async applyPenaltyFromSocketH2H(msg = {}) {
+    async applyPenaltyFromSocketH2H(msg = {}, opts = {}) {
       // BUG FIX (2026-09-23): sama pola dgn Sprint/Slalom/DRR
       // (MEMORY-SPRINT.md) — verifikasi kategori+babak aktif dulu sebelum
       // mencocokkan teamId, krn teamId bisa dipakai ulang lintas Initial.
@@ -5639,8 +5652,10 @@ export default {
         return;
       }
 
-      // audit trail — catat tindakan judge ini, tidak menunggu balasan
-      if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+      // audit trail — catat tindakan judge ini, tidak menunggu balasan.
+      // Dilewati saat catch-up (opts.skipAudit) — replay penalty yg sudah
+      // sukses tersimpan sebelumnya BUKAN tindakan baru.
+      if (!opts.skipAudit && typeof ipcRenderer !== "undefined" && this.currentEventId) {
         const bucket = getBucket();
         ipcRenderer.send("judgeLog:send", {
           eventId: this.currentEventId,
@@ -5675,6 +5690,75 @@ export default {
       }
 
       await this.onPenaltyChange(target);
+    },
+
+    // Catch-up: dipanggil watcher "connectionState.reconnectTick" begitu
+    // socket realtime reconnect setelah sempat putus. Fetch penalty juri
+    // yg SUKSES tersimpan (judgereportdetails) utk babak yg SEDANG dibuka
+    // (roundId), lalu replay lewat applyPenaltyFromSocketH2H() yg sudah
+    // ada — reuse validasi & merge logic yg sama, audit trail dilewati.
+    async catchUpMissedPenaltiesH2H() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        const bucket = getBucket();
+        const r = this.currentRound;
+        if (!bucket || !bucket.eventId || !r) return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 8000);
+          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("judgeReports:getForBucket", {
+            category: "h2h",
+            eventId: String(bucket.eventId || ""),
+            initialId: String(bucket.initialId || ""),
+            raceId: String(bucket.raceId || ""),
+            divisionId: String(bucket.divisionId || ""),
+            roundId: String(r.id),
+          });
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items)) return;
+
+        const typeMap = {
+          start: "PenaltyStart",
+          cl: "PenaltyCutLine",
+          finish: "PenaltyFinish",
+          other: "PenaltyOther",
+        };
+        const cornerKeys = ["r1", "r2", "l1", "l2"];
+
+        for (const rec of res.items) {
+          const posKey = String(rec.position || "").toLowerCase();
+          let msg;
+          if (cornerKeys.includes(posKey)) {
+            msg = {
+              type: "BooyanCorner",
+              corner: posKey,
+              touched: !!Number(rec.penalty),
+              teamId: rec.team,
+            };
+          } else if (typeMap[posKey]) {
+            msg = { type: typeMap[posKey], value: rec.penalty, teamId: rec.team };
+          } else {
+            continue;
+          }
+          msg.eventId = rec.eventId;
+          msg.initialId = rec.initialId;
+          msg.raceId = rec.raceId;
+          msg.divisionId = rec.divisionId;
+          msg.roundId = rec.roundId;
+          msg.judge = rec.judge;
+
+          await this.applyPenaltyFromSocketH2H(msg, { skipAudit: true });
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("catchUpMissedPenaltiesH2H failed:", err);
+        }
+      }
     },
 
     ensurePenaltiesObject(result) {

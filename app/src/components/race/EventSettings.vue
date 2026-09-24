@@ -139,25 +139,36 @@
           </b-row>
 
           <b-row>
+            <!-- BUG FIX: b-form-datepicker (dropdown) ke-tutup/klik
+                 ke-intercept oleh elemen field lain di modal ini — kuirk
+                 rendering Chromium pada <legend>/fieldset yang TIDAK bisa
+                 diperbaiki murni via CSS (z-index, transform, overflow
+                 modal, pointer-events semua sudah dicoba). Diganti total
+                 ke <b-calendar> (SELALU tampil inline, TIDAK ADA
+                 popup/dropdown) — sama fix pattern dgn CreateEvent.vue. -->
             <b-col md="6">
               <b-form-group label="Start Date">
-                <b-form-datepicker
-                  size="sm"
+                <div class="stx-inline-calendar-value">
+                  {{ form.startDateEvent || "Belum ada tanggal dipilih" }}
+                </div>
+                <b-calendar
                   v-model="form.startDateEvent"
-                  placeholder="Select start date"
-                  class="mb-2 br-15"
+                  class="mb-2 br-15 stx-inline-calendar"
+                  block
                 />
               </b-form-group>
             </b-col>
             <b-col md="6">
               <b-form-group label="End Date">
-                <b-form-datepicker
+                <div class="stx-inline-calendar-value">
+                  {{ form.endDateEvent || "Belum ada tanggal dipilih" }}
+                </div>
+                <b-calendar
                   :disabled="form.startDateEvent === ''"
-                  size="sm"
                   v-model="form.endDateEvent"
-                  placeholder="Select end date"
-                  class="mb-2 br-15"
+                  class="mb-2 br-15 stx-inline-calendar"
                   :min="form.startDateEvent"
+                  block
                 />
               </b-form-group>
             </b-col>
@@ -1242,6 +1253,21 @@ export default {
 
 .rs-modal .modal-body {
   overflow: auto;
+}
+
+/* Start/End Date sekarang <b-calendar> inline (bukan lagi
+   b-form-datepicker dropdown, lihat catatan di template) — styling
+   kosmetik saja, tidak ada lagi kebutuhan z-index/overflow khusus krn
+   tidak ada popup yang perlu escape batas modal. */
+.stx-inline-calendar-value {
+  font-weight: 600;
+  color: #1c4c7a;
+  padding: 6px 2px;
+  font-size: 0.9rem;
+}
+.stx-inline-calendar {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
 }
 </style>
 

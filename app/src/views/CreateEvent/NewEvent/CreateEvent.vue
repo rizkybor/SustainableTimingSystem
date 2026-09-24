@@ -340,17 +340,27 @@
                 <b-row>
                   <b-col cols="6">
                     <!-- START DATE -->
+                    <!-- BUG FIX: b-form-datepicker (dropdown) ke-tutup elemen
+                         <legend>/konten field lain saat popup-nya perlu
+                         render melewati batas fieldset-nya sendiri —
+                         terbukti tidak bisa diperbaiki murni via CSS
+                         (z-index, transform, position:static, pointer-events
+                         semua sudah dicoba). Diganti b-calendar: kalender
+                         SELALU tampil langsung di layout normal (tidak ada
+                         popup/dropdown sama sekali), jadi tidak ada lagi
+                         elemen lain yang bisa "menutupi"-nya. -->
                     <b-form-group>
                       <template #label>
                         Start Date (Tanggal Mulai) <span class="text-danger">*</span>
                       </template>
-                      <b-form-datepicker
+                      <div class="stx-inline-calendar-value">
+                        {{ formEvent.startDateEvent || "Belum ada tanggal dipilih" }}
+                      </div>
+                      <b-calendar
                         v-model="formEvent.startDateEvent"
-                        placeholder="Select start date"
-                        class="mb-2 br-15"
+                        class="mb-2 br-15 stx-inline-calendar"
                         :min="minDate"
-                        v-b-tooltip.hover
-                        title="Tanggal Mulai"
+                        block
                       />
                     </b-form-group>
                   </b-col>
@@ -360,14 +370,15 @@
                       <template #label>
                         End Date (Tanggal Berakhir) <span class="text-danger">*</span>
                       </template>
-                      <b-form-datepicker
+                      <div class="stx-inline-calendar-value">
+                        {{ formEvent.endDateEvent || "Belum ada tanggal dipilih" }}
+                      </div>
+                      <b-calendar
                         :disabled="formEvent.startDateEvent === ''"
                         v-model="formEvent.endDateEvent"
-                        placeholder="Select end date"
-                        class="mb-2 br-15"
+                        class="mb-2 br-15 stx-inline-calendar"
                         :min="formEvent.startDateEvent"
-                        v-b-tooltip.hover
-                        title="Tanggal Berakhir"
+                        block
                       />
                     </b-form-group>
                   </b-col>
@@ -1172,6 +1183,28 @@ export default {
 }
 
 .br-15 {
+  border-radius: 10px;
+}
+
+/* BUG FIX: kalender popup Start/End Date (b-form-datepicker, dropdown)
+   ke-tutup/klik ke-intercept oleh elemen field FORM LAIN yang urutannya
+   lebih belakang di halaman — root cause: kuirk rendering Chromium pada
+   <legend>+konten fieldset yang TIDAK bisa diperbaiki murni via CSS
+   (z-index, transform compositing layer, position:static, pointer-events
+   semua sudah dicoba, tidak ada yang konsisten menang). Diganti total ke
+   <b-calendar> (SELALU tampil inline di layout normal, TIDAK ADA
+   popup/dropdown sama sekali) — lihat template di atas. Class ini cuma
+   styling kosmetik utk tampilan kalender inline, bukan lagi perbaikan
+   stacking/z-index.
+*/
+.stx-inline-calendar-value {
+  font-weight: 600;
+  color: #1c4c7a;
+  padding: 6px 2px;
+  font-size: 0.9rem;
+}
+.stx-inline-calendar {
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
 }
 

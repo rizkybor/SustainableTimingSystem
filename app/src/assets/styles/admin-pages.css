@@ -146,6 +146,22 @@
 /* Direct-on-control usage: class="input-soft" on the b-form-input /
    b-form-select itself (CreateTeam, AdminUserManagement, AllEvent's
    filter/rows-per-page selects). */
+/* DEFENSIVE, global: Chromium memberi <legend> default `position:
+   relative` di UA stylesheet (bagian dari implementasi "border cutout"
+   fieldset bawaan browser) — ini membuat <legend> field manapun bisa
+   MENANGKAP klik yang seharusnya menuju elemen position:absolute lain
+   yang kebetulan render di koordinat yang sama (mis. dropdown/popup),
+   terlepas dari z-index apa pun yang diberikan (ditemukan & didiagnosis
+   panjang lebar saat debug kalender Start/End Date — lihat
+   CreateEvent.vue/EventSettings.vue, yang akhirnya diperbaiki dgn
+   mengganti komponennya, BUKAN via CSS ini). <legend> di app ini SELALU
+   murni teks label statis, tidak pernah perlu menangkap klik/hover
+   sendiri — pointer-events:none aman diterapkan global sbg pencegahan
+   kalau kombinasi field+popup serupa muncul lagi di tempat lain nanti. */
+legend {
+  pointer-events: none;
+}
+
 .input-soft,
 .form-control,
 .custom-select {
@@ -154,6 +170,18 @@
   border: 1px solid #e5e7eb;
   background: #f8fafc;
   padding: 0.5rem 0.875rem;
+}
+/* BUG FIX: BootstrapVue kasih class `form-control` ke elemen INTERNAL
+   `<b-calendar>`/`<b-form-datepicker>` yang SAMA SEKALI bukan text-input
+   (mis. `.b-calendar-grid` — wrapper caption+weekdays+grid-body+help,
+   normalnya height:auto) — height:44px!important generik di atas
+   memangkasnya jadi cuma setinggi 1 baris, membuat SELURUH baris tanggal
+   (angka 1-31) tidak pernah kelihatan/bisa diklik sama sekali. Kembalikan
+   height:auto khusus utk elemen kalender ini, overflow:visible supaya
+   tidak ada yg ke-clip. */
+.b-calendar-grid {
+  height: auto !important;
+  overflow: visible !important;
 }
 .input-soft::placeholder {
   color: #9aa5b1;

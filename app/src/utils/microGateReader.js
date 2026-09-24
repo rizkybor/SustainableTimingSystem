@@ -35,6 +35,18 @@
 // the frame off before its payload exists yet. Fixed by additionally
 // waiting for the trailing '\r' every real frame was observed to end with
 // before splitting off `a`/`b` — see handleChunk() below.
+//
+// SECOND frame family (found 2026-09-25, user-reported): 19 chars,
+// digits-only, terminated by a bare 'R' marker with NO space+payload after
+// it (`b` is empty), e.g. "001800190010140010R" / "000100020010140010R".
+// This is NOT the M-marker heartbeat/STOP shape above — applying that
+// shape's a[11]/a[13] flag-byte convention to it is meaningless (a[11] is
+// structurally always "0" in this family, so it was falling into the
+// Start branch by accident). No verified time-encoding for this family
+// exists yet — handleChunk() only detects it (marker 'R' + non-standard
+// payload) and routes it to onFinish per user instruction, without
+// reinterpreting its digits. Revisit if/when the actual field layout of
+// this frame is confirmed against the device.
 import { SerialPort } from "serialport";
 
 function toHex(bytes) {
@@ -128,12 +140,34 @@ export function createMicroGateReader(options) {
       if (typeof onData === "function") onData(a, b);
 
       const flag = a && a.length > 11 ? a[11] : undefined;
-      // LAP frame: shares a[11]="0" with a genuine Start frame — a[13]
-      // ("0" for Start, "1" for Lap) is what actually tells them apart,
-      // confirmed against real captured Start/Lap/Finish frames. Checked
-      // BEFORE the plain flag==="0" branch so Lap doesn't fall into onStart.
+      // a[13] tells apart THREE cases that all otherwise share the same
+      // a[11]="0" (confirmed against real captured frames):
+      //   "1" -> LAP
+      //   "4" -> BUG FIX (2026-09-25): this device's REAL live frames are
+      //          all "bare" — 19 chars, digits-only, terminated directly by
+      //          their marker letter with NO space/payload after it (`b`
+      //          empty) — NOT the "<header>M<space><9-digit payload>"
+      //          shape this file's top comment originally documented. User
+      //          captured and categorized both families side by side:
+      //            Start:  "001700190010000000M", a[13]="0"
+      //            Finish: "004800630010140010R", a[13]="4"
+      //          Originally detected via the trailing marker letter (M vs
+      //          R), but per user instruction that was swapped for this
+      //          a[13]="4" check instead — same routing outcome, doesn't
+      //          depend on marker character. Checked BEFORE the plain
+      //          flag==="0" branch so it doesn't fall into onStart. Time
+      //          semantics of this family are NOT reverse-engineered here —
+      //          no verified encoding found for what its digits mean —
+      //          routed to onFinish with the same formatTime(b) computation
+      //          used everywhere else in this function (currently empty,
+      //          since `b` is empty for this shape), just targeting the
+      //          correct field.
+      //   other (e.g. "0") -> Start
       const subFlag = a && a.length > 13 ? a[13] : undefined;
-      if (flag === "0" && subFlag === "1") {
+      if (flag === "0" && subFlag === "4") {
+        const vFinish = formatTime(b);
+        if (typeof onFinish === "function") onFinish(vFinish, a, b);
+      } else if (flag === "0" && subFlag === "1") {
         const vLap = formatTime(b);
         if (typeof onLap === "function") onLap(vLap, a, b);
       } else if (flag === "0") {

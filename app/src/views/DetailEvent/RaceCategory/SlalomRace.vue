@@ -3173,13 +3173,33 @@ export default {
         }
         const payload = [doc];
         ipcRenderer.send("insert-slalom-result", payload);
-        ipcRenderer.once("insert-slalom-result-reply", (_e, res) => {
+        ipcRenderer.once("insert-slalom-result-reply", async (_e, res) => {
           if (res && res.ok) {
             ipcRenderer.send("get-alert-saved", {
               type: "question",
               detail: "Session 1 berhasil disimpan.",
               message: "Successfully",
             });
+
+            // BUG FIX: sebelumnya Save Session 1 TIDAK PERNAH mengisi
+            // koleksi `event-results` (cuma saveResult() — simpan SEMUA
+            // run — yang melakukannya) — akibatnya tombol "Show Result" di
+            // tabel Registered Teams (canShowResult di TeamPanel.vue, cek
+            // koleksi ini) tetap ter-disable walau Run 1 sudah selesai &
+            // tersimpan, padahal Run 2 belum tentu bertanding. Panggil
+            // upsertEventResults() yg sama dipakai saveResult(), supaya
+            // ranking/score Run 1 (assignRanks() saat ini aktif di tab Run
+            // 1) ikut ter-merge & "Show Result" langsung bisa diakses.
+            await this.upsertEventResults();
+
+            // Set status resmi kategori SLALOM ke "provisional" begitu
+            // Session 1 pertama kali disimpan — TAPI cuma kalau BELUM ada
+            // status eksplisit sama sekali (operator belum pernah sentuh
+            // toggle Official/Provisional/Unofficial di halaman Result).
+            // Jangan sampai menimpa keputusan operator yang sudah ada
+            // (mis. sudah di-set Official manual sebelumnya lalu Session 1
+            // disimpan ulang utk koreksi kecil).
+            await this.ensureSlalomStatusProvisionalIfUnset();
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
@@ -3194,6 +3214,57 @@ export default {
           detail: e && e.message ? e.message : "Save Session 1 failed",
           message: "Failed",
         });
+      }
+    },
+
+    // Dipanggil HANYA dari saveSession1() — lihat catatan di pemanggilnya.
+    async ensureSlalomStatusProvisionalIfUnset() {
+      try {
+        if (typeof ipcRenderer === "undefined" || !this.currentSlalomEventId)
+          return;
+
+        const eventDoc = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 6000);
+          ipcRenderer.once("get-events-byid-reply", (_e, doc) => {
+            clearTimeout(timeoutId);
+            resolve(doc);
+          });
+          ipcRenderer.send("get-events-byid", this.currentSlalomEventId);
+        });
+
+        // BUG FIX: cek status eksplisit BARU (resultsStatusByCategory) SAJA
+        // tidak cukup — event lama bisa punya cuma field boolean legacy
+        // (resultsOfficialByCategory.slalom === true) tanpa
+        // resultsStatusByCategory pernah di-set sama sekali. deriveResultStatus()
+        // (dipakai halaman Result) tetap menganggap kategori ini "official"
+        // lewat fallback boolean itu — kalau cuma cek field baru di sini,
+        // status Official yang sudah ada bisa DIAM-DIAM ketimpa
+        // "provisional" tiap kali Session 1 disimpan ulang.
+        const explicitStatus =
+          eventDoc &&
+          eventDoc.resultsStatusByCategory &&
+          eventDoc.resultsStatusByCategory.slalom;
+        const legacyOfficial =
+          eventDoc &&
+          eventDoc.resultsOfficialByCategory &&
+          eventDoc.resultsOfficialByCategory.slalom === true;
+        if (explicitStatus || legacyOfficial) return; // sudah pernah di-set operator, jangan ditimpa
+
+        await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 6000);
+          ipcRenderer.once("event:set-official-reply", (_e, resp) => {
+            clearTimeout(timeoutId);
+            resolve(resp);
+          });
+          ipcRenderer.send("event:set-official", {
+            eventId: this.currentSlalomEventId,
+            category: "slalom",
+            status: "provisional",
+          });
+        });
+      } catch (e) {
+        // best-effort — kegagalan set status awal tidak boleh mengganggu
+        // Save Session 1 yang sudah berhasil
       }
     },
 

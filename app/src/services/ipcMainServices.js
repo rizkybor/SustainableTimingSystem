@@ -1440,9 +1440,18 @@ function setupIPCMainHandlers() {
     event.sender.send("teams-registered:find-reply", { ...res, __reqId: reqId });
   });
 
+  // BUG FIX (2026-09-26): sama persis kelas bug yg sudah diperbaiki di
+  // "teams-slalom-registered:find" (lihat komentar di situ) — dulu balasan
+  // channel ini lewat .once() polos, jadi 2 klik pindah kategori H2H yang
+  // tumpang tindih (mis. R4 MEN SENIOR lalu cepat ke R4 WOMEN SENIOR) bisa
+  // sama2 ke-resolve dgn payload PERTAMA yang datang, membuat kategori
+  // kedua terlihat terisi data kategori pertama. __reqId (kalau dikirim)
+  // digemakan balik supaya pemanggil bisa cocokkan balasan ke request-nya
+  // sendiri — pemanggil lama yg tidak kirim __reqId tidak terpengaruh.
   ipcMain.on("teams-h2h-registered:find", async (event, filters) => {
+    const reqId = filters && filters.__reqId;
     const res = await getRegisteredH2H(filters || {});
-    event.sender.send("teams-h2h-registered:find-reply", res);
+    event.sender.send("teams-h2h-registered:find-reply", { ...res, __reqId: reqId });
   });
 
   ipcMain.on("teams-sprint-registered:find", async (event, filters) => {

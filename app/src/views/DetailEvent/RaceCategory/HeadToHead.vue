@@ -2595,9 +2595,32 @@ export default {
 
     async tryLoadBracketFromDB() {
       const bucket = this._currentBucketOrThrow();
+      // BUG FIX (2026-09-26): sama persis pola fix di
+      // fetchH2HBucketTeamsByKey() di atas — dulu pakai ipcRenderer.once()
+      // polos di channel ini, jadi 2 klik pindah kategori H2H yang tumpang
+      // tindih bisa membuat bracket kategori kedua diam-diam terisi dgn
+      // bracket kategori pertama (balasan yang "tertukar"). Backend
+      // h2h:bracket:get SUDAH menggemakan __reqId sejak dulu (dipakai
+      // Details/index.vue), cuma pemanggil di sini belum memanfaatkannya.
+      const token = Date.now() + "|" + Math.random();
+      this._lastH2HBracketToken = token;
+      const reqId = "h2hbracket|" + JSON.stringify(bucket) + "|" + token;
       return new Promise((resolve) => {
-        ipcRenderer.send("h2h:bracket:get", bucket);
-        ipcRenderer.once("h2h:bracket:get-reply", (_e, res) => {
+        let settled = false;
+        const onReply = (_e, res) => {
+          if (!res || res.__reqId !== reqId) return;
+          ipcRenderer.removeListener("h2h:bracket:get-reply", onReply);
+          if (settled) return;
+          settled = true;
+
+          if (this._lastH2HBracketToken !== token) {
+            // permintaan sudah usang (user sudah pindah kategori lagi
+            // sebelum balasan ini datang) — buang, jangan timpa bracket
+            // yang sedang aktif.
+            resolve(false);
+            return;
+          }
+
           if (res && res.ok && res.item && Array.isArray(res.item.rounds)) {
             // pakai bracket dari DB
             this.rounds = res.item.rounds;
@@ -2624,7 +2647,15 @@ export default {
           } else {
             resolve(false);
           }
-        });
+        };
+        ipcRenderer.on("h2h:bracket:get-reply", onReply);
+        ipcRenderer.send("h2h:bracket:get", { ...bucket, __reqId: reqId });
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ipcRenderer.removeListener("h2h:bracket:get-reply", onReply);
+          resolve(false);
+        }, 8000);
       });
     },
 
@@ -4004,12 +4035,44 @@ export default {
         this.selectedH2HKey = key;
         localStorage.setItem("currentH2HBucketKey", key);
 
+        // BUG FIX (2026-09-26): sama persis pola fix di SlalomRace.vue's
+        // fetchSlalomBucketTeamsByKey() — dulu pakai ipcRenderer.once()
+        // polos, yang menyalakan SEMUA once-listener yg masih menunggu di
+        // channel yang sama begitu balasan PERTAMA datang, jadi 2 klik
+        // pindah kategori yang tumpang tindih (mis. R4 MEN SENIOR lalu
+        // cepat ke R4 WOMEN SENIOR) bisa sama2 ke-resolve dgn payload yang
+        // SAMA, membuat tabel kategori kedua terlihat identik dgn kategori
+        // pertama. Sekarang dicocokkan lewat __reqId + token per-instance
+        // supaya balasan yang sudah usang (key sudah ganti lagi) dibuang.
+        const token = Date.now() + "|" + Math.random();
+        this._lastH2HTeamsToken = token;
+        const reqId = "h2hteams|" + key + "|" + token;
+
         const res = await new Promise((resolve) => {
-          ipcRenderer.once("teams-h2h-registered:find-reply", (_e, payload) =>
-            resolve(payload)
-          );
-          ipcRenderer.send("teams-h2h-registered:find", filters);
+          let settled = false;
+          const onReply = (_e, payload) => {
+            if (!payload || payload.__reqId !== reqId) return;
+            ipcRenderer.removeListener("teams-h2h-registered:find-reply", onReply);
+            if (settled) return;
+            settled = true;
+            resolve(payload);
+          };
+          ipcRenderer.on("teams-h2h-registered:find-reply", onReply);
+          ipcRenderer.send("teams-h2h-registered:find", {
+            ...filters,
+            __reqId: reqId,
+          });
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener("teams-h2h-registered:find-reply", onReply);
+            resolve(null);
+          }, 8000);
         });
+
+        // permintaan sudah usang (user sudah pindah key lain sebelum
+        // balasan ini datang) -> buang, jangan timpa tabel yang aktif
+        if (this._lastH2HTeamsToken !== token) return;
 
         if (!res || !res.ok) {
           // kosongkan participant tapi tetap apply bucket untuk judul & payload
@@ -6065,14 +6128,43 @@ export default {
         )
           return;
 
+        // BUG FIX (2026-09-26): sama persis kelas bug yg sudah diperbaiki di
+        // fetchH2HBucketTeamsByKey()/tryLoadBracketFromDB() di atas —
+        // ipcRenderer.once() polos di channel ini bisa salah tangkap
+        // balasan bucket LAIN kalau operator pindah kategori sebelum
+        // balasan permintaan sebelumnya datang. Karena fungsi ini mencocokkan
+        // hasil ke tim BERDASARKAN NAMA (bukan bucket-scoped di sisi
+        // renderer), tim dgn nama yang SAMA persis di kategori lain (mis.
+        // "FAJI BALI B" terdaftar baik di MEN maupun WOMEN) bisa membuat
+        // Heat/waktu kategori sebelumnya "ikut nempel" ke kategori baru —
+        // persis gejala yang dilaporkan. __reqId + token per-instance
+        // memastikan hanya balasan utk bucket yang MASIH aktif yang dipakai.
+        const token = Date.now() + "|" + Math.random();
+        this._lastH2HHydrateToken = token;
+        const reqId = "h2hhydrate1|" + JSON.stringify(bucket) + "|" + token;
+
         const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 6000);
-          ipcRenderer.once("h2h:results:getAll-reply", (_e, payload) => {
-            clearTimeout(timeoutId);
+          let settled = false;
+          const onReply = (_e, payload) => {
+            if (!payload || payload.__reqId !== reqId) return;
+            ipcRenderer.removeListener("h2h:results:getAll-reply", onReply);
+            if (settled) return;
+            settled = true;
             resolve(payload);
-          });
-          ipcRenderer.send("h2h:results:getAll", bucket);
+          };
+          ipcRenderer.on("h2h:results:getAll-reply", onReply);
+          ipcRenderer.send("h2h:results:getAll", { ...bucket, __reqId: reqId });
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener("h2h:results:getAll-reply", onReply);
+            resolve(null);
+          }, 6000);
         });
+
+        // permintaan sudah usang (bucket sudah ganti lagi sebelum balasan
+        // ini datang) -> buang, jangan timpa round yang sedang aktif.
+        if (this._lastH2HHydrateToken !== token) return;
 
         if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
           return;
@@ -6185,14 +6277,34 @@ export default {
         )
           return;
 
+        // BUG FIX (2026-09-26): sama pola fix dgn hydrateRoundResultsFromDb()
+        // — ipcRenderer.once() polos di channel yg SAMA bisa salah tangkap
+        // balasan bucket lain kalau "Save All Round"/"Save Overall" di dua
+        // kategori berbeda ke-trigger hampir bersamaan.
+        const token = Date.now() + "|" + Math.random();
+        this._lastH2HHydrateAllToken = token;
+        const reqId = "h2hhydrateall|" + JSON.stringify(bucket) + "|" + token;
+
         const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 6000);
-          ipcRenderer.once("h2h:results:getAll-reply", (_e, payload) => {
-            clearTimeout(timeoutId);
+          let settled = false;
+          const onReply = (_e, payload) => {
+            if (!payload || payload.__reqId !== reqId) return;
+            ipcRenderer.removeListener("h2h:results:getAll-reply", onReply);
+            if (settled) return;
+            settled = true;
             resolve(payload);
-          });
-          ipcRenderer.send("h2h:results:getAll", bucket);
+          };
+          ipcRenderer.on("h2h:results:getAll-reply", onReply);
+          ipcRenderer.send("h2h:results:getAll", { ...bucket, __reqId: reqId });
+          setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            ipcRenderer.removeListener("h2h:results:getAll-reply", onReply);
+            resolve(null);
+          }, 6000);
         });
+
+        if (this._lastH2HHydrateAllToken !== token) return;
 
         if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
           return;

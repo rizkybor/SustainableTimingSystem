@@ -2128,8 +2128,14 @@ export default {
       var i, t;
       for (i = 0; i < participantArr.length; i++) {
         t = participantArr[i];
+        // BUG FIX (2026-09-25): key harus stabil antar penyimpanan. teamId
+        // bisa kosong pada satu save lalu terisi pada save berikutnya untuk
+        // tim yang sama, sehingga jika teamId dijadikan prioritas utama,
+        // entry lama (key=bib) dan entry baru (key=teamId) tidak pernah
+        // ketemu saat merge -> data tim jadi dobel di eventResult.
+        // bib bersifat stabil sejak registrasi, jadi jadikan prioritas utama.
         var key = String(
-          (t && t.teamId) || (t && t.bibTeam) || ""
+          (t && t.bibTeam) || (t && t.teamId) || ""
         );
         if (!key) continue;
 
@@ -2198,7 +2204,7 @@ export default {
         var ei;
         for (ei = 0; ei < safeArr.length; ei++) {
           var row = safeArr[ei] || {};
-          var k = String(row.teamId || row.bib || "");
+          var k = String(row.bib || row.teamId || "");
           if (k) map.set(k, JSON.parse(JSON.stringify(row)));
         }
 

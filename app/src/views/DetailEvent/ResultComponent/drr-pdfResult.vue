@@ -8,9 +8,13 @@
       
       <div class="band">
         <div class="band-left">
+          <!-- BUG FIX (2026-09-25): "categories" prop dulu diisi dari
+               localStorage raceStartPayload, jadi bisa basi/salah kategori
+               saat operator pindah kategori lewat query tanpa menyentuh
+               localStorage. Kategori yang benar sudah ditampilkan di
+               band-right via drrCats (route-query-first). Lihat catatan
+               yang sama di sprint-pdfResult.vue. -->
           <strong>SCORE BOARD</strong>
-          <span class="dot">•</span>
-          <span class="cat">{{ categories || "DRR" }}</span>
           <span class="dot">•</span>
           <span class="cat">
             {{ data && data.levelName ? data.levelName : "Classification" }}
@@ -249,7 +253,6 @@ export default {
   props: {
     data: { type: Object, required: true },
     dataParticipant: { type: Array, required: true },
-    categories: { type: String, default: "" },
     status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     drrCats: { type: Object, required: true },

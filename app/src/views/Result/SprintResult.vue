@@ -338,7 +338,6 @@
         <SprintPdf
           :data="pdfEventData"
           :dataParticipant="pdfParticipants"
-          :categories="pdfCategories"
           :status="resultStatus"
           :officialSetAt="officialSetAt"
           :sprintCats="sprintCats"
@@ -704,17 +703,6 @@ export default {
               : this.getScoreByRanked(r.ranked) || 0,
         },
       }));
-    },
-    pdfCategories() {
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      const title = [b.divisionName, b.raceName, b.initialName]
-        .filter(Boolean)
-        .join(" – ");
-      return title || "SPRINT";
     },
   },
 

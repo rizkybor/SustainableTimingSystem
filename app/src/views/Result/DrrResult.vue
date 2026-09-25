@@ -401,7 +401,6 @@
         <DrrPdf
           :data="pdfEventData"
           :dataParticipant="pdfParticipants"
-          :categories="pdfCategories"
           :status="resultStatus"
           :officialSetAt="officialSetAt"
           :drrCats="drrCats"
@@ -789,26 +788,6 @@ export default {
       return arr;
     },
 
-    pdfCategories() {
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      const parts = [];
-      if (b.divisionName) parts.push(b.divisionName);
-      if (b.raceName) parts.push(b.raceName);
-      if (b.initialName) parts.push(b.initialName);
-      if (parts.length === 0) return "DRR";
-      let i = 0;
-      let title = "";
-      while (i < parts.length) {
-        if (i > 0) title += " – ";
-        title += parts[i];
-        i++;
-      }
-      return title;
-    },
   },
 
   async created() {

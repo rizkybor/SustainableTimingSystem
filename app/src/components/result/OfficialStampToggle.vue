@@ -47,7 +47,16 @@
         untuk kategori ini — ditampilkan di stempel PDF &amp; Live Result. Default otomatis
         mengikuti waktu saat status dipilih; ubah di sini kalau perlu koreksi manual.
       </p>
-      <b-form-group label="Tanggal &amp; Waktu (WIB / Asia-Jakarta)">
+      <b-form-group label="Zona Waktu">
+        <b-form-radio-group
+          v-model="manualTz"
+          :options="TZ_OPTIONS"
+          button-variant="outline-primary"
+          buttons
+          size="sm"
+        />
+      </b-form-group>
+      <b-form-group :label="'Tanggal & Waktu (' + manualTz + ')'">
         <b-form-input type="datetime-local" v-model="manualDateTime" />
       </b-form-group>
       <div class="d-flex justify-content-end" style="gap: 8px">
@@ -65,6 +74,14 @@
 <script>
 import { RESULT_STATUS_LABELS } from "@/utils/officialStamp";
 
+// BUG FIX (2026-09-25): modal "Atur Waktu Penetapan Status" sebelumnya
+// HARDCODE WIB (Asia/Jakarta, UTC+7) — event di luar Jawa/Sumatra (WITA/
+// WIT) terpaksa menghitung manual selisih jam sendiri sebelum input.
+// Offset tetap (bukan lookup timezone library) krn Indonesia TIDAK
+// kenal DST — WIB/WITA/WIT masing2 selalu +7/+8/+9 sepanjang tahun.
+const TZ_OFFSET_HOURS = { WIB: 7, WITA: 8, WIT: 9 };
+const TZ_OPTIONS = ["WIB", "WITA", "WIT"];
+
 export default {
   name: "OfficialStampToggle",
   props: {
@@ -77,7 +94,31 @@ export default {
     return {
       showModal: false,
       manualDateTime: "",
+      // Default WIB — SAMA PERSIS dgn perilaku lama sebelum fix ini utk
+      // operator yang tidak menyentuh pilihan zona sama sekali (zero
+      // impact kalau tidak dipakai).
+      manualTz: "WIB",
+      TZ_OPTIONS,
     };
+  },
+  watch: {
+    // Operator ganti pilihan zona di tengah pengisian — hitung ulang
+    // instant dari nilai yang SEDANG diketik di zona LAMA (`oldTz`, dari
+    // Vue watcher, bukan asumsi urutan event), lalu tampilkan ulang di
+    // zona BARU, supaya waktu absolut yang dimaksud TIDAK berubah cuma
+    // krn ganti pilihan zona (bukan reset ke waktu sekarang lagi).
+    manualTz(newTz, oldTz) {
+      if (!this.manualDateTime) return;
+      const withSeconds =
+        this.manualDateTime.length === 16
+          ? this.manualDateTime + ":00"
+          : this.manualDateTime;
+      const prevOffsetMs = (TZ_OFFSET_HOURS[oldTz] || 7) * 3600000;
+      const asUtcGuess = new Date(withSeconds + "Z");
+      if (isNaN(asUtcGuess.getTime())) return;
+      const instant = new Date(asUtcGuess.getTime() - prevOffsetMs);
+      this.manualDateTime = this.formatForTz(instant, newTz);
+    },
   },
   computed: {
     statusLabel() {
@@ -102,38 +143,49 @@ export default {
     },
   },
   methods: {
-    // Buka modal, pre-fill input datetime-local dgn waktu SEKARANG (kalau
-    // belum pernah di-set) atau waktu tersimpan saat ini — keduanya
-    // dikonversi ke wall-clock WIB dgn cara geser epoch +7 jam lalu baca
-    // komponen UTC-nya, supaya benar TERLEPAS dari timezone OS operator
-    // (tidak butuh library timezone tambahan).
-    openManualModal() {
-      const base = this.setAt ? new Date(this.setAt) : new Date();
-      const wib = new Date(base.getTime() + 7 * 3600000);
+    // Format instant (Date) jadi wall-clock string "YYYY-MM-DDTHH:mm" utk
+    // input datetime-local, pada zona `tz` — geser epoch sesuai offset
+    // tetap zona itu lalu baca komponen UTC-nya, supaya benar TERLEPAS
+    // dari timezone OS operator (tidak butuh library timezone tambahan).
+    formatForTz(date, tz) {
+      const offsetMs = (TZ_OFFSET_HOURS[tz] || 7) * 3600000;
+      const shifted = new Date(date.getTime() + offsetMs);
       const pad = (n) => String(n).padStart(2, "0");
-      this.manualDateTime =
-        wib.getUTCFullYear() +
+      return (
+        shifted.getUTCFullYear() +
         "-" +
-        pad(wib.getUTCMonth() + 1) +
+        pad(shifted.getUTCMonth() + 1) +
         "-" +
-        pad(wib.getUTCDate()) +
+        pad(shifted.getUTCDate()) +
         "T" +
-        pad(wib.getUTCHours()) +
+        pad(shifted.getUTCHours()) +
         ":" +
-        pad(wib.getUTCMinutes());
+        pad(shifted.getUTCMinutes())
+      );
+    },
+    // Buka modal, pre-fill input datetime-local dgn waktu SEKARANG (kalau
+    // belum pernah di-set) atau waktu tersimpan saat ini, pada zona yang
+    // sedang dipilih (default WIB — sama persis perilaku lama).
+    openManualModal() {
+      this.manualTz = "WIB";
+      const base = this.setAt ? new Date(this.setAt) : new Date();
+      this.manualDateTime = this.formatForTz(base, this.manualTz);
       this.showModal = true;
     },
     confirmManual() {
       if (!this.manualDateTime) return;
-      // Input datetime-local diperlakukan sbg wall-clock WIB (UTC+7,
-      // Indonesia tidak kenal DST) — susun ISO string dgn offset eksplisit
-      // "+07:00" supaya Date selalu diparse benar jadi instant UTC yang
-      // tepat, terlepas dari timezone OS operator.
+      // Input datetime-local diperlakukan sbg wall-clock pada zona yang
+      // dipilih (WIB/WITA/WIT — Indonesia tidak kenal DST, jadi offset
+      // tetap) — susun ISO string dgn offset eksplisit supaya Date selalu
+      // diparse benar jadi instant UTC yang tepat, terlepas dari timezone
+      // OS operator.
       const withSeconds =
         this.manualDateTime.length === 16
           ? this.manualDateTime + ":00"
           : this.manualDateTime;
-      const d = new Date(withSeconds + "+07:00");
+      const offset = TZ_OFFSET_HOURS[this.manualTz] || 7;
+      const offsetStr = "+" + String(offset).padStart(2, "0") + ":00";
+      const d = new Date(withSeconds + offsetStr);
       if (isNaN(d.getTime())) return;
       this.$emit("set-manual", d.toISOString());
       this.showModal = false;

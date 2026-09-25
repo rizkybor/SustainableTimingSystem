@@ -3342,6 +3342,9 @@ export default {
         return;
       }
 
+      // BUG FIX (2026-09-25): isi celah babak yg TIDAK sedang dibuka dari
+      // DB dulu sebelum membangun paket — lihat hydrateAllRoundsFromDb().
+      await this.hydrateAllRoundsFromDb();
       const roundsSheets = this.buildAllRoundsPackage();
 
       this.isSavingAllRounds = true;
@@ -3368,6 +3371,9 @@ export default {
         return;
       }
 
+      // BUG FIX (2026-09-25): isi celah babak yg TIDAK sedang dibuka dari
+      // DB dulu sebelum menghitung Overall — lihat hydrateAllRoundsFromDb().
+      await this.hydrateAllRoundsFromDb();
       const overallPkg = this.buildOverallPackage();
       // BUG FIX: dulu tidak dicek — klik "Save Overall" sebelum Final A/B
       // (atau babak apa pun) selesai akan menyimpan dokumen Overall KOSONG
@@ -6140,6 +6146,157 @@ export default {
       } catch (err) {
         if (logger && logger.warn) {
           logger.warn("hydrateRoundResultsFromDb failed:", err);
+        }
+      }
+    },
+
+    // BUG FIX (2026-09-25, audit keamanan alur Save): sama tujuan dgn
+    // hydrateRoundResultsFromDb() di atas TAPI utk SEMUA babak sekaligus,
+    // bukan cuma currentRound — dipanggil sebelum "All Round Save"/"Save
+    // Overall". Root cause yang diperbaiki: buildRoundRows() utk babak yg
+    // BUKAN currentRound baca dari snapshot localStorage SAJA (lihat
+    // komentarnya, ~baris 2695) — kalau operator refresh halaman/pindah
+    // device TANPA membuka ulang tiap tab Round dalam sesi ini,
+    // localStorage babak itu kosong, dan "All Round Save"/"Save Overall"
+    // akan menulis hasil KOSONG ke DB, MENIMPA hasil yg sebelumnya sudah
+    // benar tersimpan — tanpa peringatan apa pun ke operator. Lihat
+    // MEMORY-H2H.md utk detail audit lengkap.
+    //
+    // Non-destruktif, sama filosofi dgn hydrateRoundResultsFromDb(): HANYA
+    // mengisi field yg masih kosong per tim per babak, TIDAK PERNAH
+    // menimpa nilai yg sudah ada (edit operator yg belum sempat di-Save
+    // tetap diutamakan). Babak yg SEDANG AKTIF (currentRound) SENGAJA
+    // DILEWATI — sumber kebenarannya live state (participantArr), sudah
+    // ditangani hydrateRoundResultsFromDb() lewat jalur terpisah.
+    async hydrateAllRoundsFromDb() {
+      try {
+        if (typeof ipcRenderer === "undefined") return;
+        if (!this.roundResultsRootKey) return;
+        const rounds = Array.isArray(this.rounds) ? this.rounds : [];
+        if (!rounds.length) return;
+
+        const bucket = getBucket();
+        if (
+          !bucket ||
+          !bucket.eventId ||
+          !bucket.initialId ||
+          !bucket.raceId ||
+          !bucket.divisionId
+        )
+          return;
+
+        const res = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => resolve(null), 6000);
+          ipcRenderer.once("h2h:results:getAll-reply", (_e, payload) => {
+            clearTimeout(timeoutId);
+            resolve(payload);
+          });
+          ipcRenderer.send("h2h:results:getAll", bucket);
+        });
+
+        if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
+          return;
+
+        const byRound = new Map();
+        res.items.forEach((row) => {
+          const rid = String((row && row.roundId) || "");
+          if (!rid) return;
+          if (!byRound.has(rid)) byRound.set(rid, new Map());
+          byRound
+            .get(rid)
+            .set(
+              String((row && row.nameTeam) || "").trim().toUpperCase(),
+              row
+            );
+        });
+        if (!byRound.size) return;
+
+        const isEmptyVal = (v) => {
+          if (v === undefined || v === null || v === "") return true;
+          if (typeof v === "object" && !Array.isArray(v)) {
+            return Object.values(v).every((x) => !x);
+          }
+          return false;
+        };
+        const hasFillableVal = (v) => {
+          if (v === undefined || v === null || v === "") return false;
+          if (typeof v === "object" && !Array.isArray(v)) {
+            return Object.values(v).some((x) => !!x);
+          }
+          return !!v;
+        };
+        const fillableKeys = [
+          "startTime",
+          "finishTime",
+          "raceTime",
+          "totalTime",
+          "penaltyTime",
+          "penalty",
+          "penalties",
+          "winLose",
+          "flag",
+        ];
+
+        const all = readAllRoundResults(this.roundResultsRootKey) || {};
+        let changedAny = false;
+
+        rounds.forEach((r) => {
+          if (!r) return;
+          const isCurrentRound = !!(
+            this.currentRound && this.currentRound.id === r.id
+          );
+          if (isCurrentRound) return;
+
+          const roundKey = String(r.id);
+          const dbByName = byRound.get(roundKey);
+          if (!dbByName || !dbByName.size) return;
+
+          const subset = this.participantsForRound(r);
+          const existingRows = Array.isArray(all[roundKey])
+            ? all[roundKey]
+            : [];
+          const existingByName = new Map(
+            existingRows.map((row) => [
+              String(row.nameTeam || "").trim().toUpperCase(),
+              row,
+            ])
+          );
+
+          const merged = subset.map((p) => {
+            const nameKey = String(p.nameTeam || p.teamName || "")
+              .trim()
+              .toUpperCase();
+            const existing = existingByName.get(nameKey) || {
+              nameTeam: String(p.nameTeam || p.teamName || ""),
+              bibTeam: String(p.bibTeam || ""),
+              result: {},
+            };
+            const dbRow = dbByName.get(nameKey);
+            if (dbRow && dbRow.result) {
+              const nextResult = { ...(existing.result || {}) };
+              fillableKeys.forEach((k) => {
+                if (
+                  isEmptyVal(nextResult[k]) &&
+                  hasFillableVal(dbRow.result[k])
+                ) {
+                  nextResult[k] = dbRow.result[k];
+                  changedAny = true;
+                }
+              });
+              existing.result = nextResult;
+            }
+            return existing;
+          });
+
+          all[roundKey] = merged;
+        });
+
+        if (changedAny) {
+          writeAllRoundResults(this.roundResultsRootKey, all);
+        }
+      } catch (err) {
+        if (logger && logger.warn) {
+          logger.warn("hydrateAllRoundsFromDb failed:", err);
         }
       }
     },

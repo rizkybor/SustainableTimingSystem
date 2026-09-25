@@ -440,7 +440,7 @@ import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
 import PrintOverallModal from "@/components/result/PrintOverallModal.vue";
 import OfficialStampToggle from "@/components/result/OfficialStampToggle.vue";
-import { deriveResultStatus } from "@/utils/officialStamp";
+import { deriveResultStatus, buildCategoryStatusKey } from "@/utils/officialStamp";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -545,6 +545,7 @@ export default {
       defaultImg,
       // "provisional" | "unofficial" | "official"
       resultStatus: "provisional",
+      resultCategoryKey: "",
       loading: false,
       error: "",
       results: [],
@@ -610,7 +611,7 @@ export default {
   computed: {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
-      return (m && m.drr) || "";
+      return (m && m[this.resultCategoryKey]) || (m && m.drr) || "";
     },
     isOfficial() {
       return this.resultStatus === "official";
@@ -818,7 +819,16 @@ export default {
         chiefJudge: ev.chiefJudge || "",
         event_logo: ev.event_logo || [],
       };
-      this.resultStatus = deriveResultStatus(this.eventInfo, "drr");
+      this.resultCategoryKey = buildCategoryStatusKey("drr", {
+        divisionId: q.divisionId,
+        raceId: q.raceId,
+        initialId: q.initialId,
+      });
+      this.resultStatus = deriveResultStatus(
+        this.eventInfo,
+        this.resultCategoryKey,
+        "drr"
+      );
     }
 
     this.loadDrrResult();
@@ -1253,7 +1263,17 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res;
-              this.resultStatus = deriveResultStatus(this.eventInfo, "drr");
+              const q = this.$route.query || {};
+              this.resultCategoryKey = buildCategoryStatusKey("drr", {
+                divisionId: q.divisionId,
+                raceId: q.raceId,
+                initialId: q.initialId,
+              });
+              this.resultStatus = deriveResultStatus(
+                this.eventInfo,
+                this.resultCategoryKey,
+                "drr"
+              );
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -1287,15 +1307,15 @@ export default {
               ...this.eventInfo,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                drr: nextStatus,
+                [this.resultCategoryKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                drr: nextStatus === "official",
+                [this.resultCategoryKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                drr: res.setAt || new Date().toISOString(),
+                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -1312,7 +1332,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: "drr",
+          category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
         });

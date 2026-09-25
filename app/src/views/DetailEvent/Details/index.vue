@@ -65,6 +65,27 @@
               >
             </div>
           </b-col>
+
+          <!-- Backup/Restore/Reset Data -->
+          <b-col cols="auto" class="ml-auto hero-actions d-flex flex-column align-items-stretch">
+            <b-button class="btn-race-settings mb-2" @click="openBackupModal">
+              <Icon icon="mdi:database-export-outline" class="mr-1" />
+              Backup Data
+            </b-button>
+
+            <b-button class="btn-race-settings mb-2" @click="openRestoreModal">
+              <Icon icon="mdi:database-import-outline" class="mr-1" />
+              Restore Data
+            </b-button>
+
+            <b-button
+              variant="outline-danger"
+              class="btn-race-reset"
+              @click="openResetDataModal"
+            >
+              Reset Data
+            </b-button>
+          </b-col>
         </b-row>
       </b-container>
     </section>
@@ -80,7 +101,7 @@
           <Icon icon="mdi:history" class="mr-1" />
           Judges Activity History
         </b-button>
-        
+
         <b-button
           class="btn-race-settings mr-2"
           @click="goToEventOverallResult"
@@ -99,10 +120,6 @@
 
         <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
           Race Settings
-        </b-button>
-
-        <b-button variant="outline-danger" class="btn-race-reset" @click="openResetDataModal">
-          Reset Data
         </b-button>
       </div>
 
@@ -320,6 +337,193 @@
         </b-button>
       </div>
     </b-modal>
+
+    <!-- MODAL: Backup Data Event -->
+    <b-modal
+      v-model="showBackupModal"
+      title="Backup Data Event"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="backupInProgress"
+      hide-footer
+      @hidden="onBackupModalHidden"
+    >
+      <div v-if="!backupInProgress && !backupDone">
+        <p class="mb-2">
+          Ini akan mengumpulkan <strong>seluruh data</strong> yang terhubung
+          dengan event <strong>{{ events.eventName || "-" }}</strong> —
+          info event, semua hasil kompetisi (Sprint/H2H/Slalom/DRR/Rafting
+          Cross), Registered Teams, profil tim terdaftar, riwayat penalty
+          juri, chat, Race/Judges Settings, dan lainnya — menjadi satu file
+          JSON yang bisa disimpan di komputer Anda.
+        </p>
+        <p class="mb-0 text-muted small">
+          File ini bisa dipakai kembali lewat <strong>Restore Data</strong>
+          untuk mengembalikan data event ini persis seperti saat backup
+          dibuat.
+        </p>
+      </div>
+
+      <div v-else-if="backupInProgress" class="mb-3">
+        <b-progress
+          :value="backupProgressPercent"
+          :max="100"
+          show-progress
+          animated
+          variant="primary"
+          class="mb-2"
+        />
+        <div class="small text-muted">
+          {{ backupProgressLabel }} — {{ backupProgressPercent }}%
+        </div>
+      </div>
+
+      <div v-else-if="backupDone" class="text-center py-2">
+        <Icon
+          icon="mdi:check-circle-outline"
+          width="40"
+          height="40"
+          class="text-success mb-2"
+        />
+        <p class="mb-1">Backup berhasil disimpan ke:</p>
+        <p class="small text-muted mb-0" style="word-break: break-all">
+          {{ backupDone.path }}
+        </p>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3" style="gap: 8px">
+        <b-button
+          v-if="!backupInProgress && !backupDone"
+          variant="outline-secondary"
+          @click="showBackupModal = false"
+        >
+          Batal
+        </b-button>
+        <b-button
+          v-if="!backupInProgress && !backupDone"
+          variant="primary"
+          @click="confirmBackupData"
+        >
+          Mulai Backup
+        </b-button>
+        <b-button
+          v-if="backupDone"
+          variant="primary"
+          @click="showBackupModal = false"
+        >
+          Tutup
+        </b-button>
+      </div>
+    </b-modal>
+
+    <!-- MODAL: Restore Data Event -->
+    <b-modal
+      v-model="showRestoreModal"
+      title="Restore Data Event"
+      centered
+      no-close-on-backdrop
+      :no-close-on-esc="restoreInProgress"
+      hide-footer
+      @hidden="onRestoreModalHidden"
+    >
+      <!-- STEP 1: belum pilih file -->
+      <div v-if="!restorePicked && !restoreInProgress">
+        <p class="mb-3">
+          Pilih file backup (.json) hasil <strong>Backup Data</strong> untuk
+          memulihkan data event <strong>{{ events.eventName || "-" }}</strong>.
+          Restore akan <strong>menimpa</strong> data event ini dengan isi
+          file backup yang dipilih.
+        </p>
+        <div class="text-center">
+          <b-button
+            variant="outline-primary"
+            :disabled="restorePicking"
+            @click="pickRestoreFile"
+          >
+            <b-spinner small v-if="restorePicking" class="mr-1" />
+            Pilih File Backup...
+          </b-button>
+        </div>
+      </div>
+
+      <!-- STEP 2: file dipilih tapi eventId tidak cocok -->
+      <div v-else-if="restorePicked && restorePicked.mismatched && !restoreInProgress">
+        <p class="mb-2 text-danger">
+          File backup ini bukan untuk event yang sedang dibuka.
+        </p>
+        <p class="mb-1 small">
+          File berisi data event: <strong>{{ restorePicked.eventName || "-" }}</strong>
+          (ID: <code>{{ restorePicked.eventId }}</code>)
+        </p>
+        <p class="mb-3 small">
+          Event yang sedang dibuka: <strong>{{ events.eventName || "-" }}</strong>
+          (ID: <code>{{ eventId }}</code>)
+        </p>
+        <p class="mb-3 small text-muted">
+          Restore hanya bisa dilakukan ke event yang sama dengan asal backup.
+        </p>
+        <div class="d-flex justify-content-end" style="gap: 8px">
+          <b-button variant="outline-secondary" @click="showRestoreModal = false">
+            Tutup
+          </b-button>
+          <b-button variant="outline-primary" @click="restorePicked = null">
+            Pilih File Lain
+          </b-button>
+        </div>
+      </div>
+
+      <!-- STEP 3: file cocok, tampilkan ringkasan + konfirmasi -->
+      <div v-else-if="restorePicked && !restoreInProgress">
+        <p class="mb-2">
+          Backup dari event ini, dibuat pada
+          <strong>{{ formatBackupDate(restorePicked.createdAt) }}</strong>.
+        </p>
+        <p class="mb-2">
+          Tindakan ini akan <strong>menimpa (replace) semua data event ini</strong>
+          dengan isi file backup — data yang ada sekarang akan hilang dan
+          diganti dengan data dari backup. Tindakan ini
+          <strong>tidak dapat dibatalkan</strong>.
+        </p>
+        <b-form-group>
+          <label class="small text-muted mb-1">
+            Ketik <strong>{{ RESTORE_CONFIRM_PHRASE }}</strong> untuk konfirmasi:
+          </label>
+          <b-form-input
+            v-model="restoreConfirmText"
+            :placeholder="RESTORE_CONFIRM_PHRASE"
+            autocomplete="off"
+            @keyup.enter="confirmRestoreData"
+          />
+        </b-form-group>
+        <div class="d-flex justify-content-end" style="gap: 8px">
+          <b-button variant="outline-secondary" @click="restorePicked = null">
+            Pilih File Lain
+          </b-button>
+          <b-button
+            variant="danger"
+            :disabled="restoreConfirmText !== RESTORE_CONFIRM_PHRASE"
+            @click="confirmRestoreData"
+          >
+            Restore Data
+          </b-button>
+        </div>
+      </div>
+
+      <!-- STEP 4: progress -->
+      <div v-else-if="restoreInProgress" class="mb-3">
+        <b-progress
+          :value="restoreProgressPercent"
+          :max="100"
+          show-progress
+          animated
+          variant="danger"
+          class="mb-2"
+        />
+        <div class="small text-muted">
+          {{ restoreProgressLabel }} — {{ restoreProgressPercent }}%
+        </div>
+      </div>
+    </b-modal>
   </div>
 </template>
 
@@ -418,6 +622,23 @@ export default {
       resetProgressPercent: 0,
       resetProgressLabel: "",
       RESET_CONFIRM_PHRASE: "MAKOPLANET",
+
+      // --- Backup Data Event ---
+      showBackupModal: false,
+      backupInProgress: false,
+      backupProgressPercent: 0,
+      backupProgressLabel: "",
+      backupDone: null, // { path }
+
+      // --- Restore Data Event ---
+      showRestoreModal: false,
+      restorePicking: false,
+      restorePicked: null, // { eventId, eventName, createdAt, counts, mismatched }
+      restoreConfirmText: "",
+      restoreInProgress: false,
+      restoreProgressPercent: 0,
+      restoreProgressLabel: "",
+      RESTORE_CONFIRM_PHRASE: "PULIHKAN",
       MAX_GATE: 14,
       MAX_SECTION: 6,
       raceSettings: {
@@ -1084,6 +1305,228 @@ export default {
         this.resetInProgress = false;
         this.resetProgressPercent = 0;
         this.resetProgressLabel = "";
+      }
+    },
+
+    // ========================================================================
+    // Backup Data Event
+    // ========================================================================
+    openBackupModal() {
+      this.backupDone = null;
+      this.backupProgressPercent = 0;
+      this.backupProgressLabel = "";
+      this.showBackupModal = true;
+    },
+
+    onBackupModalHidden() {
+      if (!this.backupInProgress) this.backupDone = null;
+    },
+
+    _fetchBackupCollectionsList() {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:backup-data:collections-reply", (_e, list) =>
+          resolve(Array.isArray(list) ? list : [])
+        );
+        ipcRenderer.send("event:backup-data:collections");
+      });
+    },
+
+    _backupOneCollection(eventId, collection) {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:backup-data:step-reply", (_e, r) => resolve(r));
+        ipcRenderer.send("event:backup-data:step", { eventId, collection });
+      });
+    },
+
+    _saveBackupFile(eventId, eventName, collections) {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:backup-data:save-file-reply", (_e, r) =>
+          resolve(r)
+        );
+        ipcRenderer.send("event:backup-data:save-file", {
+          eventId,
+          eventName,
+          collections,
+        });
+      });
+    },
+
+    async confirmBackupData() {
+      const eventId = this.eventId || this.$route.params.id || "";
+      if (!eventId) return;
+
+      this.backupInProgress = true;
+      this.backupProgressPercent = 0;
+      this.backupProgressLabel = "Menyiapkan...";
+      try {
+        const steps = await this._fetchBackupCollectionsList();
+        const total = steps.length || 1;
+        const collections = {};
+
+        for (let i = 0; i < steps.length; i++) {
+          const { name, label } = steps[i];
+          this.backupProgressLabel = `Mengumpulkan ${label}... (${i + 1}/${
+            steps.length
+          })`;
+          const r = await this._backupOneCollection(eventId, name);
+          if (!r || !r.ok) {
+            throw new Error((r && r.error) || `Gagal mengumpulkan ${name}`);
+          }
+          collections[name] = r.docs || [];
+          this.backupProgressPercent = Math.round(((i + 1) / total) * 100);
+        }
+
+        this.backupProgressLabel = "Menyimpan file...";
+        const saveRes = await this._saveBackupFile(
+          eventId,
+          this.events.eventName || "",
+          collections
+        );
+        if (saveRes && saveRes.canceled) {
+          // user membatalkan save dialog — bukan error, cukup kembali ke awal
+          this.backupInProgress = false;
+          this.backupProgressPercent = 0;
+          this.backupProgressLabel = "";
+          return;
+        }
+        if (!saveRes || !saveRes.ok) {
+          throw new Error((saveRes && saveRes.error) || "Gagal menyimpan file backup");
+        }
+
+        this.backupProgressPercent = 100;
+        this.backupDone = { path: saveRes.path };
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Backup Data gagal",
+          detail: err && err.message ? err.message : String(err),
+        });
+        this.showBackupModal = false;
+      } finally {
+        this.backupInProgress = false;
+        this.backupProgressPercent = 0;
+        this.backupProgressLabel = "";
+      }
+    },
+
+    // ========================================================================
+    // Restore Data Event
+    // ========================================================================
+    openRestoreModal() {
+      this.restorePicked = null;
+      this.restoreConfirmText = "";
+      this.restoreProgressPercent = 0;
+      this.restoreProgressLabel = "";
+      this.showRestoreModal = true;
+    },
+
+    onRestoreModalHidden() {
+      if (!this.restoreInProgress) {
+        this.restorePicked = null;
+        this.restoreConfirmText = "";
+        ipcRenderer.send("event:restore-data:clear");
+      }
+    },
+
+    formatBackupDate(iso) {
+      if (!iso) return "-";
+      try {
+        return new Date(iso).toLocaleString("id-ID");
+      } catch (e) {
+        return String(iso);
+      }
+    },
+
+    pickRestoreFile() {
+      this.restorePicking = true;
+      ipcRenderer.once("event:restore-data:pick-file-reply", (_e, r) => {
+        this.restorePicking = false;
+        if (!r || r.canceled) return;
+        if (!r.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "File backup tidak valid",
+            detail: r.error || "Gagal membaca file backup.",
+          });
+          return;
+        }
+        const currentEventId = this.eventId || this.$route.params.id || "";
+        this.restorePicked = {
+          eventId: r.eventId,
+          eventName: r.eventName,
+          createdAt: r.createdAt,
+          counts: r.counts || {},
+          mismatched: String(r.eventId) !== String(currentEventId),
+        };
+      });
+      ipcRenderer.send("event:restore-data:pick-file");
+    },
+
+    _fetchRestoreCollectionsList() {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:restore-data:collections-reply", (_e, list) =>
+          resolve(Array.isArray(list) ? list : [])
+        );
+        ipcRenderer.send("event:restore-data:collections");
+      });
+    },
+
+    _restoreOneCollection(eventId, collection) {
+      return new Promise((resolve) => {
+        ipcRenderer.once("event:restore-data:step-reply", (_e, r) => resolve(r));
+        ipcRenderer.send("event:restore-data:step", { eventId, collection });
+      });
+    },
+
+    async confirmRestoreData() {
+      if (this.restoreConfirmText !== this.RESTORE_CONFIRM_PHRASE) return;
+      if (!this.restorePicked || this.restorePicked.mismatched) return;
+      const eventId = this.eventId || this.$route.params.id || "";
+      if (!eventId) return;
+
+      this.restoreInProgress = true;
+      this.restoreProgressPercent = 0;
+      this.restoreProgressLabel = "Menyiapkan...";
+      try {
+        const steps = await this._fetchRestoreCollectionsList();
+        const total = steps.length || 1;
+
+        for (let i = 0; i < steps.length; i++) {
+          const { name, label } = steps[i];
+          this.restoreProgressLabel = `Memulihkan ${label}... (${i + 1}/${
+            steps.length
+          })`;
+          const r = await this._restoreOneCollection(eventId, name);
+          if (!r || !r.ok) {
+            throw new Error((r && r.error) || `Gagal memulihkan ${name}`);
+          }
+          this.restoreProgressPercent = Math.round(((i + 1) / total) * 100);
+        }
+
+        this.restoreProgressLabel = "Menyegarkan tampilan...";
+        this._clearLocalCachesForEvent(eventId);
+        await this.loadEvent(eventId);
+        await this.refreshVisibleBuckets();
+        this.restoreProgressPercent = 100;
+
+        ipcRenderer.send("event:restore-data:clear");
+        this.showRestoreModal = false;
+        ipcRenderer.send("get-alert-saved", {
+          type: "info",
+          message: "Restore Data berhasil",
+          detail: "Data event ini sudah dipulihkan dari file backup.",
+        });
+      } catch (err) {
+        ipcRenderer.send("get-alert", {
+          type: "error",
+          message: "Restore Data gagal",
+          detail: err && err.message ? err.message : String(err),
+        });
+      } finally {
+        this.restoreInProgress = false;
+        this.restoreProgressPercent = 0;
+        this.restoreProgressLabel = "";
+        this.restoreConfirmText = "";
       }
     },
 
@@ -2710,6 +3153,20 @@ export default {
 
   .hero-logo {
     margin-bottom: 12px;
+  }
+}
+
+/* Backup/Restore/Reset Data di pojok kanan hero — wrap ke bawah kalau
+   sempit, jangan menempel judul event */
+.hero-actions {
+  margin-top: 8px;
+}
+
+@media (max-width: 991px) {
+  .hero-actions {
+    width: 100%;
+    align-items: stretch !important;
+    margin-top: 16px;
   }
 }
 

@@ -367,7 +367,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel, exportSheetsToExcel } from "@/utils/exportExcel";
-import { deriveResultStatus } from "@/utils/officialStamp";
+import { deriveResultStatus, buildCategoryStatusKey } from "@/utils/officialStamp";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -398,6 +398,7 @@ export default {
       defaultImg,
       // "provisional" | "unofficial" | "official"
       resultStatus: "provisional",
+      resultCategoryKey: "",
       loading: false,
       error: "",
       // semua bucket registrasi (lintas race category) utk event ini,
@@ -430,7 +431,7 @@ export default {
   computed: {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
-      return (m && m.raftingcross) || "";
+      return (m && m[this.resultCategoryKey]) || (m && m.raftingcross) || "";
     },
     isOfficial() {
       return this.resultStatus === "official";
@@ -635,15 +636,15 @@ export default {
               ...this.eventInfo,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                raftingcross: nextStatus,
+                [this.resultCategoryKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                raftingcross: nextStatus === "official",
+                [this.resultCategoryKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                raftingcross: res.setAt || new Date().toISOString(),
+                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -660,7 +661,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: "raftingcross",
+          category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
         });
@@ -674,7 +675,17 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.resultStatus = deriveResultStatus(this.eventInfo, "raftingcross");
+            const q = this.$route.query || {};
+            this.resultCategoryKey = buildCategoryStatusKey("raftingcross", {
+              divisionId: q.divisionId,
+              raceId: q.raceId,
+              initialId: q.initialId,
+            });
+            this.resultStatus = deriveResultStatus(
+              this.eventInfo,
+              this.resultCategoryKey,
+              "raftingcross"
+            );
             resolve();
           });
         });

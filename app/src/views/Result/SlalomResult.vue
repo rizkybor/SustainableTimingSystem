@@ -514,7 +514,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
-import { deriveResultStatus } from "@/utils/officialStamp";
+import { deriveResultStatus, buildCategoryStatusKey } from "@/utils/officialStamp";
 
 /* ========= Helpers ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -563,6 +563,7 @@ export default {
       defaultImg,
       // "provisional" | "unofficial" | "official"
       resultStatus: "provisional",
+      resultCategoryKey: "",
       loading: false,
       error: "",
       results: [],
@@ -641,7 +642,7 @@ export default {
   computed: {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
-      return (m && m.slalom) || "";
+      return (m && m[this.resultCategoryKey]) || (m && m.slalom) || "";
     },
     isOfficial() {
       return this.resultStatus === "official";
@@ -1560,7 +1561,17 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.resultStatus = deriveResultStatus(this.eventInfo, "slalom");
+            const q = this.$route.query || {};
+            this.resultCategoryKey = buildCategoryStatusKey("slalom", {
+              divisionId: q.divisionId,
+              raceId: q.raceId,
+              initialId: q.initialId,
+            });
+            this.resultStatus = deriveResultStatus(
+              this.eventInfo,
+              this.resultCategoryKey,
+              "slalom"
+            );
             if (!this.eventInfo.eventName) this.error = this.error || "";
             resolve();
           });
@@ -1591,15 +1602,15 @@ export default {
               ...this.eventInfo,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                slalom: nextStatus,
+                [this.resultCategoryKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                slalom: nextStatus === "official",
+                [this.resultCategoryKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                slalom: res.setAt || new Date().toISOString(),
+                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -1616,7 +1627,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: "slalom",
+          category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
         });

@@ -105,6 +105,21 @@ const RESET_COLLECTIONS = [
   { name: "raceSettings", label: "Race Settings", mode: "deleteOneDoc" },
 ];
 
+// Filter identitas event standar (dipakai Reset Data, Backup, dan Restore
+// supaya ketiganya selalu menunjuk ke dokumen yang SAMA persis — dipisah
+// jadi fungsi sendiri biar tidak ada drift antara reset/backup/restore).
+// Mengembalikan `null` utk koleksi bermode khusus (pullJudgesArray/
+// deleteOneDoc) yang tidak pakai deleteMany/find filter generik ini.
+function buildEventFilter(eventId, cfg) {
+  const id = String(eventId || "");
+  if (cfg.byBucket) return { "bucket.eventId": id };
+  if (cfg.eventIdType === "objectId") {
+    if (!ObjectId.isValid(id)) return null;
+    return { eventId: new ObjectId(id) };
+  }
+  return { eventId: id };
+}
+
 async function deleteOneCollectionForEvent(eventId, collectionName) {
   const id = String(eventId || "");
   const cfg = RESET_COLLECTIONS.find((c) => c.name === collectionName);
@@ -126,17 +141,8 @@ async function deleteOneCollectionForEvent(eventId, collectionName) {
     return { ok: true, collection: cfg.name, deletedCount: res.deletedCount || 0 };
   }
 
-  let filter;
-  if (cfg.byBucket) {
-    filter = { "bucket.eventId": id };
-  } else if (cfg.eventIdType === "objectId") {
-    if (!ObjectId.isValid(id)) {
-      return { ok: true, collection: cfg.name, deletedCount: 0 };
-    }
-    filter = { eventId: new ObjectId(id) };
-  } else {
-    filter = { eventId: id };
-  }
+  const filter = buildEventFilter(id, cfg);
+  if (!filter) return { ok: true, collection: cfg.name, deletedCount: 0 };
   const res = await db.collection(cfg.name).deleteMany(filter);
   return { ok: true, collection: cfg.name, deletedCount: res.deletedCount || 0 };
 }
@@ -156,6 +162,7 @@ async function resetEventData(eventId) {
 
 module.exports = {
   RESET_COLLECTIONS,
+  buildEventFilter,
   deleteOneCollectionForEvent,
   resetEventData,
 };

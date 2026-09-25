@@ -32,25 +32,49 @@ export const RESULT_STATUS_LABELS = {
   official: "OFFICIAL",
 };
 
+// BUG FIX (2026-09-25): status Provisional/Unofficial/Official dulu
+// disimpan FLAT per tipe kategori saja (mis. resultsStatusByCategory.sprint)
+// — jadi mengubah status di satu bucket (mis. SENIOR R4 MEN) ikut mengubah
+// SEMUA bucket lain di kategori yang sama (mis. SENIOR R4 WOMEN), karena
+// semuanya baca/tulis key yang sama persis. Sekarang key-nya menyertakan
+// identitas bucket (Division+Race+Initial) supaya tiap kombinasi berdiri
+// sendiri. Dipakai bareng oleh Sprint/H2H/Slalom/DRR/RaftingCross Result.vue
+// — Overall SENGAJA tetap event-wide (tidak per-bucket), karena halamannya
+// memang menggabungkan seluruh kategori, bukan satu Division/Race/Initial.
+export function buildCategoryStatusKey(categoryType, bucket) {
+  const b = bucket || {};
+  const divisionId = String(b.divisionId || "");
+  const raceId = String(b.raceId || "");
+  const initialId = String(b.initialId || "");
+  return `${categoryType}__${divisionId}__${raceId}__${initialId}`;
+}
+
 // Turunkan status 3-pilihan dari eventInfo suatu event, dgn fallback ke
-// data lama (sebelum field resultsStatusByCategory ada):
-// - Kalau resultsStatusByCategory.<cat> sudah eksplisit tersimpan, pakai itu.
-// - Kalau belum (event lama) TAPI resultsOfficialByCategory.<cat> === true
-//   (pernah eksplisit di-Official-kan lewat UI lama), tetap "official" —
-//   supaya keputusan final yg sudah dibuat operator tidak "mundur" jadi
-//   Provisional gara-gara migrasi field.
-// - Selain itu (belum pernah disentuh sama sekali, ATAU dulu ditoggle jadi
-//   "false"/Unofficial di UI lama — boolean lama tidak bisa membedakan dua
-//   kasus ini) → default BARU "provisional" (bukan lagi "unofficial").
-export function deriveResultStatus(eventInfo, categoryKey) {
-  const explicit =
-    eventInfo &&
-    eventInfo.resultsStatusByCategory &&
-    eventInfo.resultsStatusByCategory[categoryKey];
+// data lama:
+// - Kalau resultsStatusByCategory.<categoryKey> (composite, per-bucket)
+//   sudah eksplisit tersimpan, pakai itu.
+// - Kalau belum ADA TAPI `fallbackKey` (key FLAT lama, sebelum migrasi
+//   bucket-granular) diberikan dan eksplisit tersimpan di sana, pakai itu
+//   — supaya event lama yg sudah pernah di-Official-kan sebelum fix ini
+//   tidak "mundur" jadi Provisional untuk SEMUA bucket-nya.
+// - Kalau masih belum ketemu juga, cek resultsOfficialByCategory boolean
+//   lama (categoryKey lalu fallbackKey) demi kompatibilitas data yg lebih
+//   lama lagi (sebelum resultsStatusByCategory ada sama sekali).
+// - Selain itu → default "provisional".
+export function deriveResultStatus(eventInfo, categoryKey, fallbackKey) {
+  const statusMap = (eventInfo && eventInfo.resultsStatusByCategory) || {};
+  const officialMap = (eventInfo && eventInfo.resultsOfficialByCategory) || {};
+
+  const explicit = statusMap[categoryKey];
   if (explicit && RESULT_STATUSES.includes(explicit)) return explicit;
-  const wasOfficial =
-    eventInfo &&
-    eventInfo.resultsOfficialByCategory &&
-    eventInfo.resultsOfficialByCategory[categoryKey];
-  return wasOfficial ? "official" : "provisional";
+
+  if (fallbackKey) {
+    const explicitFlat = statusMap[fallbackKey];
+    if (explicitFlat && RESULT_STATUSES.includes(explicitFlat)) return explicitFlat;
+  }
+
+  if (officialMap[categoryKey]) return "official";
+  if (fallbackKey && officialMap[fallbackKey]) return "official";
+
+  return "provisional";
 }

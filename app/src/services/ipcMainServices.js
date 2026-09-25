@@ -151,6 +151,11 @@ const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
 const { resetSlalomDataForEvent } = require("../controllers/DELETE/resetSlalomData");
 const { resetDrrDataForEvent } = require("../controllers/DELETE/resetDrrData");
 const {
+  getBackupSteps,
+  backupOneCollectionForEvent,
+} = require("../controllers/BACKUP/backupEventData");
+const { restoreOneCollectionForEvent } = require("../controllers/BACKUP/restoreEventData");
+const {
   insertChatMessage,
   listChatMessagesByEvent,
   deleteChatMessage,
@@ -494,6 +499,203 @@ function setupIPCMainHandlers() {
         error: error && error.message ? error.message : String(error),
       });
     }
+  });
+
+  // ========================================================================
+  // Backup & Restore Data Event
+  // ========================================================================
+  // Cakupan koleksi backup SELALU sinkron dgn RESET_COLLECTIONS (lihat
+  // backupEventData.js) supaya tidak ada drift antara apa yg dihapus Reset
+  // Data dan apa yg disimpan/dipulihkan Backup/Restore.
+
+  // daftar koleksi + label utk progress bar backup (renderer memanggil
+  // event:backup-data:step satu per satu, sama pola dgn Reset Data)
+  ipcMain.on("event:backup-data:collections", (event) => {
+    event.reply("event:backup-data:collections-reply", getBackupSteps());
+  });
+
+  ipcMain.on(
+    "event:backup-data:step",
+    async (event, { eventId, collection, __reqId } = {}) => {
+      try {
+        const result = await backupOneCollectionForEvent(eventId, collection);
+        event.reply("event:backup-data:step-reply", { ...result, __reqId });
+      } catch (error) {
+        event.reply("event:backup-data:step-reply", {
+          ok: false,
+          collection,
+          __reqId,
+          error: error && error.message ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // finalisasi: renderer sudah kumpulkan semua koleksi dari step-step di
+  // atas, kirim ke sini utk ditulis jadi satu file JSON via save dialog.
+  // BSON (ObjectId/Date) diamankan lewat EJSON.serialize supaya file JSON-
+  // nya bisa dibaca ulang persis (EJSON.deserialize) tanpa kehilangan tipe.
+  ipcMain.on(
+    "event:backup-data:save-file",
+    async (event, { eventId, eventName, collections } = {}) => {
+      try {
+        if (!eventId) throw new Error("eventId kosong");
+        const backupObj = {
+          backupVersion: 1,
+          eventId: String(eventId),
+          eventName: String(eventName || ""),
+          createdAt: new Date().toISOString(),
+          collections: collections || {},
+        };
+        const serialized = EJSON.serialize(backupObj);
+
+        const safeName =
+          String(eventName || "event")
+            .replace(/[\\/:*?"<>|]+/g, "_")
+            .trim() || "event";
+        const defaultPath = `Backup - ${safeName} - ${new Date()
+          .toISOString()
+          .slice(0, 10)}.json`;
+
+        const r = await dialog.showSaveDialog({
+          title: "Simpan Backup Data Event",
+          defaultPath,
+          filters: [{ name: "Backup JSON", extensions: ["json"] }],
+        });
+        if (r.canceled || !r.filePath) {
+          event.reply("event:backup-data:save-file-reply", {
+            ok: false,
+            canceled: true,
+          });
+          return;
+        }
+        fs.writeFileSync(r.filePath, JSON.stringify(serialized, null, 2), "utf8");
+        event.reply("event:backup-data:save-file-reply", {
+          ok: true,
+          path: r.filePath,
+        });
+      } catch (error) {
+        event.reply("event:backup-data:save-file-reply", {
+          ok: false,
+          error: error && error.message ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Restore: simpan hasil parse file backup di memori proses main
+  // (di-keyed oleh eventId) supaya renderer tidak perlu kirim ulang seluruh
+  // isi file lewat IPC di setiap step restore — cukup kirim nama koleksi.
+  let pendingRestoreBackup = null;
+
+  ipcMain.on("event:restore-data:pick-file", async (event) => {
+    try {
+      const r = await dialog.showOpenDialog({
+        title: "Pilih File Backup",
+        properties: ["openFile"],
+        filters: [{ name: "Backup JSON", extensions: ["json"] }],
+      });
+      if (r.canceled || !r.filePaths || r.filePaths.length === 0) {
+        event.reply("event:restore-data:pick-file-reply", {
+          ok: false,
+          canceled: true,
+        });
+        return;
+      }
+
+      const raw = fs.readFileSync(r.filePaths[0], "utf8");
+      const parsed = EJSON.deserialize(JSON.parse(raw));
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        !parsed.eventId ||
+        !parsed.collections ||
+        typeof parsed.collections !== "object"
+      ) {
+        event.reply("event:restore-data:pick-file-reply", {
+          ok: false,
+          error: "File backup tidak valid atau rusak (format tidak dikenali).",
+        });
+        return;
+      }
+
+      pendingRestoreBackup = {
+        path: r.filePaths[0],
+        eventId: String(parsed.eventId),
+        eventName: parsed.eventName || "",
+        createdAt: parsed.createdAt || "",
+        collections: parsed.collections,
+      };
+
+      const counts = {};
+      Object.keys(parsed.collections).forEach((k) => {
+        counts[k] = Array.isArray(parsed.collections[k])
+          ? parsed.collections[k].length
+          : 0;
+      });
+
+      event.reply("event:restore-data:pick-file-reply", {
+        ok: true,
+        path: r.filePaths[0],
+        eventId: pendingRestoreBackup.eventId,
+        eventName: pendingRestoreBackup.eventName,
+        createdAt: pendingRestoreBackup.createdAt,
+        counts,
+      });
+    } catch (error) {
+      event.reply("event:restore-data:pick-file-reply", {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  });
+
+  // daftar koleksi utk progress bar restore — HANYA koleksi yang benar-benar
+  // ada di file backup yang baru saja dipilih (bisa jadi file backup lama
+  // tidak punya koleksi yang baru ditambahkan belakangan, atau sebaliknya).
+  ipcMain.on("event:restore-data:collections", (event) => {
+    if (!pendingRestoreBackup) {
+      event.reply("event:restore-data:collections-reply", []);
+      return;
+    }
+    const known = getBackupSteps();
+    const steps = Object.keys(pendingRestoreBackup.collections).map((name) => {
+      const found = known.find((s) => s.name === name);
+      return { name, label: found ? found.label : name };
+    });
+    event.reply("event:restore-data:collections-reply", steps);
+  });
+
+  ipcMain.on(
+    "event:restore-data:step",
+    async (event, { eventId, collection, __reqId } = {}) => {
+      try {
+        if (
+          !pendingRestoreBackup ||
+          String(pendingRestoreBackup.eventId) !== String(eventId)
+        ) {
+          throw new Error(
+            "Data backup tidak ditemukan di memori — silakan pilih ulang file backup."
+          );
+        }
+        const docs = pendingRestoreBackup.collections[collection] || [];
+        const result = await restoreOneCollectionForEvent(eventId, collection, docs);
+        event.reply("event:restore-data:step-reply", { ...result, __reqId });
+      } catch (error) {
+        event.reply("event:restore-data:step-reply", {
+          ok: false,
+          collection,
+          __reqId,
+          error: error && error.message ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  ipcMain.on("event:restore-data:clear", (event) => {
+    pendingRestoreBackup = null;
+    if (event) event.reply("event:restore-data:clear-reply", { ok: true });
   });
 
   // "Reset All" di halaman Head to Head — hapus semua data kompetisi H2H

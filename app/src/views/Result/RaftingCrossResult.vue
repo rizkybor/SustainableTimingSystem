@@ -255,7 +255,6 @@
         <RaftingCrossPdf
           :data="pdfEventData"
           :dataParticipant="pdfRows"
-          :categories="pdfCategories"
           :status="resultStatus"
           :officialSetAt="officialSetAt"
           :rxCats="rxCats"
@@ -548,17 +547,6 @@ export default {
         ...r,
         countryCode: this.flagFor(r.nameTeam),
       }));
-    },
-    pdfCategories() {
-      const payload = safeParse(
-        localStorage.getItem(RACE_PAYLOAD_KEY) || "{}",
-        {}
-      );
-      const b = payload.bucket || {};
-      const title = [b.divisionName, b.raceName, b.initialName]
-        .filter(Boolean)
-        .join(" – ");
-      return title || "RAFTING CROSS";
     },
   },
   async created() {

@@ -3282,7 +3282,10 @@ export default {
       var i = 0;
       while (i < arr.length) {
         var t = arr[i] || {};
-        var key = String(t.teamId || t.bibTeam || "");
+        // BUG FIX (2026-09-25): bib harus jadi prioritas key, bukan teamId,
+        // karena teamId bisa kosong pada satu save lalu terisi pada save
+        // berikutnya untuk tim yang sama -> menyebabkan data tim dobel.
+        var key = String(t.bibTeam || t.teamId || "");
         if (!key) key = String(t.nameTeam || "");
         if (key) {
           var ranked = Number.isFinite(Number(t.result && t.result.ranked))
@@ -3347,7 +3350,7 @@ export default {
           : now;
         payload.updatedAt = now;
 
-        // map existing rows: key = teamId || bib || nameTeam
+        // map existing rows: key = bib || teamId || nameTeam (bib stabil antar save)
         var map = new Map();
         var safeArr = Array.isArray(existingDoc.eventResult)
           ? existingDoc.eventResult
@@ -3355,7 +3358,7 @@ export default {
         var ei = 0;
         while (ei < safeArr.length) {
           var row = safeArr[ei] || {};
-          var k = String(row.teamId || row.bib || row.teamName || "");
+          var k = String(row.bib || row.teamId || row.teamName || "");
           if (k) map.set(k, JSON.parse(JSON.stringify(row)));
           ei++;
         }

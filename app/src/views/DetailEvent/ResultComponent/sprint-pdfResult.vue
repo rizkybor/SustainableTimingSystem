@@ -8,9 +8,22 @@
       </div>
       <div class="band">
         <div class="band-left">
+          <!-- BUG FIX: kolom kategori di sini sebelumnya diisi `categories`
+               (prop dari pdfCategories() di SprintResult.vue), yang baca
+               LANGSUNG dari localStorage (RACE_PAYLOAD_KEY) — bucket LAMA
+               yg basi begitu operator pindah kategori lewat "Switch Sprint
+               Category" (murni via query, TIDAK menyentuh localStorage,
+               lihat komentar sprintCats() di SprintResult.vue yg SUDAH
+               diperbaiki dgn pola query-dulu). Akibatnya band kiri PDF bisa
+               menampilkan kategori yg BEDA dari band kanan (yg pakai
+               sprintCats, sudah benar) — mis. kiri "R4 - MEN - SENIOR",
+               kanan "U19 - R4 WOMEN" padahal keduanya harus menunjuk
+               kategori yang SAMA (yg sedang dipilih operator). Drpd
+               menambal sumber data basi ini, kategori dihapus dari band
+               kiri sepenuhnya — band kanan sudah menampilkan kategori yang
+               benar, tidak perlu diulang di kiri.
+          -->
           <strong>SCORE BOARD</strong>
-          <span class="dot">•</span>
-          <span class="cat">{{ categories || "SPRINT" }}</span>
           <span class="dot">•</span>
           <span class="cat">
             {{ data && data.levelName ? data.levelName : "Classification" }}
@@ -224,7 +237,6 @@ export default {
   props: {
     data: { type: Object, required: true },
     dataParticipant: { type: Array, required: true },
-    categories: { type: String, default: "" },
     status: { type: String, default: "unofficial" },
     officialSetAt: { type: String, default: "" },
     sprintCats: { type: Object, required: true },

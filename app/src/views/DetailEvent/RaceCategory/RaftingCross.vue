@@ -1635,7 +1635,10 @@ export default {
 
       const incoming = new Map();
       (overallRows || []).forEach((r) => {
-        const key = String(r.teamId || r.bibTeam || "");
+        // BUG FIX (2026-09-25): bib harus jadi prioritas key, bukan teamId,
+        // karena teamId bisa kosong pada satu save lalu terisi pada save
+        // berikutnya untuk tim yang sama -> menyebabkan data tim dobel.
+        const key = String(r.bibTeam || r.teamId || "");
         if (!key) return;
         incoming.set(key, {
           teamId: r.teamId || "",
@@ -1690,7 +1693,7 @@ export default {
           ? existingDoc.eventResult
           : [];
         safeArr.forEach((row) => {
-          const k = String((row && row.teamId) || (row && row.bib) || "");
+          const k = String((row && row.bib) || (row && row.teamId) || "");
           if (k) map.set(k, JSON.parse(JSON.stringify(row)));
         });
 

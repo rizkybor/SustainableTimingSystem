@@ -3544,7 +3544,10 @@ export default {
       var ti = 0;
       while (ti < teamsArr.length) {
         var t = teamsArr[ti] || {};
-        var key = String(t.teamId || t.bibNumber || t.bibTeam || "");
+        // BUG FIX (2026-09-25): bib harus jadi prioritas key, bukan teamId,
+        // karena teamId bisa kosong pada satu save lalu terisi pada save
+        // berikutnya untuk tim yang sama -> menyebabkan data tim dobel.
+        var key = String(t.bibNumber || t.bibTeam || t.teamId || "");
         if (key) {
           var rMap = this.ranksMap || {};
           var rInfo = rMap[String(t._id)];
@@ -3609,7 +3612,7 @@ export default {
           : now;
         payload.updatedAt = now;
 
-        // map existing rows: key = teamId || bib
+        // map existing rows: key = bib || teamId (bib stabil antar save)
         var map = new Map();
         var safeArr = Array.isArray(existingDoc.eventResult)
           ? existingDoc.eventResult
@@ -3617,7 +3620,7 @@ export default {
         var ei = 0;
         while (ei < safeArr.length) {
           var row = safeArr[ei] || {};
-          var k = String(row.teamId || row.bib || "");
+          var k = String(row.bib || row.teamId || "");
           if (k) {
             // deep clone sederhana
             map.set(k, JSON.parse(JSON.stringify(row)));

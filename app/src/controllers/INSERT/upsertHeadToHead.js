@@ -64,6 +64,22 @@ async function upsertBracket(bucket, rounds, { showBronze = true, settings = {} 
     { $set: doc },
     { upsert: true }
   );
+
+  // BUG FIX (2026-09-25): sebelumnya perubahan bracket (assign tim, ubah
+  // Heat, buat babak baru) TIDAK PERNAH memberi tahu sts-jurysystem —
+  // Live Result publik cuma refresh saat `upsertOverall()` (hasil akhir
+  // H2H) tersimpan, jadi Bracket H2H publik (baru dibangun) hanya update
+  // setelah SELURUH pertandingan selesai, bukan live per-babak. Reuse
+  // event `results:updated` yang SUDAH didengarkan LiveEventDetail.jsx —
+  // tidak perlu tipe event baru, cukup category "H2H" match.
+  notifyResultsUpdated({
+    eventId: doc.bucket.eventId,
+    category: "H2H",
+    initialId: doc.bucket.initialId,
+    divisionId: doc.bucket.divisionId,
+    raceId: doc.bucket.raceId,
+  });
+
   return { ok: true };
 }
 
@@ -140,6 +156,20 @@ async function upsertRoundRows(bucket, roundId, roundName, rows = []) {
   if (ops.length) {
     await col.bulkWrite(ops, { ordered: false });
   }
+
+  // Sama pola dgn upsertBracket() — laporkan hasil per-babak (waktu,
+  // Win/Lose) supaya Bracket H2H publik ikut refresh live per-match,
+  // bukan cuma menunggu upsertOverall() di akhir seluruh pertandingan.
+  if (ops.length) {
+    notifyResultsUpdated({
+      eventId: String(bucket.eventId || ""),
+      category: "H2H",
+      initialId: String(bucket.initialId || ""),
+      divisionId: String(bucket.divisionId || ""),
+      raceId: String(bucket.raceId || ""),
+    });
+  }
+
   return { ok: true, count: ops.length };
 }
 
@@ -204,6 +234,18 @@ async function upsertAllRounds(bucket, roundsSheets = []) {
   if (ops.length) {
     await col.bulkWrite(ops, { ordered: false });
   }
+
+  // Sama pola dgn upsertRoundRows() di atas.
+  if (ops.length) {
+    notifyResultsUpdated({
+      eventId: String(bucket.eventId || ""),
+      category: "H2H",
+      initialId: String(bucket.initialId || ""),
+      divisionId: String(bucket.divisionId || ""),
+      raceId: String(bucket.raceId || ""),
+    });
+  }
+
   return { ok: true, count: ops.length };
 }
 

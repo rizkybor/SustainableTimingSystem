@@ -1457,7 +1457,15 @@ export default {
 
       const incoming = new Map();
       (rows || []).forEach((r) => {
-        const key = String(r.teamId || r.bibTeam || "");
+        // BUG FIX (2026-09-25): bib harus jadi prioritas key, bukan teamId,
+        // sama persis dgn fix di SprintRace.vue's upsertEventResults() —
+        // teamId bisa kosong pada satu save lalu terisi pada save
+        // berikutnya utk tim yang sama, menyebabkan entry lama (key=bib)
+        // tidak pernah match entry baru (key=teamId), lalu Map.set()
+        // dgn key baru menaruhnya di AKHIR array alih-alih update in-place
+        // — persis pola yg menyebabkan data tim di View Overall "terdorong"
+        // ke urutan/skor yang salah.
+        const key = String(r.bibTeam || r.teamId || "");
         if (!key) return;
         const ranked = r.ranked || r.ranked === 0 ? r.ranked : "";
         const scored = ranked !== "" ? this.getScoreByRanked(ranked) : "";
@@ -1509,7 +1517,7 @@ export default {
         const map = new Map();
         (Array.isArray(existingDoc.eventResult) ? existingDoc.eventResult : []).forEach(
           (row) => {
-            const k = String((row && row.teamId) || (row && row.bib) || "");
+            const k = String((row && row.bib) || (row && row.teamId) || "");
             if (k) map.set(k, JSON.parse(JSON.stringify(row)));
           }
         );

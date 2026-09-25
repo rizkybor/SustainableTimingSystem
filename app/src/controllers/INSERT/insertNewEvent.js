@@ -289,8 +289,21 @@ async function updateAssets(payload) {
 }
 
 // Kategori valid utk status Provisional/Unofficial/Official per-kategori.
-// "overall" = Event Overall Result (bukan bagian dari race category manapun).
+// "overall" = Event Overall Result (bukan bagian dari race category manapun,
+// SENGAJA tetap event-wide/flat, bukan per-bucket).
 const OFFICIAL_CATEGORIES = ["sprint", "h2h", "slalom", "drr", "raftingcross", "overall"];
+
+// BUG FIX (2026-09-25): Sprint/H2H/Slalom/DRR/RaftingCross sekarang kirim
+// key KOMPOSIT per-bucket (mis. "sprint__<divisionId>__<raceId>__<initialId>"
+// — lihat buildCategoryStatusKey() di utils/officialStamp.js) supaya status
+// tiap kombinasi Division/Race/Initial berdiri sendiri, bukan berbagi satu
+// status per tipe kategori. Validasi di sini cuma cek PREFIX-nya (sebelum
+// "__") termasuk kategori yang dikenal — "overall" tidak pernah punya
+// suffix bucket (tetap flat), jadi otomatis tetap valid via cek prefix ini.
+function isValidCategoryKey(category) {
+  const base = String(category || "").split("__")[0];
+  return OFFICIAL_CATEGORIES.includes(base);
+}
 
 // 3 status result yg valid. "provisional" = default (hasil masih berjalan/
 // sementara, belum ada keputusan), "unofficial" = draft/belum final,
@@ -353,7 +366,7 @@ async function setEventStatus(eventId, status) {
 async function setResultsStatus(eventId, category, status, timestamp) {
   const id = toObjectId(eventId);
   if (!id) return { ok: false, error: "invalid eventId" };
-  if (!OFFICIAL_CATEGORIES.includes(category)) {
+  if (!isValidCategoryKey(category)) {
     return { ok: false, error: "invalid category" };
   }
   if (!RESULT_STATUSES.includes(status)) {

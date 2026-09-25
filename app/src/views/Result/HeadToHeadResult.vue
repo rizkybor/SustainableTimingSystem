@@ -492,7 +492,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportSheetsToExcel } from "@/utils/exportExcel";
-import { deriveResultStatus } from "@/utils/officialStamp";
+import { deriveResultStatus, buildCategoryStatusKey } from "@/utils/officialStamp";
 
 const RACE_PAYLOAD_KEY = "raceStartPayload";
 
@@ -522,6 +522,7 @@ export default {
       defaultImg,
       // "provisional" | "unofficial" | "official"
       resultStatus: "provisional",
+      resultCategoryKey: "",
       loading: false,
       error: "",
       // semua bucket registrasi (lintas race category) utk event ini,
@@ -565,7 +566,7 @@ export default {
   computed: {
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
-      return (m && m.h2h) || "";
+      return (m && m[this.resultCategoryKey]) || (m && m.h2h) || "";
     },
     isOfficial() {
       return this.resultStatus === "official";
@@ -844,7 +845,17 @@ export default {
           ipcRenderer.once("get-events-byid-reply", (_e, res) => {
             this.loading = false;
             this.eventInfo = res && typeof res === "object" ? res : {};
-            this.resultStatus = deriveResultStatus(this.eventInfo, "h2h");
+            const q = this.$route.query || {};
+            this.resultCategoryKey = buildCategoryStatusKey("h2h", {
+              divisionId: q.divisionId,
+              raceId: q.raceId,
+              initialId: q.initialId,
+            });
+            this.resultStatus = deriveResultStatus(
+              this.eventInfo,
+              this.resultCategoryKey,
+              "h2h"
+            );
             resolve();
           });
         });
@@ -873,15 +884,15 @@ export default {
               ...this.eventInfo,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                h2h: nextStatus,
+                [this.resultCategoryKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                h2h: nextStatus === "official",
+                [this.resultCategoryKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                h2h: res.setAt || new Date().toISOString(),
+                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -898,7 +909,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: "h2h",
+          category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
         });

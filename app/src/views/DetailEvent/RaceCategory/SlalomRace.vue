@@ -862,6 +862,7 @@ import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import VueHtml2pdf from "vue-html2pdf";
 import { logger } from "@/utils/logger";
+import { buildCategoryStatusKey } from "@/utils/officialStamp";
 import { Icon } from "@iconify/vue2";
 import { getSocket, connectionState } from "@/services/socket";
 import tone from "../../../assets/tone/tone_message.mp3";
@@ -3199,7 +3200,11 @@ export default {
             // Jangan sampai menimpa keputusan operator yang sudah ada
             // (mis. sudah di-set Official manual sebelumnya lalu Session 1
             // disimpan ulang utk koreksi kecil).
-            await this.ensureSlalomStatusProvisionalIfUnset();
+            await this.ensureSlalomStatusProvisionalIfUnset({
+              divisionId: doc.divisionId,
+              raceId: doc.raceId,
+              initialId: doc.initialId,
+            });
           } else {
             ipcRenderer.send("get-alert", {
               type: "error",
@@ -3218,7 +3223,12 @@ export default {
     },
 
     // Dipanggil HANYA dari saveSession1() — lihat catatan di pemanggilnya.
-    async ensureSlalomStatusProvisionalIfUnset() {
+    // `bucket` = {divisionId, raceId, initialId} dari doc yang baru saja
+    // disimpan — BUG FIX (2026-09-25): status sekarang per-bucket (lihat
+    // buildCategoryStatusKey() di utils/officialStamp.js), bukan lagi flat
+    // per-kategori, jadi key-nya harus menyertakan bucket ini juga supaya
+    // konsisten dengan apa yang dibaca/ditulis SlalomResult.vue.
+    async ensureSlalomStatusProvisionalIfUnset(bucket) {
       try {
         if (typeof ipcRenderer === "undefined" || !this.currentSlalomEventId)
           return;
@@ -3232,22 +3242,29 @@ export default {
           ipcRenderer.send("get-events-byid", this.currentSlalomEventId);
         });
 
+        const categoryKey = buildCategoryStatusKey("slalom", bucket);
+
         // BUG FIX: cek status eksplisit BARU (resultsStatusByCategory) SAJA
         // tidak cukup — event lama bisa punya cuma field boolean legacy
-        // (resultsOfficialByCategory.slalom === true) tanpa
-        // resultsStatusByCategory pernah di-set sama sekali. deriveResultStatus()
-        // (dipakai halaman Result) tetap menganggap kategori ini "official"
-        // lewat fallback boolean itu — kalau cuma cek field baru di sini,
-        // status Official yang sudah ada bisa DIAM-DIAM ketimpa
-        // "provisional" tiap kali Session 1 disimpan ulang.
+        // (resultsOfficialByCategory.slalom === true, key FLAT lama sebelum
+        // status per-bucket ada) tanpa resultsStatusByCategory pernah
+        // di-set sama sekali. deriveResultStatus() (dipakai halaman Result)
+        // tetap menganggap kategori/bucket ini "official" lewat fallback
+        // boolean itu — kalau cuma cek field baru di sini, status Official
+        // yang sudah ada bisa DIAM-DIAM ketimpa "provisional" tiap kali
+        // Session 1 disimpan ulang. Cek KEDUA key (composite per-bucket
+        // DAN flat lama) supaya konsisten dengan fallback di
+        // deriveResultStatus().
         const explicitStatus =
           eventDoc &&
           eventDoc.resultsStatusByCategory &&
-          eventDoc.resultsStatusByCategory.slalom;
+          (eventDoc.resultsStatusByCategory[categoryKey] ||
+            eventDoc.resultsStatusByCategory.slalom);
         const legacyOfficial =
           eventDoc &&
           eventDoc.resultsOfficialByCategory &&
-          eventDoc.resultsOfficialByCategory.slalom === true;
+          (eventDoc.resultsOfficialByCategory[categoryKey] === true ||
+            eventDoc.resultsOfficialByCategory.slalom === true);
         if (explicitStatus || legacyOfficial) return; // sudah pernah di-set operator, jangan ditimpa
 
         await new Promise((resolve) => {
@@ -3258,7 +3275,7 @@ export default {
           });
           ipcRenderer.send("event:set-official", {
             eventId: this.currentSlalomEventId,
-            category: "slalom",
+            category: categoryKey,
             status: "provisional",
           });
         });

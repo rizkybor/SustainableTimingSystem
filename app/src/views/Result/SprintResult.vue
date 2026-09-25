@@ -378,7 +378,7 @@ import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
 import { getVisibleCategoryMeta } from "@/utils/overallCategoryMeta";
 import { buildStaticBucketOptions } from "@/utils/buildStaticBucketOptions";
 import { exportRowsToExcel } from "@/utils/exportExcel";
-import { deriveResultStatus } from "@/utils/officialStamp";
+import { deriveResultStatus, buildCategoryStatusKey } from "@/utils/officialStamp";
 
 /* ========= Helpers localStorage ========= */
 const RACE_PAYLOAD_KEY = "raceStartPayload";
@@ -448,6 +448,9 @@ export default {
       defaultImg,
       // "provisional" | "unofficial" | "official"
       resultStatus: "provisional",
+      // key komposit per-bucket (sprint__divisionId__raceId__initialId) —
+      // lihat buildCategoryStatusKey() di utils/officialStamp.js
+      resultCategoryKey: "",
       loading: false,
       error: "",
       results: [],
@@ -534,7 +537,7 @@ export default {
     // insertNewEvent.js), null kalau belum pernah di-set sama sekali.
     officialSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
-      return (m && m.sprint) || "";
+      return (m && m[this.resultCategoryKey]) || (m && m.sprint) || "";
     },
     // Dipertahankan sbg computed (bukan data) supaya semua v-if/:disabled
     // yg sudah ada tetap terkunci HANYA saat status === "official";
@@ -958,7 +961,17 @@ export default {
             this.loading = false;
             if (res && typeof res === "object") {
               this.eventInfo = res; // langsung simpan hasil ke data
-              this.resultStatus = deriveResultStatus(this.eventInfo, "sprint");
+              const q = this.$route.query || {};
+              this.resultCategoryKey = buildCategoryStatusKey("sprint", {
+                divisionId: q.divisionId,
+                raceId: q.raceId,
+                initialId: q.initialId,
+              });
+              this.resultStatus = deriveResultStatus(
+                this.eventInfo,
+                this.resultCategoryKey,
+                "sprint"
+              );
             } else {
               this.eventInfo = {};
               this.error = "Gagal memuat data event.";
@@ -1143,15 +1156,15 @@ export default {
               ...this.eventInfo,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                sprint: nextStatus,
+                [this.resultCategoryKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                sprint: nextStatus === "official",
+                [this.resultCategoryKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                sprint: res.setAt || new Date().toISOString(),
+                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -1168,7 +1181,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: "sprint",
+          category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
         });

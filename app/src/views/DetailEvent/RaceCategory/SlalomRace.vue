@@ -73,8 +73,22 @@
     </section>
 
     <!-- STICKY HEADER -->
+    <!-- UX (2026-09-26): dibuat BENAR-BENAR sticky (position: sticky) —
+         sebelumnya cuma nama class, bukan perilaku CSS-nya, jadi Switch
+         Slalom Category & kontrol Connect Racetime ikut ter-scroll hilang
+         begitu operator scroll ke bawah utk lihat OperationTimePanel/tabel
+         Output Racetime. Slalom sering butuh operator memantau Racetime
+         SAMBIL siap pindah kategori dengan cepat (termasuk saat start
+         simultan/berdekatan antar tim) — dipin di bawah navbar (var(--nav-h))
+         supaya kedua kontrol ini selalu terjangkau tanpa perlu scroll balik
+         ke atas. `position: sticky` butuh PARENT LANGSUNG-nya lebih tinggi
+         dari elemennya sendiri supaya ada "ruang" utk menempel saat
+         di-scroll (bukan cukup ancestor yang lebih jauh) — makanya
+         OperationTimePanel (monitor live time utama) dipindah jadi child
+         LANGSUNG di dalam `.px-5` ini juga (lihat di bawah), bukan sibling
+         terpisah sesudahnya. -->
     <div class="px-5">
-      <div class="card-body">
+      <div class="card-body slalom-sticky-bar" ref="stickyBar">
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -211,6 +225,13 @@
         </b-row>
       </div>
     </div>
+    <!-- Spacer: `.slalom-sticky-bar` di atas jadi position:fixed (lepas dari
+         normal flow), jadi konten sesudahnya perlu "ruang kosong" pengganti
+         setinggi bar itu supaya tidak ketutupan. Tingginya diukur otomatis
+         lewat ResizeObserver (lihat mounted()/beforeDestroy()) — BUKAN
+         angka statis — supaya tetap presisi walau baris tombol Baud Rate
+         wrap ke bawah di layar sempit. -->
+    <div :style="{ height: stickyBarHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (reuse Sprint) -->
     <OperationTimePanel
@@ -1097,6 +1118,10 @@ export default {
   data() {
     return {
       connectionState,
+      // Tinggi terukur `.slalom-sticky-bar` (position: fixed) — dipakai
+      // spacer di bawahnya supaya OperationTimePanel/tabel tidak ketutupan.
+      // Diperbarui otomatis via ResizeObserver di mounted().
+      stickyBarHeight: 0,
       slalomCats: { initial: "-", race: "-", division: "-" },
       judgeLogRefreshTick: 0,
       fieldNotesRefreshTick: 0,
@@ -1405,6 +1430,24 @@ export default {
     },
   },
   async mounted() {
+    // Ukur tinggi `.slalom-sticky-bar` (position: fixed, lihat CSS) supaya
+    // spacer di bawahnya selalu presisi — ResizeObserver otomatis update
+    // ulang kalau tingginya berubah (mis. tombol Baud Rate wrap ke baris
+    // baru di layar sempit, atau path device jadi lebih panjang).
+    this.$nextTick(() => {
+      const el = this.$refs.stickyBar;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      this._stickyBarObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          this.stickyBarHeight = Math.ceil(entry.contentRect.height);
+        }
+      });
+      this._stickyBarObserver.observe(el);
+    });
+    this.$once("hook:beforeDestroy", () => {
+      if (this._stickyBarObserver) this._stickyBarObserver.disconnect();
+    });
+
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -3931,6 +3974,35 @@ export default {
 </script>
 
 <style scoped>
+/* UX (2026-09-26): pin Switch Slalom Category + kontrol Connect Racetime
+   ke bawah navbar aplikasi (--nav-h, lihat App.vue) selama halaman
+   di-scroll — supaya keduanya tetap terjangkau tanpa scroll balik ke atas
+   saat operator sedang memantau OperationTimePanel/tabel Output Racetime
+   di bawahnya (penting khusus utk Slalom krn start bisa terjadi
+   berdekatan/simultan antar tim, operator perlu respons cepat pindah
+   kategori TANPA kehilangan pantauan Racetime). z-index di bawah navbar
+   (1000, lihat App.vue .app-header) tapi di atas konten halaman lainnya. */
+.slalom-sticky-bar {
+  /* `position: sticky` butuh parent langsungnya (.px-5) lebih tinggi dari
+     elemen ini sendiri supaya ada "ruang" menempel saat di-scroll — tidak
+     praktis dipenuhi kalau semua konten (OperationTimePanel + tabel Output
+     Racetime, bisa sangat panjang) harus jadi child langsung .px-5. Pakai
+     `position: fixed` supaya benar-benar lepas dari batasan tinggi parent
+     — SELALU menempel di viewport apa pun panjang halaman di bawahnya.
+     Konsekuensinya: elemen ini keluar dari normal flow, jadi butuh spacer
+     (lihat div kosong sesudah .px-5 di template) supaya konten di
+     bawahnya tidak ketutupan — tingginya diukur otomatis via
+     ResizeObserver di mounted(), lihat stickyBarHeight. */
+  position: fixed;
+  top: var(--nav-h, 64px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #fff;
+  padding: 10px 3rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
 .racetime-header {
   display: flex;
   flex-direction: column; /* susun vertikal */

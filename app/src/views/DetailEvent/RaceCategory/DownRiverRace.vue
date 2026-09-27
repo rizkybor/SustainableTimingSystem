@@ -415,12 +415,36 @@
                     <!-- PENALTY SECTION TIME -->
                     <td class="text-center">
                       <div class="pen-grid">
+                        <!-- BUG FIX (2026-09-28): dulu pakai v-model — v-model
+                             otomatis MENIMPA item.result.penaltySection[sIdx-1]
+                             ke value baru SEBELUM @change/updateTimePen()
+                             sempat baca nilai LAMA-nya, jadi tidak mungkin
+                             akumulasi. Sekarang: (1) elemen SELALU value=""
+                             (bukan dibind ke total akumulasi — total tetap
+                             lihat kolom "Total Penalty"), (2) `:key` disertai
+                             counter `_sectionPickGen` yang naik tiap kali ada
+                             pick, memaksa Vue REMOUNT elemen select ini —
+                             krn elemen <select> HTML TIDAK memicu event
+                             "change" kalau operator memilih opsi yg SAMA
+                             dgn yg sudah aktif (mis. pilih "10" lagi persis
+                             stlh "10"), remount ini yang membuat setiap pick
+                             (termasuk value yg sama berturut-turut) SELALU
+                             dianggap perubahan baru & memicu updateTimePen(),
+                             supaya "pilih 10 berkali-kali -> terakumulasi"
+                             benar2 berfungsi. -->
                         <b-select
                           v-for="sIdx in drrSectionsCount"
-                          :key="sIdx"
+                          :key="
+                            'sec-' +
+                            sIdx +
+                            '-' +
+                            (item._sectionPickGen
+                              ? item._sectionPickGen[sIdx - 1] || 0
+                              : 0)
+                          "
                           class="small-select"
                           style="border-radius: 12px; font-weight: 600"
-                          v-model="item.result.penaltySection[sIdx - 1]"
+                          value=""
                           @change="
                             updateTimePen(
                               $event,
@@ -3025,7 +3049,42 @@ export default {
     ) {
       // 1) set waktu penalti di field yang sesuai
       if (penaltyType === "penaltySection" && sectionIndex !== null) {
-        item.result.penaltySection[sectionIndex] = selectedTimePen;
+        // BUG FIX (2026-09-28): Pen. Section bermagnitudo 10 (termasuk opsi
+        // bonus "-10") SEKARANG SENGAJA boleh dipilih berkali-kali oleh
+        // OPERATOR (khusus DRR) & harus TERAKUMULASI — bukan diganti —
+        // supaya konsisten dgn penalty magnitude 10 yang masuk lewat socket
+        // dari juri (sts-jurysystem, lihat applyPenaltyFromSocketDirect()).
+        // Nilai section lain (0, 5, 50) tetap replace spt semula. Karena
+        // template sekarang pakai :value (bukan v-model), array-nya BELUM
+        // ter-timpa di titik ini — nilai lama masih terbaca utuh.
+        var selectedSeconds = this.timeToPenaltyValue(selectedTimePen);
+        if (Math.abs(Number(selectedSeconds)) === 10) {
+          var existingSeconds = this.timeToPenaltyValue(
+            item.result.penaltySection[sectionIndex] || "00:00:00.000"
+          );
+          this.$set(
+            item.result.penaltySection,
+            sectionIndex,
+            this.secondsToTimeString(existingSeconds + selectedSeconds)
+          );
+        } else {
+          this.$set(item.result.penaltySection, sectionIndex, selectedTimePen);
+        }
+
+        // Naikkan generation counter section ini supaya `:key` di template
+        // berubah & Vue me-remount <b-select>-nya — lihat komentar lengkap
+        // di template (blok PENALTY SECTION TIME) soal kenapa remount ini
+        // WAJIB supaya memilih "10" berkali-kali berturut-turut tetap
+        // memicu event change (native <select> tidak memicu change kalau
+        // opsi yang dipilih SAMA dgn yang sudah aktif).
+        if (!Array.isArray(item._sectionPickGen)) {
+          this.$set(item, "_sectionPickGen", []);
+        }
+        this.$set(
+          item._sectionPickGen,
+          sectionIndex,
+          (item._sectionPickGen[sectionIndex] || 0) + 1
+        );
       } else {
         item.result[penaltyType] = selectedTimePen; // "penaltyStartTime" / "penaltyFinishTime"
       }

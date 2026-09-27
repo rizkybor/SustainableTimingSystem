@@ -72,8 +72,17 @@
       </b-container>
     </section>
 
+    <!-- UX (2026-09-28): sama persis pola fix "Switch Slalom Category" —
+         position:fixed (bukan sticky biasa, parent .px-5 terlalu pendek
+         utk sticky punya "ruang" menempel) supaya Switch DRR Category +
+         kontrol Connect Racetime selalu terjangkau tanpa scroll balik ke
+         atas saat operator memantau OperationTimePanel/tabel Output
+         Racetime — penting krn DRR simultan antar Initial & antar
+         kategori, operator perlu respons cepat pindah kategori tanpa
+         kehilangan pantauan Racetime. Lihat MEMORY project_slalom_
+         sticky_category_switch.md utk detail lengkap pola ini. -->
     <div class="px-5">
-      <div class="card-body">
+      <div class="card-body drr-sticky-bar" ref="stickyBar">
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -212,6 +221,11 @@
         </b-row>
       </div>
     </div>
+    <!-- Spacer: `.drr-sticky-bar` di atas jadi position:fixed (lepas dari
+         normal flow), jadi konten sesudahnya perlu "ruang kosong" pengganti
+         setinggi bar itu supaya tidak ketutupan. Tingginya diukur otomatis
+         lewat ResizeObserver (lihat mounted()) — BUKAN angka statis. -->
+    <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
     <OperationTimePanel
@@ -942,6 +956,10 @@ export default {
       fieldNotesRefreshTick: 0,
       isLoading: false,
       defaultImg,
+      // Tinggi terukur `.drr-sticky-bar` (position: fixed) — dipakai
+      // spacer di bawahnya supaya OperationTimePanel/tabel tidak ketutupan.
+      // Diperbarui otomatis via ResizeObserver di mounted().
+      drrStickyBarHeight: 0,
       judgeLogRefreshTick: 0,
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
@@ -1142,6 +1160,24 @@ export default {
   async mounted() {
     const audio = new Audio(tone);
 
+    // Ukur tinggi `.drr-sticky-bar` (position: fixed, lihat CSS) supaya
+    // spacer di bawahnya selalu presisi — ResizeObserver otomatis update
+    // ulang kalau tingginya berubah (mis. tombol Baud Rate wrap ke baris
+    // baru di layar sempit).
+    this.$nextTick(() => {
+      const el = this.$refs.stickyBar;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      this._stickyBarObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          this.drrStickyBarHeight = Math.ceil(entry.contentRect.height);
+        }
+      });
+      this._stickyBarObserver.observe(el);
+    });
+    this.$once("hook:beforeDestroy", () => {
+      if (this._stickyBarObserver) this._stickyBarObserver.disconnect();
+    });
+
     await this.loadDataScore("DRR");
     await this.loadDataPenalties("DRR");
 
@@ -1338,7 +1374,50 @@ export default {
             String(msg.initialId != null ? msg.initialId : bucket.initialId) === String(bucket.initialId) &&
             String(msg.raceId != null ? msg.raceId : bucket.raceId) === String(bucket.raceId) &&
             String(msg.divisionId != null ? msg.divisionId : bucket.divisionId) === String(bucket.divisionId);
-          if (!sameCategory) return false;
+          // BUG FIX (2026-09-28): dulu `return false` di sini LANGSUNG
+          // membuang pesan begitu saja — penalty-nya sendiri SUDAH AMAN
+          // tersimpan (jurysystem menulis LANGSUNG ke TeamsRegistered lewat
+          // HTTP POST, independen dari socket/browser ini sama sekali),
+          // tapi audit trail "Riwayat Judge" (judgeLog:send, ada JAUH di
+          // bawah fungsi ini) TIDAK PERNAH tercatat kalau operator sedang
+          // membuka kategori LAIN saat submit terjadi — notifikasi & bunyi
+          // konfirmasi juga ikut hilang. Operator perlu tetap tahu "ada
+          // penalty masuk utk kategori lain" meski tabel yang sedang
+          // ditampilkan TIDAK boleh ikut berubah (itu tetap benar & sengaja
+          // — mencegah salah tempel ke tim yang kebetulan teamId-nya sama
+          // di Initial/kategori lain, lihat komentar di atas). Catat audit
+          // log + toast di sini pakai data MENTAH dari `msg` saja (tidak
+          // perlu resolveTeamByKey ke this.participant), lalu tetap
+          // berhenti sebelum menyentuh tabel live.
+          if (!sameCategory) {
+            if (typeof ipcRenderer !== "undefined" && this.currentEventId) {
+              ipcRenderer.send("judgeLog:send", {
+                eventId: this.currentEventId,
+                raceCategory: "drr",
+                type: msg.type,
+                text: msg.text,
+                teamId: msg.teamId,
+                teamName: msg.teamName,
+                bibTeam: msg.bib != null ? msg.bib : msg.bibTeam,
+                value: msg.penalty != null ? msg.penalty : msg.value,
+                from: msg.from,
+                sourceTs: msg.ts,
+                raw: msg,
+              });
+            }
+            if (this.$bvToast) {
+              var otherTeamLabel = msg.teamName || "Tim";
+              this.$bvToast.toast(
+                `${otherTeamLabel} — kategori lain (bukan yang sedang dibuka), penalty tetap tersimpan.`,
+                {
+                  title: "Penalty Masuk (Kategori Lain)",
+                  variant: "info",
+                  solid: true,
+                }
+              );
+            }
+            return false;
+          }
         }
 
         // --- identifikasi kunci tim ---
@@ -1529,8 +1608,34 @@ export default {
           var cursec =
             (team.result.penaltySection &&
               team.result.penaltySection[sectionIdx]) ||
-            "";
-          if (cursec !== timeStr) {
+            "00:00:00.000";
+          // BUG FIX (2026-09-28): dulu SELALU replace (timpa) nilai section
+          // lama dgn yang baru — submit ulang value yang SAMA persis bahkan
+          // di-skip total (cursec === timeStr, tidak ada perubahan sama
+          // sekali). Section Penalty bermagnitudo 10 (termasuk opsi bonus
+          // "-10") SEKARANG SENGAJA boleh disubmit berkali-kali dari juri
+          // (sts-jurysystem) & harus TERAKUMULASI, bukan diganti — tim bisa
+          // genuinely kena infraksi yang sama >1x di section yang sama
+          // (mis. nyentuh gate lebih dari sekali). Anti-duplikat di
+          // sts-jurysystem (judge-reports/detail/route.js,
+          // isRepeatableSectionPenalty) sudah sengaja HANYA mengizinkan
+          // submit berulang utk magnitude 10 — value section lain tetap
+          // ditolak duplikatnya di server sblm sampai ke sini, jadi scope
+          // akumulasi di sisi ini disamakan (value lain tetap replace spt
+          // semula).
+          if (Math.abs(Number(numericValue)) === 10) {
+            var curSeconds = this.timeToPenaltyValue(cursec);
+            var addSeconds = this.timeToPenaltyValue(timeStr);
+            var accumulatedTimeStr = this.secondsToTimeString(
+              curSeconds + addSeconds
+            );
+            this.$set(
+              team.result.penaltySection,
+              sectionIdx,
+              accumulatedTimeStr
+            );
+            changed = true;
+          } else if (cursec !== timeStr) {
             this.$set(team.result.penaltySection, sectionIdx, timeStr);
             changed = true;
           }
@@ -1947,6 +2052,24 @@ export default {
 
       // paksa re-render jika diperlukan
       if (this.$forceUpdate) this.$forceUpdate();
+
+      // BUG FIX (2026-09-28): resetRow() (beda dgn Reset All, yang reload
+      // penuh + hapus SELURUH drrLocal cache event ini via
+      // _clearAllDrrLocalCachesForEvent() sebelum reload) TIDAK PERNAH
+      // menyimpan state ter-reset ini ke drrBucketCache — cache bucket ini
+      // masih menyimpan snapshot LAMA (sebelum reset). Sejak
+      // fetchBucketTeamsByKey() ikut me-merge drrBucketCache.load() (fix
+      // "input belum ke-Save hilang saat switch/refresh"), tanpa baris ini
+      // waktu yang BARU SAJA direset bisa "hidup lagi" begitu operator
+      // pindah kategori lalu kembali, atau refresh — krn merge tsb
+      // mengoverlay cache LAMA (yg belum ikut di-reset) di atas hasil
+      // reset yang sebenarnya sudah benar di DB/roster. Simpan ulang
+      // snapshot SEKARANG (sudah ter-reset) supaya cache selalu
+      // merefleksikan state terbaru, sama pola dgn updateTime()/
+      // onPenaltyChange() dkk.
+      if (this.selectedDrrKey) {
+        drrBucketCache.save(this.selectedDrrKey, this.participant);
+      }
 
       // BUG FIX: Reset row sebelumnya cuma menghapus state lokal — riwayat
       // penalty yg sudah disubmit juri (sts-jurysystem) tetap ada, jadi
@@ -2475,6 +2598,27 @@ export default {
         // hasilnya SUDAH pernah disimpan — sama pola fix dgn
         // hydrateTeamsFromResult() di SlalomRace.vue.
         await this.hydrateTeamsFromDrrResult();
+
+        // BUG FIX (2026-09-28): fungsi ini (dipanggil baik oleh mounted()
+        // saat refresh MAUPUN onSelectDrrBucket() saat Switch Category —
+        // satu-satunya jalur pemuatan bucket yang aktif) tidak pernah
+        // membaca balik drrBucketCache, padahal cache-nya SENDIRI rutin
+        // ditulis di tiap input Start/Finish/penalty (lihat updateTime()/
+        // onPenaltyChange() dkk.) DAN sebelum pindah bucket
+        // (onSelectDrrBucket()). Akibatnya: input Start/Finish yang BELUM
+        // sempat "Save Result" hilang begitu operator refresh halaman atau
+        // pindah kategori lalu kembali lagi — krusial utk DRR krn race di
+        // sini simultan antar initial & antar kategori, operator WAJIB
+        // bolak-balik pindah kategori saat race masih berjalan (belum
+        // sempat Save). merge() ini non-destruktif: cache HANYA menimpa
+        // field yg nilainya tidak kosong, dan dipanggil SETELAH hydrate DB
+        // di atas supaya draft lokal yg lebih baru menang drpd hasil DB
+        // yg lebih lama (bukan sebaliknya).
+        this.participant = drrBucketCache.merge(
+          this.participant,
+          drrBucketCache.load(key)
+        );
+
         await this.assignRanks(this.participant);
         if (this.$forceUpdate) this.$forceUpdate();
       } catch (err) {
@@ -3543,6 +3687,26 @@ export default {
 </script>
 
 <style scoped>
+/* UX (2026-09-28): pin Switch DRR Category + kontrol Connect Racetime ke
+   bawah navbar aplikasi (--nav-h, lihat App.vue) selama halaman di-scroll
+   — sama pola persis dgn .slalom-sticky-bar di SlalomRace.vue (position:
+   sticky TIDAK cukup krn parent langsung .px-5 lebih pendek dari bar-nya
+   sendiri; position:fixed dipakai supaya lepas dari batasan tinggi
+   parent, selalu menempel di viewport apa pun panjang tabel Output
+   Racetime di bawahnya). Penting khusus DRR krn race simultan antar
+   Initial & antar kategori, operator perlu respons cepat pindah kategori
+   tanpa kehilangan pantauan Racetime. */
+.drr-sticky-bar {
+  position: fixed;
+  top: var(--nav-h, 64px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #fff;
+  padding: 10px 3rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
 .racetime-header {
   display: flex;
   flex-direction: column; /* susun vertikal */

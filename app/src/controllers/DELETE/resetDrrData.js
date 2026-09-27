@@ -123,12 +123,62 @@ async function resetDrrDataForEvent(eventId) {
     }
   }
 
+  // BUG FIX (2026-09-28): "Reset All" sebelumnya HANYA membersihkan data
+  // milik sts-timingsystem sendiri (temporaryDrrResult, roster,
+  // judgeActionLogs lokal, Overall) — tapi TIDAK PERNAH menyentuh riwayat
+  // aktivitas juri di sts-jurysystem (judgereportdetails/judgereports),
+  // maupun flag "tim sudah Start" (drrteamstatuses). Akibatnya, walau
+  // tabel Output Racetime sudah kosong sepenuhnya pasca Reset All,
+  // validasi anti-duplikat & anti-belum-Start di sts-jurysystem tetap
+  // menganggap SEMUA tim "sudah pernah diberi penalty ini" / "sudah
+  // Start" — juri jadi TIDAK BISA assign ulang penalty utk tim mana pun
+  // sampai riwayat ini ikut dibersihkan. Sama fix pattern dgn
+  // deleteJudgeReportsForRow.js (dipakai Reset per-baris), cuma di sini
+  // di-scope ke SELURUH tim DRR event ini (bukan 1 tim) krn Reset All
+  // memang menyasar semua kategori DRR pada event ini sekaligus.
+  const reportDetailIds = await db
+    .collection("judgereportdetails")
+    .find({ eventId: id, eventType: "DRR" }, { projection: { _id: 1 } })
+    .toArray();
+  const idsToClear = reportDetailIds.map((d) => d._id);
+
+  let deletedJudgeReportDetails = 0;
+  let updatedJudgeReports = 0;
+  if (idsToClear.length) {
+    const delDetailRes = await db
+      .collection("judgereportdetails")
+      .deleteMany({ _id: { $in: idsToClear } });
+    deletedJudgeReportDetails = delDetailRes.deletedCount || 0;
+
+    // Cabut referensi id yg baru dihapus dari array per-juri (JANGAN
+    // hapus dokumen juri — array `reportDrr` dipakai bersama utk semua
+    // kategori/tim yg pernah dipegang juri itu, cukup keluarkan id yg
+    // sudah tidak valid).
+    const pullRes = await db
+      .collection("judgereports")
+      .updateMany(
+        { reportDrr: { $in: idsToClear } },
+        { $pull: { reportDrr: { $in: idsToClear } } }
+      );
+    updatedJudgeReports = pullRes.modifiedCount || 0;
+  }
+
+  // Flag "team sudah Start" (drrteamstatuses, dipakai jurysystem menolak
+  // submit penalty Finish/Section sebelum team benar2 mulai) — event-wide
+  // spy tim mana pun bisa di-Start ulang stlh Reset All.
+  const teamStatusRes = await db
+    .collection("drrteamstatuses")
+    .deleteMany({ eventId: id });
+
   return {
     ok: true,
     deletedCounts: {
       temporaryDrrResult: drrRes.deletedCount || 0,
       judgeActionLogs: judgeLogsRes.deletedCount || 0,
+      judgeReportDetails: deletedJudgeReportDetails,
+      drrTeamStatuses: teamStatusRes.deletedCount || 0,
     },
+    updatedJudgeReports,
     overallDocsTouched,
     registeredDocsTouched,
   };

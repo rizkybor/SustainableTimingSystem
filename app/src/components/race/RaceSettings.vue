@@ -1448,10 +1448,14 @@ const DEFAULT_DRR_FINISH_PENALTIES = [
   { label: "10", value: 10 },
   { label: "50", value: 50 },
 ];
+// BUG FIX (2026-09-28): tambah "-10" (bonus/pengurang waktu) ke default —
+// lihat komentar identik di editRaceSettings.js. Fitur akumulasi magnitude
+// 10 sengaja mencakup +10 & -10 sbg standing capability.
 const DEFAULT_DRR_SECTION_PENALTIES = [
   { label: "0", value: 0 },
   { label: "5", value: 5 },
   { label: "10", value: 10 },
+  { label: "-10", value: -10 },
   { label: "50", value: 50 },
 ];
 

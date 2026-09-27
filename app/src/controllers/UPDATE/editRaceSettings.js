@@ -209,10 +209,18 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
     { label: "10", value: 10 },
     { label: "50", value: 50 },
   ];
+  // BUG FIX (2026-09-28): tambah opsi "-10" (bonus/pengurang waktu) ke
+  // daftar DEFAULT — sebelumnya operator HARUS menambahkannya manual lewat
+  // panel Race Settings tiap kali bikin event baru, padahal fitur akumulasi
+  // Section Penalty magnitude 10 (lihat applyPenaltyFromSocketDirect() di
+  // DownRiverRace.vue & isRepeatableSectionPenalty di sts-jurysystem's
+  // judge-reports/detail/route.js) sudah SENGAJA mencakup baik +10 maupun
+  // -10 sbg standing capability, bukan cuma utk 1 event tertentu.
   const DEFAULT_DRR_SECTION_PENALTIES = [
     { label: "0", value: 0 },
     { label: "5", value: 5 },
     { label: "10", value: 10 },
+    { label: "-10", value: -10 },
     { label: "50", value: 50 },
   ];
 

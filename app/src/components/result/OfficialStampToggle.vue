@@ -18,7 +18,7 @@
       <button
         type="button"
         class="ost-edit-btn"
-        title="Atur waktu manual (WIB)"
+        :title="'Atur waktu manual (' + tz + ')'"
         @click.stop="openManualModal"
       >
         <Icon icon="mdi:pencil-outline" width="12" height="12" />
@@ -28,7 +28,7 @@
       v-else
       type="button"
       class="ost-set-time-btn"
-      title="Atur waktu manual (WIB)"
+      :title="'Atur waktu manual (' + tz + ')'"
       @click.stop="openManualModal"
     >
       <Icon icon="mdi:clock-plus-outline" width="12" height="12" class="mr-1" />

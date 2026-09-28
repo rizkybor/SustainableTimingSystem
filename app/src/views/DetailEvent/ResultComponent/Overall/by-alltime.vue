@@ -148,7 +148,7 @@
             <div style="font-size: 14px; display: flex; justify-content: center;">
               {{ isDerivedOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
             </div>
-            <small v-if="!isDerivedOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:05:00.000" }}</small>
+            <small v-if="!isDerivedOfficial && !isProvisional" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:05:00.000" }}</small>
             <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
           </span>
         </div>

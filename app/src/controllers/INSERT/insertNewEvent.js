@@ -416,6 +416,42 @@ async function setResultsStatus(eventId, category, status, timestamp) {
   };
 }
 
+// Update HANYA timestamp "Ditetapkan" (resultsOfficialSetAt.<category>) ke
+// waktu SEKARANG, tanpa menyentuh status/resultsOfficialByCategory sama
+// sekali — dipanggil tiap kali operator klik "Save Result" (apa pun
+// perubahan datanya) di SprintRace/SlalomRace/DownRiverRace/HeadToHead/
+// RaftingCross.vue, supaya label "Ditetapkan: ..." di halaman Result & PDF
+// selalu mencerminkan kapan hasil TERAKHIR disimpan — bukan cuma kapan
+// status Provisional/Unofficial/Official terakhir diganti manual (yg sudah
+// reaktif duluan lewat setResultsStatus() di atas).
+async function touchResultTimestamp(eventId, category) {
+  const id = toObjectId(eventId);
+  if (!id) return { ok: false, error: "invalid eventId" };
+  if (!isValidCategoryKey(category)) {
+    return { ok: false, error: "invalid category" };
+  }
+
+  const setAt = new Date();
+  var db = await getDb();
+  const coll = db.collection("eventsCollection");
+  const resp = await coll.updateOne(
+    { _id: id },
+    {
+      $set: {
+        [`resultsOfficialSetAt.${category}`]: setAt,
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: false }
+  );
+  return {
+    ok: true,
+    matchedCount: resp.matchedCount,
+    modifiedCount: resp.modifiedCount,
+    setAt: setAt.toISOString(),
+  };
+}
+
 module.exports = {
   insertNewEvent,
   updateEventPoster,
@@ -423,4 +459,5 @@ module.exports = {
   updateAssets,
   setResultsStatus,
   setEventStatus,
+  touchResultTimestamp,
 };

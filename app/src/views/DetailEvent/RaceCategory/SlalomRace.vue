@@ -2304,19 +2304,32 @@ export default {
         division: b.divisionName || q.divisionName || "-",
       };
     },
+    // BUG FIX (2026-09-28): dulu tidak dibungkus Promise — `await
+    // this.loadDataScore(type)` langsung resolve seketika tanpa nunggu
+    // balasan IPC, jadi kalau balasan tabel skor GLOBAL/default ini
+    // kebetulan datang TERLAMBAT (setelah race-settings dgn scoreByRank
+    // per-event custom sudah lebih dulu mengisi dataScore), balasan telat
+    // itu diam2 menimpa balik dataScore ke default — sama root cause dgn
+    // bug skor H2H KEJURNAS FAJI 2026 (lihat HeadToHead.vue). Dibungkus
+    // Promise supaya urutan load (global dulu, baru override per-event)
+    // selalu terjamin.
     async loadDataScore(type) {
-      try {
-        ipcRenderer.send("option-ranked", type);
-        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
-          if (payload) {
-            this.dataScore = payload[0].data;
-          } else {
-            this.dataScore = [];
-          }
-        });
-      } catch (error) {
-        this.dataScore = [];
-      }
+      return new Promise((resolve) => {
+        try {
+          ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+            if (payload) {
+              this.dataScore = payload[0].data;
+            } else {
+              this.dataScore = [];
+            }
+            resolve();
+          });
+          ipcRenderer.send("option-ranked", type);
+        } catch (error) {
+          this.dataScore = [];
+          resolve();
+        }
+      });
     },
 
     async loadDataPenalties(type) {
@@ -3792,6 +3805,13 @@ export default {
             type: "info",
             message: "Event Results Updated",
             detail: "SLALOM category merged successfully",
+          });
+          // BUG FIX (2026-09-28): "Ditetapkan: ..." di halaman Result/PDF
+          // dulu cuma ter-update saat status diganti manual — sekarang
+          // ikut ter-refresh tiap kali Save Result berhasil.
+          ipcRenderer.send("event:touch-result-timestamp", {
+            eventId: baseFilter.eventId,
+            category: buildCategoryStatusKey("slalom", baseFilter),
           });
         } else {
           ipcRenderer.send("get-alert", {

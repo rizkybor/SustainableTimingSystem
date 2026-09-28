@@ -1529,6 +1529,7 @@ import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
 import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue";
+import { buildCategoryStatusKey } from "@/utils/officialStamp";
 // html2canvas + jspdf: sudah pasti ada di node_modules krn jadi dependency
 // transitif vue-html2pdf (lewat html2pdf.js) yang sudah dipakai project ini —
 // dipakai langsung (bukan lewat vue-html2pdf) krn kita mau capture bagan
@@ -3701,6 +3702,13 @@ export default {
             type: "info",
             message: "Event Results Updated",
             detail: "HEADTOHEAD category merged successfully",
+          });
+          // BUG FIX (2026-09-28): "Ditetapkan: ..." di halaman Result/PDF
+          // dulu cuma ter-update saat status diganti manual — sekarang
+          // ikut ter-refresh tiap kali Save Result berhasil.
+          ipcRenderer.send("event:touch-result-timestamp", {
+            eventId: baseFilter.eventId,
+            category: buildCategoryStatusKey("h2h", baseFilter),
           });
         } else {
           ipcRenderer.send("get-alert", {
@@ -6483,24 +6491,44 @@ export default {
     },
 
     async loadDataScore(type) {
-      try {
-        ipcRenderer.send("option-ranked", type);
-        ipcRenderer.once("option-ranked-reply", (_e, payload) => {
-          // BUG FIX: `payload` = [] (array kosong, tidak ada dokumen yang
-          // cocok) masih truthy di JS — `payload[0].data` di sini akan
-          // throw TypeError ("Cannot read properties of undefined") yang
-          // tidak pernah ketangkap try/catch luar (callback ini async,
-          // dipanggil belakangan oleh ipcRenderer), jadi dataScore diam2
-          // tidak pernah keisi. Cek eksplisit payload[0] dulu, sama seperti
-          // pola aman di loadDataPenalties().
-          this.dataScore =
-            payload && payload[0] && Array.isArray(payload[0].data)
-              ? payload[0].data
-              : [];
-        });
-      } catch (error) {
-        this.dataScore = [];
-      }
+      // BUG FIX (2026-09-28): dulu fungsi ini TIDAK benar2 nunggu balasan
+      // IPC-nya (cuma ipcRenderer.once() tanpa dibungkus Promise) — async
+      // function-nya langsung resolve seketika, padahal `this.dataScore`
+      // baru keisi belakangan saat balasan datang. Akibatnya `await
+      // this.loadDataScore("HEADTOHEAD")` lalu `await this.loadRaceSettings()`
+      // di mounted() TIDAK menjamin urutan eksekusi — kalau balasan
+      // "option-ranked-reply" (tabel skor GLOBAL/default) kebetulan datang
+      // TERLAMBAT (setelah loadRaceSettings() sudah benar mengisi dataScore
+      // dgn tabel skor KUSTOM per-event dari Race Settings), balasan
+      // terlambat itu DIAM2 MENIMPA BALIK dataScore ke tabel default —
+      // persis skenario yg bikin H2H U19 R4 MEN/WOMEN event KEJURNAS FAJI
+      // 2026 kesimpen dgn skor dari tabel default (100/92/86/...) padahal
+      // Race Settings H2H event ini sudah dikustomisasi (100/90/80/...).
+      // Sekarang dibungkus Promise supaya `await` di mounted() benar2
+      // menunggu balasan IPC selesai dulu sebelum lanjut ke
+      // loadRaceSettings() (yg override-nya jadi PASTI menang terakhir).
+      return new Promise((resolve) => {
+        try {
+          ipcRenderer.once("option-ranked-reply", (_e, payload) => {
+            // BUG FIX: `payload` = [] (array kosong, tidak ada dokumen yang
+            // cocok) masih truthy di JS — `payload[0].data` di sini akan
+            // throw TypeError ("Cannot read properties of undefined") yang
+            // tidak pernah ketangkap try/catch luar (callback ini async,
+            // dipanggil belakangan oleh ipcRenderer), jadi dataScore diam2
+            // tidak pernah keisi. Cek eksplisit payload[0] dulu, sama seperti
+            // pola aman di loadDataPenalties().
+            this.dataScore =
+              payload && payload[0] && Array.isArray(payload[0].data)
+                ? payload[0].data
+                : [];
+            resolve();
+          });
+          ipcRenderer.send("option-ranked", type);
+        } catch (error) {
+          this.dataScore = [];
+          resolve();
+        }
+      });
     },
 
     async loadDataPenalties() {

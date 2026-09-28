@@ -16,6 +16,11 @@
                yang sama di sprint-pdfResult.vue. -->
           <strong>SCORE BOARD</strong>
           <span class="dot">•</span>
+          <!-- BUG FIX (2026-09-28): label kategori Event ("DRR") dulu tidak
+               pernah ditampilkan sama sekali di PDF ini — samakan dgn
+               Slalom/H2H yg sudah py label eksplisit ini. -->
+          <span class="cat">{{ "DRR" }}</span>
+          <span class="dot">•</span>
           <span class="cat">
             {{ data && data.levelName ? data.levelName : "Classification" }}
           </span>
@@ -221,7 +226,7 @@
           <div style="font-size: 14px; display: flex; justify-content: center;">
             {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
           </div>
-          <small v-if="!isOfficial" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:05:00.000" }}</small>
+          <small v-if="!isOfficial && !isProvisional" style="font-size: 8px;">Protest Time : {{ data.protestTime || "00:05:00.000" }}</small>
           <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
         </span>
       </div>

@@ -176,7 +176,7 @@
           <div style="font-size: 14px; display: flex; justify-content: center">
             {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
           </div>
-          <small v-if="!isOfficial" style="font-size: 8px"
+          <small v-if="!isOfficial && !isProvisional" style="font-size: 8px"
             >Protest Time : {{ data.protestTime || "00:05:00.000" }}</small
           >
           <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block">{{ formattedOfficialSetAt }}</small>

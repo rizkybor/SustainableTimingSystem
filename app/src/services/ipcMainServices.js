@@ -58,6 +58,7 @@ const {
   updateAssets,
   setResultsStatus,
   setEventStatus,
+  touchResultTimestamp,
 } = require("../controllers/INSERT/insertNewEvent.js");
 
 const {
@@ -898,6 +899,28 @@ function setupIPCMainHandlers() {
       evt.reply("event:set-official-reply", resp);
     } catch (e) {
       evt.reply("event:set-official-reply", {
+        ok: false,
+        error: e && e.message ? e.message : String(e),
+      });
+    }
+  });
+
+  // BUG FIX (2026-09-28): label "Ditetapkan: ..." di halaman Result & PDF
+  // dulu HANYA ter-update saat operator ganti status (Provisional/
+  // Unofficial/Official) secara manual — kalau status TETAP SAMA tapi
+  // operator klik "Save Result" lagi (mis. ada koreksi waktu/penalty),
+  // timestamp "Ditetapkan" tidak ikut ter-refresh, jadi tidak benar2
+  // mencerminkan kapan hasil TERAKHIR disimpan. Dipanggil fire-and-forget
+  // (tidak menghambat alur Save Result) dari tiap SprintRace/SlalomRace/
+  // DownRiverRace/HeadToHead/RaftingCross.vue setelah save berhasil.
+  ipcMain.on("event:touch-result-timestamp", async (evt, payload) => {
+    try {
+      const eventId = payload && payload.eventId;
+      const category = payload && payload.category;
+      const resp = await touchResultTimestamp(eventId, category);
+      evt.reply("event:touch-result-timestamp-reply", resp);
+    } catch (e) {
+      evt.reply("event:touch-result-timestamp-reply", {
         ok: false,
         error: e && e.message ? e.message : String(e),
       });

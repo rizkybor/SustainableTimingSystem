@@ -23,11 +23,22 @@ function getStorage() {
 
 const storage = getStorage();
 
+// BUG FIX (2026-09-28): angka 0 dan string waktu-nol "00:00:00.000" dulu
+// TIDAK dianggap kosong — akibatnya cache LAMA (tersimpan sblm sebuah
+// penalty/waktu masuk, saat field itu masih default 0/"00:00:00.000")
+// menimpa BALIK nilai fresh yang baru saja dihitung ulang dari DB (mis.
+// totalPenalty/penaltyTime DRR jadi balik ke 0 stlh operator Switch
+// Category, walau juri baru saja kirim penalty via sts-jurysystem — lihat
+// hydratePenaltiesFromRegistered() di DownRiverRace.vue). Cache ini murni
+// utk melindungi input yg BELUM ke-save, jadi kalau nilainya masih
+// default/nol tidak ada apa2 yg perlu dilindungi — aman dianggap kosong.
 function isEmptyLeaf(v) {
   return (
     v === "" ||
     v === null ||
     v === undefined ||
+    v === 0 ||
+    v === "00:00:00.000" ||
     (typeof v === "number" && Number.isNaN(v))
   );
 }

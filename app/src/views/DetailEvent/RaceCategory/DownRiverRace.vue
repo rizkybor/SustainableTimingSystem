@@ -1591,8 +1591,25 @@ export default {
         var ALLOWED = (ALLOWED_SRC || []).map(function (p) {
           return Number(p.value);
         });
-        var numericValue =
-          ALLOWED.indexOf(Number(rawVal)) >= 0 ? Number(rawVal) : 0;
+        // BUG FIX (2026-09-28): dulu nilai yg TIDAK ketemu di whitelist
+        // (mis. "-10" blm sempat ke-reload dari Race Settings sisi
+        // sts-timingsystem) DIAM-DIAM dianggap 0 — lalu 0 itu MENIMPA
+        // (replace, bukan accumulate) nilai section yg sudah ada, membuat
+        // Penalty Total & Penalty Time ter-reset ke 0/00:00:00.000 padahal
+        // juri mengirim penalty yg valid. Sekarang: nilai yg tak dikenal
+        // di-SKIP total (tidak menyentuh data sama sekali) — 0 cuma dipakai
+        // kalau memang itu opsi eksplisit di whitelist (mis. "Section 1: 0"
+        // benar2 dipilih juri), bukan sbg fallback diam2 utk value asing.
+        if (ALLOWED.indexOf(Number(rawVal)) < 0) {
+          if (logger && logger.warn) {
+            logger.warn(
+              "applyPenaltyFromSocketDirect: nilai penalty tidak dikenal (blm ada di Race Settings), pesan di-skip:",
+              rawVal
+            );
+          }
+          return false;
+        }
+        var numericValue = Number(rawVal);
 
         // --- map numeric -> time string ---
         // BUG FIX: dulu cari numericValue di this.dataPenalties (daftar

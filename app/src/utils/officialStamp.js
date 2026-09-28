@@ -1,24 +1,46 @@
+// BUG FIX (2026-09-28): dulu HARDCODE "Asia/Jakarta" + suffix " WIB" —
+// event yang digelar di luar Jawa/Sumatra (WITA/WIT) tetap ditampilkan
+// dalam WIB, salah ~1-2 jam dari waktu setempat sebenarnya. Sekarang ambil
+// zona dari `eventsCollection.resultTimezone` (1 pengaturan per-Event,
+// diatur lewat Event Settings — lihat EventSettings.vue), default "WIB"
+// kalau event lama belum pernah mengatur field ini (zero-impact utk event
+// existing). Indonesia tidak kenal DST, jadi offset tetap sudah cukup
+// akurat, tidak perlu IANA timezone lookup library tambahan.
+export const RESULT_TIMEZONE_OPTIONS = ["WIB", "WITA", "WIT"];
+export const RESULT_TIMEZONE_IANA = {
+  WIB: "Asia/Jakarta",
+  WITA: "Asia/Makassar",
+  WIT: "Asia/Jayapura",
+};
+export const DEFAULT_RESULT_TIMEZONE = "WIB";
+
+export function normalizeResultTimezone(tz) {
+  return RESULT_TIMEZONE_OPTIONS.includes(tz) ? tz : DEFAULT_RESULT_TIMEZONE;
+}
+
 // Format timestamp kapan status result suatu kategori terakhir di-set
 // (ISO string UTC, dari eventsCollection.resultsOfficialSetAt.<cat> —
-// lihat setResultsStatus() di insertNewEvent.js) jadi teks WIB
-// (Asia/Jakarta) yang dicetak di bawah stempel PDF Print Result. Dipakai
-// bareng oleh semua *-pdfResult.vue (Sprint/Slalom/DRR/H2H/RX/Overall)
-// supaya format & zona waktunya konsisten satu sama lain, dan konsisten
-// dengan badge Live Result di sts-jurysystem (LiveEventDetail.jsx pakai
-// format id-ID + timeZone Asia/Jakarta yang sama persis).
-export function formatOfficialSetAt(iso) {
+// lihat setResultsStatus() di insertNewEvent.js) jadi teks WIB/WITA/WIT
+// sesuai zona waktu event, dicetak di bawah stempel PDF Print Result.
+// Dipakai bareng oleh semua *-pdfResult.vue (Sprint/Slalom/DRR/H2H/RX/
+// Overall) supaya format & zona waktunya konsisten satu sama lain, dan
+// konsisten dengan badge Live Result di sts-jurysystem.
+export function formatOfficialSetAt(iso, tz) {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
+  const zone = normalizeResultTimezone(tz);
   return (
     d.toLocaleString("id-ID", {
-      timeZone: "Asia/Jakarta",
+      timeZone: RESULT_TIMEZONE_IANA[zone],
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    }) + " WIB"
+    }) +
+    " " +
+    zone
   );
 }
 

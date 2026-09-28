@@ -43,15 +43,59 @@ function isEmptyLeaf(v) {
   );
 }
 
+// BUG FIX (2026-09-28): array TIM (this.participant) dulu ikut di-merge
+// by INDEX sama seperti array primitif (mis. penaltySection). Itu benar
+// utk penaltySection (index = nomor section, stabil), tapi FATAL utk daftar
+// tim: kalau ada tim ditambah/dihapus dari Registered Teams SETELAH cache
+// lokal tersimpan, index seluruh tim setelahnya ikut geser — field cache
+// tim LAMA (mis. nameTeam/bibTeam/startTime) bisa "menempel" ke tim LAIN
+// yang kebetulan menempati index yang sama di array fresh, membuat BIB yg
+// tampil di Operation Panel/Output Racetime tidak sesuai lagi dgn Registered
+// Teams walau data DB-nya sendiri benar. Sekarang: array berisi OBJECT ber-
+// identitas (teamId/_id/bibTeam) di-merge berdasarkan identitas itu, bukan
+// index — array primitif (string/number, spt penaltySection) tetap by index
+// spt semula.
+function arrayIdentityKey(item) {
+  if (!item || typeof item !== "object") return null;
+  if (item.teamId != null && item.teamId !== "") return "teamId:" + item.teamId;
+  if (item._id != null && item._id !== "") return "_id:" + item._id;
+  if (item.bibTeam != null && item.bibTeam !== "") return "bib:" + item.bibTeam;
+  return null;
+}
+
 // Deep-overlay: prefer `cached`'s leaf values over `base`'s, recursing into
-// arrays (matched by index) and plain objects (matched by key), but only
-// where the cached leaf is non-empty. Falls back to `base` wherever cached
-// has nothing to offer, so freshly-fetched DB fields not present in an older
-// cache entry are preserved.
+// arrays (matched by index, or by identity key for object arrays — lihat
+// arrayIdentityKey()) and plain objects (matched by key), but only where the
+// cached leaf is non-empty. Falls back to `base` wherever cached has nothing
+// to offer, so freshly-fetched DB fields not present in an older cache entry
+// are preserved.
 function deepOverlayNonEmpty(base, cached) {
   if (cached === undefined) return base;
 
   if (Array.isArray(base) && Array.isArray(cached)) {
+    const hasIdentity =
+      base.some((b) => arrayIdentityKey(b)) ||
+      cached.some((c) => arrayIdentityKey(c));
+
+    if (hasIdentity) {
+      const cachedByKey = {};
+      cached.forEach((c) => {
+        const k = arrayIdentityKey(c);
+        if (k) cachedByKey[k] = c;
+      });
+      // base (fresh dari DB) yang menentukan KEANGGOTAAN & URUTAN — tim
+      // yang sudah dihapus dari DB tidak akan "hidup lagi" cuma krn masih
+      // ada di cache lama; cache HANYA menyumbang field draft utk tim yang
+      // memang masih ada.
+      return base.map((b) => {
+        const k = arrayIdentityKey(b);
+        const c = k && Object.prototype.hasOwnProperty.call(cachedByKey, k)
+          ? cachedByKey[k]
+          : undefined;
+        return deepOverlayNonEmpty(b, c);
+      });
+    }
+
     const len = Math.max(base.length, cached.length);
     const out = [];
     for (let i = 0; i < len; i++) {

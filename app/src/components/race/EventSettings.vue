@@ -217,6 +217,22 @@
               label="name"
             />
           </b-form-group>
+
+          <!-- Zona Waktu Event — 1 pengaturan berlaku utk SEMUA tampilan
+               Protest/Unofficial/Official Time (badge Result, stempel PDF,
+               Live Result sts-jurysystem). Lihat officialStamp.js. -->
+          <b-form-group label="Zona Waktu Event" label-cols="3">
+            <b-form-radio-group
+              v-model="form.resultTimezone"
+              :options="['WIB', 'WITA', 'WIT']"
+              button-variant="outline-primary"
+              buttons
+            />
+            <small class="text-muted d-block mt-1">
+              Dipakai utk semua tampilan waktu Provisional/Unofficial/Official
+              (badge Result, stempel PDF, Live Result di sts-jurysystem).
+            </small>
+          </b-form-group>
         </section>
 
         <!-- ===================== Poster Event ===================== -->
@@ -610,6 +626,7 @@ export default {
         technicalDelegate: "",
         chiefJudge: "",
         raceDirector: "",
+        resultTimezone: "WIB",
       },
       optionLevels: [],
       optionCategories: [],
@@ -758,6 +775,10 @@ export default {
             technicalDelegate: ev && ev.technicalDelegate ? String(ev.technicalDelegate) : "",
             chiefJudge: ev && ev.chiefJudge ? String(ev.chiefJudge) : "",
             raceDirector: ev && ev.raceDirector ? String(ev.raceDirector) : "",
+            resultTimezone:
+              ev && ["WIB", "WITA", "WIT"].includes(ev.resultTimezone)
+                ? ev.resultTimezone
+                : "WIB",
           };
 
           self.technicalDelegateSignatureUrl =
@@ -1202,6 +1223,9 @@ export default {
         technicalDelegate: this.form.technicalDelegate,
         chiefJudge: this.form.chiefJudge,
         raceDirector: this.form.raceDirector,
+
+        // ===== Zona Waktu =====
+        resultTimezone: this.form.resultTimezone,
 
         // ===== Comitte signature (File baru, opsional) =====
         technicalDelegateSignatureFile: this.technicalDelegateSignatureFile,

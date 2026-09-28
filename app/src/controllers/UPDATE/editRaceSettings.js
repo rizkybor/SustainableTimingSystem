@@ -15,7 +15,9 @@ async function upsertRaceSettingsByEventId(eventId, settings) {
   // Protest Time — satu nilai GLOBAL (bukan per-kategori), ditampilkan di
   // PDF Result semua kategori & initial saat status masih UNOFFICIAL.
   // Format "HH:MM:SS.mmm", sama dgn format waktu race lain di app ini.
-  const DEFAULT_PROTEST_TIME = "00:00:05.000";
+  // BUG FIX (2026-09-28): default lama "00:00:05.000" = 5 DETIK — protest
+  // window realistis itu hitungan MENIT, samakan dgn utils/protestTime.js.
+  const DEFAULT_PROTEST_TIME = "00:05:00.000";
   const PROTEST_TIME_RE = /^([0-9]{2}):([0-9]{2}):([0-9]{2})\.([0-9]{3})$/;
   const cleanProtestTime = (raw) =>
     typeof raw === "string" && PROTEST_TIME_RE.test(raw)

@@ -30,12 +30,35 @@ function normTeam(t = {}) {
   };
 }
 
+// BUG FIX (2026-09-28): identitas bucket yg SESUNGGUHNYA adalah 4 ID
+// (eventId/initialId/raceId/divisionId) + eventName (fixed, DRR/SPRINT/dst)
+// — sama persis prinsip yg dipakai getRegistered() (dibaca DownRiverRace.vue
+// dkk via teams-registered:find). Fungsi di file ini dulu MEWAJIBKAN
+// initialName/raceName/divisionName (label tampilan, BUKAN identitas) ikut
+// cocok PERSIS juga di query findOne() — kalau nama kategori di-rename lewat
+// Race Settings/Event Details SETELAH tim di-assign, atau ada selisih
+// spasi/kapitalisasi antara label yg disimpan dulu vs label yg di-derive
+// ulang saat ini, findOne() gagal cocok & bucket-nya jadi "hilang" dari
+// panel "Registered Teams" (index.vue) — padahal datanya MASIH ADA & tetap
+// kebaca normal di DRR Detail/Output Racetime (yg query-nya cuma pakai ID).
+// Sekarang query & existing-lookup di sini disamakan: HANYA pakai ID +
+// eventName, supaya kedua panel selalu melihat bucket yang identik.
+function idOnlyIdentity(identity) {
+  return {
+    eventId: identity.eventId,
+    initialId: identity.initialId,
+    raceId: identity.raceId,
+    divisionId: identity.divisionId,
+    eventName: identity.eventName,
+  };
+}
+
 // --- READ one bucket by identity ---
 async function getTeamsRegistered(identityInput) {
   const db = await getDb();
   const coll = db.collection("teamsRegisteredCollection");
   const identity = normIdentity(identityInput);
-  const bucket = await coll.findOne(identity);
+  const bucket = await coll.findOne(idOnlyIdentity(identity));
   return bucket || null;
 }
 
@@ -46,10 +69,20 @@ async function upsertTeamsRegistered(bucketInput) {
 
   const bucket = sanitizeBucket(bucketInput);
   const identity = normIdentity(bucket);
+  const idFilter = idOnlyIdentity(identity);
 
-  const existing = await coll.findOne(identity);
+  const existing = await coll.findOne(idFilter);
   if (existing) {
-    const result = await coll.updateOne(identity, { $set: { teams: bucket.teams } });
+    // tetap simpan label nama TERBARU (initialName/raceName/divisionName)
+    // sekalian — kalau sempat drift dari nilai lama, biar ikut ter-refresh.
+    const result = await coll.updateOne(idFilter, {
+      $set: {
+        teams: bucket.teams,
+        initialName: identity.initialName,
+        raceName: identity.raceName,
+        divisionName: identity.divisionName,
+      },
+    });
     return { updated: true, modifiedCount: result.modifiedCount };
   } else {
     const newDoc = { ...identity, teams: bucket.teams };
@@ -63,7 +96,7 @@ async function deleteTeamInBucket({ identity, team }) {
   const db = await getDb();
   const coll = db.collection("teamsRegisteredCollection");
 
-  const iden = normIdentity(identity);
+  const iden = idOnlyIdentity(normIdentity(identity));
   const { nameTeam, bibTeam } = normTeam(team);
 
   // Update pipeline (MongoDB >= 4.2)

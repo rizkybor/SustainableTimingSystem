@@ -140,6 +140,7 @@
         <OfficialStampToggle
           :status="resultStatus"
           :set-at="officialSetAt"
+          :tz="eventInfo.resultTimezone || 'WIB'"
           @set-status="setResultStatus"
           @set-manual="setOfficialManualTime"
         />

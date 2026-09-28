@@ -432,37 +432,62 @@
                              dianggap perubahan baru & memicu updateTimePen(),
                              supaya "pilih 10 berkali-kali -> terakumulasi"
                              benar2 berfungsi. -->
-                        <b-select
+                        <div
                           v-for="sIdx in drrSectionsCount"
-                          :key="
-                            'sec-' +
-                            sIdx +
-                            '-' +
-                            (item._sectionPickGen
-                              ? item._sectionPickGen[sIdx - 1] || 0
-                              : 0)
-                          "
-                          class="small-select"
-                          style="border-radius: 12px; font-weight: 600"
-                          value=""
-                          @change="
-                            updateTimePen(
-                              $event,
-                              item,
-                              'penaltySection',
-                              sIdx - 1
-                            )
-                          "
+                          :key="'sec-wrap-' + sIdx"
+                          class="pen-grid-item"
                         >
-                          <option disabled value="">Section {{ sIdx }}</option>
-                          <option
-                            v-for="p in penaltiesSection"
-                            :key="p.value"
-                            :value="p.timePen"
+                          <b-select
+                            :key="
+                              'sec-' +
+                              sIdx +
+                              '-' +
+                              (item._sectionPickGen
+                                ? item._sectionPickGen[sIdx - 1] || 0
+                                : 0)
+                            "
+                            class="small-select"
+                            style="border-radius: 12px; font-weight: 600"
+                            value=""
+                            @change="
+                              updateTimePen(
+                                $event,
+                                item,
+                                'penaltySection',
+                                sIdx - 1
+                              )
+                            "
                           >
-                            {{ p.label }}
-                          </option>
-                        </b-select>
+                            <option disabled value="">
+                              Section {{ sIdx }}
+                            </option>
+                            <option
+                              v-for="p in penaltiesSection"
+                              :key="p.value"
+                              :value="p.timePen"
+                            >
+                              {{ p.label }}
+                            </option>
+                          </b-select>
+                          <!-- Indikator nilai section AKTIF (dari operator
+                               ATAU socket judge sts-jurysystem) — dropdown
+                               di atas SENGAJA selalu blank (lihat catatan
+                               di atasnya), jadi tanpa ini operator tidak
+                               tahu section mana yang baru saja menerima
+                               penalty dari juri. -->
+                          <span
+                            v-if="sectionPenaltyDisplay(item, sIdx - 1)"
+                            class="section-pen-badge"
+                            :class="{
+                              'section-pen-badge--neg': sectionPenaltyDisplay(
+                                item,
+                                sIdx - 1
+                              ).startsWith('-'),
+                            }"
+                          >
+                            S{{ sIdx }}: {{ sectionPenaltyDisplay(item, sIdx - 1) }}
+                          </span>
+                        </div>
                       </div>
                     </td>
 
@@ -2830,6 +2855,18 @@ export default {
     // Sama fix pattern dgn penaltyValueToTime(): value SELALU berarti detik
     // (konvensi yg sama di seluruh app), jadi cukup parse langsung dari
     // string waktunya, tanpa lookup tabel yg gampang stale/tidak konsisten.
+    // Nilai section AKTIF saat ini (detik, ditampilkan sbg "+10"/"-10"),
+    // dipakai badge di sebelah dropdown Pen. Section — supaya operator tahu
+    // section mana yg baru saja diupdate (manual ATAU dari socket judge),
+    // krn dropdown-nya sendiri sengaja selalu blank (one-shot picker).
+    sectionPenaltyDisplay(item, sectionIndex) {
+      const arr = item && item.result && item.result.penaltySection;
+      const raw = Array.isArray(arr) ? arr[sectionIndex] : null;
+      const seconds = raw ? this.timeToPenaltyValue(raw) : 0;
+      if (!seconds) return "";
+      return (seconds > 0 ? "+" : "") + seconds;
+    },
+
     timeToPenaltyValue(timeStr) {
       const p = String(timeStr || "");
       const neg = p.startsWith("-");
@@ -3890,6 +3927,33 @@ export default {
   grid-column-gap: 8px; /* jarak antar kolom */
   grid-row-gap: 6px; /* jarak antar item vertikal */
   align-items: start;
+}
+
+.pen-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+/* Badge nilai section aktif — muncul di bawah dropdown-nya begitu ada
+   penalty tersimpan utk section itu (dari operator ATAU judge). */
+.section-pen-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b8860b;
+  background: #fff6e0;
+  border: 1px solid #f0d896;
+  border-radius: 8px;
+  padding: 1px 6px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.section-pen-badge--neg {
+  color: #1c7a4c;
+  background: #e6f7ee;
+  border-color: #96d9b8;
 }
 
 /* responsif: di layar kecil, batasi 2 per kolom */

@@ -89,6 +89,12 @@ export default {
     status: { type: String, default: "provisional" },
     // ISO string (UTC) atau null/kosong kalau belum pernah di-set.
     setAt: { type: String, default: "" },
+    // BUG FIX (2026-09-28): dulu badge waktu di sini SELALU ditampilkan
+    // sbg WIB terlepas dari zona sebenarnya event ini (Event Settings ->
+    // resultTimezone). Sekarang parent (tiap *Result.vue) mengoper zona
+    // event via prop ini, dipakai buat format tampilan DAN sbg default
+    // pilihan saat modal "Atur Waktu Manual" dibuka.
+    tz: { type: String, default: "WIB" },
   },
   data() {
     return {
@@ -128,17 +134,25 @@ export default {
       if (!this.setAt) return "";
       const d = new Date(this.setAt);
       if (isNaN(d.getTime())) return "";
+      const zone = TZ_OFFSET_HOURS[this.tz] ? this.tz : "WIB";
+      const ianaZone =
+        zone === "WITA"
+          ? "Asia/Makassar"
+          : zone === "WIT"
+          ? "Asia/Jayapura"
+          : "Asia/Jakarta";
       return (
         "Ditetapkan: " +
         d.toLocaleString("id-ID", {
-          timeZone: "Asia/Jakarta",
+          timeZone: ianaZone,
           day: "2-digit",
           month: "short",
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
         }) +
-        " WIB"
+        " " +
+        zone
       );
     },
   },
@@ -167,7 +181,7 @@ export default {
     // belum pernah di-set) atau waktu tersimpan saat ini, pada zona yang
     // sedang dipilih (default WIB — sama persis perilaku lama).
     openManualModal() {
-      this.manualTz = "WIB";
+      this.manualTz = TZ_OFFSET_HOURS[this.tz] ? this.tz : "WIB";
       const base = this.setAt ? new Date(this.setAt) : new Date();
       this.manualDateTime = this.formatForTz(base, this.manualTz);
       this.showModal = true;

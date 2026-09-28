@@ -148,7 +148,7 @@
             <div style="font-size: 14px; display: flex; justify-content: center;">
               {{ isDerivedOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
             </div>
-            <small v-if="!isDerivedOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:00:05.000" }} min</small>
+            <small v-if="!isDerivedOfficial" style="font-size: 8px;">Protest Time : {{ dataEvent.protestTime || "00:05:00.000" }}</small>
             <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block;">{{ formattedOfficialSetAt }}</small>
           </span>
         </div>
@@ -209,7 +209,7 @@ export default {
     // yang perlu diteruskan manual lewat PrintOverallModal.
     formattedOfficialSetAt() {
       const m = this.dataEvent && this.dataEvent.resultsOfficialSetAt;
-      return formatOfficialSetAt((m && m.overall) || "");
+      return formatOfficialSetAt((m && m.overall) || "", this.dataEvent && this.dataEvent.resultTimezone);
     },
     // Sama pola dgn formattedOfficialSetAt di atas: turunkan status
     // Provisional/Unofficial/Official langsung dari dataEvent (kategori

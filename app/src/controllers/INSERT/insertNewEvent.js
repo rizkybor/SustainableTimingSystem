@@ -227,6 +227,17 @@ async function updateBasic(payload) {
   if (payload && Array.isArray(payload.categoriesInitial))
     set.categoriesInitial = cleanCategoryArray(payload.categoriesInitial);
 
+  // Zona waktu event (WIB/WITA/WIT) — 1 pengaturan per-Event, dipakai
+  // konsisten oleh SEMUA tampilan Protest/Unofficial/Official Time (badge
+  // Result, stempel PDF, Live Result di sts-jurysystem). Lihat
+  // formatOfficialSetAt() di utils/officialStamp.js.
+  if (
+    payload &&
+    ["WIB", "WITA", "WIT"].includes(payload.resultTimezone)
+  ) {
+    set.resultTimezone = payload.resultTimezone;
+  }
+
   const update = { $set: set };
 
   var db = await getDb();

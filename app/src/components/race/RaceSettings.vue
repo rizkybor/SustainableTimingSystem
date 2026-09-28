@@ -29,8 +29,8 @@
             <div class="font-weight-bold mb-1">Protest Time</div>
             <small class="text-muted d-block mb-3">
               Ditampilkan di PDF Result setiap kategori & initial selama
-              status masih UNOFFICIAL (mis. "Protest Time : 00:00:05.000
-              min").
+              status masih UNOFFICIAL (mis. "Protest Time : 00:05:00.000",
+              format Jam:Menit:Detik.Milidetik).
             </small>
             <div class="d-flex align-items-end flex-wrap" style="gap: 16px">
               <div>
@@ -64,7 +64,7 @@
               <div>
                 <small class="text-muted d-block mb-1">Preview</small>
                 <div class="font-weight-bold" style="padding: 6px 0">
-                  {{ draft.protestTime }} min
+                  {{ draft.protestTime }}
                 </div>
               </div>
             </div>

@@ -5,7 +5,11 @@
 // only exposes Minutes/Seconds/Milliseconds since protest windows are
 // realistically sub-hour.
 
-export const DEFAULT_PROTEST_TIME = "00:00:05.000";
+// BUG FIX (2026-09-28): default lama "00:00:05.000" = 5 DETIK — protest
+// window realistis itu hitungan MENIT, bukan detik. Default sekarang 5
+// MENIT ("00:05:00.000"), konsisten dgn UI-nya sendiri yang memang
+// menonjolkan input Menit di atas Detik/Milidetik (lihat RaceSettings.vue).
+export const DEFAULT_PROTEST_TIME = "00:05:00.000";
 
 const PROTEST_TIME_RE = /^([0-9]{2}):([0-9]{2}):([0-9]{2})\.([0-9]{3})$/;
 

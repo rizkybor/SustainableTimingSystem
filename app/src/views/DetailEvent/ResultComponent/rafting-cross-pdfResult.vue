@@ -143,7 +143,7 @@
             {{ isOfficial ? "OFFICIAL" : (isProvisional ? "PROVISIONAL" : "UNOFFICIAL") }}
           </div>
           <small v-if="!isOfficial" style="font-size: 8px"
-            >Protest Time : {{ data.protestTime || "00:00:05.000" }} min</small
+            >Protest Time : {{ data.protestTime || "00:05:00.000" }}</small
           >
           <small v-if="formattedOfficialSetAt" style="font-size: 7.5px; display: block">{{ formattedOfficialSetAt }}</small>
         </span>
@@ -187,7 +187,7 @@ export default {
       return this.status === "provisional";
     },
     formattedOfficialSetAt() {
-      return formatOfficialSetAt(this.officialSetAt);
+      return formatOfficialSetAt(this.officialSetAt, this.data && this.data.resultTimezone);
     },
     rows() {
       return Array.isArray(this.dataParticipant) ? this.dataParticipant : [];

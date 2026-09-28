@@ -938,6 +938,10 @@ export default {
           payload && payload.chiefJudge ? String(payload.chiefJudge) : "",
         raceDirector:
           payload && payload.raceDirector ? String(payload.raceDirector) : "",
+        resultTimezone:
+          payload && ["WIB", "WITA", "WIT"].includes(payload.resultTimezone)
+            ? payload.resultTimezone
+            : "WIB",
       };
 
       // preview sederhana ke console
@@ -991,6 +995,7 @@ export default {
           technicalDelegate: safePayload.technicalDelegate,
           chiefJudge: safePayload.chiefJudge,
           raceDirector: safePayload.raceDirector,
+          resultTimezone: safePayload.resultTimezone,
         };
         ipcRenderer.send("services:update:event-basic", basicDoc);
 

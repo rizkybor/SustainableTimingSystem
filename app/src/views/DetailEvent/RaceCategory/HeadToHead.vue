@@ -4831,13 +4831,15 @@ export default {
     // PDF SELALU A4 baku, brp pun ukuran/rasio bagan atau tabel yang
     // di-capture (lebar/sempit, panjang/pendek).
     // BUG FIX (2026-09-29): dulu embed screenshot bagan sbg PNG (lossless)
-    // hasil html2canvas scale:2 — utk diagram bagan/tabel yg didominasi area
-    // putih polos + garis/teks hitam, PNG jauh lebih besar drpd JPEG tanpa
+    // hasil html2canvas — utk diagram bagan/tabel yg didominasi area putih
+    // polos + garis/teks hitam, PNG jauh lebih besar drpd JPEG tanpa
     // manfaat kualitas yg terlihat (tidak ada gradasi warna yg butuh
-    // lossless). Ganti ke JPEG kualitas tinggi (0.92) — visualnya nyaris
-    // identik tapi ukuran file PDF turun drastis (biasanya 5-10x lebih
-    // kecil utk jenis konten ini). Dipakai bareng oleh downloadBracketPdf()
-    // & download Heat Assignment PDF (kedua pemanggil fungsi ini).
+    // lossless). Ganti ke JPEG (kualitas 0.75 — cukup utk konten garis/teks,
+    // diturunkan dari percobaan awal 0.92 atas permintaan ukuran file lebih
+    // kecil lagi) + scale html2canvas diturunkan ke 1.5 (dari 2) di kedua
+    // pemanggil fungsi ini — gabungan keduanya bikin ukuran file PDF turun
+    // drastis (biasanya >10x lebih kecil drpd PNG scale:2 semula) sementara
+    // teks/garis tetap terbaca jelas saat dicetak.
     _addFittedImageToPdf(pdf, canvas) {
       const { pageMargin, headerHeight } = this._pdfLayout();
       const pageW = pdf.internal.pageSize.getWidth();
@@ -4856,7 +4858,7 @@ export default {
       const x = (pageW - drawW) / 2;
       const y = contentTop + (maxH - drawH) / 2;
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const imgData = canvas.toDataURL("image/jpeg", 0.75);
       pdf.addImage(imgData, "JPEG", x, y, drawW, drawH, undefined, "MEDIUM");
     },
 
@@ -5131,8 +5133,13 @@ export default {
       this.isDownloadingBracketPdf = true;
       try {
         await this.$nextTick();
+        // BUG FIX (2026-09-29): scale 2 (dobel resolusi CSS) tidak
+        // diperlukan utk konten diagram/tabel spt bagan ini (beda dgn foto)
+        // — teks & garis tetap tajam di scale 1.5, tapi jumlah piksel turun
+        // ~44% (kuadratik), menambah penghematan ukuran file di atas
+        // kompresi JPEG (_addFittedImageToPdf).
         const canvas = await html2canvas(el, {
-          scale: 2,
+          scale: 1.5,
           backgroundColor: "#ffffff",
           useCORS: true,
         });
@@ -5188,7 +5195,7 @@ export default {
       try {
         await this.$nextTick();
         const canvas = await html2canvas(el, {
-          scale: 2,
+          scale: 1.5,
           backgroundColor: "#ffffff",
           useCORS: true,
         });

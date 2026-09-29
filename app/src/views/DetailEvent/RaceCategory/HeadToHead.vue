@@ -4830,6 +4830,14 @@ export default {
     // ratio aslinya — dicentang di tengah area itu. Dipakai supaya ukuran
     // PDF SELALU A4 baku, brp pun ukuran/rasio bagan atau tabel yang
     // di-capture (lebar/sempit, panjang/pendek).
+    // BUG FIX (2026-09-29): dulu embed screenshot bagan sbg PNG (lossless)
+    // hasil html2canvas scale:2 — utk diagram bagan/tabel yg didominasi area
+    // putih polos + garis/teks hitam, PNG jauh lebih besar drpd JPEG tanpa
+    // manfaat kualitas yg terlihat (tidak ada gradasi warna yg butuh
+    // lossless). Ganti ke JPEG kualitas tinggi (0.92) — visualnya nyaris
+    // identik tapi ukuran file PDF turun drastis (biasanya 5-10x lebih
+    // kecil utk jenis konten ini). Dipakai bareng oleh downloadBracketPdf()
+    // & download Heat Assignment PDF (kedua pemanggil fungsi ini).
     _addFittedImageToPdf(pdf, canvas) {
       const { pageMargin, headerHeight } = this._pdfLayout();
       const pageW = pdf.internal.pageSize.getWidth();
@@ -4848,8 +4856,8 @@ export default {
       const x = (pageW - drawW) / 2;
       const y = contentTop + (maxH - drawH) / 2;
 
-      const imgData = canvas.toDataURL("image/png");
-      pdf.addImage(imgData, "PNG", x, y, drawW, drawH);
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      pdf.addImage(imgData, "JPEG", x, y, drawW, drawH, undefined, "MEDIUM");
     },
 
     // Tampilkan PDF panduan cara mengisi bagan H2H (BAGAN HEAD TO HEAD

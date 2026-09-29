@@ -31,41 +31,91 @@
       :title="'Atur waktu manual (' + tz + ')'"
       @click.stop="openManualModal"
     >
-      <Icon icon="mdi:clock-plus-outline" width="12" height="12" class="mr-1" />
-      Atur Waktu
+      <Icon icon="mdi:clock-plus-outline" width="13" height="13" />
+      <span>Atur Waktu</span>
     </button>
 
     <b-modal
       v-model="showModal"
-      title="Atur Waktu Penetapan Status"
+      hide-header
       hide-footer
-      size="sm"
       centered
+      size="md"
+      body-class="ost-modal-body"
+      content-class="ost-modal-content"
     >
-      <p class="small text-muted mb-3">
-        Waktu ditetapkannya status <strong>{{ statusLabel }}</strong>
-        untuk kategori ini — ditampilkan di stempel PDF &amp; Live Result. Default otomatis
-        mengikuti waktu saat status dipilih; ubah di sini kalau perlu koreksi manual.
+      <button
+        type="button"
+        class="ost-modal-close"
+        aria-label="Tutup"
+        @click="showModal = false"
+      >
+        <Icon icon="mdi:close" width="16" height="16" />
+      </button>
+
+      <div class="ost-modal-icon" :class="'ost-modal-icon--' + status">
+        <Icon icon="mdi:clock-edit-outline" width="22" height="22" />
+      </div>
+
+      <h3 class="ost-modal-title">Atur Waktu Penetapan Status</h3>
+      <p class="ost-modal-desc">
+        Waktu ditetapkannya status
+        <span class="ost-modal-badge" :class="'ost-modal-badge--' + status">{{
+          statusLabel
+        }}</span>
+        untuk kategori ini — ditampilkan di stempel PDF &amp; Live Result.
+        Default otomatis mengikuti waktu saat status dipilih; ubah di sini
+        kalau perlu koreksi manual.
       </p>
-      <b-form-group label="Zona Waktu">
+
+      <div class="ost-field">
+        <label class="ost-field-label">Zona Waktu</label>
         <b-form-radio-group
           v-model="manualTz"
           :options="TZ_OPTIONS"
           button-variant="outline-primary"
           buttons
           size="sm"
+          class="ost-tz-group"
         />
-      </b-form-group>
-      <b-form-group :label="'Tanggal & Waktu (' + manualTz + ')'">
-        <b-form-input type="datetime-local" v-model="manualDateTime" />
-      </b-form-group>
-      <div class="d-flex justify-content-end" style="gap: 8px">
-        <b-button variant="outline-secondary" size="sm" @click="showModal = false">
+      </div>
+
+      <div class="ost-field">
+        <label class="ost-field-label">
+          Tanggal &amp; Waktu
+          <span class="ost-field-label-hint">({{ manualTz }})</span>
+        </label>
+        <div class="ost-datetime-wrap">
+          <Icon
+            icon="mdi:calendar-clock-outline"
+            width="16"
+            height="16"
+            class="ost-datetime-icon"
+          />
+          <b-form-input
+            type="datetime-local"
+            v-model="manualDateTime"
+            class="ost-datetime-input"
+          />
+        </div>
+      </div>
+
+      <div class="ost-modal-actions">
+        <button
+          type="button"
+          class="ost-btn ost-btn--ghost"
+          @click="showModal = false"
+        >
           Batal
-        </b-button>
-        <b-button variant="primary" size="sm" @click="confirmManual">
-          Simpan Waktu
-        </b-button>
+        </button>
+        <button
+          type="button"
+          class="ost-btn ost-btn--primary"
+          @click="confirmManual"
+        >
+          <Icon icon="mdi:content-save-outline" width="15" height="15" />
+          <span>Simpan Waktu</span>
+        </button>
       </div>
     </b-modal>
   </span>
@@ -277,24 +327,239 @@ export default {
   color: #64748b;
   white-space: nowrap;
 }
-.ost-edit-btn,
-.ost-set-time-btn {
+.ost-edit-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  padding: 1px 4px;
+  padding: 2px;
   color: #94a3b8;
   cursor: pointer;
   border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.ost-edit-btn:hover,
-.ost-set-time-btn:hover {
+.ost-edit-btn:hover {
   background: #f1f5f9;
   color: #1c4c7a;
 }
+
 .ost-set-time-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 3px 9px;
+  color: #475569;
+  cursor: pointer;
+  border-radius: 999px;
   font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.ost-set-time-btn:hover {
+  background: #eef6ff;
+  border-color: #bfdbfe;
+  color: #1c4c7a;
+}
+
+/* ===================== Modal "Atur Waktu Penetapan Status" ===================== */
+:deep(.ost-modal-content) {
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+:deep(.ost-modal-body) {
+  padding: 28px 26px 22px;
+  position: relative;
+}
+
+.ost-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ost-modal-close:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.ost-modal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #eef6ff;
+  color: #2f6ea5;
+  margin-bottom: 14px;
+}
+.ost-modal-icon--provisional {
+  background: #fef3e2;
+  color: #b45309;
+}
+.ost-modal-icon--unofficial {
+  background: #fdecec;
+  color: #c0392b;
+}
+.ost-modal-icon--official {
+  background: #e7f7ee;
+  color: #148a3b;
+}
+
+.ost-modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.ost-modal-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #64748b;
+  margin: 0 0 20px;
+}
+
+.ost-modal-badge {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 5px;
+  color: #1e293b;
+  background: #eef2f7;
+}
+.ost-modal-badge--provisional {
+  color: #b45309;
+  background: #fef3e2;
+}
+.ost-modal-badge--unofficial {
+  color: #c0392b;
+  background: #fdecec;
+}
+.ost-modal-badge--official {
+  color: #148a3b;
+  background: #e7f7ee;
+}
+
+.ost-field {
+  margin-bottom: 18px;
+}
+.ost-field-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.ost-field-label-hint {
   font-weight: 600;
+  color: #94a3b8;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Bootstrap .btn-group merapatkan tombol jadi satu blok nyambung (margin-
+   left negatif + border-radius cuma di ujung kiri/kanan) — gap saja tidak
+   cukup krn keduanya "berebut" jarak antar tombol. Lepas semua perilaku
+   nyambung itu supaya WIB/WITA/WIT tampil sbg 3 pill terpisah dgn jarak
+   yg jelas. */
+.ost-tz-group :deep(.btn-group) {
+  display: flex;
+  gap: 8px;
+}
+.ost-tz-group :deep(.btn) {
+  border-radius: 8px !important;
+  font-weight: 700;
+  font-size: 12px;
+  margin-left: 0 !important;
+}
+
+.ost-datetime-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ost-datetime-icon {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+:deep(.ost-datetime-input) {
+  padding-left: 36px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #dde3ec;
+  font-weight: 600;
+  color: #1e293b;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+:deep(.ost-datetime-input:focus) {
+  border-color: #2f6ea5;
+  box-shadow: 0 0 0 3px rgba(47, 110, 165, 0.12);
+}
+
+.ost-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.ost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.ost-btn:active {
+  transform: translateY(1px);
+}
+.ost-btn--ghost {
+  background: #fff;
+  border: 1px solid #dde3ec;
+  color: #475569;
+}
+.ost-btn--ghost:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.ost-btn--primary {
+  background: linear-gradient(135deg, #3aa3ec, #1c6fb0);
+  border: 1px solid #1c6fb0;
+  color: #fff;
+  box-shadow: 0 6px 16px -4px rgba(28, 111, 176, 0.45);
+}
+.ost-btn--primary:hover {
+  background: linear-gradient(135deg, #46addb, #2178bb);
+  box-shadow: 0 8px 20px -4px rgba(28, 111, 176, 0.55);
 }
 </style>

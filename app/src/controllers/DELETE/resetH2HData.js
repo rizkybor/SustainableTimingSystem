@@ -46,6 +46,7 @@ async function resetH2HDataForEvent(eventId) {
     judgeDetailsRes,
     judgeReportsPullRes,
     activeRoundsRes,
+    livePreviewRes,
   ] = await Promise.all([
     db.collection("h2h_brackets").deleteMany({ "bucket.eventId": id }),
     db.collection("h2h_results").deleteMany({ "bucket.eventId": id }),
@@ -70,6 +71,11 @@ async function resetH2HDataForEvent(eventId) {
     // Babak Aktif H2H sisi juri (filter dropdown Team per Heat) —
     // eventId String top-level, lihat models/H2HActiveRound.js.
     db.collection("h2hactiverounds").deleteMany({ eventId: id }),
+    // Live preview hasil H2H (per babak) SEBELUM "Save Round" — eventId
+    // String top-level, lihat models/H2HLivePreview.js. Tanpa ini, juri
+    // masih bisa melihat preview waktu SESI LAMA (sebelum reset) sampai
+    // ada tim baru yg genuinely Start+Finish lagi.
+    db.collection("h2hlivepreviews").deleteMany({ eventId: id }),
   ]);
 
   // temporaryOverallEventResults dipakai BERSAMA oleh semua kategori
@@ -130,6 +136,7 @@ async function resetH2HDataForEvent(eventId) {
       judgereportdetails: judgeDetailsRes.deletedCount || 0,
       judgereports: judgeReportsPullRes.modifiedCount || 0,
       h2hactiverounds: activeRoundsRes.deletedCount || 0,
+      h2hlivepreviews: livePreviewRes.deletedCount || 0,
     },
     overallDocsTouched,
   };

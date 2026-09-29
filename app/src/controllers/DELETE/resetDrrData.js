@@ -170,6 +170,15 @@ async function resetDrrDataForEvent(eventId) {
     .collection("drrteamstatuses")
     .deleteMany({ eventId: id });
 
+  // Live preview hasil DRR SEBELUM operator klik "Save Result" —
+  // models/DrrLivePreview.js di sts-jurysystem, diisi lewat relay socket
+  // "drr:team-finished". Tanpa ini, juri masih bisa melihat preview hasil
+  // SESI LAMA (sebelum reset) sampai ada tim baru yg genuinely
+  // Start+Finish lagi — sama pola/alasan dgn drrteamstatuses di atas.
+  const livePreviewRes = await db
+    .collection("drrlivepreviews")
+    .deleteMany({ eventId: id });
+
   return {
     ok: true,
     deletedCounts: {
@@ -177,6 +186,7 @@ async function resetDrrDataForEvent(eventId) {
       judgeActionLogs: judgeLogsRes.deletedCount || 0,
       judgeReportDetails: deletedJudgeReportDetails,
       drrTeamStatuses: teamStatusRes.deletedCount || 0,
+      drrLivePreviews: livePreviewRes.deletedCount || 0,
     },
     updatedJudgeReports,
     overallDocsTouched,

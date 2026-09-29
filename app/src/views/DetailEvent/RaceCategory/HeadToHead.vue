@@ -7696,6 +7696,38 @@ export default {
             target.result.startTime,
             target.result.finishTime
           );
+
+          // Broadcast LIVE PREVIEW begitu satu tim genuinely selesai
+          // (Start & Finish Time terisi) di babak yang sedang aktif —
+          // TIDAK menunggu "Save Round", sama pola persis dgn
+          // sprint/drr/slalom:team-finished. Win/Lose & rank final tetap
+          // menunggu Save Round (butuh KEDUA tim di match yang sama).
+          // Fire-and-forget.
+          if (typeof ipcRenderer !== "undefined") {
+            try {
+              const bucket = this.currentBucket || getBucket();
+              ipcRenderer.send("h2h:team-finished", {
+                eventId: bucket.eventId,
+                initialId: bucket.initialId,
+                divisionId: bucket.divisionId,
+                raceId: bucket.raceId,
+                teamId: String(target.teamId || target._id || ""),
+                bibTeam: String(target.bibTeam || ""),
+                nameTeam: String(target.nameTeam || target.teamName || ""),
+                roundId: this.currentRound ? String(this.currentRound.id || "") : "",
+                roundName: this.currentRound
+                  ? this.currentRound.bronze
+                    ? "Final B"
+                    : this.currentRound.name
+                  : "",
+                startTime: target.result.startTime,
+                finishTime: target.result.finishTime,
+                raceTime: target.result.raceTime,
+              });
+            } catch (_e) {
+              // non-critical
+            }
+          }
         }
       }
 

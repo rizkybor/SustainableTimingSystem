@@ -1279,6 +1279,21 @@ export default {
           return;
         if (!isSameEvent(msg)) return;
 
+        // BUG FIX (2026-09-29): Race Settings (Total Section, Pilihan
+        // Penalty, Score by Rank) dulu HANYA dimuat sekali saat halaman
+        // ini pertama dibuka (fetchDrrSectionCountFromSettings() di
+        // mounted()) — kalau operator ubah Race Settings DRR lewat modal
+        // di Event Details SEMENTARA halaman ini sudah terbuka duluan
+        // (window lain), perubahannya tidak pernah terlihat sampai
+        // halaman ditutup-buka ulang. Sekarang refetch otomatis begitu
+        // broadcast "race-settings:updated" diterima (lihat
+        // notifyRaceSettingsUpdated() di socketBroadcast.js, dipanggil
+        // stlh race-settings:upsert sukses).
+        if (msg.type === "race-settings:updated") {
+          this.fetchDrrSectionCountFromSettings();
+          return;
+        }
+
         // notifikasi realtime + audio
         if (this.$bvToast && msg.text) {
           try {
@@ -3301,6 +3316,40 @@ export default {
           this.participant[id].result.penaltyTime || "00:00:00.000"
         );
         await this.assignRanks(this.participant);
+
+        // Broadcast LIVE PREVIEW begitu tim ini genuinely selesai (Start &
+        // Finish Time terisi) — TIDAK menunggu "Save Result", sama pola
+        // persis dgn sprint:team-finished di SprintRace.vue. Murni
+        // pratinjau tambahan (digabung dgn hasil resmi di sts-jurysystem's
+        // live-results route.js), rank final tetap menunggu Save Result.
+        // Fire-and-forget.
+        if (typeof ipcRenderer !== "undefined") {
+          try {
+            const row = this.participant[id];
+            const bucket = this.currentBucket || getBucket();
+            ipcRenderer.send("drr:team-finished", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(row.teamId || ""),
+              bibTeam: String(row.bibTeam || ""),
+              nameTeam: String(row.nameTeam || ""),
+              startTime: row.result.startTime,
+              finishTime: row.result.finishTime,
+              raceTime: row.result.raceTime,
+              startPenalty: row.result.startPenalty,
+              finishPenalty: row.result.finishPenalty,
+              sectionPenaltyTime: Array.isArray(row.result.penaltySection)
+                ? row.result.penaltySection.slice()
+                : [],
+              penaltyTime: row.result.totalPenaltyTime || row.result.penaltyTime,
+              totalTime: row.result.totalTime,
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
       }
 
       if (this.selectedDrrKey) {

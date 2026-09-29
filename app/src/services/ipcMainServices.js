@@ -118,6 +118,10 @@ const {
   notifySlalomTeamStarted,
   notifyOfficialStatusChanged,
   notifySprintTeamFinished,
+  notifyDrrTeamFinished,
+  notifySlalomTeamFinished,
+  notifyH2HTeamFinished,
+  notifyRaceSettingsUpdated,
 } = require("../controllers/socketBroadcast");
 const {
   insertH2HFoulsReport,
@@ -965,6 +969,24 @@ function setupIPCMainHandlers() {
     notifySprintTeamFinished(payload || {});
   });
 
+  // Broadcast LIVE PREVIEW begitu satu team DRR genuinely selesai (Start &
+  // Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("drr:team-finished", (_event, payload) => {
+    notifyDrrTeamFinished(payload || {});
+  });
+
+  // Broadcast LIVE PREVIEW begitu satu Run Slalom genuinely selesai (Start
+  // & Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("slalom:team-finished", (_event, payload) => {
+    notifySlalomTeamFinished(payload || {});
+  });
+
+  // Broadcast LIVE PREVIEW begitu satu tim H2H genuinely selesai (Start &
+  // Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("h2h:team-finished", (_event, payload) => {
+    notifyH2HTeamFinished(payload || {});
+  });
+
   // Broadcast LIVE begitu operator H2H pindah/buka babak (round) lain —
   // dipakai sts-jurysystem utk label "babak aktif" + filter dropdown
   // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
@@ -1552,6 +1574,10 @@ function setupIPCMainHandlers() {
 
       const updated = await upsertRaceSettingsByEventId(id, incoming);
       const out = updated && updated.settings ? updated.settings : incoming;
+
+      // Broadcast supaya Race Detail (window lain) & halaman juri yang
+      // sedang terbuka utk event ini ikut refetch settings terbaru.
+      notifyRaceSettingsUpdated({ eventId: id });
 
       event.reply("race-settings:upsert-reply", {
         ok: true,

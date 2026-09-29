@@ -1,7 +1,7 @@
 // ../Controllers/insert/upsertHeadToHead.js
 const { getDb } = require("../index");
 const { ObjectId } = require("mongodb");
-const { notifyResultsUpdated } = require("../socketBroadcast");
+const { notifyResultsUpdated, notifyH2HBracketUpdated } = require("../socketBroadcast");
 
 // --- Nama koleksi (silakan samain dengan konvensi kamu)
 const COL_BRACKETS = "h2h_brackets";
@@ -80,6 +80,16 @@ async function upsertBracket(bucket, rounds, { showBronze = true, settings = {} 
     raceId: doc.bucket.raceId,
   });
 
+  // FITUR (2026-09-29, atas permintaan user): halaman juri H2H butuh tahu
+  // SEMUA Heat yang ter-assign lintas kategori secara real-time (bukan
+  // cuma babak yang operator sedang buka) — lihat notifyH2HBracketUpdated().
+  notifyH2HBracketUpdated({
+    eventId: doc.bucket.eventId,
+    initialId: doc.bucket.initialId,
+    divisionId: doc.bucket.divisionId,
+    raceId: doc.bucket.raceId,
+  });
+
   return { ok: true };
 }
 
@@ -90,6 +100,67 @@ async function getBracket(bucket) {
   const key = makeKey(bucket);
   const item = await db.collection(COL_BRACKETS).findOne({ key });
   return { ok: true, item };
+}
+
+// FITUR (2026-09-29, atas permintaan user): set nomor Heat SATU match
+// langsung ke DB tanpa perlu bucket itu sedang dimuat aktif di layar
+// (this.rounds) — dipakai widget "Assign Heat Lintas Kategori" supaya
+// operator bisa isi Heat kategori LAIN tanpa pindah tab Switch Category.
+// Tidak melakukan validasi "Heat sudah dipakai" di sini — itu tetap jadi
+// tanggung jawab caller (HeadToHead.vue) yang SUDAH py info Heat usage
+// lintas kategori dari getAllBracketsForEvent().
+async function assignHeatDirect(bucket, roundId, matchIndex, heat) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const key = makeKey(bucket);
+  const doc = await db.collection(COL_BRACKETS).findOne({ key });
+  if (!doc || !Array.isArray(doc.rounds)) {
+    return { ok: false, error: "Bracket tidak ditemukan" };
+  }
+  const round = doc.rounds.find((r) => r.id === roundId);
+  if (!round || !Array.isArray(round.matches) || !round.matches[matchIndex]) {
+    return { ok: false, error: "Match tidak ditemukan" };
+  }
+  const match = round.matches[matchIndex];
+  if (match.bye) {
+    return { ok: false, error: "Match BYE tidak perlu Heat" };
+  }
+  const has1 = !!(match.team1 && match.team1.name);
+  const has2 = !!(match.team2 && match.team2.name);
+  if (!has1 || !has2) {
+    return { ok: false, error: "Kedua sisi match belum terisi tim" };
+  }
+
+  match.heat = Number(heat) || 0;
+  await db
+    .collection(COL_BRACKETS)
+    .updateOne({ key }, { $set: { rounds: doc.rounds, updatedAt: new Date() } });
+
+  notifyH2HBracketUpdated({
+    eventId: doc.bucket.eventId,
+    initialId: doc.bucket.initialId,
+    divisionId: doc.bucket.divisionId,
+    raceId: doc.bucket.raceId,
+  });
+
+  return { ok: true };
+}
+
+// FITUR (2026-09-29, atas permintaan user): ambil SEMUA bracket H2H punya
+// satu event sekaligus (lintas Division/Race/Initial) — dipakai widget
+// "Assign Heat Lintas Kategori" di HeadToHead.vue supaya operator bisa
+// lihat & isi Heat yang masih kosong dari SEMUA kategori tanpa perlu
+// pindah-pindah tab Switch Category satu-satu dulu.
+async function getAllBracketsForEvent(eventId) {
+  const db = await getDb();
+  await ensureIndexes(db);
+
+  const items = await db
+    .collection(COL_BRACKETS)
+    .find({ "bucket.eventId": String(eventId || "") })
+    .toArray();
+  return { ok: true, items };
 }
 
 /** =========================================
@@ -320,6 +391,8 @@ async function getAllResults(bucket) {
 module.exports = {
   upsertBracket,
   getBracket,
+  getAllBracketsForEvent,
+  assignHeatDirect,
   upsertRoundRows,
   upsertAllRounds,
   upsertOverall,

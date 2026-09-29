@@ -10,6 +10,8 @@ const cloudinary = require("cloudinary").v2;
 const {
   upsertBracket,
   getBracket,
+  getAllBracketsForEvent,
+  assignHeatDirect,
   upsertRoundRows,
   upsertAllRounds,
   upsertOverall,
@@ -1722,6 +1724,38 @@ ipcMain.on("h2h:bracket:get", async (e, bucket) => {
       ok: false,
       error: String(err),
       __reqId: reqId,
+    });
+  }
+});
+
+// FITUR (2026-09-29): ambil SEMUA bracket H2H punya satu event sekaligus
+// (lintas Division/Race/Initial) — dipakai widget "Assign Heat Lintas
+// Kategori" di HeadToHead.vue.
+ipcMain.on("h2h:brackets:get-all-for-event", async (e, eventId) => {
+  try {
+    const result = await getAllBracketsForEvent(eventId);
+    e.reply("h2h:brackets:get-all-for-event-reply", result);
+  } catch (err) {
+    e.reply("h2h:brackets:get-all-for-event-reply", {
+      ok: false,
+      items: [],
+      error: String(err),
+    });
+  }
+});
+
+// FITUR (2026-09-29): set nomor Heat satu match langsung ke DB tanpa
+// bucket itu perlu sedang aktif di layar — dipakai widget "Assign Heat
+// Lintas Kategori".
+ipcMain.on("h2h:bracket:assign-heat-direct", async (e, payload) => {
+  try {
+    const { bucket, roundId, matchIndex, heat } = payload || {};
+    const result = await assignHeatDirect(bucket, roundId, matchIndex, heat);
+    e.reply("h2h:bracket:assign-heat-direct-reply", result);
+  } catch (err) {
+    e.reply("h2h:bracket:assign-heat-direct-reply", {
+      ok: false,
+      error: String(err),
     });
   }
 });

@@ -193,6 +193,27 @@ function notifyRaceSettingsUpdated(payload) {
   }
 }
 
+// FITUR (2026-09-29, atas permintaan user): beritahu halaman juri H2H
+// bahwa bracket bucket ini baru saja disimpan (Heat baru di-assign, tim
+// baru ditempatkan, match selesai, dll — saveBracketToDB() di
+// HeadToHead.vue dipanggil utk SEMUA jenis perubahan itu) — supaya daftar
+// Heat yang ditampilkan ke juri (SEMUA babak, bukan cuma babak aktif)
+// selalu real-time tanpa perlu babak itu dijadikan "aktif" oleh operator
+// dulu.
+function notifyH2HBracketUpdated(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "h2h:bracket-updated",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan proses simpan bracket
+  }
+}
+
 module.exports = {
   notifyResultsUpdated,
   notifyTeamStarted,
@@ -204,4 +225,5 @@ module.exports = {
   notifySlalomTeamFinished,
   notifyH2HTeamFinished,
   notifyRaceSettingsUpdated,
+  notifyH2HBracketUpdated,
 };

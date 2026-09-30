@@ -2353,6 +2353,18 @@ export default {
       // lengkap di hydrateRoundResultsFromDb() (gap-fill only, aman
       // dipanggil tiap pindah tab Round).
       this.hydrateRoundResultsFromDb();
+      // BUG FIX (2026-09-30): catchUpMissedPenaltiesH2H() sebelumnya HANYA
+      // dipanggil saat socket reconnect — sejak widget "semua Heat lintas
+      // kategori" di halaman judges H2H (2026-09-29), juri bisa submit
+      // penalty utk babak MANAPUN yg sudah di-assign Heat-nya, termasuk
+      // babak yg SAAT ITU belum/tidak sedang dibuka operator.
+      // applyPenaltyFromSocketH2H() menolak (lihat notify "Penalty
+      // Realtime Ditolak") penalty yg datang saat babaknya tidak aktif —
+      // tanpa replay di sini, penalty itu HILANG permanen sampai
+      // kebetulan ada reconnect. Panggil juga setiap kali operator
+      // PINDAH ke babak ini, supaya penalty yg sempat ditolak otomatis
+      // ter-apply begitu babak yg sesuai dibuka.
+      this.catchUpMissedPenaltiesH2H();
     },
     showBracket(val) {
       localStorage.setItem(SHOW_BRACKET_KEY, val ? "1" : "0");
@@ -6073,7 +6085,34 @@ export default {
           msg.roundId == null ||
           !this.currentRound ||
           String(msg.roundId) === String(this.currentRound.id);
-        if (!sameCategory || !sameRound) return;
+        // BUG FIX (2026-09-30): sebelumnya di sini SILENT return — operator
+        // tidak pernah tahu ada penalty masuk sama sekali. Waktu itu aman
+        // krn juri hanya bisa pilih Heat dari babak yg SEDANG dibuka
+        // operator (activeRound), jadi sameCategory/sameRound praktis
+        // SELALU cocok. Sejak widget "semua Heat lintas kategori" di
+        // halaman judges H2H (2026-09-29) — juri sekarang bisa klik Heat
+        // MANAPUN yg sudah di-assign, termasuk babak/kategori yg BUKAN
+        // sedang tampil di layar operator — kasus tidak cocok jadi NYATA,
+        // bukan cuma teoretis. Tanpa notify ini, juri mengira sudah
+        // terkirim (toast sukses + tercatat di Riwayat judgereportdetails)
+        // padahal operator sama sekali tidak tahu ada kiriman yg tertolak.
+        if (!sameCategory || !sameRound) {
+          const catLabel =
+            msg.categoryLabel ||
+            [msg.initialName, msg.divisionName, msg.raceName]
+              .filter(Boolean)
+              .join(" - ") ||
+            "kategori lain";
+          const roundLabel = msg.heatRoundName || msg.roundName || "babak lain";
+          this.notify(
+            "warning",
+            `Penalty dari juri utk Heat ${
+              msg.heat || "-"
+            } (${catLabel} — ${roundLabel}) BELUM diterapkan — buka kategori & babak tsb dulu di operator, lalu juri submit ulang.`,
+            "Penalty Realtime Ditolak"
+          );
+          return;
+        }
       }
 
       // resolve tim: teamId/bib/nama -> index di this.participant

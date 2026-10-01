@@ -228,6 +228,7 @@
     <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="participantArr && participantArr.length"
       :digit-id="digitId"
@@ -758,6 +759,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import photofinishMixin from "@/mixins/photofinishMixin";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -989,6 +992,7 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: {
+    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     Icon,
@@ -997,7 +1001,7 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
   data() {
     return {
       connectionState,
@@ -1065,6 +1069,9 @@ export default {
     },
   },
   computed: {
+    pfCategory() {
+      return "DRR";
+    },
     // Opsi Pen. Start — dulu whitelist KETAT {0,10,50} thd daftar GLOBAL
     // (dataPenalties), jadi custom value dari Pilihan Pen. Start (Race
     // Settings) tidak akan pernah muncul krn di-filter habis. Sekarang pakai
@@ -1384,6 +1391,25 @@ export default {
     }
   },
   methods: {
+    /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfBucket() {
+      // Sengaja TANPA fallback getBucket(): bisa stale setelah "Switch DRR
+      // Category", dan null (tampilan aggregate) berarti jangan terapkan.
+      return this.currentBucket;
+    },
+    pfLocateTeam(msg) {
+      const list = Array.isArray(this.participant) ? this.participant : [];
+      let index = list.findIndex((p) => String(p.teamId || "") === String(msg.teamId));
+      if (index < 0 && msg.bib) index = list.findIndex((p) => String(p.bibTeam || "") === String(msg.bib));
+      if (index < 0) return null;
+      const p = list[index];
+      return {
+        index: index,
+        name: String(p.nameTeam || p.teamName || ""),
+        finishTime: (p.result && p.result.finishTime) || "",
+      };
+    },
+
     // Field Notes — catatan bebas juri (murni informasi, tidak
     // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
     // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.

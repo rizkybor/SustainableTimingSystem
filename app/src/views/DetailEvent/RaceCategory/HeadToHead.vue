@@ -1144,6 +1144,7 @@
     </div>
 
     <!-- OPERATION TIME (shared component) -->
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="visibleParticipants && visibleParticipants.length"
       :digit-id="digitId"
@@ -1695,6 +1696,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import photofinishMixin from "@/mixins/photofinishMixin";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
@@ -1837,6 +1840,7 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
+    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     VueHtml2pdf,
@@ -1848,7 +1852,7 @@ export default {
     FoulsReportModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
   data() {
     return {
       connectionState,
@@ -1952,6 +1956,9 @@ export default {
   },
 
   computed: {
+    pfCategory() {
+      return "H2H";
+    },
     // Mapping this.rounds (struktur internal app) -> format yang dipahami
     // vue-tournament-bracket ({games:[{player1,player2}]}). Bronze/Final B
     // TIDAK ikut di sini — komponen bracket ini mengasumsikan tiap babak
@@ -2535,6 +2542,26 @@ export default {
   },
 
   methods: {
+    /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfBucket() {
+      // Sumber kebenaran bucket H2H = getBucket() (sama dgn _currentBucketOrThrow()).
+      return getBucket();
+    },
+    pfLocateTeam(msg) {
+      const list = this.visibleParticipants || [];
+      const byId = (p) => String(p.teamId || p._id || "") === String(msg.teamId);
+      const byBib = (p) => !!msg.bib && String(p.bibTeam || "") === String(msg.bib);
+      let index = list.findIndex(byId);
+      if (index < 0) index = list.findIndex(byBib);
+      if (index < 0) return null;
+      const p = list[index];
+      return {
+        index: index,
+        name: String(p.nameTeam || p.teamName || ""),
+        finishTime: (p.result && p.result.finishTime) || "",
+      };
+    },
+
     scoreForRank(rank) {
       if (!rank || !Number.isFinite(+rank)) return 0;
       const s = this.getScoreByRanked ? this.getScoreByRanked(+rank) : null;

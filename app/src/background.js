@@ -15,6 +15,11 @@ let mainWindow = null;
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 setupIPCMainHandlers();
 
+// STS Photo Finish — nonaktif otomatis bila tidak dikonfigurasi
+// (lihat services/photofinishMain.js).
+const { setupPhotofinish } = require("./services/photofinishMain");
+setupPhotofinish();
+
 protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { secure: true, standard: true } }]);
 
 function resolveIcon() {

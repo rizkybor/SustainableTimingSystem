@@ -2,16 +2,9 @@
 const { MongoClient } = require("mongodb");
 require("dotenv").config();
 
-const SEED_URI="mongodb://rizkyak:Mongos-Jeko-STS2025@" +
-  "mongo-jeko-shard-00-00.qdk8a.mongodb.net:27017," +
-  "mongo-jeko-shard-00-01.qdk8a.mongodb.net:27017," +
-  "mongo-jeko-shard-00-02.qdk8a.mongodb.net:27017/" +
-  "sustainabledb_atlas" +
-  "?tls=true&replicaSet=atlas-13yy7d-shard-0&authSource=admin" +
-  "&retryWrites=true&w=majority";
-
-const uri = SEED_URI;
-
+// Connection string MongoDB TIDAK ditulis di kode — lihat dbConfig.js
+// (MONGO_URI di app/.env, database.json di folder data aplikasi, atau nilai build).
+const { resolveMongoUri } = require("./dbConfig");
 let client;
 let db;
 let connecting;
@@ -45,7 +38,7 @@ async function getDb() {
   if (db) return db;
 
   if (!client) {
-    client = new MongoClient(uri, {
+    client = new MongoClient(resolveMongoUri(), {
       maxPoolSize: 30,
       minPoolSize: 5,
       maxIdleTimeMS: 10000,

@@ -19,9 +19,16 @@ PF_HMAC_SECRET=<sama dengan API>
 
 Tanpa konfigurasi, integrasi nonaktif dan aplikasi berjalan seperti biasa.
 
+## Kirim heat ke Photo Finish
+
+Di halaman H2H / Rafting Cross / DRR, klik **Kirim heat ke Photo Finish**,
+pilih heat, lalu **Kirim & aktifkan**. Sesi Photo Finish dibuat dengan
+kategori, heat, dan tim yang sedang tampil, lalu langsung aktif.
+
 ## Kode
 
 - `src/services/photofinishCore.js`, `photofinishMain.js` (main process, menyimpan secret)
 - `src/services/photofinish.js` (renderer, IPC)
-- `src/mixins/photofinishMixin.js` + hook `pfCategory` / `pfBucket()` / `pfLocateTeam()` di view
+- `src/mixins/photofinishMixin.js` + hook `pfCategory` / `pfBucket()` / `pfLocateTeam()` / `pfHeats()` di view
+- `src/components/photofinish/PhotofinishBar.vue` (badge + tombol kirim heat)
 - `src/utils/microGateReader.js`: callback menerima argumen ke-4 `meta = { recvUs, frameBytes }`

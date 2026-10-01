@@ -228,7 +228,7 @@
     <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
+    <div class="ml-5 mb-2"><PhotofinishBar :get-heats="pfHeats" :send-heat="pfSendHeat" /></div>
     <OperationTimePanel
       v-if="participantArr && participantArr.length"
       :digit-id="digitId"
@@ -760,7 +760,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
+import PhotofinishBar from "@/components/photofinish/PhotofinishBar.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -992,7 +992,7 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: {
-    PhotofinishBadge,
+    PhotofinishBar,
     OperationTimePanel,
     EmptyCard,
     Icon,
@@ -1392,6 +1392,23 @@ export default {
   },
   methods: {
     /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfHeats() {
+      // DRR tanpa heat: semua tim kategori ini dalam satu sesi; label lintasan = BIB.
+      const b = this.currentBucket;
+      if (!b) return [];
+      const crew = this.pfCrewExpected(b.divisionName);
+      const seen = {};
+      const lanes = (Array.isArray(this.participant) ? this.participant : [])
+        .filter((p) => p && String(p.teamId || ""))
+        .map((p, i) => {
+          let lane = String(p.bibTeam || i + 1).slice(0, 16);
+          while (seen[lane]) lane = `${lane}'`;
+          seen[lane] = true;
+          return { lane, teamId: String(p.teamId), bib: p.bibTeam ? String(p.bibTeam) : null, teamName: p.nameTeam || p.teamName || null, crewExpected: crew };
+        });
+      if (!lanes.length) return [];
+      return [{ key: "drr", title: `Semua tim (${lanes.length})`, heatId: null, label: `DRR ${this.pfBucketLabel(b)}`.trim(), lanes: lanes.slice(0, 64) }];
+    },
     pfBucket() {
       // Sengaja TANPA fallback getBucket(): bisa stale setelah "Switch DRR
       // Category", dan null (tampilan aggregate) berarti jangan terapkan.

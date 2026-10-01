@@ -75,6 +75,7 @@ function serialLatencyNs(frameBytes, baudRate) {
  * @param {{load: Function, save: Function}} opts.storage  persistensi kecil (JSON)
  * @param {Function} opts.onVerified dipanggil untuk setiap hasil photo finish baru/terkoreksi
  * @param {Function} [opts.onStatus] dipanggil saat status koneksi/antrean berubah
+ * @param {Function} [opts.onTrigger] dipanggil untuk setiap perahu yang terdeteksi kamera Photo Finish
  */
 function createPhotofinishClient(opts) {
   const storage = opts.storage;
@@ -198,6 +199,43 @@ function createPhotofinishClient(opts) {
     emitStatus();
   }
 
+  /**
+   * "Kirim heat ke Photo Finish": minta API membuat/memakai ulang sesi untuk
+   * heat ini lalu mengaktifkannya. Langsung (tanpa antrean) agar operator
+   * tahu hasilnya saat itu juga.
+   */
+  async function armHeat(heat) {
+    if (!socket || !socket.connected) return { ok: false, error: "Photo Finish tidak terhubung" };
+    const payload = {
+      type: "timing:session",
+      eventId: String(heat.eventId),
+      bucket: {
+        divisionId: String(heat.bucket.divisionId),
+        raceId: String(heat.bucket.raceId),
+        initialId: String(heat.bucket.initialId),
+      },
+      raceCategory: heat.raceCategory,
+      heatId: heat.heatId === null || heat.heatId === undefined ? null : String(heat.heatId),
+      label: String(heat.label).slice(0, 128),
+      // Semua field ditulis eksplisit (termasuk null) — tanda tangan HMAC
+      // dihitung atas payload persis seperti yang dikirim.
+      lanes: (heat.lanes || []).map(function (l) {
+        return {
+          lane: String(l.lane),
+          teamId: String(l.teamId),
+          bib: l.bib ? String(l.bib) : null,
+          teamName: l.teamName ? String(l.teamName).slice(0, 128) : null,
+          crewExpected: typeof l.crewExpected === "number" ? l.crewExpected : null,
+        };
+      }),
+    };
+    try {
+      return await socket.timeout(5000).emitWithAck("timing:session", sign(opts.hmacSecret, payload));
+    } catch (_e) {
+      return { ok: false, error: "Photo Finish tidak menjawab (timeout)" };
+    }
+  }
+
   function markApplied(crossingId, revision) {
     const cur = pending[crossingId];
     if (cur && cur.revision <= revision) {
@@ -227,6 +265,12 @@ function createPhotofinishClient(opts) {
       emitStatus();
     });
     socket.on("photofinish:verified", onVerified);
+    // Setiap perahu yang terdeteksi kamera Photo Finish → baris "Photo Finish"
+    // di panel waktu + Buffer-Timer-Finish. Pesan palsu (HMAC salah) dibuang.
+    socket.on("photofinish:trigger", function (msg) {
+      if (!verify(opts.hmacSecret, msg)) return;
+      if (typeof opts.onTrigger === "function") opts.onTrigger(msg);
+    });
     clockTimer = setInterval(sendClock, CLOCK_SEND_EVERY_MS);
   }
 
@@ -243,6 +287,7 @@ function createPhotofinishClient(opts) {
     sendImpulse: sendImpulse,
     heartbeat: heartbeat,
     markApplied: markApplied,
+    armHeat: armHeat,
     pending: function () {
       return Object.keys(pending).map(function (k) {
         return pending[k];

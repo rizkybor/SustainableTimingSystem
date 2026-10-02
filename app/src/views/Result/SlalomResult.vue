@@ -1587,10 +1587,15 @@ export default {
     setResultStatus(newStatus) {
       return this._setResultStatus(newStatus, null);
     },
-    setOfficialManualTime(isoTimestamp) {
-      return this._setResultStatus(this.resultStatus, isoTimestamp);
+    setOfficialManualTime(payload) {
+      // BUG FIX (2026-10-02): payload {iso, tz} — tz (WIB/WITA/WIT dari
+      // modal) diteruskan supaya ikut tersimpan sbg resultTimezone event,
+      // tidak dibuang spt sebelumnya.
+      const iso = payload && payload.iso ? payload.iso : payload;
+      const tz = payload && payload.tz;
+      return this._setResultStatus(this.resultStatus, iso, tz);
     },
-    async _setResultStatus(nextStatus, timestamp) {
+    async _setResultStatus(nextStatus, timestamp, resultTimezone) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -1601,6 +1606,7 @@ export default {
             this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultTimezone: res.resultTimezone || this.eventInfo.resultTimezone,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
                 [this.resultCategoryKey]: nextStatus,
@@ -1631,6 +1637,7 @@ export default {
           category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
+          resultTimezone: resultTimezone || undefined,
         });
       });
     },

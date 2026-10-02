@@ -886,7 +886,17 @@ function setupIPCMainHandlers() {
       // renderer) kalau operator set waktu manual; kosong = otomatis
       // pakai waktu server saat ini (lihat setResultsStatus()).
       const timestamp = payload && payload.timestamp;
-      const resp = await setResultsStatus(eventId, category, status, timestamp);
+      // Opsional — WIB/WITA/WIT kalau operator ikut ganti zona result
+      // event ini dari modal "Atur Waktu Penetapan Status" (lihat BUG FIX
+      // 2026-10-02 di setResultsStatus()); undefined = zona tidak disentuh.
+      const resultTimezone = payload && payload.resultTimezone;
+      const resp = await setResultsStatus(
+        eventId,
+        category,
+        status,
+        timestamp,
+        resultTimezone
+      );
       // BUG FIX: sebelumnya toggle Official/Unofficial TIDAK PERNAH
       // broadcast apa pun ke sts-jurysystem — Live Result cuma bisa
       // "kebetulan" ikut update kalau ada aksi lain (mis. Save Result)

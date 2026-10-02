@@ -374,7 +374,7 @@ async function setEventStatus(eventId, status) {
 // (otomatis = waktu submit, atau override manual operator) tetap di
 // `resultsOfficialSetAt.<category>` (ISO string UTC), sekarang berlaku
 // utk perubahan ke status manapun (bukan cuma ke Official).
-async function setResultsStatus(eventId, category, status, timestamp) {
+async function setResultsStatus(eventId, category, status, timestamp, resultTimezone) {
   const id = toObjectId(eventId);
   if (!id) return { ok: false, error: "invalid eventId" };
   if (!isValidCategoryKey(category)) {
@@ -393,26 +393,36 @@ async function setResultsStatus(eventId, category, status, timestamp) {
     if (!isNaN(parsed.getTime())) setAt = parsed;
   }
 
+  // BUG FIX (2026-10-02): modal "Atur Waktu Penetapan Status" biarkan
+  // operator pilih WIB/WITA/WIT utk mengoreksi `setAt` manual — tapi zona
+  // itu sebelumnya cuma dipakai LOKAL (renderer) utk menghitung instant
+  // UTC-nya, lalu dibuang. Label "Ditetapkan" & stempel PDF tetap baca
+  // `resultTimezone` EVENT-WIDE lama (diatur dari Event Settings), jadi
+  // keliatan seperti pilihan zona di modal ini tidak berpengaruh sama
+  // sekali. `resultTimezone` SENGAJA event-wide (1 field, bukan per-
+  // category — field yg sama dibaca SEMUA halaman Result/PDF kategori
+  // manapun di event ini), jadi update di sini otomatis "mengikuti" di
+  // semua halaman tsb begitu masing2 memuat ulang eventInfo.
+  const set = {
+    [`resultsStatusByCategory.${category}`]: status,
+    [`resultsOfficialByCategory.${category}`]: status === "official",
+    [`resultsOfficialSetAt.${category}`]: setAt,
+    updatedAt: new Date(),
+  };
+  if (["WIB", "WITA", "WIT"].includes(resultTimezone)) {
+    set.resultTimezone = resultTimezone;
+  }
+
   var db = await getDb();
   const coll = db.collection("eventsCollection");
-  const resp = await coll.updateOne(
-    { _id: id },
-    {
-      $set: {
-        [`resultsStatusByCategory.${category}`]: status,
-        [`resultsOfficialByCategory.${category}`]: status === "official",
-        [`resultsOfficialSetAt.${category}`]: setAt,
-        updatedAt: new Date(),
-      },
-    },
-    { upsert: false }
-  );
+  const resp = await coll.updateOne({ _id: id }, { $set: set }, { upsert: false });
   return {
     ok: true,
     matchedCount: resp.matchedCount,
     modifiedCount: resp.modifiedCount,
     status,
     setAt: setAt.toISOString(),
+    resultTimezone: set.resultTimezone,
   };
 }
 

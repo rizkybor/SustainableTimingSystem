@@ -272,6 +272,12 @@
                 type="button"
                 class="session-tab"
                 :class="{ active: activeRun === 1 }"
+                :disabled="!hasAnyRun1Finished"
+                :title="
+                  hasAnyRun1Finished
+                    ? ''
+                    : 'Belum ada tim yang menyelesaikan Run 1 (Start & Finish) di kategori ini'
+                "
                 @click="setRun(1)"
               >
                 Run Session #2
@@ -1179,6 +1185,19 @@ export default {
   },
 
   computed: {
+    // FITUR (2026-10-02, atas permintaan user): Tab "Run Session #2" tidak
+    // boleh pernah dibuka sebelum ADA SATU tim pun yang menyelesaikan Run 1
+    // — dicek per Division/Race/Initial Categories yang SEDANG dibuka
+    // (this.teams sudah otomatis ter-scope ke bucket itu, sama spt
+    // visibleTeams, krn halaman ini memang dibuka per kategori). "Selesai"
+    // = sessions[0] sudah punya startTime & finishTime (bukan cuma salah
+    // satu — tim yg baru Start tapi belum Finish BELUM dianggap selesai).
+    hasAnyRun1Finished() {
+      return (this.teams || []).some((t) => {
+        const s = t && t.sessions && t.sessions[0];
+        return !!(s && s.startTime && s.finishTime);
+      });
+    },
     pdfFilenameSession1: function () {
       var eventSafe =
         this.dataEventSafe && this.dataEventSafe.eventName
@@ -4624,6 +4643,15 @@ td {
   background: linear-gradient(135deg, #1c4c7a, #25b0eb);
   color: #fff;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+.session-tab:disabled {
+  color: #9aa3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.session-tab:disabled:hover {
+  background: transparent;
+  color: #9aa3af;
 }
 
 /* ---- Redesign: Save Session/Result Session/Save Result/Sort Ranked ---- */

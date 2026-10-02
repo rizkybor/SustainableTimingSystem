@@ -1139,12 +1139,19 @@ export default {
       // setResultsStatus() di insertNewEvent.js).
       return this._setResultStatus(newStatus, null);
     },
-    setOfficialManualTime(isoTimestamp) {
+    setOfficialManualTime(payload) {
       // Dari modal "Atur Waktu Manual" — status TIDAK berubah, cuma
-      // timestamp-nya yang dikoreksi manual operator.
-      return this._setResultStatus(this.resultStatus, isoTimestamp);
+      // timestamp-nya yang dikoreksi manual operator. BUG FIX
+      // (2026-10-02): `payload` sekarang {iso, tz} (dulu cuma ISO string)
+      // — `tz` (WIB/WITA/WIT yang dipilih operator di modal) diteruskan
+      // ke _setResultStatus() supaya ikut disimpan sbg resultTimezone
+      // event ini, bukan dibuang. Fallback ke string polos masih didukung
+      // (kompatibilitas kalau ada pemanggil lama).
+      const iso = payload && payload.iso ? payload.iso : payload;
+      const tz = payload && payload.tz;
+      return this._setResultStatus(this.resultStatus, iso, tz);
     },
-    async _setResultStatus(nextStatus, timestamp) {
+    async _setResultStatus(nextStatus, timestamp, resultTimezone) {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
@@ -1155,6 +1162,7 @@ export default {
             this.resultStatus = nextStatus;
             this.eventInfo = {
               ...this.eventInfo,
+              resultTimezone: res.resultTimezone || this.eventInfo.resultTimezone,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
                 [this.resultCategoryKey]: nextStatus,
@@ -1185,6 +1193,7 @@ export default {
           category: this.resultCategoryKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
+          resultTimezone: resultTimezone || undefined,
         });
       });
     },

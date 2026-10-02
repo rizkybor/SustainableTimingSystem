@@ -2654,8 +2654,20 @@ export default {
         roundIdx: v.roundIdx,
       }));
 
-      // Urut “others”: waktu tercepat → duluan
+      // Urut "others" (ranked 5 dst, atas permintaan user 2026-10-02):
+      // dikelompokkan dulu per babak tersingkir (roundIdx lebih besar =
+      // tersingkir di babak LEBIH AKHIR = rank lebih baik/lebih kecil),
+      // BARU di dalam kelompok babak yang sama diurutkan waktu tercepat
+      // → duluan. Sebelumnya waktu dipakai LANGSUNG lintas semua babak
+      // tersingkir (baris `roundIdx` di bawah ini sengaja dikomentari) —
+      // akibatnya tim yang tersingkir di Round 1 tapi waktunya kebetulan
+      // cepat bisa rank di atas tim yang tersingkir di Semifinal, padahal
+      // tim Semifinal jelas lebih jauh melaju. `rounds` yang dipakai
+      // membangun `lastRowByTeam` di atas sudah scoped ke bucket (Division
+      // Categories+Race Categories+Initial Categories) yang sedang dibuka
+      // operator — jadi urutan ini otomatis per-bucket, bukan event-wide.
       others.sort((a, b) => {
+        if (a.roundIdx !== b.roundIdx) return b.roundIdx - a.roundIdx;
         const ta = Number.isFinite(a.timeMs)
           ? a.timeMs
           : Number.POSITIVE_INFINITY;
@@ -2663,8 +2675,6 @@ export default {
           ? b.timeMs
           : Number.POSITIVE_INFINITY;
         if (ta !== tb) return ta - tb;
-        // (opsional) kalau mau: yang tersingkir di babak lebih akhir → lebih atas
-        // if (a.roundIdx !== b.roundIdx) return b.roundIdx - a.roundIdx;
         return String(a.name).localeCompare(String(b.name));
       });
 

@@ -251,7 +251,17 @@ export default {
       const offsetStr = "+" + String(offset).padStart(2, "0") + ":00";
       const d = new Date(withSeconds + offsetStr);
       if (isNaN(d.getTime())) return;
-      this.$emit("set-manual", d.toISOString());
+      // BUG FIX (2026-10-02): sebelumnya cuma emit ISO instant-nya saja —
+      // `manualTz` yang dipilih operator di modal ini (WIB/WITA/WIT)
+      // dibuang begitu saja setelah dipakai utk MENGHITUNG instant-nya,
+      // tidak pernah diteruskan ke parent. Akibatnya label "Ditetapkan"
+      // di sebelah ikon pensil & stempel PDF tetap memakai zona LAMA
+      // (eventInfo.resultTimezone dari Event Settings) walau operator
+      // baru saja ganti zona + klik "Simpan Waktu" di sini — perubahan
+      // zonanya kelihatan HILANG. Sertakan `tz` supaya parent bisa ikut
+      // menyimpan zona baru ini sbg zona result event (lihat
+      // setOfficialManualTime() di tiap *Result.vue).
+      this.$emit("set-manual", { iso: d.toISOString(), tz: this.manualTz });
       this.showModal = false;
     },
   },

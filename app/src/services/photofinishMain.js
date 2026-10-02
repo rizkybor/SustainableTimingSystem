@@ -2,7 +2,7 @@
 //
 // Renderer (serialPortMixin & view race) hanya bicara lewat IPC:
 //   renderer → main : "pf:impulse", "pf:heartbeat", "pf:applied",
-//                     invoke "pf:status", invoke "pf:pending", invoke "pf:arm-heat"
+//                     invoke "pf:status", invoke "pf:pending"
 //   main → renderer : "pf:verified", "pf:status", "pf:trigger"
 //
 // Konfigurasi (salah satu):
@@ -108,10 +108,6 @@ function setupPhotofinish() {
   });
   ipcMain.handle("pf:status", function () {
     return client ? client.status() : { enabled: false, connected: false, outbox: 0, pending: 0, lastError: null };
-  });
-  ipcMain.handle("pf:arm-heat", function (_event, heat) {
-    if (!client) return { ok: false, error: "Integrasi Photo Finish belum dikonfigurasi" };
-    return client.armHeat(heat);
   });
   ipcMain.handle("pf:pending", function () {
     return client ? client.pending() : [];

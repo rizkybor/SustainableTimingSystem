@@ -1144,7 +1144,7 @@
     </div>
 
     <!-- OPERATION TIME (shared component) -->
-    <div class="ml-5 mb-2"><PhotofinishBar :get-heats="pfHeats" :send-heat="pfSendHeat" /></div>
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="visibleParticipants && visibleParticipants.length"
       :digit-id="digitId"
@@ -1697,7 +1697,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBar from "@/components/photofinish/PhotofinishBar.vue";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
@@ -1840,7 +1840,7 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
-    PhotofinishBar,
+    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     VueHtml2pdf,
@@ -2543,47 +2543,6 @@ export default {
 
   methods: {
     /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
-    pfHeats() {
-      // Satu heat H2H = tim di babak aktif dgn nomor result.heat yang sama.
-      const round = this.currentRound;
-      if (!round) return [];
-      const b = getBucket();
-      const crew = this.pfCrewExpected(b.divisionName);
-      const roundName = round.bronze ? "Final B" : String(round.name || "");
-      const nameOf = (p) => String(p.nameTeam || p.teamName || "").toUpperCase();
-      const groups = {};
-      (this.visibleParticipants || []).forEach((p) => {
-        const h = p && p.result ? p.result.heat : null;
-        if (h === null || h === undefined || h === "") return;
-        (groups[h] = groups[h] || []).push(p);
-      });
-      return Object.keys(groups)
-        .sort((x, y) => Number(x) - Number(y))
-        .map((h) => {
-          // lintasan A/B mengikuti team1/team2 di bagan bila match-nya ada
-          const m = (round.matches || []).find((x) => x && String(x.heat) === String(h));
-          const order = m ? [m.team1 && m.team1.name, m.team2 && m.team2.name].map((n) => String(n || "").toUpperCase()) : [];
-          const rank = (p) => (order.indexOf(nameOf(p)) < 0 ? 99 : order.indexOf(nameOf(p)));
-          const teams = groups[h].slice().sort((x, y) => rank(x) - rank(y));
-          const title = `${roundName} · Heat ${h}`;
-          return {
-            key: `${round.id}-${h}`,
-            title,
-            heatId: `${round.id}-H${h}`,
-            label: `H2H ${this.pfBucketLabel(b)} · ${title}`.trim(),
-            lanes: teams
-              .filter((p) => String(p.teamId || p._id || ""))
-              .map((p, i) => ({
-                lane: String.fromCharCode(65 + i),
-                teamId: String(p.teamId || p._id),
-                bib: String(p.bibTeam || "") || null,
-                teamName: p.nameTeam || p.teamName || null,
-                crewExpected: crew,
-              })),
-          };
-        })
-        .filter((h) => h.lanes.length);
-    },
     pfBucket() {
       // Sumber kebenaran bucket H2H = getBucket() (sama dgn _currentBucketOrThrow()).
       return getBucket();

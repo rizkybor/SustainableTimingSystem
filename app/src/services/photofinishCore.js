@@ -199,43 +199,6 @@ function createPhotofinishClient(opts) {
     emitStatus();
   }
 
-  /**
-   * "Kirim heat ke Photo Finish": minta API membuat/memakai ulang sesi untuk
-   * heat ini lalu mengaktifkannya. Langsung (tanpa antrean) agar operator
-   * tahu hasilnya saat itu juga.
-   */
-  async function armHeat(heat) {
-    if (!socket || !socket.connected) return { ok: false, error: "Photo Finish tidak terhubung" };
-    const payload = {
-      type: "timing:session",
-      eventId: String(heat.eventId),
-      bucket: {
-        divisionId: String(heat.bucket.divisionId),
-        raceId: String(heat.bucket.raceId),
-        initialId: String(heat.bucket.initialId),
-      },
-      raceCategory: heat.raceCategory,
-      heatId: heat.heatId === null || heat.heatId === undefined ? null : String(heat.heatId),
-      label: String(heat.label).slice(0, 128),
-      // Semua field ditulis eksplisit (termasuk null) — tanda tangan HMAC
-      // dihitung atas payload persis seperti yang dikirim.
-      lanes: (heat.lanes || []).map(function (l) {
-        return {
-          lane: String(l.lane),
-          teamId: String(l.teamId),
-          bib: l.bib ? String(l.bib) : null,
-          teamName: l.teamName ? String(l.teamName).slice(0, 128) : null,
-          crewExpected: typeof l.crewExpected === "number" ? l.crewExpected : null,
-        };
-      }),
-    };
-    try {
-      return await socket.timeout(5000).emitWithAck("timing:session", sign(opts.hmacSecret, payload));
-    } catch (_e) {
-      return { ok: false, error: "Photo Finish tidak menjawab (timeout)" };
-    }
-  }
-
   function markApplied(crossingId, revision) {
     const cur = pending[crossingId];
     if (cur && cur.revision <= revision) {
@@ -259,7 +222,18 @@ function createPhotofinishClient(opts) {
       emitStatus();
       flush();
     });
-    socket.on("disconnect", emitStatus);
+    socket.on("disconnect", function (reason) {
+      emitStatus();
+      // API ditutup/di-restart dengan rapi (Ctrl+C dev:local, deploy) → alasan
+      // "io server disconnect", dan socket.io TIDAK reconnect sendiri. Sambung
+      // ulang manual; bila API belum hidup, reconnect bawaan socket.io mengambil
+      // alih (jeda bertahap s.d. 10 dtk).
+      if (reason === "io server disconnect") {
+        setTimeout(function () {
+          if (socket && !socket.connected) socket.connect();
+        }, 1000);
+      }
+    });
     socket.on("connect_error", function (err) {
       lastError = "Tidak bisa terhubung ke Photo Finish: " + ((err && err.message) || err);
       emitStatus();
@@ -287,7 +261,6 @@ function createPhotofinishClient(opts) {
     sendImpulse: sendImpulse,
     heartbeat: heartbeat,
     markApplied: markApplied,
-    armHeat: armHeat,
     pending: function () {
       return Object.keys(pending).map(function (k) {
         return pending[k];

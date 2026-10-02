@@ -208,7 +208,7 @@
       </div>
     </div>
 
-    <div class="ml-5 mb-2"><PhotofinishBar :get-heats="pfHeats" :send-heat="pfSendHeat" /></div>
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
 
     <OperationTimePanel
       v-if="roundParticipants && roundParticipants.length"
@@ -490,7 +490,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBar from "@/components/photofinish/PhotofinishBar.vue";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -504,7 +504,7 @@ const RACE_PAYLOAD_KEY = "raceStartPayload";
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
   components: {
-    PhotofinishBar,
+    PhotofinishBadge,
     Icon,
     EmptyCard,
     OperationTimePanel,
@@ -771,31 +771,6 @@ export default {
 
   methods: {
     /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
-    pfHeats() {
-      const round = this.currentRound;
-      if (!round) return [];
-      const b = this.currentBucket();
-      const crew = this.pfCrewExpected(b.divisionName);
-      return (round.heats || [])
-        .map((heat, hi) => {
-          const title = `${round.name || ""} · Heat ${hi + 1}`;
-          return {
-            key: `${round.id}-${heat.id}`,
-            title,
-            heatId: `${round.id}-${heat.id}`,
-            label: `RX ${this.pfBucketLabel(b)} · ${title}`.trim(),
-            // lintasan 1–4 = urutan slot tim di heat (sama dgn kolom hasil)
-            lanes: (heat.teams || [])
-              .map((t, i) =>
-                t && t.id
-                  ? { lane: String(i + 1), teamId: String(t.id), bib: t.bibTeam ? String(t.bibTeam) : null, teamName: t.name || null, crewExpected: crew }
-                  : null
-              )
-              .filter(Boolean),
-          };
-        })
-        .filter((h) => h.lanes.length);
-    },
     pfBucket() {
       return this.currentBucket();
     },

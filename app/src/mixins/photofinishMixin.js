@@ -2,18 +2,18 @@
 // Dipakai HeadToHead, RaftingCross, DownRiverRace. Setiap view menyediakan:
 //
 //   pfCategory          : "H2H" | "RX" | "DRR"
-//   pfBucket()          : { eventId, divisionId, raceId, initialId } kategori aktif
+//   pfBucket()          : { eventId, ... } kategori aktif — Photo Finish hanya
+//                         memakai eventId (dan eventName bila ada)
 //   pfLocateTeam(msg)   : { index, finishTime, name } di list yang dipakai
 //                         updateTime(), atau null bila tim tidak ada di
 //                         heat/babak yang sedang tampil
-//   pfHeats()           : heat yang bisa dikirim ke Photo Finish (tombol
-//                         "Kirim heat ke Photo Finish", lihat PhotofinishBar)
 //
-// Aturan (lihat feedback "Scope by 4 Categories"): hasil HANYA diterapkan
-// bila Event + Division + Race + Initial sama persis. Hasil yang belum
-// cocok tetap tersimpan di main process dan dicoba lagi saat operator
-// membuka kategori/babak yang benar.
-import { armHeat, getPending, markApplied, onTrigger, onVerified } from "@/services/photofinish";
+// Aturan: sesi Photo Finish cukup terhubung ke EVENT (Id Event) — tidak
+// membaca Division/Race/Initial maupun format lomba. Hasil diterapkan bila
+// Event sama DAN tim ada di heat/babak yang sedang tampil (pfLocateTeam). Hasil
+// yang belum cocok tetap tersimpan di main process dan dicoba lagi saat
+// operator membuka halaman yang memuat tim tersebut.
+import { getPending, markApplied, onTrigger, onVerified } from "@/services/photofinish";
 
 const RETRY_MS = 5000;
 
@@ -77,27 +77,23 @@ export default {
      * digitId/digitTime/digitTimeFinish milik serialPortMixin di komponen yang sama.
      */
     pfOnTrigger(msg) {
-      if (!msg || !msg.time || msg.raceCategory !== this.pfCategory) return;
-      if (msg.bucket && !this.pfBucketMatches(msg)) return; // heat kategori lain
+      if (!msg || !msg.time || !this.pfEventMatches(msg)) return; // event lain
       if (Array.isArray(this.digitId)) this.digitId.unshift("Photo Finish");
       if (Array.isArray(this.digitTime)) this.digitTime.unshift(msg.time);
       this.digitTimeFinish = msg.time;
     },
 
-    pfBucketMatches(msg) {
+    pfEventMatches(msg) {
       const b = typeof this.pfBucket === "function" ? this.pfBucket() : null;
-      if (!b || !msg.bucket) return false;
-      return (
-        String(msg.eventId) === String(b.eventId) &&
-        String(msg.bucket.divisionId) === String(b.divisionId) &&
-        String(msg.bucket.raceId) === String(b.raceId) &&
-        String(msg.bucket.initialId) === String(b.initialId)
-      );
+      return !!(b && b.eventId && msg && String(msg.eventId) === String(b.eventId));
     },
 
     async pfApply(msg) {
-      // Bukan untuk halaman/kategori ini — biarkan tertunda, tanpa notifikasi.
-      if (msg.raceCategory !== this.pfCategory || !this.pfBucketMatches(msg)) return;
+      // Bukan untuk Event ini — biarkan tertunda, tanpa notifikasi. Sesi Photo
+      // Finish tidak membawa format lomba (null) → berlaku di halaman mana pun
+      // yang menampilkan tim tersebut; sesi lama yang masih membawa format
+      // tetap dicocokkan formatnya.
+      if ((msg.raceCategory && msg.raceCategory !== this.pfCategory) || !this.pfEventMatches(msg)) return;
 
       const loc = this.pfLocateTeam(msg);
       if (!loc) {
@@ -139,40 +135,6 @@ export default {
         `Finish ${label}: ${msg.finishTime} (urutan ${msg.rank}).` +
           (notes.length ? ` Juri mencatat: ${notes.join(", ")} — terapkan penalti finish sesuai aturan.` : "")
       );
-    },
-
-    /** Jumlah awak dari nama Division (R4/R6) — null bila tidak terbaca. */
-    pfCrewExpected(divisionName) {
-      const m = /R\s*(\d{1,2})/i.exec(String(divisionName || ""));
-      return m ? Number(m[1]) : null;
-    },
-
-    /** Label kategori yang mudah dibaca untuk nama sesi Photo Finish. */
-    pfBucketLabel(b) {
-      return [b && b.divisionName, b && b.raceName, b && b.initialName].filter(Boolean).join(" ");
-    },
-
-    /** Dipanggil PhotofinishBar: buat & aktifkan sesi Photo Finish untuk heat ini. */
-    async pfSendHeat(heat) {
-      const b = this.pfBucket();
-      if (!b || !b.eventId || !b.divisionId || !b.raceId || !b.initialId) {
-        this.pfToast("warning", "Buka kategori spesifik (Division/Race/Initial) dulu sebelum mengirim heat.");
-        return { ok: false };
-      }
-      const res = await armHeat({
-        eventId: b.eventId,
-        bucket: { divisionId: b.divisionId, raceId: b.raceId, initialId: b.initialId },
-        raceCategory: this.pfCategory,
-        heatId: heat.heatId,
-        label: heat.label,
-        lanes: heat.lanes,
-      });
-      if (res && res.ok) {
-        this.pfToast("success", `${res.created ? "Sesi dibuat" : "Sesi diperbarui"} & AKTIF: ${res.label}. Sinyal RaceTime2 berikutnya masuk ke sesi ini.`);
-      } else {
-        this.pfToast("error", "Gagal mengirim heat ke Photo Finish: " + ((res && res.error) || "tidak diketahui"));
-      }
-      return res;
     },
 
     pfToast(variant, text) {

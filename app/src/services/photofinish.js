@@ -73,16 +73,6 @@ export function onStatus(handler) {
   };
 }
 
-/**
- * Kirim heat yang sedang tampil ke Photo Finish → sesi dibuat & diaktifkan.
- * heat = { eventId, bucket:{divisionId,raceId,initialId}, raceCategory, heatId, label, lanes:[...] }
- */
-export function armHeat(heat) {
-  return ipcRenderer.invoke("pf:arm-heat", heat).catch(function (err) {
-    return { ok: false, error: (err && err.message) || String(err) };
-  });
-}
-
 /** Langganan pemicu kamera Photo Finish (setiap perahu lewat garis finish). */
 export function onTrigger(handler) {
   const fn = function (_event, msg) {

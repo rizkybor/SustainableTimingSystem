@@ -209,12 +209,6 @@
                           >
                             <img :src="m.attachment.url" alt="Gambar" class="chat-attachment-image" @load="scrollToBottom" />
                           </button>
-                          <VoiceMessageBubble
-                            v-else-if="m.attachment && m.attachment.type === 'audio'"
-                            :url="m.attachment.url"
-                            :duration="m.attachment.duration"
-                            :is-own="m.senderEmail === ADMIN_EMAIL"
-                          />
                           <template v-if="m.text">
                             <span
                               v-for="(tok, ti) in renderMessageTokens(m.text)"
@@ -297,11 +291,6 @@
                 <div v-if="uploadError" class="chat-upload-error">
                   {{ uploadError }}
                 </div>
-                <div v-if="recording" class="chat-recording-indicator">
-                  <span class="chat-recording-dot"></span>
-                  Merekam… {{ recordTimeLabel }}
-                </div>
-
                 <div v-if="replyingTo" class="chat-reply-preview">
                   <div class="chat-reply-preview-bar" />
                   <div class="chat-reply-preview-body">
@@ -340,24 +329,10 @@
                     type="button"
                     class="chat-tool-btn"
                     title="Kirim gambar"
-                    :disabled="sending || uploading || recording"
+                    :disabled="sending || uploading"
                     @click="triggerImagePicker"
                   >
                     <Icon icon="mdi:image-outline" width="18" height="18" />
-                  </button>
-                  <button
-                    type="button"
-                    class="chat-tool-btn"
-                    :class="{ 'chat-tool-btn--recording': recording }"
-                    :title="recording ? 'Berhenti rekam' : 'Rekam pesan suara'"
-                    :disabled="sending || uploading"
-                    @click="recording ? stopRecording() : startRecording()"
-                  >
-                    <Icon
-                      :icon="recording ? 'mdi:stop' : 'mdi:microphone-outline'"
-                      width="18"
-                      height="18"
-                    />
                   </button>
                   <input
                     ref="composerInput"
@@ -369,7 +344,7 @@
                         ? 'Mengunggah...'
                         : `Kirim ke judge ${activeCategoryLabel}... (ketik @ untuk sebut nama)`
                     "
-                    :disabled="sending || uploading || recording"
+                    :disabled="sending || uploading"
                     @input="onDraftInput"
                     @keydown="onComposerKeydown"
                     @blur="onComposerBlur"
@@ -377,7 +352,7 @@
                   <button
                     type="submit"
                     class="chat-send-btn"
-                    :disabled="sending || uploading || recording || !draft.trim()"
+                    :disabled="sending || uploading || !draft.trim()"
                     title="Kirim"
                   >
                     <Icon v-if="!sending" icon="mdi:send" width="17" height="17" />
@@ -413,37 +388,11 @@ import { Icon } from "@iconify/vue2";
 import { getSocket } from "@/services/socket";
 import tone from "@/assets/tone/message_notify.mp3";
 import { uploadOne, MAX_UPLOAD_BYTES } from "@/utils/cloudinaryUpload";
-import VoiceMessageBubble from "@/components/chat/VoiceMessageBubble.vue";
 
 const ADMIN_EMAIL = "timing-system@internal";
 const ADMIN_NAME = "Timing System";
 const EXPANDED_STORAGE_KEY = "chatWidgetExpanded";
 const CHAT_PAGE_SIZE = 25; // jumlah pesan per batch (initial load & load pesan lama)
-const MAX_RECORD_SECONDS = 120; // jaring pengaman ukuran file
-
-const AUDIO_MIME_CANDIDATES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/mp4",
-  "audio/ogg;codecs=opus",
-];
-
-function pickSupportedAudioMime() {
-  if (typeof MediaRecorder === "undefined") return null;
-  return (
-    AUDIO_MIME_CANDIDATES.find(
-      (m) =>
-        typeof MediaRecorder.isTypeSupported === "function" &&
-        MediaRecorder.isTypeSupported(m)
-    ) || null
-  );
-}
-
-function formatDuration(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 const CATEGORY_DEFS = [
   { key: "sprint", eventName: "SPRINT", label: "Sprint" },
@@ -489,7 +438,7 @@ function categoryRoleLabel(entry, key) {
 
 export default {
   name: "EventChatWidget",
-  components: { Icon, VoiceMessageBubble },
+  components: { Icon },
   props: {
     eventId: { type: String, default: "" },
   },
@@ -515,8 +464,6 @@ export default {
       pollTimer: null,
       uploading: false,
       uploadError: null,
-      recording: false,
-      recordSeconds: 0,
       previewImage: null,
       confirmDeleteId: null,
       deletingId: null,
@@ -568,28 +515,12 @@ export default {
     totalMentionUnread() {
       return Object.values(this.mentionUnreadByCategory).some(Boolean);
     },
-    recordTimeLabel() {
-      return formatDuration(this.recordSeconds);
-    },
   },
   watch: {
     eventId() {
       this.resetEventState();
       if (this.eventId) this.loadEventContext();
     },
-  },
-  created() {
-    // Objek imperatif (MediaRecorder/stream/chunks) sengaja bukan di data()
-    // supaya tidak ikut di-reactive-kan Vue.
-    this._mediaRecorder = null;
-    this._mediaStream = null;
-    this._recordedChunks = [];
-    this._recordTimer = null;
-    // guard start-up (bukan this.recording) — mic-permission prompt bisa
-    // berlangsung lama & this.recording baru true SETELAH itu selesai;
-    // tanpa flag ini tombol mic masih bisa diklik 2x saat prompt tampil,
-    // memicu getUserMedia() ganda (lihat BUG FIX di startRecording()).
-    this._startingRecording = false;
   },
   mounted() {
     if (this.eventId) this.loadEventContext();
@@ -607,11 +538,6 @@ export default {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
-    }
-    if (this._recordTimer) clearInterval(this._recordTimer);
-    if (this._mediaStream) {
-      this._mediaStream.getTracks().forEach((t) => t.stop());
-      this._mediaStream = null;
     }
   },
   methods: {
@@ -906,110 +832,6 @@ export default {
       } finally {
         this.uploading = false;
       }
-    },
-
-    async startRecording() {
-      // BUG FIX: guard cuma cek `this.recording` sebelumnya — flag itu baru
-      // jadi true SETELAH getUserMedia() (prompt izin mikrofon) selesai.
-      // Tombol mic sendiri tidak di-disable selama recording (supaya bisa
-      // diklik lagi utk stop), jadi kalau user klik 2x cepat SEBELUM prompt
-      // selesai, startRecording() terpanggil 2x bersamaan → 2 stream mic
-      // aktif + 2 interval, yang pertama jadi orphan (tidak pernah
-      // di-stop, mic nyala terus diam2). Tambah flag `_startingRecording`
-      // yang di-set true SEBELUM await, supaya panggilan kedua langsung
-      // ke-block.
-      if (this.recording || this.uploading || this._startingRecording) return;
-      this._startingRecording = true;
-      let stream = null;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this._mediaStream = stream;
-
-        const mimeType = pickSupportedAudioMime();
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
-
-        this._recordedChunks = [];
-        recorder.ondataavailable = (ev) => {
-          if (ev.data && ev.data.size > 0) this._recordedChunks.push(ev.data);
-        };
-        recorder.onstop = () => {
-          if (this._mediaStream) {
-            this._mediaStream.getTracks().forEach((t) => t.stop());
-            this._mediaStream = null;
-          }
-        };
-
-        this._mediaRecorder = recorder;
-        recorder.start();
-        this.recording = true;
-        this.recordSeconds = 0;
-
-        this._recordTimer = setInterval(() => {
-          this.recordSeconds += 1;
-          if (this.recordSeconds >= MAX_RECORD_SECONDS) this.stopRecording();
-        }, 1000);
-      } catch (err) {
-        // BUG FIX: kalau getUserMedia() berhasil (mic sudah aktif) tapi
-        // `new MediaRecorder(...)` sesudahnya yang gagal/throw, stream yg
-        // sudah didapat tidak pernah di-stop — mic nyala terus tanpa
-        // indikator apa pun di UI (this.recording tetap false). Selalu
-        // matikan track stream kalau proses ini gagal di tengah jalan.
-        if (stream) stream.getTracks().forEach((t) => t.stop());
-        this._mediaStream = null;
-        this.showUploadError("Tidak bisa mengakses mikrofon");
-      } finally {
-        this._startingRecording = false;
-      }
-    },
-
-    stopRecording() {
-      const recorder = this._mediaRecorder;
-      if (!recorder || recorder.state === "inactive") return;
-
-      clearInterval(this._recordTimer);
-      const durationSec = this.recordSeconds;
-
-      recorder.addEventListener(
-        "stop",
-        async () => {
-          this.recording = false;
-
-          const blob = new Blob(this._recordedChunks, {
-            type: recorder.mimeType || "audio/webm",
-          });
-          this._recordedChunks = [];
-
-          if (!blob.size) return;
-          if (blob.size > MAX_UPLOAD_BYTES) {
-            this.showUploadError("Rekaman terlalu besar (maks 5MB), coba lebih pendek");
-            return;
-          }
-
-          this.uploading = true;
-          try {
-            const up = await uploadOne(blob, "sustainable-js/chat", "video");
-            if (up && up.ok && up.result) {
-              this.sendMessage({
-                type: "audio",
-                url: up.result.secure_url,
-                publicId: up.result.public_id,
-                format: up.result.format,
-                bytes: up.result.bytes,
-                duration: durationSec,
-              });
-            } else {
-              this.showUploadError((up && up.error) || "Gagal upload suara");
-            }
-          } finally {
-            this.uploading = false;
-          }
-        },
-        { once: true }
-      );
-
-      recorder.stop();
     },
 
     sendMessage(attachment) {
@@ -2139,13 +1961,6 @@ export default {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.chat-tool-btn--recording {
-  background: #ef4444;
-  color: #fff;
-}
-.chat-tool-btn--recording:hover:not(:disabled) {
-  background: #dc2626;
-}
 .chat-upload-error {
   padding: 6px 14px;
   font-size: 11.5px;
@@ -2153,23 +1968,7 @@ export default {
   background: #fef2f2;
   border-top: 1px solid #fee2e2;
 }
-.chat-recording-indicator {
-  padding: 6px 14px;
-  font-size: 11.5px;
-  color: #dc2626;
-  background: #fef2f2;
-  border-top: 1px solid #fee2e2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.chat-recording-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ef4444;
-  animation: chat-recording-pulse 1.2s ease-in-out infinite;
-}
+/* chat-recording-pulse masih dipakai .chat-fab-mention-badge — jangan hapus */
 @keyframes chat-recording-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }

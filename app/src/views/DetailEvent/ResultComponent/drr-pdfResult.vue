@@ -561,7 +561,14 @@ export default {
 header,
 .band,
 .mid-image-row,
-.mid-image-sponsor-row {
+.mid-image-sponsor-row,
+.sign {
+  /* BUG FIX (2026-10-02): ".sign" (blok TTD + stempel) sebelumnya TIDAK
+     ikut di daftar ini — beda dgn head-to-head-pdfResult.vue yg sudah
+     benar. Akibatnya kalau tabel hasil panjang (mis. 10 baris tim) & sisa
+     ruang di halaman itu tidak cukup utk seluruh blok TTD, html2pdf.js
+     akan memotong blok TTD persis di batas halaman drpd memindahkannya
+     utuh ke halaman berikutnya. */
   page-break-inside: avoid;
   break-inside: avoid;
 }

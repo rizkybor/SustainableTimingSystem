@@ -10,6 +10,8 @@ const cloudinary = require("cloudinary").v2;
 const {
   upsertBracket,
   getBracket,
+  getAllBracketsForEvent,
+  assignHeatDirect,
   upsertRoundRows,
   upsertAllRounds,
   upsertOverall,
@@ -118,6 +120,10 @@ const {
   notifySlalomTeamStarted,
   notifyOfficialStatusChanged,
   notifySprintTeamFinished,
+  notifyDrrTeamFinished,
+  notifySlalomTeamFinished,
+  notifyH2HTeamFinished,
+  notifyRaceSettingsUpdated,
 } = require("../controllers/socketBroadcast");
 const {
   insertH2HFoulsReport,
@@ -965,6 +971,24 @@ function setupIPCMainHandlers() {
     notifySprintTeamFinished(payload || {});
   });
 
+  // Broadcast LIVE PREVIEW begitu satu team DRR genuinely selesai (Start &
+  // Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("drr:team-finished", (_event, payload) => {
+    notifyDrrTeamFinished(payload || {});
+  });
+
+  // Broadcast LIVE PREVIEW begitu satu Run Slalom genuinely selesai (Start
+  // & Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("slalom:team-finished", (_event, payload) => {
+    notifySlalomTeamFinished(payload || {});
+  });
+
+  // Broadcast LIVE PREVIEW begitu satu tim H2H genuinely selesai (Start &
+  // Finish Time terisi) — pola sama persis dgn sprint:team-finished.
+  ipcMain.on("h2h:team-finished", (_event, payload) => {
+    notifyH2HTeamFinished(payload || {});
+  });
+
   // Broadcast LIVE begitu operator H2H pindah/buka babak (round) lain —
   // dipakai sts-jurysystem utk label "babak aktif" + filter dropdown
   // Team. Fire-and-forget, sama pola dgn sprint:team-started di atas.
@@ -1553,6 +1577,10 @@ function setupIPCMainHandlers() {
       const updated = await upsertRaceSettingsByEventId(id, incoming);
       const out = updated && updated.settings ? updated.settings : incoming;
 
+      // Broadcast supaya Race Detail (window lain) & halaman juri yang
+      // sedang terbuka utk event ini ikut refetch settings terbaru.
+      notifyRaceSettingsUpdated({ eventId: id });
+
       event.reply("race-settings:upsert-reply", {
         ok: true,
         settings: out,
@@ -1696,6 +1724,38 @@ ipcMain.on("h2h:bracket:get", async (e, bucket) => {
       ok: false,
       error: String(err),
       __reqId: reqId,
+    });
+  }
+});
+
+// FITUR (2026-09-29): ambil SEMUA bracket H2H punya satu event sekaligus
+// (lintas Division/Race/Initial) — dipakai widget "Assign Heat Lintas
+// Kategori" di HeadToHead.vue.
+ipcMain.on("h2h:brackets:get-all-for-event", async (e, eventId) => {
+  try {
+    const result = await getAllBracketsForEvent(eventId);
+    e.reply("h2h:brackets:get-all-for-event-reply", result);
+  } catch (err) {
+    e.reply("h2h:brackets:get-all-for-event-reply", {
+      ok: false,
+      items: [],
+      error: String(err),
+    });
+  }
+});
+
+// FITUR (2026-09-29): set nomor Heat satu match langsung ke DB tanpa
+// bucket itu perlu sedang aktif di layar — dipakai widget "Assign Heat
+// Lintas Kategori".
+ipcMain.on("h2h:bracket:assign-heat-direct", async (e, payload) => {
+  try {
+    const { bucket, roundId, matchIndex, heat } = payload || {};
+    const result = await assignHeatDirect(bucket, roundId, matchIndex, heat);
+    e.reply("h2h:bracket:assign-heat-direct-reply", result);
+  } catch (err) {
+    e.reply("h2h:bracket:assign-heat-direct-reply", {
+      ok: false,
+      error: String(err),
     });
   }
 });

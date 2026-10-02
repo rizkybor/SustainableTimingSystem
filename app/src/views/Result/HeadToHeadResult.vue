@@ -362,10 +362,54 @@
                     :disabled="isOfficial"
                   />
                 </td>
-                <td class="pen-col text-center">{{ r.r1 || "—" }}</td>
-                <td class="pen-col text-center">{{ r.r2 || "—" }}</td>
-                <td class="pen-col text-center">{{ r.l1 || "—" }}</td>
-                <td class="pen-col text-center">{{ r.l2 || "—" }}</td>
+                <td class="pen-col">
+                  <b-form-select
+                    v-model="r.r1"
+                    :options="ynChoices"
+                    text-field="label"
+                    value-field="value"
+                    size="sm"
+                    style="min-width: 70px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-select
+                    v-model="r.r2"
+                    :options="ynChoices"
+                    text-field="label"
+                    value-field="value"
+                    size="sm"
+                    style="min-width: 70px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-select
+                    v-model="r.l1"
+                    :options="ynChoices"
+                    text-field="label"
+                    value-field="value"
+                    size="sm"
+                    style="min-width: 70px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
+                <td class="pen-col">
+                  <b-form-select
+                    v-model="r.l2"
+                    :options="ynChoices"
+                    text-field="label"
+                    value-field="value"
+                    size="sm"
+                    style="min-width: 70px"
+                    @change="onRowFieldChange(r)"
+                    :disabled="isOfficial"
+                  />
+                </td>
                 <td class="pen-col">
                   <b-form-input
                     v-model.number="r.pb"
@@ -561,6 +605,17 @@ export default {
       // "overall") — salinan lokal, baru dikirim ke DB saat "Save Round".
       editRows: [],
       savingRound: false,
+      // R1/R2/L1/L2 (buoy kena/tidak) — pilihan Ya/Tidak, sama seperti
+      // dropdown-nya di Race Detail (HeadToHead.vue). PB tetap field
+      // manual terpisah di sini (TIDAK dihitung ulang otomatis dari
+      // R1/R2/L1/L2) — sengaja tidak menduplikasi mesin hitung buoy-mode
+      // yg bergantung Judges Configuration per-event, biar tidak ada dua
+      // implementasi aturan yg bisa beda hasil (lihat catatan di
+      // recomputeRow()).
+      ynChoices: [
+        { label: "Yes", value: "Y" },
+        { label: "No", value: "N" },
+      ],
     };
   },
 
@@ -1161,9 +1216,15 @@ export default {
         : "";
     },
 
+    // BUG FIX (2026-09-29): dulu edit field di sini HANYA mengubah state
+    // lokal (editRows) — operator harus klik tombol "Save Round" terpisah
+    // supaya benar2 masuk DB. Sekarang auto-save tiap field berubah,
+    // konsisten dgn pola Sprint (SprintResult.vue's onEditTimeField/
+    // onPenaltyDropdownChange yg langsung saveResultsToDb()).
     onRowFieldChange(row) {
       this.recomputeRow(row);
       this.computeWinLoseForEditRows();
+      this.saveRoundEdits();
     },
 
     // Win/Lose per match: bandingkan Total Time kedua sisi match yg sama
@@ -1227,6 +1288,11 @@ export default {
       // OFFICIAL tidak boleh diedit lagi lewat jalur mana pun.
       if (this.isOfficial) return;
       if (this.activeTab === "overall" || typeof ipcRenderer === "undefined") return;
+      // BUG FIX (2026-09-29): sekarang dipanggil OTOMATIS tiap field
+      // berubah (bukan cuma tombol "Save Round" manual) — cegah 2
+      // panggilan tumpang tindih kalau operator sempat ganti field lain
+      // sebelum save sebelumnya (yg ikut reload editRows) selesai.
+      if (this.savingRound) return;
       const round = this._findRound(this.activeTab);
       if (!round || !this.editRows.length) return;
 
@@ -1260,12 +1326,32 @@ export default {
         await new Promise((resolve) => {
           ipcRenderer.once("h2h:round:save-reply", (_e, res) => {
             if (res && res.ok) {
+              // BUG FIX (2026-09-29): menyimpan round di sini TIDAK PERNAH
+              // mendorong hasilnya ke Overall Result (beda dgn Sprint) —
+              // placement akhir H2H (1st/2nd/3rd/4th dst) dihitung dari
+              // SELURUH bracket+round oleh mesin di Race Detail
+              // (HeadToHead.vue's buildOverallPackage()), sengaja TIDAK
+              // direplikasi di sini (risiko beda hasil kalau aturan
+              // berubah cuma di 1 tempat). Ingatkan operator supaya buka
+              // Race Detail utk regenerate Overall kalau koreksi ini bisa
+              // mengubah placement akhir.
               this.$bvToast &&
-                this.$bvToast.toast("Round tersimpan.", {
-                  variant: "success",
-                  title: "Saved",
-                  autoHideDelay: 2000,
+                this.$bvToast.toast(
+                  "Round tersimpan. Kalau perubahan ini memengaruhi hasil akhir, buka Race Detail H2H untuk regenerate Overall Result.",
+                  {
+                    variant: "success",
+                    title: "Saved",
+                    autoHideDelay: 5000,
+                  }
+                );
+              // "Ditetapkan: ..." ikut ter-refresh tiap kali round disimpan
+              // ulang — konsisten dgn fix yg sama di SprintResult.vue.
+              if (typeof ipcRenderer !== "undefined" && this.resultCategoryKey) {
+                ipcRenderer.send("event:touch-result-timestamp", {
+                  eventId: String(bucket.eventId),
+                  category: this.resultCategoryKey,
                 });
+              }
             } else {
               this.$bvToast &&
                 this.$bvToast.toast((res && res.error) || "Gagal menyimpan.", {

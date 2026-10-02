@@ -1144,6 +1144,7 @@
     </div>
 
     <!-- OPERATION TIME (shared component) -->
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="visibleParticipants && visibleParticipants.length"
       :digit-id="digitId"
@@ -1430,6 +1431,176 @@
       </div>
     </b-modal>
 
+    <!-- WIDGET MENGAMBANG: "Assign Heat Lintas Kategori" (2026-09-29, atas
+         permintaan user) — gaya sama persis dgn EventChatWidget.vue (tombol
+         bulat mengambang + badge jumlah pending), tapi HANYA muncul di
+         halaman Head to Head Details ini (bukan komponen global spt chat
+         widget) krn memang cuma relevan utk operator H2H. Diposisikan di
+         kiri-bawah (bukan kanan spt chat widget) supaya tidak bertumpuk. -->
+    <div class="h2h-heat-fab-wrap">
+      <button
+        type="button"
+        class="h2h-heat-fab"
+        :disabled="isLoadingCrossCategoryHeats"
+        @click="openCrossCategoryHeatModal"
+        v-b-tooltip.hover.right="'Assign Heat Lintas Kategori — isi Heat yang masih kosong dari SEMUA kategori H2H event ini'"
+      >
+        <b-spinner v-if="isLoadingCrossCategoryHeats" small />
+        <Icon v-else icon="mdi:swap-horizontal-bold" width="24" height="24" />
+        <span v-if="crossCategoryPendingHeats.length" class="h2h-heat-fab-badge">{{
+          crossCategoryPendingHeats.length > 99
+            ? "99+"
+            : crossCategoryPendingHeats.length
+        }}</span>
+      </button>
+    </div>
+
+    <!-- MODAL: Assign Heat Lintas Kategori (2026-09-29, atas permintaan
+         user) — daftar match yg SUDAH lengkap 2 tim tapi BELUM py nomor
+         Heat, dikumpulkan dari SEMUA kategori H2H event ini sekaligus,
+         supaya operator bisa isi Heat langsung dari sini tanpa perlu
+         pindah-pindah tab "Switch Category" satu-satu dulu.
+
+         Redesign (2026-09-29): header custom + body/table diperhalus,
+         pola sama dgn .h2h-picker-modal (rounded corner, shadow, header
+         berwarna) supaya konsisten dgn modal H2H lain — content-class
+         SENDIRI (bukan lagi "heat-modal" yg dipakai bareng modal "Lihat
+         Heat") supaya styling baru ini tidak ikut menimpa modal itu. -->
+    <b-modal
+      v-model="crossCategoryHeatModalVisible"
+      size="xl"
+      scrollable
+      hide-footer
+      hide-header
+      body-class="p-0"
+      content-class="h2h-cross-heat-modal"
+    >
+      <div class="h2h-cross-heat-header">
+        <div class="h2h-cross-heat-header__icon">
+          <Icon icon="mdi:swap-horizontal-bold" width="20" height="20" />
+        </div>
+        <div class="h2h-cross-heat-header__text">
+          <div class="h2h-cross-heat-header__title">
+            Assign Heat Lintas Kategori
+          </div>
+          <div class="h2h-cross-heat-header__subtitle">
+            Head to Head — isi nomor Heat utk seluruh kategori sekaligus
+            tanpa pindah tab
+          </div>
+        </div>
+        <button
+          type="button"
+          class="h2h-cross-heat-close"
+          aria-label="Tutup"
+          @click="crossCategoryHeatModalVisible = false"
+        >
+          <Icon icon="mdi:close" width="16" height="16" />
+        </button>
+      </div>
+
+      <div class="h2h-cross-heat-body">
+        <div
+          v-if="isLoadingCrossCategoryHeats"
+          class="h2h-cross-heat-state"
+        >
+          <b-spinner small class="mr-2" /> Memuat match dari semua kategori…
+        </div>
+        <div
+          v-else-if="!crossCategoryPendingHeats.length"
+          class="h2h-cross-heat-state h2h-cross-heat-state--done"
+        >
+          <Icon icon="mdi:check-circle-outline" width="28" height="28" />
+          <div class="mt-2">
+            Semua match di seluruh kategori H2H event ini sudah punya
+            nomor Heat.
+          </div>
+        </div>
+        <template v-else>
+          <div class="h2h-cross-heat-count">
+            <Icon icon="mdi:timer-sand" width="14" height="14" class="mr-1" />
+            {{ crossCategoryPendingHeats.length }} pertandingan menunggu
+            nomor Heat
+          </div>
+          <div class="h2h-cross-heat-table-wrap">
+            <table class="h2h-cross-heat-table">
+              <thead>
+                <tr>
+                  <th style="width: 36px">#</th>
+                  <th class="text-left">Kategori</th>
+                  <th style="width: 110px">Babak</th>
+                  <th class="text-left">Match</th>
+                  <th style="width: 110px">Heat</th>
+                  <th style="width: 230px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(item, idx) in crossCategoryPendingHeats"
+                  :key="item.rowKey"
+                >
+                  <td class="text-muted">{{ idx + 1 }}</td>
+                  <td class="text-left">
+                    <span class="h2h-cross-heat-badge">{{
+                      item.categoryLabel
+                    }}</span>
+                  </td>
+                  <td>
+                    <span class="h2h-cross-heat-round">{{
+                      item.roundLabel
+                    }}</span>
+                  </td>
+                  <td class="text-left">
+                    <div class="h2h-cross-heat-match">
+                      <span>{{ item.team1.name }}</span>
+                      <span class="h2h-cross-heat-match__vs">vs</span>
+                      <span>{{ item.team2.name }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <b-form-input
+                      type="number"
+                      min="1"
+                      size="sm"
+                      class="h2h-cross-heat-input"
+                      v-model.number="crossCategoryHeatInputs[item.rowKey]"
+                      :disabled="item.saving"
+                    />
+                  </td>
+                  <td>
+                    <div class="h2h-cross-heat-actions">
+                      <button
+                        type="button"
+                        class="h2h-cross-heat-btn h2h-cross-heat-btn--primary"
+                        :disabled="
+                          item.saving || !crossCategoryHeatInputs[item.rowKey]
+                        "
+                        @click="assignHeatFromWidget(item)"
+                      >
+                        <b-spinner v-if="item.saving" small />
+                        <template v-else>
+                          <Icon icon="mdi:content-save-outline" width="14" height="14" />
+                          Simpan
+                        </template>
+                      </button>
+                      <button
+                        type="button"
+                        class="h2h-cross-heat-btn h2h-cross-heat-btn--ghost"
+                        :disabled="item.saving"
+                        @click="goToMatchFromWidget(item)"
+                      >
+                        <Icon icon="mdi:open-in-new" width="14" height="14" />
+                        Buka
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+    </b-modal>
+
     <!-- MODAL: konfirmasi Reset All (seluruh kategori Head to Head di event ini) -->
     <b-modal
       v-model="showResetAllModal"
@@ -1525,6 +1696,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import photofinishMixin from "@/mixins/photofinishMixin";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
@@ -1667,6 +1840,7 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
+    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     VueHtml2pdf,
@@ -1678,7 +1852,7 @@ export default {
     FoulsReportModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
   data() {
     return {
       connectionState,
@@ -1697,6 +1871,12 @@ export default {
       showBracket: true,
       heatModalVisible: false,
       heatModalGroups: [],
+      // Widget "Assign Heat Lintas Kategori" (2026-09-29) — lihat
+      // openCrossCategoryHeatModal()/assignHeatFromWidget().
+      crossCategoryHeatModalVisible: false,
+      isLoadingCrossCategoryHeats: false,
+      crossCategoryPendingHeats: [],
+      crossCategoryHeatInputs: {},
       showResetAllModal: false,
       // grup kolom Penalties (PS/CL/R1/R2/L1/L2/PB/PF/PO) di tabel hasil bisa
       // di-minimize — klik header "Penalties Group" utk toggle.
@@ -1776,6 +1956,9 @@ export default {
   },
 
   computed: {
+    pfCategory() {
+      return "H2H";
+    },
     // Mapping this.rounds (struktur internal app) -> format yang dipahami
     // vue-tournament-bracket ({games:[{player1,player2}]}). Bronze/Final B
     // TIDAK ikut di sini — komponen bracket ini mengasumsikan tiap babak
@@ -2177,6 +2360,18 @@ export default {
       // lengkap di hydrateRoundResultsFromDb() (gap-fill only, aman
       // dipanggil tiap pindah tab Round).
       this.hydrateRoundResultsFromDb();
+      // BUG FIX (2026-09-30): catchUpMissedPenaltiesH2H() sebelumnya HANYA
+      // dipanggil saat socket reconnect — sejak widget "semua Heat lintas
+      // kategori" di halaman judges H2H (2026-09-29), juri bisa submit
+      // penalty utk babak MANAPUN yg sudah di-assign Heat-nya, termasuk
+      // babak yg SAAT ITU belum/tidak sedang dibuka operator.
+      // applyPenaltyFromSocketH2H() menolak (lihat notify "Penalty
+      // Realtime Ditolak") penalty yg datang saat babaknya tidak aktif —
+      // tanpa replay di sini, penalty itu HILANG permanen sampai
+      // kebetulan ada reconnect. Panggil juga setiap kali operator
+      // PINDAH ke babak ini, supaya penalty yg sempat ditolak otomatis
+      // ter-apply begitu babak yg sesuai dibuka.
+      this.catchUpMissedPenaltiesH2H();
     },
     showBracket(val) {
       localStorage.setItem(SHOW_BRACKET_KEY, val ? "1" : "0");
@@ -2267,6 +2462,7 @@ export default {
     this.hydrateRoundResultsFromDb();
 
     this.fetchBooyanActiveFromSettings();
+    this.fetchCrossCategoryPendingHeats();
 
     // ====== SOCKET INIT & LISTENERS (Judges Dashboard realtime) ======
     try {
@@ -2319,6 +2515,16 @@ export default {
           return;
         }
 
+        // Badge widget "Assign Heat Lintas Kategori" (lihat
+        // notifyH2HBracketUpdated() di socketBroadcast.js) — refresh diam2
+        // setiap ADA bracket kategori manapun yg berubah (termasuk
+        // perubahan dari sesi ini sendiri, spt Save Round/assign tim),
+        // supaya jumlahnya selalu akurat tanpa perlu modal dibuka dulu.
+        if (msg.type === "h2h:bracket-updated") {
+          this.fetchCrossCategoryPendingHeats();
+          return;
+        }
+
         await this.applyPenaltyFromSocketH2H(msg);
       };
 
@@ -2336,6 +2542,26 @@ export default {
   },
 
   methods: {
+    /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfBucket() {
+      // Sumber kebenaran bucket H2H = getBucket() (sama dgn _currentBucketOrThrow()).
+      return getBucket();
+    },
+    pfLocateTeam(msg) {
+      const list = this.visibleParticipants || [];
+      const byId = (p) => String(p.teamId || p._id || "") === String(msg.teamId);
+      const byBib = (p) => !!msg.bib && String(p.bibTeam || "") === String(msg.bib);
+      let index = list.findIndex(byId);
+      if (index < 0) index = list.findIndex(byBib);
+      if (index < 0) return null;
+      const p = list[index];
+      return {
+        index: index,
+        name: String(p.nameTeam || p.teamName || ""),
+        finishTime: (p.result && p.result.finishTime) || "",
+      };
+    },
+
     scoreForRank(rank) {
       if (!rank || !Number.isFinite(+rank)) return 0;
       const s = this.getScoreByRanked ? this.getScoreByRanked(+rank) : null;
@@ -2630,8 +2856,15 @@ export default {
             if (res.item.settings && res.item.settings.booyanActive) {
               this.booyanActive = { ...res.item.settings.booyanActive };
             }
-            // set currentRoundIndex ke ronde kompetitif paling awal
-            this.currentRoundIndex = this.firstRoundIndex;
+            // FITUR (2026-09-29, atas permintaan user): dulu SELALU
+            // dilempar balik ke Round paling awal (firstRoundIndex) tiap
+            // ganti kategori/reload bracket, walau tournament kategori itu
+            // sudah berjalan jauh — operator harus klik next-round manual
+            // berkali-kali tiap kali balik ke kategori itu. Sekarang
+            // langsung ke babak TERAKHIR yang memang sudah ada data tim
+            // (lihat _lastRoundIndexWithTeamData()), fallback ke
+            // firstRoundIndex kalau bracket-nya masih benar2 kosong.
+            this.currentRoundIndex = this._lastRoundIndexWithTeamData();
             this.computePodium();
             this.syncWinLoseFromBracketToParticipants();
             // BUG FIX: JANGAN persistRoundResults() di sini — this.participant
@@ -4654,6 +4887,232 @@ export default {
       this.heatModalVisible = true;
     },
 
+    // FITUR (2026-09-29, atas permintaan user): kumpulkan SEMUA match H2H
+    // event ini (lintas Division/Race/Initial) yang sudah lengkap 2 tim
+    // tapi BELUM punya nomor Heat — sumbernya langsung dari dokumen
+    // bracket DB (h2h:brackets:get-all-for-event), BUKAN localStorage,
+    // supaya akurat walau kategori itu belum pernah dibuka di sesi ini.
+    openCrossCategoryHeatModal() {
+      this.crossCategoryHeatModalVisible = true;
+      this.fetchCrossCategoryPendingHeats();
+    },
+
+    // Diambil terpisah dari openCrossCategoryHeatModal() (2026-09-29) supaya
+    // bisa dipanggil DIAM-DIAM (tanpa membuka modal) — dipakai widget
+    // mengambang "Assign Heat Lintas Kategori" (gaya sama dgn chat widget)
+    // agar badge jumlah pending-nya selalu akurat WALAU modal belum pernah
+    // dibuka sama sekali, persis spt badge unread di chat widget.
+    async fetchCrossCategoryPendingHeats() {
+      if (typeof ipcRenderer === "undefined" || !this.currentEventId) return;
+      this.isLoadingCrossCategoryHeats = true;
+      try {
+        const res = await new Promise((resolve) => {
+          ipcRenderer.once(
+            "h2h:brackets:get-all-for-event-reply",
+            (_e, r) => resolve(r)
+          );
+          ipcRenderer.send(
+            "h2h:brackets:get-all-for-event",
+            this.currentEventId
+          );
+        });
+
+        const docs = res && res.ok && Array.isArray(res.items) ? res.items : [];
+        const usedHeats = new Set();
+        const pending = [];
+
+        docs.forEach((doc) => {
+          const bucket = doc.bucket || {};
+          const categoryLabel = `${bucket.divisionName || ""} ${
+            bucket.raceName || ""
+          } – ${bucket.initialName || ""}`.trim();
+
+          (doc.rounds || []).forEach((round) => {
+            (round.matches || []).forEach((match, matchIndex) => {
+              const h = Number(match && match.heat) || 0;
+              if (h > 0) usedHeats.add(h);
+
+              if (!match || match.bye) return;
+              const has1 = !!(match.team1 && match.team1.name);
+              const has2 = !!(match.team2 && match.team2.name);
+              if (!has1 || !has2 || h > 0) return;
+
+              pending.push({
+                rowKey: [
+                  bucket.eventId,
+                  bucket.initialId,
+                  bucket.raceId,
+                  bucket.divisionId,
+                  round.id,
+                  matchIndex,
+                ].join("|"),
+                bucket: {
+                  eventId: String(bucket.eventId || ""),
+                  initialId: String(bucket.initialId || ""),
+                  raceId: String(bucket.raceId || ""),
+                  divisionId: String(bucket.divisionId || ""),
+                },
+                categoryLabel,
+                roundId: round.id,
+                roundLabel: round.bronze ? "Final B" : round.name,
+                matchIndex,
+                team1: {
+                  name: match.team1.name,
+                  bibTeam: match.team1.bibTeam || "",
+                },
+                team2: {
+                  name: match.team2.name,
+                  bibTeam: match.team2.bibTeam || "",
+                },
+                saving: false,
+              });
+            });
+          });
+        });
+
+        // sarankan nomor Heat berikutnya yang belum dipakai, berurutan per
+        // baris — operator tetap bebas mengubahnya sebelum "Simpan". PAKAI
+        // Set SALINAN (`reserved`) utk menghasilkan saran yg tidak saling
+        // bentrok ANTAR baris pending, TANPA ikut mencemari `usedHeats` asli.
+        // BUG FIX (2026-09-29): sebelumnya nomor saran ini di-add LANGSUNG
+        // ke `usedHeats`/`_crossCategoryUsedHeats` (yg juga dipakai
+        // assignHeatFromWidget() utk validasi saat "Simpan") — akibatnya
+        // baris pending yang di-"Simpan" TANPA mengubah nomor sarannya akan
+        // selalu dianggap "bentrok dgn match lain", padahal itu nomor
+        // sarannya SENDIRI, bukan milik match lain (termasuk kasus habis
+        // "Reset All" — bracket sudah bersih, tapi baris pertama tetap
+        // ditolak krn saran Heat 1-nya sendiri ikut ter-reserve di set yg
+        // sama).
+        const reserved = new Set(usedHeats);
+        let nextHeat = reserved.size ? Math.max(...reserved) + 1 : 1;
+        const inputs = {};
+        pending.forEach((item) => {
+          inputs[item.rowKey] = nextHeat;
+          reserved.add(nextHeat);
+          nextHeat += 1;
+        });
+
+        this._crossCategoryUsedHeats = usedHeats;
+        this.crossCategoryPendingHeats = pending;
+        this.crossCategoryHeatInputs = inputs;
+      } finally {
+        this.isLoadingCrossCategoryHeats = false;
+      }
+    },
+
+    // Simpan nomor Heat satu baris dari widget "Assign Heat Lintas
+    // Kategori". Kalau kategorinya SEDANG aktif di layar (this.rounds
+    // sudah dimuat), reuse renumberMatchHeat() yang sudah teruji penuh
+    // (guard/reset-hasil/persist/broadcast) — BUKAN direct-DB write.
+    // Kategori LAIN (belum dimuat) pakai h2h:bracket:assign-heat-direct.
+    async assignHeatFromWidget(item) {
+      const heat = Math.max(
+        1,
+        parseInt(this.crossCategoryHeatInputs[item.rowKey], 10) || 0
+      );
+      if (!heat) return;
+
+      // Bentrok kalau: (a) sudah dipakai match REAL lain di DB, ATAU
+      // (b) baris pending LAIN (bukan baris ini sendiri) kebetulan diisi
+      // nomor yang sama persis oleh operator sebelum sempat "Simpan".
+      const usedByRealMatch =
+        this._crossCategoryUsedHeats && this._crossCategoryUsedHeats.has(heat);
+      const usedByOtherPendingRow = this.crossCategoryPendingHeats.some(
+        (p) =>
+          p.rowKey !== item.rowKey &&
+          (Math.max(1, parseInt(this.crossCategoryHeatInputs[p.rowKey], 10) || 0)) ===
+            heat
+      );
+
+      if (usedByRealMatch || usedByOtherPendingRow) {
+        this.$bvToast &&
+          this.$bvToast.toast(`Heat ${heat} sudah dipakai match lain.`, {
+            variant: "warning",
+            autoHideDelay: 2500,
+            title: "Tidak bisa disimpan",
+          });
+        return;
+      }
+
+      this.$set(item, "saving", true);
+      try {
+        const activeKey = [
+          item.bucket.eventId,
+          item.bucket.initialId,
+          item.bucket.raceId,
+          item.bucket.divisionId,
+        ].join("|");
+        const isActiveBucket = this.selectedH2HKey === activeKey;
+
+        if (isActiveBucket) {
+          const round = (this.rounds || []).find((r) => r.id === item.roundId);
+          const match = round && round.matches && round.matches[item.matchIndex];
+          if (round && match) {
+            this.renumberMatchHeat(round, match, heat);
+          }
+        } else {
+          const res = await new Promise((resolve) => {
+            ipcRenderer.once(
+              "h2h:bracket:assign-heat-direct-reply",
+              (_e, r) => resolve(r)
+            );
+            ipcRenderer.send("h2h:bracket:assign-heat-direct", {
+              bucket: item.bucket,
+              roundId: item.roundId,
+              matchIndex: item.matchIndex,
+              heat,
+            });
+          });
+          if (!res || !res.ok) {
+            this.$bvToast &&
+              this.$bvToast.toast(
+                (res && res.error) || "Gagal menyimpan Heat.",
+                { variant: "danger", autoHideDelay: 3000, title: "Gagal" }
+              );
+            return;
+          }
+        }
+
+        if (this._crossCategoryUsedHeats) this._crossCategoryUsedHeats.add(heat);
+        this.crossCategoryPendingHeats = this.crossCategoryPendingHeats.filter(
+          (x) => x.rowKey !== item.rowKey
+        );
+        this.$bvToast &&
+          this.$bvToast.toast(
+            `Heat ${heat} berhasil di-assign ke ${item.team1.name} vs ${item.team2.name}.`,
+            { variant: "success", autoHideDelay: 2000, title: "Tersimpan" }
+          );
+      } finally {
+        this.$set(item, "saving", false);
+      }
+    },
+
+    // Quick action "Buka Pertandingan" — pindah ke kategori+babak match
+    // ini (tanpa perlu operator cari sendiri lewat dropdown Switch
+    // Category + tab babak satu-satu).
+    async goToMatchFromWidget(item) {
+      this.crossCategoryHeatModalVisible = false;
+
+      const targetKey = [
+        item.bucket.eventId,
+        item.bucket.initialId,
+        item.bucket.raceId,
+        item.bucket.divisionId,
+      ].join("|");
+
+      if (!this.h2hBucketMap[targetKey]) return;
+
+      if (this.selectedH2HKey !== targetKey) {
+        await this.onSelectH2HBucket(targetKey);
+      }
+
+      const idx = (this.rounds || []).findIndex((r) => r.id === item.roundId);
+      if (idx >= 0) {
+        this.persistRoundResults();
+        this.currentRoundIndex = idx;
+      }
+    },
+
     // Muat gambar (mis. logo) jadi data URL + dimensi asli — dipakai utk
     // menempelkan logo ke PDF via jsPDF.addImage(), yang butuh data URL
     // (bukan sekadar path/URL import webpack).
@@ -4831,13 +5290,15 @@ export default {
     // PDF SELALU A4 baku, brp pun ukuran/rasio bagan atau tabel yang
     // di-capture (lebar/sempit, panjang/pendek).
     // BUG FIX (2026-09-29): dulu embed screenshot bagan sbg PNG (lossless)
-    // hasil html2canvas scale:2 — utk diagram bagan/tabel yg didominasi area
-    // putih polos + garis/teks hitam, PNG jauh lebih besar drpd JPEG tanpa
+    // hasil html2canvas — utk diagram bagan/tabel yg didominasi area putih
+    // polos + garis/teks hitam, PNG jauh lebih besar drpd JPEG tanpa
     // manfaat kualitas yg terlihat (tidak ada gradasi warna yg butuh
-    // lossless). Ganti ke JPEG kualitas tinggi (0.92) — visualnya nyaris
-    // identik tapi ukuran file PDF turun drastis (biasanya 5-10x lebih
-    // kecil utk jenis konten ini). Dipakai bareng oleh downloadBracketPdf()
-    // & download Heat Assignment PDF (kedua pemanggil fungsi ini).
+    // lossless). Ganti ke JPEG (kualitas 0.75 — cukup utk konten garis/teks,
+    // diturunkan dari percobaan awal 0.92 atas permintaan ukuran file lebih
+    // kecil lagi) + scale html2canvas diturunkan ke 1.5 (dari 2) di kedua
+    // pemanggil fungsi ini — gabungan keduanya bikin ukuran file PDF turun
+    // drastis (biasanya >10x lebih kecil drpd PNG scale:2 semula) sementara
+    // teks/garis tetap terbaca jelas saat dicetak.
     _addFittedImageToPdf(pdf, canvas) {
       const { pageMargin, headerHeight } = this._pdfLayout();
       const pageW = pdf.internal.pageSize.getWidth();
@@ -4856,7 +5317,7 @@ export default {
       const x = (pageW - drawW) / 2;
       const y = contentTop + (maxH - drawH) / 2;
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const imgData = canvas.toDataURL("image/jpeg", 0.75);
       pdf.addImage(imgData, "JPEG", x, y, drawW, drawH, undefined, "MEDIUM");
     },
 
@@ -5131,8 +5592,13 @@ export default {
       this.isDownloadingBracketPdf = true;
       try {
         await this.$nextTick();
+        // BUG FIX (2026-09-29): scale 2 (dobel resolusi CSS) tidak
+        // diperlukan utk konten diagram/tabel spt bagan ini (beda dgn foto)
+        // — teks & garis tetap tajam di scale 1.5, tapi jumlah piksel turun
+        // ~44% (kuadratik), menambah penghematan ukuran file di atas
+        // kompresi JPEG (_addFittedImageToPdf).
         const canvas = await html2canvas(el, {
-          scale: 2,
+          scale: 1.5,
           backgroundColor: "#ffffff",
           useCORS: true,
         });
@@ -5188,7 +5654,7 @@ export default {
       try {
         await this.$nextTick();
         const canvas = await html2canvas(el, {
-          scale: 2,
+          scale: 1.5,
           backgroundColor: "#ffffff",
           useCORS: true,
         });
@@ -5383,6 +5849,10 @@ export default {
 
       this.computePodium();
       this.persistRoundResults();
+      // FITUR (2026-09-29): auto-advance begitu SELURUH match di babak ini
+      // sudah punya pemenang — lihat catatan lengkap di
+      // _autoAdvanceRoundIfComplete().
+      this._autoAdvanceRoundIfComplete();
     },
     isByeTeam(item) {
       const r = this.currentRound;
@@ -5642,7 +6112,34 @@ export default {
           msg.roundId == null ||
           !this.currentRound ||
           String(msg.roundId) === String(this.currentRound.id);
-        if (!sameCategory || !sameRound) return;
+        // BUG FIX (2026-09-30): sebelumnya di sini SILENT return — operator
+        // tidak pernah tahu ada penalty masuk sama sekali. Waktu itu aman
+        // krn juri hanya bisa pilih Heat dari babak yg SEDANG dibuka
+        // operator (activeRound), jadi sameCategory/sameRound praktis
+        // SELALU cocok. Sejak widget "semua Heat lintas kategori" di
+        // halaman judges H2H (2026-09-29) — juri sekarang bisa klik Heat
+        // MANAPUN yg sudah di-assign, termasuk babak/kategori yg BUKAN
+        // sedang tampil di layar operator — kasus tidak cocok jadi NYATA,
+        // bukan cuma teoretis. Tanpa notify ini, juri mengira sudah
+        // terkirim (toast sukses + tercatat di Riwayat judgereportdetails)
+        // padahal operator sama sekali tidak tahu ada kiriman yg tertolak.
+        if (!sameCategory || !sameRound) {
+          const catLabel =
+            msg.categoryLabel ||
+            [msg.initialName, msg.divisionName, msg.raceName]
+              .filter(Boolean)
+              .join(" - ") ||
+            "kategori lain";
+          const roundLabel = msg.heatRoundName || msg.roundName || "babak lain";
+          this.notify(
+            "warning",
+            `Penalty dari juri utk Heat ${
+              msg.heat || "-"
+            } (${catLabel} — ${roundLabel}) BELUM diterapkan — buka kategori & babak tsb dulu di operator, lalu juri submit ulang.`,
+            "Penalty Realtime Ditolak"
+          );
+          return;
+        }
       }
 
       // resolve tim: teamId/bib/nama -> index di this.participant
@@ -7145,6 +7642,16 @@ export default {
       // ter-assign ke slot), jurysystem perlu tahu tim mana yang sekarang
       // aktif/pasangannya siapa (fitur filter Team & Fouls Report).
       this.broadcastActiveRound(round, true);
+
+      // FITUR (2026-09-29): kalau slot yang baru diisi ini bikin match jadi
+      // BYE (auto-menang) DAN ini terjadi di babak yang SEDANG AKTIF, cek
+      // apakah seluruh babak jadi lengkap & auto-advance — lihat catatan
+      // lengkap di _autoAdvanceRoundIfComplete(). Sengaja di-scope hanya ke
+      // currentRound (bukan babak lain yang mungkin sedang di-assign lewat
+      // jalur lain) supaya tidak salah konteks.
+      if (this.currentRound && round.id === this.currentRound.id) {
+        this._autoAdvanceRoundIfComplete();
+      }
     },
 
     // Reset live `p.result` ke kosong HANYA kalau babak `round` ini belum
@@ -7373,6 +7880,180 @@ export default {
     // operator sempat membuka tab Semifinal lagi di antaranya, memulihkan
     // waktu asli ke `result` yang dipakai bersama sebelum akhirnya
     // ke-assign salah ke Final B. Sekarang keduanya jadi SATU aksi atomik.
+    // Cari index Round TERAKHIR (paling jauh progresnya) yang SUDAH py
+    // data tim (minimal 1 slot match terisi) — dipakai sbg default tab
+    // babak aktif saat kategori dipilih/bracket dimuat dari DB, atas
+    // permintaan user (2026-09-29): operator tidak mau selalu "dilempar
+    // balik" ke Round 1 tiap ganti kategori, maunya langsung diarahkan ke
+    // babak yang memang sedang berjalan/terakhir diisi. Scan dari
+    // belakang (Final duluan) supaya round paling maju yang ketemu duluan.
+    // Fallback ke firstRoundIndex kalau semua round masih benar2 kosong
+    // (bracket baru/belum ada tim sama sekali).
+    _lastRoundIndexWithTeamData() {
+      const list = this.rounds || [];
+      for (let i = list.length - 1; i >= 0; i--) {
+        const r = list[i];
+        if (!r || !Array.isArray(r.matches)) continue;
+        const hasData = r.matches.some(
+          (m) => (m.team1 && m.team1.name) || (m.team2 && m.team2.name)
+        );
+        if (hasData) return i;
+      }
+      return this.firstRoundIndex;
+    },
+
+    // FITUR (2026-09-29, atas permintaan user): auto-advance tim yang
+    // menang (termasuk yang dapat BYE) ke babak berikutnya begitu SELURUH
+    // match di babak yang sedang aktif sudah punya pemenang — operator
+    // tidak perlu lagi klik tombol "Advance to Next Round" manual. Tetap
+    // menunggu SELURUH babak selesai dulu (bukan per-match langsung),
+    // sesuai jawaban user. Placement ke babak berikutnya first-come-
+    // first-served (slot kosong pertama, BUKAN pairing bracket
+    // geometris "Match 1&2 -> Match 1"), juga sesuai jawaban user.
+    //
+    // SENGAJA reuse assignTeamToMatchSlot() apa adanya per slot (bukan
+    // menulis ulang logika penempatan) — supaya semua guard/reset-hasil/
+    // persist/broadcast yang sudah teruji di jalur assign manual tetap
+    // berlaku persis sama, TIDAK ada dua implementasi yang bisa beda
+    // hasil. Tombol "Advance to Next Round" manual TIDAK diubah sama
+    // sekali (tetap ada sbg fallback/pola pool-assign lama) — fungsi ini
+    // murni tambahan yang berjalan otomatis di background.
+    //
+    // Dipanggil dari 2 titik: akhir evaluateHeatWinnersForCurrentRound()
+    // (match riil baru selesai lewat perbandingan waktu) & akhir
+    // assignTeamToMatchSlot() KHUSUS kalau slot yang baru diisi ada di
+    // babak yang sedang aktif (mis. slot BYE auto-menang).
+    _autoAdvanceRoundIfComplete() {
+      const round = this.currentRound;
+      if (!round || round.bronze) return;
+      if (!round.matches || !round.matches.length || (round.pool || []).length)
+        return;
+
+      const orphanEmpty = round.matches.filter(
+        (m) =>
+          !m.bye && !(m.team1 && m.team1.name) && !(m.team2 && m.team2.name)
+      );
+      if (orphanEmpty.length) return;
+
+      const undecided = round.matches.filter(
+        (m) => m.team1.name && m.team2.name && !m.winner
+      );
+      if (undecided.length) return;
+
+      let nextRoundIndex = -1;
+      for (let i = this.currentRoundIndex + 1; i < this.rounds.length; i++) {
+        if (!this.rounds[i].bronze) {
+          nextRoundIndex = i;
+          break;
+        }
+      }
+      if (nextRoundIndex === -1) return; // sudah Final
+
+      const winners = round.matches
+        .map((m) => m.winner)
+        .filter((w) => w && w.name);
+      if (!winners.length) return;
+
+      const next = this.rounds[nextRoundIndex];
+
+      // Cegah duplikat — sama persis guard di advanceToNextRound(), supaya
+      // fungsi ini aman dipanggil berkali-kali (mis. evaluateHeatWinners
+      // jalan lagi krn alasan lain) tanpa menambahkan tim yang sama 2x.
+      const nextTakenKeys = new Set();
+      (next.pool || []).forEach((p) => {
+        if (p && p.name) nextTakenKeys.add(this._teamIdentityKey(p));
+      });
+      (next.matches || []).forEach((m) => {
+        if (m.team1 && m.team1.name)
+          nextTakenKeys.add(this._teamIdentityKey(m.team1));
+        if (m.team2 && m.team2.name)
+          nextTakenKeys.add(this._teamIdentityKey(m.team2));
+      });
+      const newWinners = winners.filter(
+        (w) => !nextTakenKeys.has(this._teamIdentityKey(w))
+      );
+      if (!newWinners.length) return; // sudah pernah di-auto-advance
+
+      // Semifinal -> siapkan Final B dari 2 tim yang kalah — sama pola
+      // dgn advanceToNextRound().
+      const isLeavingSemifinal = !round.bronze && round.size === 4;
+      let bronze = null;
+      let bronzeLosers = [];
+      if (isLeavingSemifinal) {
+        bronze = this.rounds.find((r) => r.bronze) || null;
+        if (bronze) {
+          const bronzeHas1 = !!(
+            bronze.matches[0] &&
+            bronze.matches[0].team1 &&
+            bronze.matches[0].team1.name
+          );
+          const bronzeHas2 = !!(
+            bronze.matches[0] &&
+            bronze.matches[0].team2 &&
+            bronze.matches[0].team2.name
+          );
+          if (!bronzeHas1 || !bronzeHas2) {
+            const losers = round.matches.map((m) => {
+              if (!m.winner) return null;
+              const lose =
+                m.winner.name === (m.team1 && m.team1.name)
+                  ? m.team2
+                  : m.team1;
+              return lose && lose.name ? lose : null;
+            });
+            if (losers[0] && losers[1]) bronzeLosers = [losers[0], losers[1]];
+          }
+        }
+      }
+
+      this._resetParticipantResultsByName(newWinners.map((w) => w.name));
+      this._placeTeamsIntoFirstEmptySlots(next, newWinners);
+
+      if (bronzeLosers.length === 2) {
+        this._resetParticipantResultsByName(bronzeLosers.map((l) => l.name));
+        this._placeTeamsIntoFirstEmptySlots(bronze, bronzeLosers);
+      }
+
+      this.$bvToast &&
+        this.$bvToast.toast(
+          `${newWinners.length} tim otomatis lanjut ke ${next.name}${
+            bronzeLosers.length === 2 ? " (yang kalah otomatis ke Final B)" : ""
+          }.`,
+          { variant: "success", autoHideDelay: 2500, title: "Auto Next Round" }
+        );
+    },
+
+    // Taruh `teams` ke slot KOSONG PERTAMA (team1 dulu baru team2) di
+    // `round.matches`, urut dari match paling atas — first-come-first-
+    // served, BUKAN pairing bracket geometris (sesuai permintaan user
+    // 2026-09-29). Reuse assignTeamToMatchSlot() apa adanya per slot
+    // supaya bye-state/reset-hasil/persist/broadcast tetap konsisten dgn
+    // jalur assign manual — tidak menduplikasi logikanya. Sisa tim yang
+    // tidak kebagian slot kosong (babak berikutnya sudah penuh) masuk ke
+    // pool seperti biasa, operator assign manual kalau perlu.
+    _placeTeamsIntoFirstEmptySlots(round, teams) {
+      if (!round || !Array.isArray(round.matches)) return;
+      const queue = teams.slice();
+      for (let i = 0; i < round.matches.length && queue.length; i++) {
+        const m = round.matches[i];
+        if (!m.team1 || !m.team1.name) {
+          this.assignTeamToMatchSlot(
+            { roundId: round.id, matchIndex: i, side: "team1" },
+            queue.shift()
+          );
+        }
+        if (queue.length && (!m.team2 || !m.team2.name)) {
+          this.assignTeamToMatchSlot(
+            { roundId: round.id, matchIndex: i, side: "team2" },
+            queue.shift()
+          );
+        }
+      }
+      if (queue.length) {
+        round.pool = (round.pool || []).concat(queue);
+      }
+    },
+
     advanceToNextRound() {
       const round = this.currentRound;
       if (!round || round.bronze) {
@@ -7689,6 +8370,38 @@ export default {
             target.result.startTime,
             target.result.finishTime
           );
+
+          // Broadcast LIVE PREVIEW begitu satu tim genuinely selesai
+          // (Start & Finish Time terisi) di babak yang sedang aktif —
+          // TIDAK menunggu "Save Round", sama pola persis dgn
+          // sprint/drr/slalom:team-finished. Win/Lose & rank final tetap
+          // menunggu Save Round (butuh KEDUA tim di match yang sama).
+          // Fire-and-forget.
+          if (typeof ipcRenderer !== "undefined") {
+            try {
+              const bucket = this.currentBucket || getBucket();
+              ipcRenderer.send("h2h:team-finished", {
+                eventId: bucket.eventId,
+                initialId: bucket.initialId,
+                divisionId: bucket.divisionId,
+                raceId: bucket.raceId,
+                teamId: String(target.teamId || target._id || ""),
+                bibTeam: String(target.bibTeam || ""),
+                nameTeam: String(target.nameTeam || target.teamName || ""),
+                roundId: this.currentRound ? String(this.currentRound.id || "") : "",
+                roundName: this.currentRound
+                  ? this.currentRound.bronze
+                    ? "Final B"
+                    : this.currentRound.name
+                  : "",
+                startTime: target.result.startTime,
+                finishTime: target.result.finishTime,
+                raceTime: target.result.raceTime,
+              });
+            } catch (_e) {
+              // non-critical
+            }
+          }
         }
       }
 
@@ -7938,6 +8651,56 @@ export default {
   opacity: 0.6;
   cursor: not-allowed;
   pointer-events: none;
+}
+/* Widget mengambang "Assign Heat Lintas Kategori" (redesign 2026-09-29) —
+   gaya sama persis dgn .chat-fab di EventChatWidget.vue, cuma diposisikan
+   kiri-bawah supaya tidak bertumpuk dgn chat widget yg ada di kanan-bawah. */
+.h2h-heat-fab-wrap {
+  position: fixed;
+  left: 24px;
+  bottom: 70px;
+  z-index: 1049;
+}
+.h2h-heat-fab {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #f7931e 0%, #c2570a 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(247, 147, 30, 0.38), 0 2px 6px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.h2h-heat-fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 14px 28px rgba(247, 147, 30, 0.45), 0 3px 8px rgba(0, 0, 0, 0.14);
+}
+.h2h-heat-fab:active {
+  transform: translateY(0) scale(0.98);
+}
+.h2h-heat-fab:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.h2h-heat-fab-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: #d9534f;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  min-width: 20px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(217, 83, 79, 0.5);
 }
 /* Save = tombol solid (nulis ke DB, konsekuensinya lebih besar drpd cuma
    generate file PDF) supaya beda bobot visual dgn Print. */
@@ -9034,6 +9797,212 @@ thead th[colspan="8"] {
 }
 .heat-modal .heat-group__table td {
   overflow-wrap: break-word;
+}
+
+/* Modal "Assign Heat Lintas Kategori" (redesign 2026-09-29) — pola sama
+   dgn .h2h-picker-modal (rounded corner, shadow, header berwarna custom)
+   tapi tabel-nya sendiri (lebih banyak kolom drpd list 1 kolom picker). */
+.h2h-cross-heat-modal {
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+  max-height: 85vh !important;
+}
+.h2h-cross-heat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, #f7931e, #c2570a);
+  position: relative;
+  flex: 0 0 auto;
+}
+.h2h-cross-heat-header__icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.h2h-cross-heat-header__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.h2h-cross-heat-header__title {
+  font-weight: 800;
+  font-size: 16px;
+  color: #ffffff;
+}
+.h2h-cross-heat-header__subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+}
+.h2h-cross-heat-close {
+  flex: 0 0 auto;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.h2h-cross-heat-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+.h2h-cross-heat-body {
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  max-height: calc(85vh - 78px);
+  background: #f8fafc;
+}
+.h2h-cross-heat-state {
+  padding: 40px 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.h2h-cross-heat-state--done {
+  color: #16a34a;
+}
+.h2h-cross-heat-count {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  width: fit-content;
+}
+.h2h-cross-heat-table-wrap {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.h2h-cross-heat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.h2h-cross-heat-table thead th {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+.h2h-cross-heat-table tbody td {
+  padding: 10px 12px;
+  text-align: center;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+.h2h-cross-heat-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.h2h-cross-heat-table tbody tr:hover {
+  background: #f8fafc;
+}
+.h2h-cross-heat-badge {
+  display: inline-block;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: normal;
+  line-height: 1.3;
+}
+.h2h-cross-heat-round {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+.h2h-cross-heat-match {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #1e293b;
+  flex-wrap: wrap;
+}
+.h2h-cross-heat-match__vs {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.h2h-cross-heat-input.form-control {
+  text-align: center;
+  font-weight: 700;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+}
+.h2h-cross-heat-input.form-control:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.h2h-cross-heat-actions {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.h2h-cross-heat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease, background-color 0.15s ease;
+}
+.h2h-cross-heat-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.h2h-cross-heat-btn--primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+.h2h-cross-heat-btn--primary:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+.h2h-cross-heat-btn--ghost {
+  background: #f1f5f9;
+  color: #334155;
+}
+.h2h-cross-heat-btn--ghost:not(:disabled):hover {
+  background: #e2e8f0;
 }
 
 /* Modal "Pilih Tim" & "Ubah Nomor Heat" — header custom (bukan header

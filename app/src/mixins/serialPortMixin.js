@@ -1,5 +1,6 @@
 import { listPorts } from "@/utils/serialConnection.js";
 import { createMicroGateReader } from "@/utils/microGateReader.js";
+import { reportFrame } from "@/services/photofinish";
 
 // RaceTime2 pada mesin ini SELALU muncul di path tetap ini (dicek manual
 // oleh user) — jadi Connect Racetime langsung cari path ini persis, bukan
@@ -99,18 +100,23 @@ export default {
             this.digitId.unshift(a);
             this.digitTime.unshift(b);
           },
-          onStart: (formatted) => {
+          onStart: (formatted, _a, _b, meta) => {
             this.digitTimeStart = formatted;
+            // STS Photo Finish: frame start yg membawa jam berjalan = heartbeat sinkron jam.
+            reportFrame("start", formatted, meta, this.baudRate);
           },
-          onFinish: (formatted) => {
+          onFinish: (formatted, _a, _b, meta) => {
             this.digitTimeFinish = formatted;
+            // STS Photo Finish: SETIAP sinyal finish dikirim & disimpan (tidak tertimpa).
+            reportFrame("finish", formatted, meta, this.baudRate);
           },
           // LAP frame (a[11]="0" + a[13]="1", lihat komentar
           // createMicroGateReader() di microGateReader.js) — per instruksi
           // operator, waktunya masuk ke field yang SAMA dgn Finish (bukan
           // Start), jadi disamakan persis dgn handler onFinish di atas.
-          onLap: (formatted) => {
+          onLap: (formatted, _a, _b, meta) => {
             this.digitTimeFinish = formatted;
+            reportFrame("finish", formatted, meta, this.baudRate);
           },
           onClose: () => {
             this.isPortConnected = false;

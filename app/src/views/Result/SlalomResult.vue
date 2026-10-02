@@ -1895,6 +1895,166 @@ export default {
       this._recomputeAllRanksAndScores();
       this.results = this.buildResultRows(this.sessionMode);
       await this.saveRawResultsToDb();
+
+      // BUG FIX (2026-09-29): koreksi di Result Detail dulu TIDAK PERNAH
+      // mendorong hasilnya ke Overall Result — beda dgn Sprint yg sudah
+      // py upsertEventResults() sendiri. Slalom ranking-nya flat (bukan
+      // bracket bertingkat spt H2H), jadi aman direplikasi dgn pola yg
+      // SAMA PERSIS dgn SprintResult.vue's upsertEventResults().
+      const q = this.$route.query || {};
+      if (q.eventId && q.initialId && q.raceId && q.divisionId) {
+        await this.upsertEventResults(q, this.buildResultRows("all"));
+      }
+      if (typeof ipcRenderer !== "undefined" && this.resultCategoryKey) {
+        ipcRenderer.send("event:touch-result-timestamp", {
+          eventId: String(q.eventId || ""),
+          category: this.resultCategoryKey,
+        });
+      }
+    },
+
+    // === merge hasil SLALOM (versi terkoreksi di halaman Result) ke
+    // dokumen event-results (kategori lain aman) — mirror PERSIS logika
+    // upsertEventResults() di SprintResult.vue, supaya View Overall selalu
+    // ikut ter-update. Hanya baris `isBest` yang dipakai (satu per tim) —
+    // Slalom py 2 baris per tim (Run 1 & Run 2), cuma run terbaik yang
+    // py ranked/score final asli, run lainnya sengaja "-"/0.
+    async upsertEventResults(identity, rows) {
+      const K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      const toNumOrEmpty = (v) => (v || v === 0 ? v : "");
+
+      const baseFilter = {
+        eventId: String(identity.eventId || ""),
+        initialId: String(identity.initialId || ""),
+        raceId: String(identity.raceId || ""),
+        divisionId: String(identity.divisionId || ""),
+      };
+
+      const incoming = new Map();
+      (rows || [])
+        .filter((r) => r.isBest)
+        .forEach((r) => {
+          const key = String(r.bibTeam || "");
+          if (!key) return;
+          const ranked =
+            r.ranked && r.ranked !== "-" ? Number(r.ranked) : "";
+          const scored = ranked !== "" ? this.getScoreByRanked(ranked) : "";
+          incoming.set(key, {
+            teamId: "",
+            teamName: r.nameTeam || "",
+            bib: r.bibTeam || "",
+            slalomCat: {
+              name: K.SLALOM,
+              rankedByCats: toNumOrEmpty(ranked),
+              scored: toNumOrEmpty(scored),
+            },
+            totalRanked: toNumOrEmpty(ranked),
+            totalScore: toNumOrEmpty(scored),
+          });
+        });
+
+      let existingDoc = null;
+      try {
+        const gres = await new Promise((resolve) => {
+          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      const now = new Date();
+      const payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: "SLALOM",
+        initialName: String(identity.initialName || this.slalomCats.initial || ""),
+        raceName: String(identity.raceName || this.slalomCats.race || ""),
+        divisionName: String(identity.divisionName || this.slalomCats.division || ""),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+
+        const map = new Map();
+        (Array.isArray(existingDoc.eventResult) ? existingDoc.eventResult : []).forEach(
+          (row) => {
+            const k = String((row && row.bib) || (row && row.teamId) || "");
+            if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+        );
+
+        incoming.forEach((inc, key) => {
+          let prev = map.get(key);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: "",
+              totalScore: "",
+            };
+          }
+          const prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          const foundIdx = prevCats.findIndex(
+            (c) => String((c && c.name) || "").toUpperCase() === K.SLALOM
+          );
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.slalomCat;
+          else prevCats.push(inc.slalomCat);
+
+          map.set(key, {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+        });
+
+        payload.eventResult = Array.from(map.values());
+      } else {
+        payload.eventResult = Array.from(incoming.values()).map((inc) => ({
+          teamId: inc.teamId,
+          teamName: inc.teamName,
+          bib: inc.bib,
+          categories: [
+            { name: K.SPRINT, rankedByCats: "", scored: "" },
+            { name: K.H2H, rankedByCats: "", scored: "" },
+            inc.slalomCat,
+            { name: K.DRR, rankedByCats: "", scored: "" },
+            { name: K.RX, rankedByCats: "", scored: "" },
+          ],
+          totalRanked: inc.totalRanked,
+          totalScore: inc.totalScore,
+        }));
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Sync Overall gagal",
+            detail: (res && res.error) || "Unknown error",
+          });
+        }
+      });
     },
 
     normalizeResult(raw) {

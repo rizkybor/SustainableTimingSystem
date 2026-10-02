@@ -228,6 +228,7 @@
     <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="participantArr && participantArr.length"
       :digit-id="digitId"
@@ -758,6 +759,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import photofinishMixin from "@/mixins/photofinishMixin";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -989,6 +992,7 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: {
+    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     Icon,
@@ -997,7 +1001,7 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
   data() {
     return {
       connectionState,
@@ -1065,6 +1069,9 @@ export default {
     },
   },
   computed: {
+    pfCategory() {
+      return "DRR";
+    },
     // Opsi Pen. Start — dulu whitelist KETAT {0,10,50} thd daftar GLOBAL
     // (dataPenalties), jadi custom value dari Pilihan Pen. Start (Race
     // Settings) tidak akan pernah muncul krn di-filter habis. Sekarang pakai
@@ -1279,6 +1286,21 @@ export default {
           return;
         if (!isSameEvent(msg)) return;
 
+        // BUG FIX (2026-09-29): Race Settings (Total Section, Pilihan
+        // Penalty, Score by Rank) dulu HANYA dimuat sekali saat halaman
+        // ini pertama dibuka (fetchDrrSectionCountFromSettings() di
+        // mounted()) — kalau operator ubah Race Settings DRR lewat modal
+        // di Event Details SEMENTARA halaman ini sudah terbuka duluan
+        // (window lain), perubahannya tidak pernah terlihat sampai
+        // halaman ditutup-buka ulang. Sekarang refetch otomatis begitu
+        // broadcast "race-settings:updated" diterima (lihat
+        // notifyRaceSettingsUpdated() di socketBroadcast.js, dipanggil
+        // stlh race-settings:upsert sukses).
+        if (msg.type === "race-settings:updated") {
+          this.fetchDrrSectionCountFromSettings();
+          return;
+        }
+
         // notifikasi realtime + audio
         if (this.$bvToast && msg.text) {
           try {
@@ -1369,6 +1391,25 @@ export default {
     }
   },
   methods: {
+    /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfBucket() {
+      // Sengaja TANPA fallback getBucket(): bisa stale setelah "Switch DRR
+      // Category", dan null (tampilan aggregate) berarti jangan terapkan.
+      return this.currentBucket;
+    },
+    pfLocateTeam(msg) {
+      const list = Array.isArray(this.participant) ? this.participant : [];
+      let index = list.findIndex((p) => String(p.teamId || "") === String(msg.teamId));
+      if (index < 0 && msg.bib) index = list.findIndex((p) => String(p.bibTeam || "") === String(msg.bib));
+      if (index < 0) return null;
+      const p = list[index];
+      return {
+        index: index,
+        name: String(p.nameTeam || p.teamName || ""),
+        finishTime: (p.result && p.result.finishTime) || "",
+      };
+    },
+
     // Field Notes — catatan bebas juri (murni informasi, tidak
     // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
     // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.
@@ -3301,6 +3342,40 @@ export default {
           this.participant[id].result.penaltyTime || "00:00:00.000"
         );
         await this.assignRanks(this.participant);
+
+        // Broadcast LIVE PREVIEW begitu tim ini genuinely selesai (Start &
+        // Finish Time terisi) — TIDAK menunggu "Save Result", sama pola
+        // persis dgn sprint:team-finished di SprintRace.vue. Murni
+        // pratinjau tambahan (digabung dgn hasil resmi di sts-jurysystem's
+        // live-results route.js), rank final tetap menunggu Save Result.
+        // Fire-and-forget.
+        if (typeof ipcRenderer !== "undefined") {
+          try {
+            const row = this.participant[id];
+            const bucket = this.currentBucket || getBucket();
+            ipcRenderer.send("drr:team-finished", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(row.teamId || ""),
+              bibTeam: String(row.bibTeam || ""),
+              nameTeam: String(row.nameTeam || ""),
+              startTime: row.result.startTime,
+              finishTime: row.result.finishTime,
+              raceTime: row.result.raceTime,
+              startPenalty: row.result.startPenalty,
+              finishPenalty: row.result.finishPenalty,
+              sectionPenaltyTime: Array.isArray(row.result.penaltySection)
+                ? row.result.penaltySection.slice()
+                : [],
+              penaltyTime: row.result.totalPenaltyTime || row.result.penaltyTime,
+              totalTime: row.result.totalTime,
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
       }
 
       if (this.selectedDrrKey) {

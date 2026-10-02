@@ -1433,6 +1433,18 @@ export default {
         // ikut memperbarui dokumen "View Overall" — kalau tidak, ranking di
         // View Overall diam-diam jadi usang begitu ada koreksi di sini.
         this.upsertEventResults(q, this.results);
+
+        // BUG FIX (2026-09-29): koreksi langsung di Result Detail (bukan
+        // cuma Save Result di Race Detail) juga harus ikut membuat label
+        // "Ditetapkan: ..." ter-refresh — konsisten dgn fix sebelumnya di
+        // SprintRace.vue (event:touch-result-timestamp tiap ada hasil yg
+        // disimpan ulang, apa pun status-nya sekarang).
+        if (typeof ipcRenderer !== "undefined" && this.resultCategoryKey) {
+          ipcRenderer.send("event:touch-result-timestamp", {
+            eventId: String(q.eventId),
+            category: this.resultCategoryKey,
+          });
+        }
       });
     },
 

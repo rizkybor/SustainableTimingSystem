@@ -1,8 +1,19 @@
 // vue.config.js
+// .env (tidak di-commit) dibaca saat build: MONGO_URI ditanam ke main process
+// lewat DefinePlugin, jadi installer tetap terhubung tanpa kredensial di git.
+require("dotenv").config();
+const webpack = require("webpack");
+
 module.exports = {
   pluginOptions: {
     electronBuilder: {
       preload: "src/preload.js",
+      // Hanya main process (bukan renderer) — rahasia tidak masuk bundle UI.
+      chainWebpackMainProcess: (config) => {
+        config.plugin("define-build-secrets").use(webpack.DefinePlugin, [
+          { __BUILD_MONGO_URI__: JSON.stringify(process.env.MONGO_URI || "") },
+        ]);
+      },
       nodeIntegration: true,
       // default plugin cuma nge-watch src/background.js utk restart Electron
       // di mode dev — file yang di-require dari situ (services/controllers)

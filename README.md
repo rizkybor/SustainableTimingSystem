@@ -8,6 +8,14 @@ with Node v20.19.5
 -rm -rf node_modules
 -rm -rf package_log.json
 
+Konfigurasi rahasia (app/.env — TIDAK di-commit):
+- Salin app/.env.example → app/.env lalu isi.
+- MONGO_URI = connection string MongoDB Atlas (wajib). Tidak lagi ditulis di
+  kode sumber; dibaca src/controllers/dbConfig.js dengan urutan: MONGO_URI di
+  .env → database.json { "mongoUri": "..." } di folder data aplikasi → nilai
+  yang ditanam saat yarn electron:build. Build installer harus di mesin yang
+  .env-nya berisi MONGO_URI.
+
 install packages : yarn install
 
 install vue-router : yarn vue-router@2

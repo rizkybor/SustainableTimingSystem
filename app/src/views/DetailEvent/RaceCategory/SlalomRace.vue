@@ -3003,6 +3003,42 @@ export default {
         );
         s.raceTime = msToHMSms(diff);
         this.recalcSession(s);
+
+        // Broadcast LIVE PREVIEW begitu satu Run tim ini genuinely selesai
+        // (Start & Finish Time terisi) — TIDAK menunggu "Save", sama pola
+        // persis dgn sprint:team-finished/drr:team-finished. Murni
+        // pratinjau tambahan (digabung dgn hasil resmi di sts-jurysystem's
+        // live-results route.js), rank final tetap menunggu Save.
+        // Fire-and-forget.
+        if (typeof ipcRenderer !== "undefined") {
+          try {
+            const runIdx =
+              this.selectedSession[String(team._id)] != null
+                ? this.selectedSession[String(team._id)]
+                : 0;
+            const bucket = getBucket();
+            ipcRenderer.send("slalom:team-finished", {
+              eventId: bucket.eventId,
+              initialId: bucket.initialId,
+              divisionId: bucket.divisionId,
+              raceId: bucket.raceId,
+              teamId: String(team.teamId || ""),
+              bibTeam: String(team.bibNumber || ""),
+              nameTeam: String(team.teamName || team.nameTeam || ""),
+              runNumber: runIdx + 1,
+              startTime: s.startTime,
+              finishTime: s.finishTime,
+              raceTime: s.raceTime,
+              startPenalty: s.startPenalty,
+              finishPenalty: s.finishPenalty,
+              gatePenalties: Array.isArray(s.penalties) ? s.penalties.slice() : [],
+              penaltyTime: s.penaltyTime,
+              totalTime: s.totalTime,
+            });
+          } catch (_e) {
+            // non-critical
+          }
+        }
       }
       this.checkEndGameStatus();
       if (this.selectedSlalomKey) {

@@ -82,6 +82,18 @@ const RESET_COLLECTIONS = [
   // tidak dihapus, juri masih bisa melihat preview hasil SESI LAMA
   // (sebelum reset) sampai ada tim baru yang genuinely Start+Finish lagi.
   { name: "sprintlivepreviews", label: "Live Preview (Sprint, sisi juri)", byBucket: false },
+  // Live preview hasil DRR SEBELUM operator klik "Save Result" — sama
+  // pola & alasan dgn sprintlivepreviews di atas (models/DrrLivePreview.js
+  // di sts-jurysystem).
+  { name: "drrlivepreviews", label: "Live Preview (DRR, sisi juri)", byBucket: false },
+  // Live preview hasil Slalom (per Run) SEBELUM operator klik "Save
+  // Result" — sama pola & alasan dgn sprintlivepreviews/drrlivepreviews di
+  // atas (models/SlalomLivePreview.js di sts-jurysystem).
+  { name: "slalomlivepreviews", label: "Live Preview (Slalom, sisi juri)", byBucket: false },
+  // Live preview hasil H2H (per babak) SEBELUM operator "Save Round" —
+  // sama pola & alasan dgn sprintlivepreviews/drrlivepreviews/
+  // slalomlivepreviews di atas (models/H2HLivePreview.js di sts-jurysystem).
+  { name: "h2hlivepreviews", label: "Live Preview (H2H, sisi juri)", byBucket: false },
   // Babak H2H yang sedang aktif/dibuka operator — models/H2HActiveRound.js
   // di sts-jurysystem, diisi lewat relay socket "h2h:round-active".
   // eventId disimpan sbg STRING. Kalau tidak dihapus, dropdown Team &

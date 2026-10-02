@@ -208,6 +208,8 @@
       </div>
     </div>
 
+    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
+
     <OperationTimePanel
       v-if="roundParticipants && roundParticipants.length"
       :digit-id="digitId"
@@ -487,6 +489,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import photofinishMixin from "@/mixins/photofinishMixin";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -500,6 +504,7 @@ const RACE_PAYLOAD_KEY = "raceStartPayload";
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
   components: {
+    PhotofinishBadge,
     Icon,
     EmptyCard,
     OperationTimePanel,
@@ -508,7 +513,7 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
   data() {
     return {
       connectionState,
@@ -565,6 +570,9 @@ export default {
   },
 
   computed: {
+    pfCategory() {
+      return "RX";
+    },
     currentEventId() {
       let fromEvent = "";
       if (this.dataEventSafe && (this.dataEventSafe._id || this.dataEventSafe.id)) {
@@ -762,6 +770,24 @@ export default {
   },
 
   methods: {
+    /* ============ STS PHOTO FINISH (lihat mixins/photofinishMixin.js) ============ */
+    pfBucket() {
+      return this.currentBucket();
+    },
+    pfLocateTeam(msg) {
+      const list = this.roundParticipants || [];
+      const idOf = (p) => String(p.id || (p.result && p.result.teamId) || "");
+      let index = list.findIndex((p) => idOf(p) === String(msg.teamId));
+      if (index < 0 && msg.bib) index = list.findIndex((p) => String(p.bibTeam || "") === String(msg.bib));
+      if (index < 0) return null;
+      const p = list[index];
+      return {
+        index: index,
+        name: String(p.name || p.nameTeam || ""),
+        finishTime: (p.result && p.result.finishTime) || "",
+      };
+    },
+
     // Field Notes — catatan bebas juri (murni informasi, tidak
     // menyentuh penalty resmi), versi ringan Fouls Report H2H tanpa
     // Pen Position/Detail/Unfouls Team. Lihat insertFieldNotesReport.js.

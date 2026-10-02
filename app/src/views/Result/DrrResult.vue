@@ -1229,6 +1229,161 @@ export default {
       // DB lama sebelum sempat tersimpan.
       this._buildResultsFromDocs(this.rawResultDocs);
       await this.saveRawResultsToDbDrr();
+
+      // BUG FIX (2026-09-29): koreksi di Result Detail dulu TIDAK PERNAH
+      // mendorong hasilnya ke Overall Result — sama gap yg sudah
+      // diperbaiki di SprintResult.vue/SlalomResult.vue. DRR ranking-nya
+      // flat (bukan bracket bertingkat spt H2H), jadi aman direplikasi
+      // dgn pola yg SAMA PERSIS.
+      const q = this.$route.query || {};
+      if (q.eventId && q.initialId && q.raceId && q.divisionId) {
+        await this.upsertEventResults(q, this.results);
+      }
+      if (typeof ipcRenderer !== "undefined" && this.resultCategoryKey) {
+        ipcRenderer.send("event:touch-result-timestamp", {
+          eventId: String(q.eventId || ""),
+          category: this.resultCategoryKey,
+        });
+      }
+    },
+
+    // === merge hasil DRR (versi terkoreksi di halaman Result) ke dokumen
+    // event-results (kategori lain aman) — mirror PERSIS logika
+    // upsertEventResults() di SprintResult.vue/SlalomResult.vue, supaya
+    // View Overall selalu ikut ter-update. ===
+    async upsertEventResults(identity, rows) {
+      const K = {
+        SPRINT: "SPRINT",
+        H2H: "HEADTOHEAD",
+        SLALOM: "SLALOM",
+        DRR: "DRR",
+        RX: "RX",
+      };
+      const toNumOrEmpty = (v) => (v || v === 0 ? v : "");
+
+      const baseFilter = {
+        eventId: String(identity.eventId || ""),
+        initialId: String(identity.initialId || ""),
+        raceId: String(identity.raceId || ""),
+        divisionId: String(identity.divisionId || ""),
+      };
+
+      const incoming = new Map();
+      (rows || []).forEach((r) => {
+        const key = String(r.bibTeam || r.teamId || "");
+        if (!key) return;
+        const ranked = r.ranked || r.ranked === 0 ? r.ranked : "";
+        const scored = ranked !== "" ? this.getScoreByRanked(ranked) : "";
+        incoming.set(key, {
+          teamId: r.teamId || "",
+          teamName: r.nameTeam || "",
+          bib: r.bibTeam || "",
+          drrCat: {
+            name: K.DRR,
+            rankedByCats: toNumOrEmpty(ranked),
+            scored: toNumOrEmpty(scored),
+          },
+          totalRanked: toNumOrEmpty(ranked),
+          totalScore: toNumOrEmpty(scored),
+        });
+      });
+
+      let existingDoc = null;
+      try {
+        const gres = await new Promise((resolve) => {
+          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
+          ipcRenderer.send("event-results:get", baseFilter);
+        });
+        if (gres && gres.ok && gres.doc) existingDoc = gres.doc;
+      } catch (e) {
+        existingDoc = null;
+      }
+
+      const now = new Date();
+      const payload = {
+        eventId: baseFilter.eventId,
+        initialId: baseFilter.initialId,
+        raceId: baseFilter.raceId,
+        divisionId: baseFilter.divisionId,
+        eventName: "DRR",
+        initialName: String(identity.initialName || this.drrCats.initial || ""),
+        raceName: String(identity.raceName || this.drrCats.race || ""),
+        divisionName: String(identity.divisionName || this.drrCats.division || ""),
+        eventResult: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (existingDoc) {
+        payload.createdAt = existingDoc.createdAt
+          ? new Date(existingDoc.createdAt)
+          : now;
+
+        const map = new Map();
+        (Array.isArray(existingDoc.eventResult) ? existingDoc.eventResult : []).forEach(
+          (row) => {
+            const k = String((row && row.bib) || (row && row.teamId) || "");
+            if (k) map.set(k, JSON.parse(JSON.stringify(row)));
+          }
+        );
+
+        incoming.forEach((inc, key) => {
+          let prev = map.get(key);
+          if (!prev) {
+            prev = {
+              teamId: inc.teamId,
+              teamName: inc.teamName,
+              bib: inc.bib,
+              categories: [],
+              totalRanked: "",
+              totalScore: "",
+            };
+          }
+          const prevCats = Array.isArray(prev.categories) ? prev.categories : [];
+          const foundIdx = prevCats.findIndex(
+            (c) => String((c && c.name) || "").toUpperCase() === K.DRR
+          );
+          if (foundIdx >= 0) prevCats[foundIdx] = inc.drrCat;
+          else prevCats.push(inc.drrCat);
+
+          map.set(key, {
+            teamId: inc.teamId || prev.teamId || "",
+            teamName: inc.teamName || prev.teamName || "",
+            bib: inc.bib || prev.bib || "",
+            categories: prevCats,
+            totalRanked: inc.totalRanked,
+            totalScore: inc.totalScore,
+          });
+        });
+
+        payload.eventResult = Array.from(map.values());
+      } else {
+        payload.eventResult = Array.from(incoming.values()).map((inc) => ({
+          teamId: inc.teamId,
+          teamName: inc.teamName,
+          bib: inc.bib,
+          categories: [
+            { name: K.SPRINT, rankedByCats: "", scored: "" },
+            { name: K.H2H, rankedByCats: "", scored: "" },
+            { name: K.SLALOM, rankedByCats: "", scored: "" },
+            inc.drrCat,
+            { name: K.RX, rankedByCats: "", scored: "" },
+          ],
+          totalRanked: inc.totalRanked,
+          totalScore: inc.totalScore,
+        }));
+      }
+
+      ipcRenderer.send("event-results:upsert", payload);
+      ipcRenderer.once("event-results:upsert-reply", (_e, res) => {
+        if (!res || !res.ok) {
+          ipcRenderer.send("get-alert", {
+            type: "error",
+            message: "Sync Overall gagal",
+            detail: (res && res.error) || "Unknown error",
+          });
+        }
+      });
     },
 
     goBack() {

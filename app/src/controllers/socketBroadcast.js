@@ -123,6 +123,97 @@ function notifySprintTeamFinished(payload) {
   }
 }
 
+// Broadcast LIVE PREVIEW begitu satu team DRR genuinely selesai (Start &
+// Finish Time terisi) — pola sama persis dgn notifySprintTeamFinished().
+function notifyDrrTeamFinished(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "drr:team-finished",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, teamId, bibTeam, nameTeam, startTime, finishTime, raceTime, startPenalty, finishPenalty, sectionPenaltyTime, penaltyTime, totalTime }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan input operator
+  }
+}
+
+// Broadcast LIVE PREVIEW begitu satu Run Slalom genuinely selesai (Start &
+// Finish Time terisi) — pola sama persis dgn notifySprintTeamFinished().
+function notifySlalomTeamFinished(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "slalom:team-finished",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, teamId, bibTeam, nameTeam, runNumber, startTime, finishTime, raceTime, startPenalty, finishPenalty, gatePenalties, penaltyTime, totalTime }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan input operator
+  }
+}
+
+// Broadcast LIVE PREVIEW begitu satu tim H2H genuinely selesai (Start &
+// Finish Time terisi) di babak yang sedang aktif — pola sama persis dgn
+// notifySprintTeamFinished().
+function notifyH2HTeamFinished(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "h2h:team-finished",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId, teamId, bibTeam, nameTeam, roundId, roundName, startTime, finishTime, raceTime }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan input operator
+  }
+}
+
+// Beritahu client lain (Race Detail sts-timingsystem yang mungkin sedang
+// terbuka di window lain, ATAU halaman juri sts-jurysystem) bahwa Race
+// Settings event ini baru saja disimpan/berubah — supaya keduanya bisa
+// refetch tanpa perlu operator/juri me-refresh manual. Sebelumnya tidak
+// ada broadcast apa pun di sini, jadi perubahan Race Settings (mis. Total
+// Section, daftar Pilihan Penalty, Score by Rank) baru terlihat setelah
+// halaman yang sudah terbuka ditutup-buka ulang.
+function notifyRaceSettingsUpdated(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "race-settings:updated",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan proses simpan settings
+  }
+}
+
+// FITUR (2026-09-29, atas permintaan user): beritahu halaman juri H2H
+// bahwa bracket bucket ini baru saja disimpan (Heat baru di-assign, tim
+// baru ditempatkan, match selesai, dll — saveBracketToDB() di
+// HeadToHead.vue dipanggil utk SEMUA jenis perubahan itu) — supaya daftar
+// Heat yang ditampilkan ke juri (SEMUA babak, bukan cuma babak aktif)
+// selalu real-time tanpa perlu babak itu dijadikan "aktif" oleh operator
+// dulu.
+function notifyH2HBracketUpdated(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "h2h:bracket-updated",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, initialId, divisionId, raceId }
+    });
+  } catch (_) {
+    // non-critical, jangan sampai gagalkan proses simpan bracket
+  }
+}
+
 module.exports = {
   notifyResultsUpdated,
   notifyTeamStarted,
@@ -130,4 +221,9 @@ module.exports = {
   notifySlalomTeamStarted,
   notifyOfficialStatusChanged,
   notifySprintTeamFinished,
+  notifyDrrTeamFinished,
+  notifySlalomTeamFinished,
+  notifyH2HTeamFinished,
+  notifyRaceSettingsUpdated,
+  notifyH2HBracketUpdated,
 };

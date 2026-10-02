@@ -112,6 +112,12 @@ export function createMicroGateReader(options) {
   }
 
   function handleChunk(chunk) {
+    // Waktu terima chunk (jam epoch host, µs) — dicatat SEBELUM parsing agar
+    // setipis mungkin dari saat byte terakhir frame (CR) tiba. Diteruskan ke
+    // callback sbg argumen ke-4 `meta`; dipakai STS Photo Finish untuk
+    // mencap frame bare (tanpa payload waktu). Callback lama yang hanya
+    // memakai 3 argumen tidak terpengaruh.
+    const recvUs = Math.round((performance.timeOrigin + performance.now()) * 1000);
     if (typeof onRawChunk === "function") onRawChunk(toHex(chunk));
 
     buffer += chunk.toString();
@@ -138,6 +144,8 @@ export function createMicroGateReader(options) {
       buffer = buffer.slice(crIdx + 1); // sisakan apa pun setelah CR untuk frame berikutnya
 
       if (typeof onData === "function") onData(a, b);
+      // +1 untuk CR — panjang frame dipakai menghitung waktu transmisi serial.
+      const meta = { recvUs: recvUs, frameBytes: a.length + b.length + 1 };
 
       const flag = a && a.length > 11 ? a[11] : undefined;
       // a[13] tells apart THREE cases that all otherwise share the same
@@ -166,16 +174,16 @@ export function createMicroGateReader(options) {
       const subFlag = a && a.length > 13 ? a[13] : undefined;
       if (flag === "0" && subFlag === "4") {
         const vFinish = formatTime(b);
-        if (typeof onFinish === "function") onFinish(vFinish, a, b);
+        if (typeof onFinish === "function") onFinish(vFinish, a, b, meta);
       } else if (flag === "0" && subFlag === "1") {
         const vLap = formatTime(b);
-        if (typeof onLap === "function") onLap(vLap, a, b);
+        if (typeof onLap === "function") onLap(vLap, a, b, meta);
       } else if (flag === "0") {
         const vStart = formatTime(b);
-        if (typeof onStart === "function") onStart(vStart, a, b);
+        if (typeof onStart === "function") onStart(vStart, a, b, meta);
       } else if (flag === "2") {
         const vFinish = formatTime(b);
-        if (typeof onFinish === "function") onFinish(vFinish, a, b);
+        if (typeof onFinish === "function") onFinish(vFinish, a, b, meta);
       }
     }
   }

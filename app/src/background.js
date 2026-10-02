@@ -20,6 +20,11 @@ setupIPCMainHandlers();
 const { setupPhotofinish } = require("./services/photofinishMain");
 setupPhotofinish();
 
+// STS Long Range Start (pistol PS-77 di garis start jauh → Buffer-Timer-Start)
+// — nonaktif otomatis bila tidak dikonfigurasi (lihat services/longrangeMain.js).
+const { setupLongrange } = require("./services/longrangeMain");
+setupLongrange();
+
 protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { secure: true, standard: true } }]);
 
 function resolveIcon() {

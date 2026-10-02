@@ -56,8 +56,9 @@
                 <b-row no-gutters class="h-100">
                   <!-- kiri: judul + input (tetap) -->
                   <b-col class="d-flex flex-column pr-md-3">
-                    <h5 class="card-title" style="font-weight: 800">
+                    <h5 class="card-title d-flex flex-wrap align-items-center" style="font-weight: 800; gap: 8px">
                       Buffer-Timer-Start
+                      <LongrangeBadge />
                     </h5>
                     <b-row>
                       <b-col>
@@ -196,8 +197,11 @@
 </template>
 
 <script>
+import LongrangeBadge from "@/components/longrange/LongrangeBadge.vue";
+
 export default {
   name: "OperationTimePanel",
+  components: { LongrangeBadge },
   data() {
     return {
       a: null,

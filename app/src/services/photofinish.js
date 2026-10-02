@@ -1,6 +1,15 @@
 // Sisi RENDERER integrasi STS Photo Finish — pembungkus IPC tipis ke
 // photofinishMain.js (main process). Secret tidak pernah ada di sini.
-import { ipcRenderer } from "electron";
+import { clipboard, ipcRenderer } from "electron";
+
+/** Salin teks (mis. waktu finish) ke clipboard sistem. */
+export function copyText(text) {
+  try {
+    clipboard.writeText(String(text));
+  } catch (_e) {
+    if (navigator.clipboard) navigator.clipboard.writeText(String(text));
+  }
+}
 
 /** Jam epoch host dalam mikrodetik (Number aman: < 2^53). */
 export function hostNowUs() {
@@ -53,8 +62,49 @@ export function getPending() {
   });
 }
 
-export function markApplied(crossingId, revision) {
-  ipcRenderer.send("pf:applied", { crossingId: crossingId, revision: revision });
+/** outcome: "diterapkan" (bawaan) atau "dipertahankan" (operator menolak mengganti Finish Time). */
+export function markApplied(crossingId, revision, outcome) {
+  ipcRenderer.send("pf:applied", { crossingId: crossingId, revision: revision, outcome: outcome || "diterapkan" });
+}
+
+/** Catat alasan hasil masih menunggu (ditampilkan di panel Hasil Photo Finish). */
+export function noteResult(crossingId, revision, note) {
+  try {
+    ipcRenderer.send("pf:note", { crossingId: crossingId, revision: revision, note: note });
+  } catch (_e) {
+    // panel riwayat tidak boleh mengganggu alur timing
+  }
+}
+
+/** Riwayat kiriman hasil juri, terbaru di depan. */
+export function getHistory() {
+  return ipcRenderer.invoke("pf:history").catch(function () {
+    return [];
+  });
+}
+
+/** Hapus satu baris riwayat (lokal di timing; data Photo Finish tidak terhapus). */
+export function deleteHistory(crossingId, revision) {
+  return ipcRenderer.invoke("pf:history-delete", { crossingId: crossingId, revision: revision }).catch(function () {
+    return 0;
+  });
+}
+
+/** { ok, url, width, height, column, marks:[{column,rank,teamId,lane,self}], frameUrl } */
+export function getResultImage(crossingId) {
+  return ipcRenderer.invoke("pf:result-image", { crossingId: crossingId }).catch(function (err) {
+    return { ok: false, error: (err && err.message) || String(err) };
+  });
+}
+
+export function onHistoryChanged(handler) {
+  const fn = function () {
+    handler();
+  };
+  ipcRenderer.on("pf:history-changed", fn);
+  return function () {
+    ipcRenderer.removeListener("pf:history-changed", fn);
+  };
 }
 
 export function getStatus() {

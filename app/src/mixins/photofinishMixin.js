@@ -13,7 +13,7 @@
 // Event sama DAN tim ada di heat/babak yang sedang tampil (pfLocateTeam). Hasil
 // yang belum cocok tetap tersimpan di main process dan dicoba lagi saat
 // operator membuka halaman yang memuat tim tersebut.
-import { getPending, markApplied, onTrigger, onVerified } from "@/services/photofinish";
+import { getPending, markApplied, noteResult, onTrigger, onVerified } from "@/services/photofinish";
 
 const RETRY_MS = 5000;
 
@@ -133,10 +133,18 @@ export default {
       // Finish tidak membawa format lomba (null) → berlaku di halaman mana pun
       // yang menampilkan tim tersebut; sesi lama yang masih membawa format
       // tetap dicocokkan formatnya.
-      if ((msg.raceCategory && msg.raceCategory !== this.pfCategory) || !this.pfEventMatches(msg)) return;
+      if (!this.pfEventMatches(msg)) {
+        noteResult(msg.crossingId, msg.revision, "Menunggu halaman race Event ini dibuka");
+        return;
+      }
+      if (msg.raceCategory && msg.raceCategory !== this.pfCategory) {
+        noteResult(msg.crossingId, msg.revision, `Menunggu halaman ${msg.raceCategory} dibuka`);
+        return;
+      }
 
       const loc = this.pfLocateTeam(msg);
       if (!loc) {
+        noteResult(msg.crossingId, msg.revision, "Tim tidak tampil di heat/babak yang sedang dibuka");
         this.pfToastOnce(msg, "warning", `Hasil Photo Finish untuk BIB ${msg.bib || msg.teamId} menunggu — tim tidak ada di heat/babak yang sedang tampil.`);
         return;
       }
@@ -149,7 +157,7 @@ export default {
         );
         if (!ok) {
           // Keputusan operator — jangan ditanyakan ulang terus-menerus.
-          markApplied(msg.crossingId, msg.revision);
+          markApplied(msg.crossingId, msg.revision, "dipertahankan");
           this.pfToast("info", `Finish Time ${label} dipertahankan (${loc.finishTime}).`);
           return;
         }
@@ -159,6 +167,7 @@ export default {
         await this.updateTime(msg.finishTime, loc.index, "finish");
         const after = this.pfLocateTeam(msg);
         if (!after || after.finishTime !== msg.finishTime) {
+          noteResult(msg.crossingId, msg.revision, "Belum bisa diisi (mis. Heat belum ditentukan) — dicoba lagi");
           this.pfToastOnce(msg, "warning", `Photo Finish untuk ${label} belum bisa diterapkan (mis. Heat belum ditentukan). Akan dicoba lagi.`);
           return;
         }

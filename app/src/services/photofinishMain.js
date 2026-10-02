@@ -1,9 +1,10 @@
 // Integrasi STS Photo Finish di MAIN process Electron.
 //
 // Renderer (serialPortMixin & view race) hanya bicara lewat IPC:
-//   renderer → main : "pf:impulse", "pf:heartbeat", "pf:applied",
-//                     invoke "pf:status", invoke "pf:pending"
-//   main → renderer : "pf:verified", "pf:status", "pf:trigger"
+//   renderer → main : "pf:impulse", "pf:heartbeat", "pf:applied", "pf:note",
+//                     invoke "pf:status", invoke "pf:pending", invoke "pf:history",
+//                     invoke "pf:history-delete", invoke "pf:result-image"
+//   main → renderer : "pf:verified", "pf:status", "pf:trigger", "pf:history-changed"
 //
 // Konfigurasi (salah satu):
 //   1. .env (dibaca dotenv):  PF_API_URL, PF_DEVICE_TOKEN, PF_HMAC_SECRET
@@ -93,6 +94,9 @@ function setupPhotofinish() {
       onTrigger: function (msg) {
         broadcast("pf:trigger", msg);
       },
+      onHistory: function () {
+        broadcast("pf:history-changed", null);
+      },
     });
     client.start();
   }
@@ -104,7 +108,21 @@ function setupPhotofinish() {
     if (client && p) client.heartbeat(p);
   });
   ipcMain.on("pf:applied", function (_event, p) {
-    if (client && p && p.crossingId) client.markApplied(p.crossingId, Number(p.revision) || 0);
+    const outcome = p && p.outcome === "dipertahankan" ? "dipertahankan" : "diterapkan";
+    if (client && p && p.crossingId) client.markApplied(p.crossingId, Number(p.revision) || 0, outcome);
+  });
+  ipcMain.on("pf:note", function (_event, p) {
+    if (client && p && p.crossingId) client.noteResult(p.crossingId, Number(p.revision) || 0, String(p.note || "").slice(0, 200));
+  });
+  ipcMain.handle("pf:history", function () {
+    return client ? client.history() : [];
+  });
+  ipcMain.handle("pf:history-delete", function (_event, p) {
+    return client && p && p.crossingId ? client.deleteHistory(String(p.crossingId), Number(p.revision) || 0) : 0;
+  });
+  ipcMain.handle("pf:result-image", function (_event, p) {
+    if (!client) return { ok: false, error: "Integrasi Photo Finish belum dikonfigurasi" };
+    return client.resultImage(p && p.crossingId);
   });
   ipcMain.handle("pf:status", function () {
     return client ? client.status() : { enabled: false, connected: false, outbox: 0, pending: 0, lastError: null };

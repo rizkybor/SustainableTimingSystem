@@ -22,7 +22,10 @@ Tanpa konfigurasi, integrasi nonaktif dan aplikasi berjalan seperti biasa.
 ## Di halaman race
 
 Halaman H2H / Rafting Cross / DRR hanya menampilkan badge **Photo Finish
-terhubung / terputus**. Sesi dibuat oleh admin di aplikasi Photo Finish
+terhubung / terputus**. **Klik badge** untuk membuka panel **Hasil Photo
+Finish**: riwayat setiap hasil juri yang diterima (tim/BIB, urutan, Finish
+Time, waktu resmi, penalti, koreksi & alasannya, status Diterapkan/Menunggu)
+— hanya untuk dilihat; klik waktu untuk menyalin. Sesi dibuat oleh admin di aplikasi Photo Finish
 (cukup pilih Event); hasil juri diterapkan bila Event sama dan tim ada di
 heat/babak yang sedang tampil.
 

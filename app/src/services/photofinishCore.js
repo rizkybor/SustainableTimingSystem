@@ -15,6 +15,7 @@ const NS_PER_SEC = BigInt(1000000000);
 const CLOCK_WINDOW_MS = 5000;
 const CLOCK_SEND_EVERY_MS = 5000;
 const ACK_TIMEOUT_MS = 3000;
+const HISTORY_MAX = 300; // riwayat hasil Photo Finish yang disimpan (panel "Hasil Photo Finish")
 
 // HARUS identik dengan canonicalJson() di sts-photofinish/api/src/canonical.ts
 // (payload di sini hanya berisi string/angka — nilai ns selalu string).
@@ -92,6 +93,17 @@ function createPhotofinishClient(opts) {
   let outbox = storage.load("outbox") || [];
   // Hasil photo finish yang sudah diterima tetapi belum diterapkan di view.
   let pending = storage.load("pending") || {};
+  // Riwayat kiriman hasil juri — untuk panel "Hasil Photo Finish" (hanya
+  // dilihat & disalin admin). Terbaru di depan, maksimal HISTORY_MAX entri.
+  let history = storage.load("history") || [];
+  // Hasil yang sudah menunggu sebelum riwayat ada (versi lama) ikut tampil.
+  Object.keys(pending).forEach(function (id) {
+    const m = pending[id];
+    const known = history.some(function (h) {
+      return h.crossingId === m.crossingId && h.revision === m.revision;
+    });
+    if (!known) history.push(Object.assign(historyEntry(m, false), { receivedAt: m.verifiedAt || null }));
+  });
 
   function status() {
     return {
@@ -188,24 +200,129 @@ function createPhotofinishClient(opts) {
       return;
     }
     const prev = pending[msg.crossingId];
-    if (!prev || prev.revision <= msg.revision) {
+    const fresh = !prev || prev.revision <= msg.revision;
+    if (fresh) {
       pending[msg.crossingId] = msg;
       storage.save("pending", pending);
       if (typeof opts.onVerified === "function") opts.onVerified(msg);
     }
+    recordReceived(msg, !fresh);
     // Ack = "sudah diterima & disimpan aplikasi timing". Penerapan ke view
     // dilacak terpisah lewat markApplied() — view bisa saja belum dibuka.
     if (typeof ack === "function") ack({ ok: true });
     emitStatus();
   }
 
-  function markApplied(crossingId, revision) {
+  function historyChanged() {
+    history = history.slice(0, HISTORY_MAX);
+    storage.save("history", history);
+    if (typeof opts.onHistory === "function") opts.onHistory();
+  }
+
+  function recordReceived(msg, stale) {
+    const dup = history.some(function (h) {
+      return h.crossingId === msg.crossingId && h.revision === msg.revision;
+    });
+    if (dup) return; // kiriman ulang (reconnect) — sudah tercatat
+    history.forEach(function (h) {
+      if (h.crossingId === msg.crossingId && h.revision < msg.revision && h.status === "menunggu") h.status = "diganti";
+    });
+    history.unshift(historyEntry(msg, stale));
+    historyChanged();
+  }
+
+  function historyEntry(msg, stale) {
+    return {
+      crossingId: msg.crossingId,
+      revision: msg.revision,
+      receivedAt: new Date().toISOString(),
+      eventId: msg.eventId,
+      eventName: msg.eventName || null,
+      sessionLabel: msg.sessionLabel || null,
+      sessionNote: msg.sessionNote || null,
+      raceCategory: msg.raceCategory || null,
+      heatId: msg.heatId || null,
+      teamId: msg.teamId,
+      teamName: msg.teamName || null,
+      bib: msg.bib || null,
+      rank: msg.rank,
+      finishTime: msg.finishTime,
+      officialTime: msg.officialTime,
+      timeSource: msg.timeSource,
+      penalties: msg.penalties || {},
+      verifiedByName: msg.verifiedByName || null,
+      verifiedAt: msg.verifiedAt || null,
+      reason: msg.reason || null,
+      status: stale ? "diganti" : "menunggu",
+      note: null,
+      appliedAt: null,
+    };
+  }
+
+  /** outcome: "diterapkan" (Finish Time diisi) atau "dipertahankan" (operator menolak mengganti). */
+  function markApplied(crossingId, revision, outcome) {
     const cur = pending[crossingId];
     if (cur && cur.revision <= revision) {
       delete pending[crossingId];
       storage.save("pending", pending);
       emitStatus();
     }
+    let touched = false;
+    history.forEach(function (h) {
+      if (h.crossingId !== crossingId || h.status !== "menunggu" || h.revision > revision) return;
+      h.status = h.revision === revision ? outcome || "diterapkan" : "diganti";
+      h.appliedAt = new Date().toISOString();
+      h.note = null;
+      touched = true;
+    });
+    if (touched) historyChanged();
+  }
+
+  /**
+   * Hapus satu baris riwayat (panel Hasil Photo Finish). Bila hasil itu masih
+   * menunggu diterapkan, antreannya ikut dibuang — operator memutuskan tidak
+   * memakainya. Data di STS Photo Finish TIDAK ikut terhapus.
+   */
+  function deleteHistory(crossingId, revision) {
+    const before = history.length;
+    history = history.filter(function (h) {
+      return !(h.crossingId === crossingId && h.revision === revision);
+    });
+    const cur = pending[crossingId];
+    if (cur && cur.revision === revision) {
+      delete pending[crossingId];
+      storage.save("pending", pending);
+      emitStatus();
+    }
+    if (history.length !== before) historyChanged();
+    return before - history.length;
+  }
+
+  /** Gambar bukti (slit-scan + foto frame) satu hasil; URL absolut, berumur pendek. */
+  async function resultImage(crossingId) {
+    if (!socket || !socket.connected) return { ok: false, error: "Photo Finish tidak terhubung" };
+    try {
+      const res = await socket.timeout(8000).emitWithAck("timing:result-image", { crossingId: String(crossingId) });
+      if (!res || !res.ok) return { ok: false, error: (res && res.error) || "Gambar tidak tersedia" };
+      const base = String(opts.apiUrl).replace(/\/+$/, "");
+      res.url = base + res.url;
+      if (res.frameUrl) res.frameUrl = base + res.frameUrl;
+      return res;
+    } catch (_e) {
+      return { ok: false, error: "Photo Finish tidak menjawab (timeout)" };
+    }
+  }
+
+  /** Alasan hasil masih menunggu (dilaporkan halaman race), mis. tim tidak tampil. */
+  function noteResult(crossingId, revision, note) {
+    let touched = false;
+    history.forEach(function (h) {
+      if (h.crossingId === crossingId && h.revision === revision && h.status === "menunggu" && h.note !== note) {
+        h.note = note;
+        touched = true;
+      }
+    });
+    if (touched) historyChanged();
   }
 
   function start() {
@@ -261,6 +378,12 @@ function createPhotofinishClient(opts) {
     sendImpulse: sendImpulse,
     heartbeat: heartbeat,
     markApplied: markApplied,
+    noteResult: noteResult,
+    deleteHistory: deleteHistory,
+    resultImage: resultImage,
+    history: function () {
+      return history.slice();
+    },
     pending: function () {
       return Object.keys(pending).map(function (k) {
         return pending[k];

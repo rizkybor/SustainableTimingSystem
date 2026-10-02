@@ -243,31 +243,9 @@
         <div class="toolbar-actions">
           <!-- Baris atas: aksi view-only (tidak mengubah data) -->
           <div class="toolbar-actions-row toolbar-actions-row--top">
-            <!-- Info & docs -->
+            <!-- Info: status realtime juri & laporan -->
             <div class="h2h-action-group h2h-action-group--info">
               <span class="h2h-action-group__label">Info</span>
-              <button
-                type="button"
-                class="h2h-action-btn"
-                @click="openHeatModal"
-                v-b-tooltip.hover="'Lihat semua nomor Heat yang sudah terassign di seluruh kategori H2H event ini'"
-              >
-                <Icon icon="mdi:view-grid-outline" class="mr-1" />
-                Lihat Heat
-              </button>
-
-              <button
-                type="button"
-                class="h2h-action-btn"
-                :disabled="isOpeningGuidePdf"
-                @click="openH2HGuidePdf"
-                v-b-tooltip.hover="'Buka panduan cara mengisi bagan Head to Head (PDF)'"
-              >
-                <b-spinner v-if="isOpeningGuidePdf" small class="mr-1" />
-                <Icon v-else icon="mdi:file-question-outline" class="mr-1" />
-                Panduan Bagan (PDF)
-              </button>
-
               <ConnectionStatusBadge class="h2h-judge-trigger" />
 
               <JudgeActionHistoryModal
@@ -303,9 +281,21 @@
               </button>
             </div>
 
-            <!-- Bracket: export & tampilan -->
+            <!-- Bracket: panduan, export & tampilan -->
             <div class="h2h-action-group h2h-action-group--bracket">
               <span class="h2h-action-group__label">Bracket</span>
+              <button
+                type="button"
+                class="h2h-action-btn"
+                :disabled="isOpeningGuidePdf"
+                @click="openH2HGuidePdf"
+                v-b-tooltip.hover="'Buka panduan cara mengisi bagan Head to Head (PDF)'"
+              >
+                <b-spinner v-if="isOpeningGuidePdf" small class="mr-1" />
+                <Icon v-else icon="mdi:file-question-outline" class="mr-1" />
+                Panduan Bagan (PDF)
+              </button>
+
               <button
                 type="button"
                 class="h2h-action-btn"
@@ -789,6 +779,8 @@
                   <tr
                     v-for="(item, index) in visibleParticipants"
                     :key="stableRowKey(item)"
+                    :data-heat="item.result && item.result.heat ? Number(item.result.heat) : null"
+                    :class="{ 'h2h-goto-hit': gotoHeatHighlight !== null && item.result && Number(item.result.heat) === gotoHeatHighlight }"
                   >
                     <td>{{ index + 1 }}</td>
                     <!-- Heat kini read-only di sini — assign/ubah Heat
@@ -1361,82 +1353,22 @@
       </div>
     </b-modal>
 
-    <!-- MODAL: Heat Assignment (seluruh kategori Head to Head di event ini) -->
-    <b-modal
-      v-model="heatModalVisible"
-      size="xl"
-      scrollable
-      hide-footer
-      content-class="heat-modal"
-    >
-      <template #modal-header>
-        <h5 class="modal-title">Heat Assignment – Head to Head</h5>
-        <div class="d-flex align-items-center" style="gap: 8px">
-          <button
-            type="button"
-            class="btn-action btn-outline-secondary"
-            :disabled="isDownloadingHeatModalPdf"
-            @click="downloadHeatAssignmentPdf"
-            v-b-tooltip.hover="'Download daftar Heat Assignment ini sebagai PDF'"
-          >
-            <b-spinner v-if="isDownloadingHeatModalPdf" small class="mr-1" />
-            <Icon v-else icon="mdi:file-pdf-box" class="mr-1" />
-            {{ isDownloadingHeatModalPdf ? "Menyiapkan PDF…" : "Download PDF" }}
-          </button>
-          <button
-            type="button"
-            class="close"
-            aria-label="Tutup"
-            @click="heatModalVisible = false"
-          >
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-      </template>
-
-      <div ref="heatModalCaptureArea">
-        <div v-if="!heatModalGroups.length" class="text-center text-muted py-4">
-          Belum ada nomor Heat yang terassign di kategori Head to Head manapun
-          pada event ini.
-        </div>
-        <div v-else>
-          <div
-            v-for="group in heatModalGroups"
-            :key="group.heat"
-            class="heat-group mb-3"
-          >
-            <div class="heat-group__title">Heat {{ group.heat }}</div>
-            <table class="table table-sm heat-group__table mb-0">
-              <thead>
-                <tr>
-                  <th style="width: 40px">#</th>
-                  <th style="width: 26%">Tim</th>
-                  <th class="text-left" style="width: 90px">Bib</th>
-                  <th class="text-left">Kategori (Divisi Race – Initial)</th>
-                  <th style="width: 140px">Babak</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(t, idx) in group.teams" :key="idx">
-                  <td>{{ idx + 1 }}</td>
-                  <td>{{ t.nameTeam || "-" }}</td>
-                  <td class="text-left">{{ t.bibTeam || "-" }}</td>
-                  <td class="text-left">{{ t.category }}</td>
-                  <td>{{ t.round || "-" }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </b-modal>
-
     <!-- WIDGET MENGAMBANG: "Assign Heat Lintas Kategori" (2026-09-29, atas
          permintaan user) — gaya sama persis dgn EventChatWidget.vue (tombol
          bulat mengambang + badge jumlah pending), tapi HANYA muncul di
          halaman Head to Head Details ini (bukan komponen global spt chat
          widget) krn memang cuma relevan utk operator H2H. Diposisikan di
          kiri-bawah (bukan kanan spt chat widget) supaya tidak bertumpuk. -->
+    <!-- WIDGET MENGAMBANG: "Go to Heat" (2026-10-02) — ketik/klik nomor
+         Heat → kategori & babak yg memuat Heat itu dibuka, barisnya
+         digulir & disorot. Ditaruh di atas widget Assign Heat. -->
+    <H2HGoToHeat
+      :event-id="String(currentEventId || '')"
+      :current-bucket-key="gotoBucketKey"
+      :current-round-id="currentRound ? String(currentRound.id || '') : ''"
+      :navigate="goToHeat"
+    />
+
     <div class="h2h-heat-fab-wrap">
       <button
         type="button"
@@ -1698,6 +1630,7 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
 import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
+import H2HGoToHeat from "@/components/race/H2HGoToHeat.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FoulsReportModal from "@/components/judge/FoulsReportModal.vue";
@@ -1841,6 +1774,7 @@ export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
     PhotofinishBadge,
+    H2HGoToHeat,
     OperationTimePanel,
     EmptyCard,
     VueHtml2pdf,
@@ -1869,8 +1803,6 @@ export default {
       endGame: false,
       isScrolled: false,
       showBracket: true,
-      heatModalVisible: false,
-      heatModalGroups: [],
       // Widget "Assign Heat Lintas Kategori" (2026-09-29) — lihat
       // openCrossCategoryHeatModal()/assignHeatFromWidget().
       crossCategoryHeatModalVisible: false,
@@ -1935,6 +1867,7 @@ export default {
         fourth: null, // Juara 4
       },
       currentRoundIndex: -1,
+      gotoHeatHighlight: null, // Heat yg sedang disorot oleh widget "Go to Heat"
       foulsRefreshTick: 0,
       judgeLogRefreshTick: 0,
       rounds: [],
@@ -2245,6 +2178,10 @@ export default {
     },
 
     // NEW: ambil round aktif (null-safe)
+    // kunci bucket aktif utk widget "Go to Heat" (eventId|initialId|raceId|divisionId)
+    gotoBucketKey() {
+      return this.currentBucket ? this._h2hBucketKey(this.currentBucket) : "";
+    },
     currentRound() {
       const i = this.currentRoundIndex;
       return i >= 0 && i < (this.rounds || []).length ? this.rounds[i] : null;
@@ -4766,125 +4703,38 @@ export default {
       return { usage, maxHeat };
     },
 
-    // ukuran kolom (size) suatu roundId "R{k}" pada bucket dgn jumlah tim
-    // tertentu — meniru persis algoritma buildEmptyBracket() (base 2^n dari
-    // jumlah tim, mengecil separuh tiap kolom) supaya nama babak "R{k}" bisa
-    // dihitung utk bucket LAIN tanpa perlu memuat bucket itu ke state aktif.
-    _h2hRoundSizeForBucket(nTeams, roundIdStr) {
-      const m = /^R(\d+)$/.exec(roundIdStr || "");
-      if (!m) return null;
-      const k = parseInt(m[1], 10);
-      const cap = Math.min(Math.max(4, Number(nTeams) || 0), 32);
-      const base = this.nextPow2(cap);
-      const size = base >> (k - 1);
-      return size >= 2 ? size : null;
-    },
-
-    // label "posisi Babak" (mis. "Semifinals", "Final A", "Final B") utk
-    // roundId tertentu, dari JUMLAH TIM (bukan objek bucket) — lihat catatan
-    // BUG FIX di buildHeatAssignments() soal kenapa jumlah tim tidak diambil
-    // dari sini lagi.
-    _h2hRoundLabelForNTeams(nTeams, roundIdStr) {
-      if (roundIdStr === "R_B") return "Final B";
-      const size = this._h2hRoundSizeForBucket(nTeams, roundIdStr);
-      return size ? this.roundName(size) : `Babak ${roundIdStr}`;
-    },
-
-    // kumpulkan tim per nomor Heat lintas SEMUA bucket H2H (division/race/
-    // initial) pada event ini — sumber datanya sama dgn getEventHeatUsage()
-    // (localStorage per-bucket), tapi di sini kita juga ambil identitas tim,
-    // label kategorinya, dan posisi Babak utk ditampilkan di modal "Lihat Heat".
-    // BUG FIX: dulu jumlah tim per bucket diambil dari h2hBucketMap[key].teams
-    // — tapi map itu cuma di-isi PENUH utk bucket yang SUDAH DIBUKA sesi ini
-    // (buildStaticH2HOptions() taruh SEMUA kombinasi Divisi/Race/Initial di
-    // map dgn teams:[] kosong dulu; fetchH2HBucketTeamsByKey() baru mengisi
-    // .teams asli utk bucket yang benar2 dipilih operator). Akibatnya, label
-    // Babak (Semifinals/Final/dst.) di modal "Lihat Heat" bisa SALAH untuk
-    // kategori yang belum sempat dibuka sesi ini (dihitung seolah cuma 4 tim
-    // krn teams=[] fallback ke minimum bracket). Ambil jumlah tim yang
-    // BENAR dari cache localStorage `eventDetails` (dipakai juga oleh
-    // loadAllH2HBucketsFromEvent() sbg sumber kebenaran) — sumber ini sudah
-    // ada di memori/disk tanpa perlu bucket itu dibuka dulu.
-    _h2hRegisteredTeamCountByKey() {
-      const counts = Object.create(null);
-      try {
-        const raw = localStorage.getItem("eventDetails");
-        const ev = raw ? JSON.parse(raw) : {};
-        const participant = Array.isArray(ev.participant) ? ev.participant : [];
-        participant
-          .filter((b) => String(b.eventName || "").toUpperCase() === "HEAD2HEAD")
-          .forEach((b) => {
-            const key = this._h2hBucketKey(b);
-            counts[key] = Array.isArray(b.teams) ? b.teams.length : 0;
-          });
-      } catch (e) {
-        /* noop — fallback ke h2hBucketMap[key].teams.length di caller */
+    /**
+     * Widget "Go to Heat": buka kategori & babak yg memuat Heat `entry.heat`,
+     * lalu gulir & sorot barisnya di tabel operasi. Pindah kategori memakai
+     * jalur yg sama dgn tab Initial/select (onSelectH2HBucket). Mengembalikan
+     * true bila baris Heat ditemukan.
+     */
+    async goToHeat(entry) {
+      const curKey = this.currentBucket ? this._h2hBucketKey(this.currentBucket) : "";
+      if (entry.bucketKey !== curKey) {
+        if (!this.h2hBucketMap[entry.bucketKey]) {
+          throw new Error("kategori Heat ini tidak tersedia di halaman Head to Head yang sedang dibuka");
+        }
+        await this.onSelectH2HBucket(entry.bucketKey);
       }
-      return counts;
+      const idx = (this.rounds || []).findIndex((r) => String(r.id) === String(entry.roundId));
+      if (idx >= 0 && idx !== this.currentRoundIndex) this.currentRoundIndex = idx;
+      // tunggu watcher babak memuat hasil & tabel dirender ulang
+      await this.$nextTick();
+      await new Promise((r) => setTimeout(r, 120));
+      return this.highlightHeat(entry.heat);
     },
-
-    buildHeatAssignments() {
-      const groups = {};
-      try {
-        const map = this.h2hBucketMap || {};
-        const registeredCounts = this._h2hRegisteredTeamCountByKey();
-        Object.keys(map).forEach((key) => {
-          const b = map[key];
-          if (!b || b._isAggregate) return;
-
-          const rootKey = RESULTS_KEY_PREFIX + this._h2hBucketKey(b);
-          const label = this._h2hBucketLabel(b);
-          const allRounds = readAllRoundResults(rootKey) || {};
-          const nTeams =
-            registeredCounts[key] !== undefined
-              ? registeredCounts[key]
-              : Array.isArray(b.teams)
-              ? b.teams.length
-              : 0;
-
-          Object.keys(allRounds).forEach((roundId) => {
-            const roundLabel = this._h2hRoundLabelForNTeams(nTeams, roundId);
-            const rows = Array.isArray(allRounds[roundId])
-              ? allRounds[roundId]
-              : [];
-            rows.forEach((row) => {
-              const h = row && row.result ? Number(row.result.heat) : null;
-              if (!Number.isFinite(h) || h <= 0) return;
-
-              if (!groups[h]) groups[h] = [];
-              const nameTeam = String((row && row.nameTeam) || "");
-              const bibTeam = String((row && row.bibTeam) || "");
-              const already = groups[h].some(
-                (t) =>
-                  t.nameTeam === nameTeam &&
-                  t.bibTeam === bibTeam &&
-                  t.category === label &&
-                  t.round === roundLabel
-              );
-              if (!already) {
-                groups[h].push({
-                  nameTeam,
-                  bibTeam,
-                  category: label,
-                  round: roundLabel,
-                });
-              }
-            });
-          });
-        });
-      } catch (e) {
-        // localStorage tidak tersedia / data korup → tampilkan kosong
-      }
-
-      return Object.keys(groups)
-        .map(Number)
-        .sort((a, b) => a - b)
-        .map((h) => ({ heat: h, teams: groups[h] }));
-    },
-
-    openHeatModal() {
-      this.heatModalGroups = this.buildHeatAssignments();
-      this.heatModalVisible = true;
+    highlightHeat(heat) {
+      const n = Number(heat);
+      this.gotoHeatHighlight = n;
+      clearTimeout(this._gotoHeatTimer);
+      this._gotoHeatTimer = setTimeout(() => {
+        this.gotoHeatHighlight = null;
+      }, 4000);
+      const row = this.$el.querySelector(`tr[data-heat="${n}"]`);
+      if (!row) return false;
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      return true;
     },
 
     // FITUR (2026-09-29, atas permintaan user): kumpulkan SEMUA match H2H
@@ -5163,8 +5013,8 @@ export default {
     // pakai HeadToHeadPdfResult), krn bagannya sendiri sudah representasi
     // visual final yang mau di-export.
     // Layout dasar semua PDF H2H (logo/keterangan/margin konten) — satu
-    // sumber angka spy "professional" & konsisten antar downloadBracketPdf()
-    // & downloadHeatAssignmentPdf(), bukan angka acak yang beda2 tiap fungsi.
+    // sumber angka spy "professional" & konsisten antar PDF H2H,
+    // bukan angka acak yang beda2 tiap fungsi.
     _pdfLayout() {
       return {
         pageMargin: 14, // mm — margin luar standar dokumen cetak
@@ -5401,8 +5251,8 @@ export default {
     },
 
     // Gambar tabel Fouls Report (semua babak) — text-based (bukan capture
-    // gambar) krn datanya tabular, beda pola dgn downloadBracketPdf/
-    // downloadHeatAssignmentPdf yang meng-capture DOM. Handle page-break
+    // gambar) krn datanya tabular, beda pola dgn downloadBracketPdf yang
+    // meng-capture DOM. Handle page-break
     // manual: kalau baris berikutnya tidak muat, halaman baru + header
     // kolom digambar ulang.
     _drawFoulsTable(pdf, items, startY) {
@@ -5640,57 +5490,6 @@ export default {
       }
     },
 
-    // Download modal "Heat Assignment – Head to Head" (lintas SEMUA
-    // kategori H2H event ini) sebagai PDF — pola sama dgn downloadBracketPdf()
-    // tapi capture area-nya isi modal (tabel per-Heat), bukan bagan, dan
-    // halamannya A4 Portrait (lebih cocok utk daftar tabel memanjang ke bawah).
-    async downloadHeatAssignmentPdf() {
-      const el = this.$refs.heatModalCaptureArea;
-      if (!el) {
-        this.notify("warning", "Konten belum tersedia untuk di-export.", "Info");
-        return;
-      }
-      this.isDownloadingHeatModalPdf = true;
-      try {
-        await this.$nextTick();
-        const canvas = await html2canvas(el, {
-          scale: 1.5,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-        });
-
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: "a4",
-        });
-
-        this._addFittedImageToPdf(pdf, canvas);
-        await this._addLogoToPdf(pdf);
-        const eventLogoH = await this._addEventLogoToPdf(pdf);
-
-        this._addInfoBlockToPdf(
-          pdf,
-          [
-            String(this.dataEventSafe.eventName || "-"),
-            this._formatEventDateForPdf(),
-            "Semua Kategori Head to Head",
-          ],
-          eventLogoH ? eventLogoH + 2 : 0
-        );
-
-        const safeName = String(this.dataEventSafe.eventName || "event")
-          .trim()
-          .replace(/[^a-z0-9]+/gi, "-")
-          .replace(/^-+|-+$/g, "");
-        pdf.save(`H2H-Heat-Assignment-${safeName || "event"}.pdf`);
-      } catch (err) {
-        this.notify("error", String(err), "Gagal export PDF Heat Assignment");
-      } finally {
-        this.isDownloadingHeatModalPdf = false;
-      }
-    },
-
     openResetAllModal() {
       this.resetAllConfirmText = "";
       this.showResetAllModal = true;
@@ -5702,7 +5501,7 @@ export default {
 
     // Bersihkan SEMUA cache localStorage h2hRoundResults:<eventId>|... —
     // lintas SELURUH bucket H2H event ini, bukan cuma yang sedang dibuka
-    // (prefix sama dgn yang dipakai getEventHeatUsage()/buildHeatAssignments()).
+    // (prefix sama dgn yang dipakai getEventHeatUsage()).
     _clearAllH2HLocalCachesForEvent(eventId) {
       try {
         const prefix = RESULTS_KEY_PREFIX + String(eventId) + "|";
@@ -8655,6 +8454,23 @@ export default {
 /* Widget mengambang "Assign Heat Lintas Kategori" (redesign 2026-09-29) —
    gaya sama persis dgn .chat-fab di EventChatWidget.vue, cuma diposisikan
    kiri-bawah supaya tidak bertumpuk dgn chat widget yg ada di kanan-bawah. */
+/* baris Heat yg dituju widget "Go to Heat" — kedip lembut lalu pudar */
+tr.h2h-goto-hit > td {
+  animation: h2h-goto-flash 1.2s ease-in-out 3;
+  background: #fff4e6 !important;
+}
+tr.h2h-goto-hit > td:first-child {
+  box-shadow: inset 4px 0 0 #f7931e;
+}
+@keyframes h2h-goto-flash {
+  0%,
+  100% {
+    background: #fff4e6;
+  }
+  50% {
+    background: #ffd9a8;
+  }
+}
 .h2h-heat-fab-wrap {
   position: fixed;
   left: 24px;

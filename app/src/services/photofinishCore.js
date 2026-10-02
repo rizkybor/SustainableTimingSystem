@@ -239,7 +239,7 @@ function createPhotofinishClient(opts) {
       emitStatus();
     });
     socket.on("photofinish:verified", onVerified);
-    // Setiap perahu yang terdeteksi kamera Photo Finish → baris "Photo Finish"
+    // Setiap perahu yang terdeteksi kamera Photo Finish → baris Registration Id "PF…"
     // di panel waktu + Buffer-Timer-Finish. Pesan palsu (HMAC salah) dibuang.
     socket.on("photofinish:trigger", function (msg) {
       if (!verify(opts.hmacSecret, msg)) return;

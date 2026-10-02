@@ -17,6 +17,46 @@ import { getPending, markApplied, onTrigger, onVerified } from "@/services/photo
 
 const RETRY_MS = 5000;
 
+// Registration Id baris Photo Finish: bentuknya sama dengan frame RaceTime2
+// (19 karakter, diakhiri marker "R", mis. "004800630010140010R") tetapi
+// selalu diawali "PF": "PF" + nomor urut 7 digit + waktu HHMMSSmmm + "R".
+// Nomor urut disimpan di localStorage → unik walau aplikasi dibuka ulang.
+const PF_SEQ_KEY = "pf.registrationSeq";
+let pfSeq = null;
+
+function nextPfSeq() {
+  if (pfSeq === null) {
+    let saved = 0;
+    try {
+      saved = Number(window.localStorage.getItem(PF_SEQ_KEY)) || 0;
+    } catch (_e) {
+      saved = 0;
+    }
+    pfSeq = saved;
+  }
+  pfSeq = (pfSeq + 1) % 10000000;
+  try {
+    window.localStorage.setItem(PF_SEQ_KEY, String(pfSeq));
+  } catch (_e) {
+    // localStorage tidak tersedia — nomor tetap naik selama aplikasi terbuka
+  }
+  return pfSeq;
+}
+
+/** "HH:MM:SS.mmm" → "HHMMSSmmm" (format mentah Racetime seperti RaceTime2). */
+function pfRawTime(time) {
+  const digits = String(time || "").replace(/\D+/g, "");
+  return (digits + "000000000").slice(0, 9);
+}
+
+export function pfRegistrationId(time, seq) {
+  return "PF" + String(seq).padStart(7, "0") + pfRawTime(time) + "R";
+}
+
+export function pfRacetime(time) {
+  return "PF" + pfRawTime(time);
+}
+
 export default {
   data() {
     return {
@@ -71,15 +111,15 @@ export default {
 
     /**
      * Perahu terdeteksi kamera Photo Finish → tampil di panel waktu seperti
-     * frame RaceTime2: baris "Photo Finish" di tabel Registration Id/Racetime,
-     * dan waktunya masuk Buffer-Timer-Finish. Operator tetap menekan tombol BIB
+     * frame RaceTime2: baris dengan Registration Id unik berawalan "PF" dan
+     * Racetime "PF" + HHMMSSmmm, waktunya masuk Buffer-Timer-Finish. Operator tetap menekan tombol BIB
      * untuk menetapkannya ke tim (atau menunggu hasil juri Photo Finish).
      * digitId/digitTime/digitTimeFinish milik serialPortMixin di komponen yang sama.
      */
     pfOnTrigger(msg) {
       if (!msg || !msg.time || !this.pfEventMatches(msg)) return; // event lain
-      if (Array.isArray(this.digitId)) this.digitId.unshift("Photo Finish");
-      if (Array.isArray(this.digitTime)) this.digitTime.unshift(msg.time);
+      if (Array.isArray(this.digitId)) this.digitId.unshift(pfRegistrationId(msg.time, nextPfSeq()));
+      if (Array.isArray(this.digitTime)) this.digitTime.unshift(pfRacetime(msg.time));
       this.digitTimeFinish = msg.time;
     },
 

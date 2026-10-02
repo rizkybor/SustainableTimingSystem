@@ -1,12 +1,42 @@
 import { listPorts } from "@/utils/serialConnection.js";
 import { createMicroGateReader } from "@/utils/microGateReader.js";
 import { reportFrame } from "@/services/photofinish";
+import { getRecent as lrGetRecent, onRecall as lrOnRecall, onStart as lrOnStart, reportHeartbeat as lrHeartbeat } from "@/services/longrange";
 
 // RaceTime2 pada mesin ini SELALU muncul di path tetap ini (dicek manual
 // oleh user) — jadi Connect Racetime langsung cari path ini persis, bukan
 // auto-pick/heuristik lagi. Kalau device-nya diganti/di-reflash macOS-nya
 // dan path berubah, update konstanta ini.
 const TARGET_PORT_PATH = "/dev/tty.usbserial-1130";
+
+// STS Long Range Start: start dari pistol PS-77 di garis start jauh masuk ke
+// Buffer-Timer-Start + baris live feed. Registration Id meniru bentuk frame
+// RaceTime2 (19 karakter, marker "R") seperti baris Photo Finish, tetapi
+// berawalan "LR": "LR" + nomor urut 7 digit + HHMMSSmmm + "R"; Racetime
+// "LR" + HHMMSSmmm. Nomor urut di localStorage → unik walau aplikasi dibuka ulang.
+const LR_SEQ_KEY = "lr.registrationSeq";
+// Start yang tiba saat halaman race belum dibuka tetap dimuat bila belum selama ini.
+const LR_RECENT_MS = 10 * 60 * 1000;
+
+function nextLrSeq() {
+  let seq = 0;
+  try {
+    seq = Number(window.localStorage.getItem(LR_SEQ_KEY)) || 0;
+  } catch (_e) {
+    seq = 0;
+  }
+  seq = (seq + 1) % 10000000;
+  try {
+    window.localStorage.setItem(LR_SEQ_KEY, String(seq));
+  } catch (_e) {
+    // localStorage tidak tersedia — nomor tetap unik selama aplikasi terbuka
+  }
+  return seq;
+}
+
+function lrRawTime(time) {
+  return (String(time || "").replace(/\D+/g, "") + "000000000").slice(0, 9);
+}
 
 // Shared "Connect Racetime" serial port handling for all race category pages
 // (SprintRace, HeadToHead, SlalomRace, DownRiverRace, RaftingCross). These 5
@@ -40,7 +70,18 @@ export default {
     };
   },
 
+  mounted() {
+    this._lrOff = [lrOnStart((entry) => this.lrApplyStart(entry, true)), lrOnRecall((entry) => this.lrApplyRecall(entry))];
+    lrGetRecent().then((list) => {
+      const last = (list || []).find((e) => e.kind === "START");
+      if (!last || last.recalled || this.digitTimeStart || this._serialMixinDestroyed) return;
+      if (Date.now() - Date.parse(last.receivedAt) > LR_RECENT_MS) return;
+      this.lrApplyStart(last, false);
+    });
+  },
+
   beforeDestroy() {
+    if (this._lrOff) this._lrOff.forEach((off) => off());
     // Flip this BEFORE calling disconnect() so an in-flight connectPort()
     // (still awaiting listPorts()/serialCtrl.connect() at the moment the
     // page is navigated away from) knows to close whatever it opens next
@@ -104,6 +145,8 @@ export default {
             this.digitTimeStart = formatted;
             // STS Photo Finish: frame start yg membawa jam berjalan = heartbeat sinkron jam.
             reportFrame("start", formatted, meta, this.baudRate);
+            // STS Long Range Start: acuan jam RaceTime2 untuk waktu start garis start jauh.
+            lrHeartbeat(formatted, meta, this.baudRate);
           },
           onFinish: (formatted, _a, _b, meta) => {
             this.digitTimeFinish = formatted;
@@ -168,6 +211,46 @@ export default {
 
     setBaud(br) {
       this.baudRate = br;
+    },
+
+    /** Start dari STS Long Range Start → baris live feed "LR…" + Buffer-Timer-Start. */
+    lrApplyStart(entry, notify) {
+      if (!entry || !entry.time) return;
+      this.digitId.unshift("LR" + String(nextLrSeq()).padStart(7, "0") + lrRawTime(entry.time) + "R");
+      this.digitTime.unshift("LR" + lrRawTime(entry.time));
+      this.digitTimeStart = entry.time;
+      const where = [entry.raceId, entry.wave ? "wave " + entry.wave : null, entry.deviceName].filter(Boolean).join(" · ");
+      const warn = !entry.clockSynced || !entry.starterClockSynced;
+      if (entry.recomputed) {
+        this.notifyPort(
+          "info",
+          "Start dihitung ulang dengan kalibrasi baru: " + (entry.originalTime || "?") + " → " + entry.time + ". Bila waktu lama sudah ditetapkan ke BIB, ubah di tim tersebut.",
+          "Long Range Start"
+        );
+        return;
+      }
+      this.notifyPort(
+        warn ? "warning" : "success",
+        (notify ? "Start " : "Start terakhir dimuat: ") +
+          entry.time +
+          (where ? " (" + where + ")" : "") +
+          (warn ? " — jam belum tersinkron, periksa waktunya." : ". Tekan tombol BIB untuk menetapkan."),
+        "Long Range Start"
+      );
+    },
+
+    /** Recall / false start → kosongkan Buffer-Timer-Start bila masih berisi start tersebut. */
+    lrApplyRecall(entry) {
+      if (!entry) return;
+      const cleared = !!(entry.refTime && this.digitTimeStart === entry.refTime);
+      if (cleared) this.digitTimeStart = "";
+      this.notifyPort(
+        "danger",
+        "RECALL / false start" +
+          (entry.refTime ? " untuk start " + entry.refTime : "") +
+          (cleared ? " — Buffer-Timer-Start dikosongkan." : ". Bila waktu itu sudah ditetapkan ke BIB, ubah manual."),
+        "Long Range Start"
+      );
     },
   },
 };

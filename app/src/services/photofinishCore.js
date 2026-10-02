@@ -87,7 +87,7 @@ function createPhotofinishClient(opts) {
   let lastError = null;
   let samples = [];
 
-  // Antrean impuls — disimpan ke disk agar tidak hilang saat Wi-Fi putus
+  // Antrean sinyal — disimpan ke disk agar tidak hilang saat Wi-Fi putus
   // atau aplikasi ditutup sebelum sempat terkirim.
   let outbox = storage.load("outbox") || [];
   // Hasil photo finish yang sudah diterima tetapi belum diterapkan di view.
@@ -121,7 +121,7 @@ function createPhotofinishClient(opts) {
         if (!res) break;
         if (!res.ok) {
           // Ditolak permanen (mis. HMAC salah) — jangan blok antrean selamanya.
-          lastError = "Impuls ditolak API: " + (res.error || "tidak diketahui");
+          lastError = "Sinyal ditolak API: " + (res.error || "tidak diketahui");
         }
         outbox.shift();
         storage.save("outbox", outbox);

@@ -24,7 +24,7 @@
       <p class="text-muted small px-3 pt-3 mb-2">
         Pilih heat yang akan berlomba. Sesi Photo Finish dibuat (atau dipakai
         ulang) dengan kategori, heat, dan tim di bawah, lalu langsung
-        <strong>diaktifkan</strong> — impuls RaceTime2 berikutnya masuk ke sesi ini.
+        <strong>diaktifkan</strong> — sinyal RaceTime2 berikutnya masuk ke sesi ini.
       </p>
       <div v-if="!heats.length" class="text-center text-muted py-4">
         Tidak ada heat yang bisa dikirim. Pastikan kategori spesifik terbuka

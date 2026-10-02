@@ -1,6 +1,6 @@
 # Integrasi STS Photo Finish
 
-Impuls finish RaceTime2 dikirim ke **STS Photo Finish**. Kamera di tepi
+Sinyal finish RaceTime2 dikirim ke **STS Photo Finish**. Kamera di tepi
 sungai menentukan urutan perahu, juri mengonfirmasi, lalu Finish Time terisi
 otomatis di halaman H2H / Rafting Cross / DRR.
 

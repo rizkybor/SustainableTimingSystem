@@ -6,7 +6,7 @@
     :title="title"
   >
     Photo Finish {{ status.connected ? "terhubung" : "terputus" }}
-    <template v-if="status.outbox"> · {{ status.outbox }} impuls antre</template>
+    <template v-if="status.outbox"> · {{ status.outbox }} sinyal antre</template>
     <template v-if="status.pending"> · {{ status.pending }} hasil menunggu</template>
   </span>
 </template>
@@ -22,7 +22,7 @@ export default {
   computed: {
     title() {
       if (this.status.lastError) return this.status.lastError;
-      return "Impuls finish RaceTime2 dikirim ke STS Photo Finish; hasil juri diterapkan otomatis.";
+      return "Sinyal finish RaceTime2 dikirim ke STS Photo Finish; hasil juri diterapkan otomatis.";
     },
   },
   async mounted() {

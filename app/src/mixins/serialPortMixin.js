@@ -107,7 +107,7 @@ export default {
           },
           onFinish: (formatted, _a, _b, meta) => {
             this.digitTimeFinish = formatted;
-            // STS Photo Finish: SETIAP impuls finish dikirim & disimpan (tidak tertimpa).
+            // STS Photo Finish: SETIAP sinyal finish dikirim & disimpan (tidak tertimpa).
             reportFrame("finish", formatted, meta, this.baudRate);
           },
           // LAP frame (a[11]="0" + a[13]="1", lihat komentar

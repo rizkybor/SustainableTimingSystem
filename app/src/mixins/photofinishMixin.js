@@ -168,7 +168,7 @@ export default {
         lanes: heat.lanes,
       });
       if (res && res.ok) {
-        this.pfToast("success", `${res.created ? "Sesi dibuat" : "Sesi diperbarui"} & AKTIF: ${res.label}. Impuls RaceTime2 berikutnya masuk ke sesi ini.`);
+        this.pfToast("success", `${res.created ? "Sesi dibuat" : "Sesi diperbarui"} & AKTIF: ${res.label}. Sinyal RaceTime2 berikutnya masuk ke sesi ini.`);
       } else {
         this.pfToast("error", "Gagal mengirim heat ke Photo Finish: " + ((res && res.error) || "tidak diketahui"));
       }

@@ -9,7 +9,7 @@ export function hostNowUs() {
 
 /**
  * Lapor frame RaceTime2 ke Photo Finish. Dipanggil dari serialPortMixin.
- *  - kind "finish": impuls FINISH (juga LAP, yang dipakai sbg finish).
+ *  - kind "finish": sinyal FINISH (juga LAP, yang dipakai sbg finish).
  *  - kind "start" : hanya dipakai sbg heartbeat jam bila frame MEMBAWA
  *    waktu; frame start bare TIDAK dikirim (belum dipastikan apakah dikirim
  *    per tekan tombol atau terus-menerus — jangan banjiri API).

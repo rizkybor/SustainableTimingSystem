@@ -16,6 +16,8 @@
 //      c. jam lokal laptop
 //      lalu + trim (koreksi halus ms, diatur operator; awal dari LRS_TRIM_MS).
 //   Kalibrasi disimpan (storage "calibration") dan dicatat di log kalibrasi.
+//   Kalibrasi juga disinkronkan dengan STS Photo Finish (clockSyncMain.js):
+//   yang lebih baru menang — lihat applySyncedCalibration() & opts.onCalibrated.
 //
 // Catatan sintaks: main process di-bundle webpack 4 (Electron 13 / Node 14)
 // — JANGAN pakai `?.`, `??`, atau literal BigInt.
@@ -110,6 +112,7 @@ function formatClock(todMs) {
  * @param {Function} [opts.onStart]   dipanggil untuk setiap START baru
  * @param {Function} [opts.onRecall]  dipanggil untuk setiap RECALL baru
  * @param {Function} [opts.onStatus]
+ * @param {Function} [opts.onCalibrated] dipanggil setelah operator mengubah kalibrasi (untuk sinkron ke Photo Finish)
  */
 function createLongrangeClient(opts) {
   const storage = opts.storage;
@@ -127,7 +130,7 @@ function createLongrangeClient(opts) {
   // Kalibrasi manual jam RaceTime2. manualOffsetMs = jam laptop − jam RaceTime2
   // (time-of-day); null = tidak manual (heartbeat / jam laptop).
   const cal = Object.assign(
-    { manualOffsetMs: null, trimMs: Number(opts.trimMs) || 0, revision: 0, updatedAt: null, log: [] },
+    { manualOffsetMs: null, trimMs: Number(opts.trimMs) || 0, revision: 0, updatedAt: null, origin: "longrange", log: [] },
     storage.load("calibration") || {}
   );
 
@@ -172,6 +175,7 @@ function createLongrangeClient(opts) {
         trimMs: cal.trimMs,
         revision: cal.revision,
         updatedAt: cal.updatedAt,
+        origin: cal.origin,
         log: cal.log.slice(0, 10),
       },
       lastError: lastError,
@@ -193,6 +197,7 @@ function createLongrangeClient(opts) {
       trimMs: cal.trimMs,
       revision: cal.revision,
       updatedAt: cal.updatedAt,
+      origin: cal.origin,
       note: cal.log.length ? cal.log[0].note : null,
     };
   }
@@ -301,11 +306,44 @@ function createLongrangeClient(opts) {
     }
     cal.revision += 1;
     cal.updatedAt = new Date().toISOString();
+    cal.origin = "longrange";
     cal.log.unshift({ at: cal.updatedAt, action: b.action, note: note, before: before, after: { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs } });
     cal.log = cal.log.slice(0, CAL_LOG_MAX);
     storage.save("calibration", cal);
     emitStatus();
+    if (typeof opts.onCalibrated === "function") opts.onCalibrated();
     return status();
+  }
+
+  /** Kalibrasi saat ini dalam bentuk yang disinkronkan ke Photo Finish. */
+  function calibrationState() {
+    return { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs, updatedAt: cal.updatedAt, origin: cal.origin, revision: cal.revision };
+  }
+
+  /**
+   * Terapkan kalibrasi dari Photo Finish (sudah dikonversi ke basis jam laptop
+   * ini) bila LEBIH BARU dari kalibrasi tersimpan. updatedAt ikut disalin
+   * dari sumbernya, sehingga pertukaran berikutnya tidak memantul balik.
+   * @returns {boolean} true bila diterapkan
+   */
+  function applySyncedCalibration(c) {
+    const incoming = Date.parse(c && c.updatedAt);
+    const current = cal.updatedAt ? Date.parse(cal.updatedAt) : 0;
+    if (!isFinite(incoming) || incoming <= current) return false;
+    const trim = Number(c.trimMs) || 0;
+    if (Math.abs(trim) > TRIM_LIMIT_MS) return false;
+    const before = { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs };
+    cal.manualOffsetMs = c.manualOffsetMs === null || c.manualOffsetMs === undefined ? null : Number(c.manualOffsetMs);
+    cal.trimMs = Math.round(trim * 1000) / 1000;
+    cal.revision += 1;
+    cal.updatedAt = new Date(incoming).toISOString();
+    cal.origin = "photofinish";
+    const note = "Disinkronkan dari Photo Finish" + (c.note ? " (" + c.note + ")" : "");
+    cal.log.unshift({ at: cal.updatedAt, action: "sync-photofinish", note: note, before: before, after: { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs } });
+    cal.log = cal.log.slice(0, CAL_LOG_MAX);
+    storage.save("calibration", cal);
+    emitStatus();
+    return true;
   }
 
   /** Hitung ulang waktu satu start dengan kalibrasi saat ini, lalu terapkan lagi ke halaman race. */
@@ -432,6 +470,8 @@ function createLongrangeClient(opts) {
     syncClock: syncClock,
     toBufferTime: toBufferTime,
     calibrate: calibrate,
+    calibrationState: calibrationState,
+    applySyncedCalibration: applySyncedCalibration,
     clockState: clockState,
     recompute: recompute,
     status: status,
@@ -447,4 +487,6 @@ module.exports = {
   formatClock: formatClock,
   clockToMs: clockToMs,
   localTodMs: localTodMs,
+  diffDay: diffDay,
+  wrapDay: wrapDay,
 };

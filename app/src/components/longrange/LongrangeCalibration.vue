@@ -29,8 +29,17 @@
           <span class="lrc-chip">Trim {{ fmtMs(status.trimMs) }}</span>
           <span v-if="status.clockSynced" class="lrc-chip">Server ±{{ Math.ceil((status.rttMs || 0) / 2) }} ms</span>
           <span v-else class="lrc-chip lrc-chip--warn">Jam server belum tersinkron</span>
+          <span
+            v-if="status.calibration && status.calibration.origin === 'photofinish'"
+            class="lrc-chip lrc-chip--sync"
+            title="Kalibrasi terakhir dibuat admin di STS Photo Finish dan diterapkan otomatis"
+          >Dari Photo Finish</span>
         </div>
         <p class="lrc-hint">Bandingkan dengan layar RaceTime2. Bila berbeda, kalibrasi di bawah.</p>
+        <p class="lrc-hint">
+          Tersinkron dengan <b>STS Photo Finish</b>: kalibrasi terbaru di salah satu aplikasi berlaku untuk keduanya,
+          termasuk yang dibuat saat aplikasi lain sedang mati (menyusul saat tersambung).
+        </p>
       </section>
 
       <!-- ===== set ke waktu ===== -->
@@ -436,6 +445,10 @@ export default {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.lrc-chip--sync {
+  background: rgba(34, 211, 238, 0.18);
+  color: #a5f3fc;
 }
 .lrc-chip--manual {
   background: #1d8fbb;

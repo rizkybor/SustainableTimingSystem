@@ -16,6 +16,7 @@ const fs = require("fs");
 const path = require("path");
 const { io } = require("socket.io-client");
 const { createPhotofinishClient } = require("./photofinishCore");
+const clockSync = require("./clockSyncMain");
 require("dotenv").config();
 
 let client = null;
@@ -97,8 +98,12 @@ function setupPhotofinish() {
       onHistory: function () {
         broadcast("pf:history-changed", null);
       },
+      onCalibration: function () {
+        clockSync.notify();
+      },
     });
     client.start();
+    clockSync.attachPhotofinish(client);
   }
 
   ipcMain.on("pf:impulse", function (_event, p) {

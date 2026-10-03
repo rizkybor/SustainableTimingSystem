@@ -50,6 +50,14 @@ Klik badge **Long Range Start** di panel Buffer-Timer-Start untuk membuka jendel
 - **Hitung ulang start terakhir** dengan kalibrasi baru. Buffer-Timer-Start terisi lagi, dan toast menampilkan waktu lama → baru.
 - **Riwayat kalibrasi** (10 terakhir) ditampilkan, disimpan di `<userData>/longrange-calibration.json`, dan tetap berlaku setelah aplikasi dibuka ulang.
 
+**Sinkron dengan STS Photo Finish** (`clockSyncMain.js` / `clockSyncCore.js`, aktif bila
+kedua integrasi dikonfigurasi; matikan dengan `CLOCK_SYNC=off`): kalibrasi yang **lebih
+baru** di salah satu aplikasi berlaku untuk keduanya. Aplikasi ini menjadi penghubung —
+mengukur selisih jam server Photo Finish terhadap laptop (`clock:ping`) lalu menerjemahkan
+offset. Masing-masing sisi menyimpan kalibrasinya, jadi kalibrasi yang dibuat saat sisi lain
+mati/terputus diterapkan begitu tersambung lagi. Chip **Dari Photo Finish** menandai
+kalibrasi yang berasal dari sana.
+
 Kalibrasi berlaku untuk start berikutnya. Start lama hanya berubah bila ditekan *Hitung ulang*. Status jam kalibrasi juga dikirim ke server (`timing:clock-state`: saat tersambung, setiap kali status berubah, dan tiap 15 dtk), begitu pula hasil *Hitung ulang* (`timing:recomputed`). Dengan itu jam dan waktu start di aplikasi garis start ikut berbasis RaceTime2 hasil kalibrasi, bukan jam laptop/server.
 
 ## Perilaku

@@ -15,6 +15,7 @@ const fs = require("fs");
 const path = require("path");
 const { io } = require("socket.io-client");
 const { createLongrangeClient } = require("./longrangeCore");
+const clockSync = require("./clockSyncMain");
 require("dotenv").config();
 
 let client = null;
@@ -93,8 +94,12 @@ function setupLongrange() {
       onStatus: function (st) {
         broadcast("lr:status", st);
       },
+      onCalibrated: function () {
+        clockSync.notify();
+      },
     });
     client.start();
+    clockSync.attachLongrange(client, hostNowMs);
   }
 
   ipcMain.on("lr:heartbeat", function (_event, p) {

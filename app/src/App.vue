@@ -12,6 +12,9 @@
       <router-view />
     </main>
 
+    <!-- Alert global (pengganti dialog native Electron) -->
+    <AppAlertHost />
+
     <!-- Footer -->
     <footer class="app-footer" role="contentinfo">
       <FooterVue />
@@ -22,10 +25,11 @@
 <script>
 import FooterVue from "./components/Footer.vue";
 import Navbar from "./components/Navbar.vue";
+import AppAlertHost from "./components/common/AppAlertHost.vue";
 
 export default {
   name: "app",
-  components: { Navbar, FooterVue },
+  components: { Navbar, FooterVue, AppAlertHost },
 };
 </script>
 

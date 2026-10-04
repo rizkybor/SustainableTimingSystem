@@ -10,58 +10,97 @@
       <Icon icon="mdi:history" width="16" height="16" />
     </b-button>
 
-    <b-modal v-model="isOpen" hide-footer size="lg" :title="modalTitle">
-      <div class="ujh-body">
-        <div v-if="loading" class="ujh-state">Memuat riwayat…</div>
-        <div v-else-if="error" class="ujh-state ujh-state--error">
+    <b-modal
+      v-model="isOpen"
+      hide-header
+      hide-footer
+      size="lg"
+      centered
+      body-class="p-0"
+      content-class="jh-content"
+    >
+      <div class="jh-head">
+        <div class="jh-head__bg"></div>
+        <button type="button" class="jh-close" aria-label="Close" @click="isOpen = false">
+          <Icon icon="mdi:close" />
+        </button>
+        <div class="jh-head__inner">
+          <span class="jh-head__icon"><Icon icon="mdi:history" /></span>
+          <div>
+            <span class="jh-eyebrow">Riwayat Judge</span>
+            <h5 class="jh-title">{{ username || "-" }}</h5>
+          </div>
+        </div>
+        <div v-if="items.length" class="jh-summary">
+          <span class="jh-summary__chip"><Icon icon="mdi:gavel" /> {{ items.length }} tindakan</span>
+          <span class="jh-summary__chip"><Icon icon="mdi:calendar-multiple" /> {{ eventOptions.length - 1 }} event</span>
+        </div>
+      </div>
+
+      <div v-if="items.length && !loading && !error" class="jh-toolbar">
+        <div class="jh-filter">
+          <label>Event</label>
+          <select v-model="filterEventId">
+            <option v-for="o in eventOptions" :key="o.value" :value="o.value">{{ o.text }}</option>
+          </select>
+        </div>
+        <div class="jh-filter">
+          <label>Task</label>
+          <select v-model="filterTask">
+            <option v-for="o in taskOptions" :key="o.value" :value="o.value">{{ o.text }}</option>
+          </select>
+        </div>
+        <span class="jh-count">
+          <strong>{{ filteredItems.length }}</strong> / {{ items.length }} tindakan
+        </span>
+      </div>
+
+      <div class="jh-body">
+        <div v-if="loading" class="jh-state">
+          <b-spinner small /> Memuat riwayat…
+        </div>
+        <div v-else-if="error" class="jh-state jh-state--error">
+          <Icon icon="mdi:alert-circle-outline" />
           Gagal memuat riwayat: {{ error }}
         </div>
-        <div v-else-if="!items.length" class="ujh-state">
+        <div v-else-if="!items.length" class="jh-state">
+          <Icon icon="mdi:clipboard-text-off-outline" />
           Juri ini belum punya tindakan apa pun yang tercatat.
         </div>
+        <div v-else-if="!filteredItems.length" class="jh-state">
+          <Icon icon="mdi:filter-off-outline" />
+          Tidak ada tindakan yang cocok dengan filter ini.
+        </div>
         <template v-else>
-          <!-- FILTER: by Event & by Task -->
-          <div class="ujh-filters">
-            <div class="ujh-filter">
-              <label>Event</label>
-              <b-form-select v-model="filterEventId" :options="eventOptions" size="sm" />
-            </div>
-            <div class="ujh-filter">
-              <label>Task</label>
-              <b-form-select v-model="filterTask" :options="taskOptions" size="sm" />
-            </div>
-            <div class="ujh-filter-count">
-              Menampilkan <strong>{{ filteredItems.length }}</strong> dari {{ items.length }} tindakan
-            </div>
-          </div>
-
-          <div v-if="!filteredItems.length" class="ujh-state">
-            Tidak ada tindakan yang cocok dengan filter ini.
-          </div>
-          <ul v-else class="ujh-list">
-            <li v-for="item in filteredItems" :key="item._id" class="ujh-item">
-              <div class="ujh-item-icon">
-                <Icon icon="mdi:gavel" width="18" height="18" />
-              </div>
-              <div class="ujh-item-main">
-                <div class="ujh-item-top">
-                  <span class="ujh-badge ujh-badge--event">{{ eventName(item.eventId) }}</span>
-                  <span class="ujh-badge ujh-badge--category">{{ (item.raceCategory || "-").toUpperCase() }}</span>
-                  <span v-if="taskLabel(item)" class="ujh-badge ujh-badge--task">{{ taskLabel(item) }}</span>
-                  <span v-if="item.value !== null && item.value !== undefined" class="ujh-badge ujh-badge--value">
-                    Penalty {{ item.value }}
-                  </span>
+          <div v-for="g in groupedItems" :key="g.key">
+            <div class="jh-day">{{ g.label }}</div>
+            <ul class="jh-list">
+              <li v-for="item in g.items" :key="item._id" class="jh-item">
+                <span class="jh-item__dot"><Icon icon="mdi:gavel" /></span>
+                <div class="jh-item__main">
+                  <div class="jh-item__top">
+                    <span class="jh-badge jh-badge--event" :title="eventName(item.eventId)">{{ eventName(item.eventId) }}</span>
+                    <span class="jh-badge jh-badge--category">{{ (item.raceCategory || "-").toUpperCase() }}</span>
+                    <span v-if="taskLabel(item)" class="jh-badge jh-badge--task">{{ taskLabel(item) }}</span>
+                    <span
+                      v-if="item.value !== null && item.value !== undefined"
+                      class="jh-pill"
+                      :class="'jh-pill--' + penaltyTone(item.value)"
+                    >
+                      Penalty {{ item.value }}
+                    </span>
+                  </div>
+                  <div class="jh-item__text">{{ item.text || item.type }}</div>
+                  <div class="jh-item__meta">
+                    <span v-if="categoryLabelFor(item)">{{ categoryLabelFor(item) }}</span>
+                    <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
+                    <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
+                  </div>
                 </div>
-                <div class="ujh-item-text">{{ item.text || item.type }}</div>
-                <div class="ujh-item-meta">
-                  <span v-if="categoryLabelFor(item)">{{ categoryLabelFor(item) }}</span>
-                  <span v-if="item.teamName"> &middot; {{ item.teamName }}</span>
-                  <span v-if="item.bibTeam"> &middot; BIB {{ item.bibTeam }}</span>
-                </div>
-              </div>
-              <div class="ujh-item-time">{{ formatAt(item.receivedAt) }}</div>
-            </li>
-          </ul>
+                <time class="jh-item__time">{{ formatClock(item.receivedAt) }}</time>
+              </li>
+            </ul>
+          </div>
         </template>
       </div>
     </b-modal>
@@ -71,6 +110,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import { groupByDay, penaltyTone, formatClock } from "@/utils/judgeHistoryView";
 
 export default {
   name: "UserJudgeHistoryModal",
@@ -128,6 +168,9 @@ export default {
       opts.unshift({ value: "", text: "Semua Task (" + this.items.length + ")" });
       return opts;
     },
+    groupedItems() {
+      return groupByDay(this.filteredItems);
+    },
     filteredItems() {
       return this.items.filter((it) => {
         if (this.filterEventId && String(it.eventId || "") !== this.filterEventId) return false;
@@ -137,6 +180,8 @@ export default {
     },
   },
   methods: {
+    penaltyTone,
+    formatClock,
     open() {
       this.isOpen = true;
       this.filterEventId = "";
@@ -200,128 +245,9 @@ export default {
 </script>
 
 <style scoped>
-.ujh-body {
-  max-height: 65vh;
-  overflow-y: auto;
-}
-.ujh-filters {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  margin-bottom: 12px;
-}
-.ujh-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 200px;
-}
-.ujh-filter label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #64748b;
-  margin: 0;
-}
-.ujh-filter-count {
-  font-size: 12.5px;
-  color: #64748b;
-  margin-left: auto;
-}
-.ujh-state {
-  padding: 24px 8px;
-  text-align: center;
-  color: #64748b;
-  font-size: 14px;
-}
-.ujh-state--error {
-  color: #dc2626;
-}
-.ujh-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ujh-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-}
-.ujh-item-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #1874a5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ujh-item-main {
-  flex: 1;
-  min-width: 0;
-}
-.ujh-item-top {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 3px;
-}
-.ujh-item-text {
-  font-weight: 600;
-  color: #0f172a;
-  font-size: 14px;
-}
-.ujh-item-meta {
-  color: #64748b;
-  font-size: 12px;
-  margin-top: 2px;
-}
-.ujh-badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  background: #eff6ff;
-  color: #1874a5;
-  vertical-align: middle;
-}
-.ujh-badge--event {
-  background: #f1f5f9;
-  color: #334155;
-}
-.ujh-badge--category {
-  background: #ecfdf5;
-  color: #047857;
-}
-.ujh-badge--value {
-  background: #fef2f2;
-  color: #dc2626;
-}
-.ujh-badge--task {
-  background: #f3ecff;
-  color: #7c3aed;
-}
-.ujh-item-time {
-  flex-shrink: 0;
-  color: #94a3b8;
-  font-size: 12px;
-  white-space: nowrap;
+/* Isi modal: assets/styles/judge-history-modal.css (global, krn b-modal
+   dirender di <body>). Tombol pemicunya distyle oleh halaman pemakai. */
+.ujh-wrapper {
+  display: inline-flex;
 }
 </style>

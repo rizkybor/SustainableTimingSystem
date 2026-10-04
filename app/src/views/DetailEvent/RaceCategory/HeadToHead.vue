@@ -198,6 +198,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -260,8 +264,6 @@
             <!-- Info: status realtime juri & laporan -->
             <div class="h2h-action-group h2h-action-group--info">
               <span class="h2h-action-group__label">Info</span>
-              <ConnectionStatusBadge class="h2h-judge-trigger" />
-
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 class="h2h-judge-trigger"
@@ -637,7 +639,7 @@
             </small>
           </div>
           <div
-            class="h2h-actions-panel d-flex flex-wrap"
+            class="h2h-actions-panel race-toolbar"
             v-if="visibleParticipants && visibleParticipants.length"
           >
             <!-- Scope: babak yang sedang aktif -->
@@ -645,7 +647,7 @@
               <span class="h2h-action-group__label">Round</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingRound"
                 @click="printCurrentRoundVuePdf"
                 v-b-tooltip.hover="'Print hasil babak yang sedang aktif'"
@@ -656,7 +658,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingRound"
                 @click="saveCurrentRoundToDB"
                 v-b-tooltip.hover="'Simpan hasil babak aktif ke database'"
@@ -672,7 +674,7 @@
               <span class="h2h-action-group__label">All Rounds</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingAllRounds"
                 @click="printAllRoundVuePdf"
                 v-b-tooltip.hover="'Print seluruh babak sekaligus'"
@@ -683,7 +685,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingAllRounds"
                 @click="saveAllRoundToDB"
                 v-b-tooltip.hover="'Simpan seluruh babak ke database'"
@@ -699,7 +701,7 @@
               <span class="h2h-action-group__label">Overall</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingOverall"
                 @click="printOverallVuePdf"
                 v-b-tooltip.hover="'Print ranking overall kategori ini'"
@@ -710,7 +712,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingOverall"
                 @click="saveOverallToDB"
                 v-b-tooltip.hover="'Simpan overall kategori ini ke database'"

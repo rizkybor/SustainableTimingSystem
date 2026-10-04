@@ -206,6 +206,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -299,12 +303,9 @@
               </small>
             </div>
             <div class="slalom-actionbar">
-              <div class="slalom-actionbar__buttons">
-                <ConnectionStatusBadge class="slalom-judge-trigger" />
-
+              <div class="slalom-actionbar__buttons race-toolbar">
                 <JudgeActionHistoryModal
                   v-if="currentSlalomEventId"
-                  class="slalom-judge-trigger"
                   :event-id="String(currentSlalomEventId)"
                   race-category="slalom"
                   category-label="Slalom"
@@ -321,7 +322,7 @@
                 <!-- SAVE ONLY SESSION 1 -->
                 <button
                   type="button"
-                  class="action-pill action-pill--save"
+                  class="race-tool-btn"
                   @click="saveSession1"
                   :disabled="!teams.length"
                   title="Simpan hanya run/session #1"
@@ -333,7 +334,7 @@
                 <!-- SHOW RESULT SESSION 1 (MODAL) -->
                 <button
                   type="button"
-                  class="action-pill action-pill--view"
+                  class="race-tool-btn"
                   @click="openSession1Modal"
                   title="Tampilkan Result Session 1 dari database"
                 >
@@ -344,7 +345,7 @@
                 <!-- PRINT PDF SESSION 1 -->
                 <button
                   type="button"
-                  class="action-pill action-pill--pdf"
+                  class="race-tool-btn"
                   @click="printPdfSession1"
                   title="Download PDF khusus Session 1"
                 >
@@ -354,7 +355,7 @@
 
                 <button
                   type="button"
-                  class="action-pill action-pill--primary"
+                  class="race-tool-btn race-tool-btn--primary"
                   @click="saveResult"
                   :disabled="!teams.length"
                   title="Simpan hasil Slalom (semua tim & semua run)"
@@ -364,7 +365,7 @@
 
                 <button
                   type="button"
-                  class="action-pill action-pill--sort"
+                  class="race-tool-btn"
                   :class="{ 'is-active': sortBest.enabled }"
                   @click="toggleSortRanked"
                   :disabled="!teams.length"
@@ -387,7 +388,7 @@
                      sudah bertanding pada event ini (semua divisi/race) -->
                 <button
                   type="button"
-                  class="action-pill action-pill--danger"
+                  class="race-tool-btn race-tool-btn--danger"
                   @click="openResetAllModal"
                   title="Hapus semua waktu yang sudah bertanding di Slalom (semua kategori) pada event ini"
                 >
@@ -4389,8 +4390,10 @@ td {
 
 .slalom-actionbar__buttons {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 @media (max-width: 767.98px) {
@@ -4438,103 +4441,7 @@ td {
   color: #9aa3af;
 }
 
-/* ---- Redesign: Save Session/Result Session/Save Result/Sort Ranked ---- */
-.action-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 13px;
-  border: 1.5px solid transparent;
-  color: #fff;
-  transition: transform 0.15s ease, box-shadow 0.15s ease,
-    background-color 0.15s ease, opacity 0.15s ease;
-}
-.action-pill:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.action-pill:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-.action-pill--save {
-  background: linear-gradient(135deg, #22b165, #148a3b);
-  box-shadow: 0 4px 12px rgba(20, 138, 59, 0.3);
-}
-.action-pill--save:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(20, 138, 59, 0.4);
-}
-.action-pill--view {
-  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
-  box-shadow: 0 4px 12px rgba(28, 111, 176, 0.3);
-}
-.action-pill--view:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.4);
-}
-.action-pill--pdf {
-  background: linear-gradient(135deg, #f5a623, #d9860f);
-  box-shadow: 0 4px 12px rgba(217, 134, 15, 0.3);
-}
-.action-pill--pdf:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(217, 134, 15, 0.4);
-}
-.action-pill--primary {
-  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-}
-.action-pill--primary:hover:not(:disabled) {
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
-}
-.action-pill--sort {
-  background: #fff;
-  color: #37475a;
-  border-color: #dbe0e8;
-}
-.action-pill--sort:hover:not(:disabled) {
-  border-color: #1c6fb0;
-  color: #1c6fb0;
-  background: #f2f9fd;
-}
-
-/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
-   disamakan dgn .action-pill--sort (varian netral) di sini supaya tidak
-   njomplang di antara pill Save/View/PDF berwarna. Class pembeda
-   (.slalom-judge-trigger) dipakai spy specificity-nya pasti menang lawan
-   .jah-trigger bawaan komponen, bukan cuma menang urutan compile CSS. */
-.slalom-judge-trigger ::v-deep .jah-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  color: #37475a;
-  border: 1.5px solid #dbe0e8;
-  font-weight: 700;
-  font-size: 13px;
-  border-radius: 999px;
-  padding: 9px 16px;
-}
-.slalom-judge-trigger ::v-deep .jah-trigger:hover {
-  border-color: #1c6fb0;
-  color: #1c6fb0;
-  background: #f2f9fd;
-}
-.action-pill--sort.is-active {
-  background: linear-gradient(135deg, #6c5ce7, #4834d4);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(72, 52, 212, 0.35);
-}
-.action-pill--danger {
-  background: #fff;
-  color: #d9364f;
-  border-color: #f0c4cc;
-}
-.action-pill--danger:hover:not(:disabled) {
-  background: #fdecef;
-  border-color: #d9364f;
-  box-shadow: 0 4px 12px rgba(217, 54, 79, 0.2);
-}
+/* Tombol toolbar Output Racetime (Save Session 1/Result Session 1/PDF/
+   Save Result/Sort Ranked/Reset All + trigger Riwayat Judge/Field Notes)
+   sekarang diatur global di race-category-toolbar.css. */
 </style>

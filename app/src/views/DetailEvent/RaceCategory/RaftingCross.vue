@@ -193,6 +193,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -262,10 +266,10 @@
 
     <div class="px-5 mt-3" v-else>
       <!-- ROUND NAV -->
-      <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="race-toolbar justify-content-between mb-3">
         <button
           type="button"
-          class="btn-action btn-secondary"
+          class="race-tool-btn"
           :disabled="currentRoundIndex <= 0"
           @click="currentRoundIndex--"
         >
@@ -278,12 +282,9 @@
           style="max-width: 320px"
         />
 
-        <div class="d-flex align-items-center">
-          <ConnectionStatusBadge class="mr-2" />
-
+        <div class="race-toolbar">
           <JudgeActionHistoryModal
             v-if="currentEventId"
-            class="mr-2"
             :event-id="String(currentEventId)"
             race-category="rx"
             category-label="Rafting Cross"
@@ -291,7 +292,6 @@
 
           <FieldNotesModal
             v-if="currentEventId"
-            class="mr-2"
             :event-id="String(currentEventId)"
             category="RX"
             :refresh-tick="fieldNotesRefreshTick"
@@ -299,7 +299,7 @@
 
           <button
             type="button"
-            class="btn-action btn-secondary"
+            class="race-tool-btn"
             :disabled="currentRoundIndex >= rounds.length - 1"
             @click="currentRoundIndex++"
           >

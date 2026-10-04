@@ -199,6 +199,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -249,7 +253,10 @@
               Category active: {{ titleCategories || "-" }}
             </small>
           </div>
-          <div v-if="participantArr && participantArr.length">
+          <div
+            v-if="participantArr && participantArr.length"
+            class="race-toolbar"
+          >
             <!-- <button
               type="button"
               class="btn-action btn-secondary mr-2"
@@ -266,11 +273,8 @@
               <Icon icon="icon-park-outline:save" /> Preview JSON
             </button> -->
 
-            <ConnectionStatusBadge class="mr-2" />
-
             <JudgeActionHistoryModal
               v-if="currentEventId"
-              class="mr-2 sprint-judge-trigger"
               :event-id="String(currentEventId)"
               race-category="sprint"
               category-label="Sprint"
@@ -279,7 +283,6 @@
 
             <FieldNotesModal
               v-if="currentEventId"
-              class="mr-2"
               :event-id="String(currentEventId)"
               category="SPRINT"
               :refresh-tick="fieldNotesRefreshTick"
@@ -287,7 +290,7 @@
 
             <button
               type="button"
-              class="btn-action btn-info mr-2"
+              class="race-tool-btn"
               @click="toggleSortRanked"
             >
               <Icon icon="icon-park-outline:ranking" /> Sort Ranked
@@ -295,7 +298,7 @@
 
             <button
               type="button"
-              class="btn-action btn-secondary"
+              class="race-tool-btn race-tool-btn--primary"
               @click="saveResult"
             >
               <Icon icon="icon-park-outline:save" /> Save Result
@@ -2541,23 +2544,8 @@ td {
   padding: 8px 14px;
 }
 
-/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
-   disamakan dgn .btn-action di sini supaya tidak njomplang saat sejajar
-   dgn Sort Ranked/Save di toolbar Output Racetime. Class pembeda
-   (.sprint-judge-trigger) dipakai spy specificity-nya pasti menang lawan
-   .jah-trigger bawaan komponen, bukan cuma menang urutan compile CSS. */
-.sprint-judge-trigger ::v-deep .jah-trigger {
-  background: #ffffff;
-  border: 1px solid #cfd8e6;
-  color: #1c4c7a;
-  font-weight: 700;
-  font-size: inherit;
-  border-radius: 10px;
-  padding: 8px 14px;
-}
-.sprint-judge-trigger ::v-deep .jah-trigger:hover {
-  background: #eef4ff;
-}
+/* Tombol toolbar Output Racetime (termasuk trigger Riwayat Judge/Field
+   Notes) sekarang diatur global di race-category-toolbar.css. */
 
 /* .btn-action (scoped, single class) menang lawan Bootstrap's .btn-danger/
    .btn-outline-danger (global, single class) karena atribut data-v-xxxx

@@ -202,6 +202,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -256,9 +260,7 @@
             </div>
           </b-col>
           <b-col cols="6" md="6">
-            <div class="drr-actionbar__buttons">
-              <ConnectionStatusBadge />
-
+            <div class="drr-actionbar__buttons race-toolbar">
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 :event-id="String(currentEventId)"
@@ -287,7 +289,7 @@
 
               <button
                 type="button"
-                class="btn-action btn-secondary"
+                class="race-tool-btn race-tool-btn--primary"
                 @click="saveResult"
                 :disabled="!currentBucket || !participantArr.length"
                 title="Simpan hasil untuk bucket yang dipilih"
@@ -297,7 +299,7 @@
 
               <button
                 type="button"
-                class="btn-action btn-info"
+                class="race-tool-btn"
                 @click="toggleSortRanked"
                 :disabled="!participantArr.length"
                 title="Urutkan berdasarkan rank naik/turun"
@@ -309,7 +311,7 @@
                    bertanding pada event ini (semua divisi/race/initial) -->
               <button
                 type="button"
-                class="btn-action btn-outline-danger"
+                class="race-tool-btn race-tool-btn--danger"
                 @click="openResetAllModal"
                 title="Hapus semua waktu yang sudah bertanding di DRR (semua kategori) pada event ini"
               >

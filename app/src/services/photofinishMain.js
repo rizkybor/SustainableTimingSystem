@@ -16,6 +16,8 @@ const fs = require("fs");
 const path = require("path");
 const { io } = require("socket.io-client");
 const { createPhotofinishClient } = require("./photofinishCore");
+const clockSync = require("./clockSyncMain");
+const clockMain = require("./clockMain");
 require("dotenv").config();
 
 let client = null;
@@ -97,8 +99,28 @@ function setupPhotofinish() {
       onHistory: function () {
         broadcast("pf:history-changed", null);
       },
+      onCalibration: function () {
+        clockSync.notify();
+      },
     });
     client.start();
+    clockSync.attachPhotofinish(client);
+    clockMain.addStatusSource(function () {
+      const st = client.status();
+      const pfClock = client.pfClock();
+      const remote = client.remoteCalibration();
+      const local = clockMain.getCalibration().state();
+      return {
+        photofinish: {
+          configured: true,
+          connected: st.connected,
+          clockSynced: pfClock.synced,
+          rttMs: pfClock.rttMs,
+          // sama = kalibrasi Photo Finish sudah mengikuti kalibrasi timing (atau sebaliknya)
+          inSync: !!(remote && local.updatedAt && Date.parse(remote.updatedAt) === Date.parse(local.updatedAt)),
+        },
+      };
+    });
   }
 
   ipcMain.on("pf:impulse", function (_event, p) {

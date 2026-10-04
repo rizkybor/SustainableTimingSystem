@@ -6,87 +6,90 @@
     hide-header
     hide-footer
     body-class="p-0"
-    content-class="lrc"
+    content-class="ccb"
     @change="$emit('input', $event)"
   >
     <!-- ===== kepala ===== -->
-    <header class="lrc-head">
-      <span class="lrc-head__icon"><Icon :icon="icons.tune" width="22" height="22" /></span>
-      <div class="lrc-head__text">
-        <h5>Kalibrasi Long Range Start</h5>
-        <small>Samakan jam start garis start jauh dengan tampilan RaceTime2</small>
+    <header class="ccb-head">
+      <span class="ccb-head__icon"><Icon :icon="icons.tune" width="22" height="22" /></span>
+      <div class="ccb-head__text">
+        <h5>Kalibrasi Jam RaceTime2</h5>
+        <small>Satu kalibrasi dipakai bersama Long Range Start &amp; STS Photo Finish</small>
       </div>
-      <button type="button" class="lrc-icon-btn" title="Tutup" @click="$emit('input', false)"><Icon :icon="icons.close" width="22" height="22" /></button>
+      <button type="button" class="ccb-icon-btn" title="Tutup" @click="$emit('input', false)"><Icon :icon="icons.close" width="22" height="22" /></button>
     </header>
 
-    <div class="lrc-body">
+    <div class="ccb-body">
       <!-- ===== jam berjalan ===== -->
-      <section class="lrc-clock">
-        <div class="lrc-clock__label">Jam Long Range (basis Buffer-Timer-Start)</div>
-        <div class="lrc-clock__value mono">{{ clockNow }}</div>
-        <div class="lrc-chips">
-          <span class="lrc-chip" :class="'lrc-chip--' + status.basis">{{ BASIS[status.basis] || "–" }}</span>
-          <span class="lrc-chip">Trim {{ fmtMs(status.trimMs) }}</span>
-          <span v-if="status.clockSynced" class="lrc-chip">Server ±{{ Math.ceil((status.rttMs || 0) / 2) }} ms</span>
-          <span v-else class="lrc-chip lrc-chip--warn">Jam server belum tersinkron</span>
+      <section class="ccb-clock">
+        <div class="ccb-clock__label">Jam RaceTime2</div>
+        <div class="ccb-clock__value mono">{{ clockNow }}</div>
+        <div class="ccb-chips">
+          <span class="ccb-chip" :class="'ccb-chip--' + status.basis">{{ BASIS[status.basis] || "–" }}</span>
+          <span class="ccb-chip">Trim {{ fmtMs(status.trimMs) }}</span>
           <span
             v-if="status.calibration && status.calibration.origin === 'photofinish'"
-            class="lrc-chip lrc-chip--sync"
+            class="ccb-chip ccb-chip--sync"
             title="Kalibrasi terakhir dibuat admin di STS Photo Finish dan diterapkan otomatis"
           >Dari Photo Finish</span>
+          <span
+            v-if="status.calibration && status.calibration.origin === 'longrange'"
+            class="ccb-chip ccb-chip--sync"
+            title="Kalibrasi terakhir dibuat lewat modal Long Range Start"
+          >Dari Long Range</span>
         </div>
-        <p class="lrc-hint">Bandingkan dengan layar RaceTime2. Bila berbeda, kalibrasi di bawah.</p>
-        <p class="lrc-hint">
-          Tersinkron dengan <b>STS Photo Finish</b>: kalibrasi terbaru di salah satu aplikasi berlaku untuk keduanya,
-          termasuk yang dibuat saat aplikasi lain sedang mati (menyusul saat tersambung).
+        <p class="ccb-hint">Bandingkan dengan layar RaceTime2. Bila berbeda, kalibrasi di bawah.</p>
+        <p class="ccb-hint">
+          Kalibrasi ini dipakai Buffer-Timer-Start (Long Range Start) &amp; disinkronkan ke
+          <b>STS Photo Finish</b> bila terhubung — kalibrasi terbaru di aplikasi manapun berlaku untuk semuanya.
         </p>
       </section>
 
       <!-- ===== set ke waktu ===== -->
-      <section class="lrc-card">
+      <section class="ccb-card">
         <h6><Icon :icon="icons.timer" width="18" height="18" /> 1. Set ke waktu RaceTime2</h6>
-        <p class="lrc-hint">
+        <p class="ccb-hint">
           Ketik waktu yang <b>akan</b> tampil di RaceTime2, lalu tekan <b>SET</b> tepat saat RaceTime2 menunjukkan waktu itu.
           Ketelitian ± waktu reaksi, rapikan dengan trim. Trim kembali 0.
         </p>
-        <div class="lrc-setbar">
-          <div class="lrc-setbar__field">
+        <div class="ccb-setbar">
+          <div class="ccb-setbar__field">
             <input
               v-model="setTime"
-              class="lrc-input mono lrc-time-input"
+              class="ccb-input mono ccb-time-input"
               inputmode="numeric"
               maxlength="12"
               placeholder="HH:MM:SS.000"
               @input="setTime = mask($event.target.value)"
             />
-            <button type="button" class="lrc-btn lrc-btn--ghost" title="Isi dengan jam sekarang + 10 detik" @click="prefill">
+            <button type="button" class="ccb-btn ccb-btn--ghost" title="Isi dengan jam sekarang + 10 detik" @click="prefill">
               <Icon :icon="icons.add" width="16" height="16" />10 dtk
             </button>
           </div>
-          <button type="button" class="lrc-btn lrc-btn--set" :disabled="busy || !validSetTime" @pointerdown.prevent="doSet">
+          <button type="button" class="ccb-btn ccb-btn--set" :disabled="busy || !validSetTime" @pointerdown.prevent="doSet">
             <Icon :icon="icons.timer" width="22" height="22" />
-            <span class="lrc-btn--set__text"><strong>SET</strong><small>tekan saat RaceTime2 = {{ validSetTime ? setTime : "…" }}</small></span>
+            <span class="ccb-btn--set__text"><strong>SET</strong><small>tekan saat RaceTime2 = {{ validSetTime ? setTime : "…" }}</small></span>
           </button>
         </div>
       </section>
 
       <!-- ===== trim ===== -->
-      <section class="lrc-card">
+      <section class="ccb-card">
         <h6><Icon :icon="icons.adjust" width="18" height="18" /> 2. Trim halus</h6>
-        <p class="lrc-hint">+ = waktu start maju (lebih besar), − = mundur. Berlaku untuk start berikutnya.</p>
-        <div class="lrc-trimbar">
+        <p class="ccb-hint">+ = jam RaceTime2 maju (lebih besar), − = mundur.</p>
+        <div class="ccb-trimbar">
           <button
             v-for="d in TRIMS_DOWN"
             :key="d"
             type="button"
-            class="lrc-trimbar__btn lrc-trimbar__btn--down"
+            class="ccb-trimbar__btn ccb-trimbar__btn--down"
             :disabled="busy"
             :title="'Mundurkan ' + -d + ' ms'"
             @click="act({ action: 'trim', deltaMs: d })"
           >
             {{ d }}
           </button>
-          <div class="lrc-trimbar__value" :class="{ 'is-zero': !status.trimMs }">
+          <div class="ccb-trimbar__value" :class="{ 'is-zero': !status.trimMs }">
             <span class="mono">{{ fmtMs(status.trimMs) }}</span>
             <small>trim</small>
           </div>
@@ -94,7 +97,7 @@
             v-for="d in TRIMS_UP"
             :key="d"
             type="button"
-            class="lrc-trimbar__btn lrc-trimbar__btn--up"
+            class="ccb-trimbar__btn ccb-trimbar__btn--up"
             :disabled="busy"
             :title="'Majukan ' + d + ' ms'"
             @click="act({ action: 'trim', deltaMs: d })"
@@ -102,30 +105,30 @@
             +{{ d }}
           </button>
         </div>
-        <div class="lrc-row lrc-row--gap">
-          <div class="lrc-suffix">
-            <input v-model.number="trimValue" type="number" step="1" class="lrc-input mono" placeholder="0" aria-label="Nilai trim (ms)" />
+        <div class="ccb-row ccb-row--gap">
+          <div class="ccb-suffix">
+            <input v-model.number="trimValue" type="number" step="1" class="ccb-input mono" placeholder="0" aria-label="Nilai trim (ms)" />
             <span>ms</span>
           </div>
           <button
             type="button"
-            class="lrc-btn lrc-btn--outline"
+            class="ccb-btn ccb-btn--outline"
             :disabled="busy || trimValue === '' || trimValue === null || trimValue === status.trimMs"
             @click="act({ action: 'set-trim', trimMs: trimValue })"
           >
             <Icon :icon="icons.check" width="16" height="16" />Terapkan
           </button>
-          <button type="button" class="lrc-btn lrc-btn--danger" :disabled="busy || !status.trimMs" @click="act({ action: 'reset-trim' })">
+          <button type="button" class="ccb-btn ccb-btn--danger" :disabled="busy || !status.trimMs" @click="act({ action: 'reset-trim' })">
             <Icon :icon="icons.restart" width="16" height="16" />Reset
           </button>
         </div>
       </section>
 
       <!-- ===== mode ===== -->
-      <section class="lrc-card">
+      <section class="ccb-card">
         <h6><Icon :icon="icons.sync" width="18" height="18" /> Mode</h6>
-        <div class="lrc-row lrc-row--gap">
-          <div class="lrc-seg" role="radiogroup" aria-label="Mode kalibrasi">
+        <div class="ccb-row ccb-row--gap">
+          <div class="ccb-seg" role="radiogroup" aria-label="Mode kalibrasi">
             <button
               type="button"
               role="radio"
@@ -141,43 +144,20 @@
               <Icon :icon="icons.tune" width="16" height="16" />Manual
             </button>
           </div>
-          <button type="button" class="lrc-btn lrc-btn--outline" :disabled="busy || !status.heartbeatAvailable" @click="act({ action: 'freeze-from-racetime' })">
+          <button type="button" class="ccb-btn ccb-btn--outline" :disabled="busy || !status.heartbeatAvailable" @click="act({ action: 'freeze-from-racetime' })">
             <Icon :icon="icons.sensors" width="16" height="16" />Kunci dari heartbeat
           </button>
         </div>
-        <p class="lrc-hint">
+        <p class="ccb-hint">
           Otomatis = heartbeat RaceTime2 berwaktu bila ada, selain itu jam laptop.
           {{ status.heartbeatAvailable ? "Heartbeat RaceTime2 sedang diterima." : "Heartbeat RaceTime2 berwaktu tidak diterima (frame bare)." }}
         </p>
       </section>
 
-      <!-- ===== start terakhir ===== -->
-      <section v-if="last" class="lrc-card">
-        <h6><Icon :icon="icons.flag" width="18" height="18" /> Start terakhir</h6>
-        <div class="lrc-row lrc-last">
-          <span class="mono lrc-last__time">{{ last.time }}</span>
-          <span v-if="last.originalTime && last.originalTime !== last.time" class="lrc-hint">semula {{ last.originalTime }}</span>
-          <span class="lrc-hint">{{ [last.raceId, last.wave ? "wave " + last.wave : null, last.deviceName].filter(Boolean).join(" · ") }}</span>
-          <span class="spacer"></span>
-          <button
-            type="button"
-            class="lrc-btn lrc-btn--primary"
-            :disabled="busy || !lastStale"
-            :title="lastStale ? 'Terapkan kalibrasi terbaru ke start ini' : 'Sudah memakai kalibrasi terbaru'"
-            @click="doRecompute"
-          >
-            <Icon :icon="icons.refresh" width="16" height="16" />
-            <template v-if="lastStale">Hitung ulang → <span class="mono">{{ lastPreview }}</span></template>
-            <template v-else>Sudah terkalibrasi</template>
-          </button>
-        </div>
-        <p class="lrc-hint">Hitung ulang mengisi Buffer-Timer-Start lagi. Bila waktu lama sudah ditetapkan ke BIB, ubah di tim tersebut.</p>
-      </section>
-
       <!-- ===== log ===== -->
-      <section v-if="log.length" class="lrc-log">
-        <div class="lrc-log__title">Riwayat kalibrasi</div>
-        <div v-for="(l, i) in log" :key="i" class="lrc-log__row">
+      <section v-if="log.length" class="ccb-log">
+        <div class="ccb-log__title">Riwayat kalibrasi</div>
+        <div v-for="(l, i) in log" :key="i" class="ccb-log__row">
           <span class="mono">{{ fmtAt(l.at) }}</span>
           <span>{{ l.note }}</span>
         </div>
@@ -187,21 +167,23 @@
 </template>
 
 <script>
-// Kalibrasi manual jam Long Range Start terhadap RaceTime2 — logika di
-// longrangeCore.js (calibrate/recompute), di sini hanya UI + jam berjalan.
+// Kalibrasi jam RaceTime2 bersama — logika di clockCalibrationCore.js
+// (lewat clockMain.js), di sini hanya UI + jam berjalan. Dikloning dari
+// LongrangeCalibration.vue (sengaja TANPA bagian "Riwayat Start"/recompute
+// — itu murni milik Long Range Start, bukan kalibrasi jam itu sendiri)
+// supaya tetap bisa dipakai walau Long Range TIDAK dikonfigurasi sama
+// sekali (mis. event yang cuma pakai STS Photo Finish).
 import { Icon } from "@iconify/vue2";
 import icTune from "@iconify/icons-ic/baseline-tune";
 import icClose from "@iconify/icons-ic/baseline-close";
 import icTimer from "@iconify/icons-ic/baseline-timer";
 import icAdjust from "@iconify/icons-ic/baseline-exposure";
 import icSync from "@iconify/icons-ic/baseline-sync";
-import icFlag from "@iconify/icons-ic/baseline-flag";
 import icAdd from "@iconify/icons-ic/baseline-add";
 import icRestart from "@iconify/icons-ic/baseline-restart-alt";
 import icSensors from "@iconify/icons-ic/baseline-sensors";
-import icRefresh from "@iconify/icons-ic/baseline-refresh";
 import icCheck from "@iconify/icons-ic/baseline-check";
-import { calibrate, getRecent, getStatus, hostNowMs, onStatus, recompute } from "@/services/longrange";
+import { calibrate, getStatus, hostNowMs, onStatus } from "@/services/clock";
 
 const DAY_MS = 86400000;
 const BASIS = { manual: "Manual", racetime: "Heartbeat RaceTime2", laptop: "Jam laptop" };
@@ -221,13 +203,12 @@ function localTod(ms) {
 }
 
 export default {
-  name: "LongrangeCalibration",
+  name: "ClockCalibration",
   components: { Icon },
   props: { value: { type: Boolean, default: false } },
   data() {
     return {
       status: {},
-      recent: [],
       clockNow: "--:--:--.---",
       setTime: "",
       trimValue: "",
@@ -236,8 +217,8 @@ export default {
       TRIMS_DOWN: TRIMS_DOWN,
       TRIMS_UP: TRIMS_UP,
       icons: {
-        tune: icTune, close: icClose, timer: icTimer, adjust: icAdjust, sync: icSync, flag: icFlag,
-        add: icAdd, restart: icRestart, sensors: icSensors, refresh: icRefresh, check: icCheck,
+        tune: icTune, close: icClose, timer: icTimer, adjust: icAdjust, sync: icSync,
+        add: icAdd, restart: icRestart, sensors: icSensors, check: icCheck,
       },
     };
   },
@@ -250,17 +231,6 @@ export default {
     },
     log() {
       return (this.status.calibration && this.status.calibration.log) || [];
-    },
-    last() {
-      return this.recent.find((e) => e.kind === "START") || null;
-    },
-    lastStale() {
-      return !!(this.last && this.status.calibration && this.last.calibrationRevision !== this.status.calibration.revision);
-    },
-    lastPreview() {
-      // Perkiraan saja (offset server→laptop saat ini dianggap sama); hasil pasti dihitung main process.
-      if (!this.last || typeof this.status.serverOffsetMs !== "number") return "";
-      return fmtClock(localTod(this.last.startServerMs - this.status.serverOffsetMs) - this.status.displayOffsetMs);
     },
   },
   watch: {
@@ -285,7 +255,6 @@ export default {
   methods: {
     async refresh() {
       this.status = await getStatus();
-      this.recent = await getRecent();
       if (!this.setTime) this.prefill();
       this.trimValue = this.status.trimMs || 0;
     },
@@ -321,16 +290,6 @@ export default {
         this.busy = false;
       }
     },
-    async doRecompute() {
-      this.busy = true;
-      try {
-        const res = await recompute(this.last.startId);
-        if (!res.ok) return this.toast("danger", res.error);
-        this.recent = await getRecent();
-      } finally {
-        this.busy = false;
-      }
-    },
     fmtMs(v) {
       const n = Number(v) || 0;
       return (n > 0 ? "+" : "") + n + " ms";
@@ -339,7 +298,7 @@ export default {
       return new Date(iso).toLocaleTimeString("id-ID");
     },
     toast(variant, text) {
-      if (this.$bvToast) this.$bvToast.toast(text, { title: "Kalibrasi Long Range Start", variant: variant, solid: true, autoHideDelay: 5000 });
+      if (this.$bvToast) this.$bvToast.toast(text, { title: "Kalibrasi Jam RaceTime2", variant: variant, solid: true, autoHideDelay: 5000 });
     },
   },
 };
@@ -347,7 +306,7 @@ export default {
 
 <style>
 /* tidak scoped: kelas ini dipasang pada elemen milik b-modal */
-.lrc {
+.ccb {
   border: 0;
   border-radius: 18px;
   overflow: hidden;
@@ -360,7 +319,7 @@ export default {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
-.lrc-head {
+.ccb-head {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -368,7 +327,7 @@ export default {
   background: linear-gradient(90deg, #1874a5, #1d8fbb);
   color: #fff;
 }
-.lrc-head__icon {
+.ccb-head__icon {
   display: grid;
   place-items: center;
   width: 40px;
@@ -376,18 +335,18 @@ export default {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.16);
 }
-.lrc-head__text {
+.ccb-head__text {
   flex: 1;
   min-width: 0;
 }
-.lrc-head__text h5 {
+.ccb-head__text h5 {
   margin: 0;
   font-weight: 800;
 }
-.lrc-head__text small {
+.ccb-head__text small {
   opacity: 0.85;
 }
-.lrc-icon-btn {
+.ccb-icon-btn {
   display: grid;
   place-items: center;
   width: 36px;
@@ -397,28 +356,28 @@ export default {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
-.lrc-icon-btn:hover {
+.ccb-icon-btn:hover {
   background: rgba(255, 255, 255, 0.24);
 }
-.lrc-body {
+.ccb-body {
   padding: 18px;
   display: grid;
   gap: 14px;
   background: #f4f7fb;
 }
-.lrc-clock {
+.ccb-clock {
   background: #2f2f2f;
   border-radius: 18px;
   padding: 16px;
   color: #fff;
   text-align: center;
 }
-.lrc-clock__label {
+.ccb-clock__label {
   font-weight: 700;
   font-size: 0.85rem;
   color: #dbe4ee;
 }
-.lrc-clock__value {
+.ccb-clock__value {
   display: inline-block;
   margin: 8px 0;
   padding: 6px 18px;
@@ -428,17 +387,17 @@ export default {
   font-size: 2.6rem;
   font-weight: 800;
 }
-.lrc-clock .lrc-hint {
+.ccb-clock .ccb-hint {
   color: #b6c2cf;
   margin: 8px 0 0;
 }
-.lrc-chips {
+.ccb-chips {
   display: flex;
   gap: 6px;
   justify-content: center;
   flex-wrap: wrap;
 }
-.lrc-chip {
+.ccb-chip {
   font-size: 12px;
   font-weight: 600;
   padding: 3px 10px;
@@ -446,31 +405,31 @@ export default {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
-.lrc-chip--sync {
+.ccb-chip--sync {
   background: rgba(34, 211, 238, 0.18);
   color: #a5f3fc;
 }
-.lrc-chip--manual {
+.ccb-chip--manual {
   background: #1d8fbb;
   border-color: #1d8fbb;
 }
-.lrc-chip--racetime {
+.ccb-chip--racetime {
   background: #10b981;
   border-color: #10b981;
 }
-.lrc-chip--laptop,
-.lrc-chip--warn {
+.ccb-chip--laptop,
+.ccb-chip--warn {
   background: #f59e0b;
   border-color: #f59e0b;
   color: #1f1f1f;
 }
-.lrc-card {
+.ccb-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   padding: 14px 16px;
 }
-.lrc-card h6 {
+.ccb-card h6 {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -478,32 +437,32 @@ export default {
   font-weight: 800;
   color: #0f172a;
 }
-.lrc-card h6 svg {
+.ccb-card h6 svg {
   color: #1874a5;
 }
-.lrc-hint {
+.ccb-hint {
   color: #6b7280;
   font-size: 0.82rem;
   margin: 0 0 10px;
 }
-.lrc-row {
+.ccb-row {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
-.lrc-row + .lrc-row {
+.ccb-row + .ccb-row {
   margin-top: 8px;
 }
-.lrc-row--gap {
+.ccb-row--gap {
   gap: 10px;
 }
-.lrc-row + .lrc-hint {
+.ccb-row + .ccb-hint {
   margin: 10px 0 0;
 }
 
 /* ---------- tombol (bahasa visual sts-timingsystem: btn-action + gradien brand) ---------- */
-.lrc-btn {
+.ccb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -521,49 +480,44 @@ export default {
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.05s;
 }
-.lrc-btn:hover:not(:disabled) {
+.ccb-btn:hover:not(:disabled) {
   background: #1f6fa3;
   border-color: #1f6fa3;
   color: #fff;
 }
-.lrc-btn:focus-visible {
+.ccb-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
 }
-.lrc-btn:active:not(:disabled) {
+.ccb-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.lrc-btn:disabled {
+.ccb-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.lrc-btn--ghost {
+.ccb-btn--ghost {
   border-color: transparent;
   background: #eaf4fa;
   color: #1874a5;
 }
-.lrc-btn--primary {
-  border-color: transparent;
-  background: linear-gradient(90deg, #1874a5, #1d8fbb);
-  color: #fff;
-}
-.lrc-btn--danger {
+.ccb-btn--danger {
   color: #dc2626;
   border-color: #fecaca;
 }
-.lrc-btn--danger:hover:not(:disabled) {
+.ccb-btn--danger:hover:not(:disabled) {
   background: #dc2626;
   border-color: #dc2626;
 }
 
 /* SET: tombol utama besar — ditekan tepat saat RaceTime2 menunjukkan waktu */
-.lrc-setbar {
+.ccb-setbar {
   display: flex;
   gap: 10px;
   align-items: stretch;
   flex-wrap: wrap;
 }
-.lrc-setbar__field {
+.ccb-setbar__field {
   flex: 1 1 260px;
   display: flex;
   align-items: center;
@@ -573,12 +527,12 @@ export default {
   border-radius: 14px;
   background: #f8fafc;
 }
-.lrc-setbar__field:focus-within {
+.ccb-setbar__field:focus-within {
   border-color: #93c5fd;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
   background: #fff;
 }
-.lrc-input {
+.ccb-input {
   height: 44px;
   width: 100%;
   min-width: 0;
@@ -588,13 +542,13 @@ export default {
   padding: 0 12px;
   color: #0f172a;
 }
-.lrc-input:focus {
+.ccb-input:focus {
   outline: none;
   border-color: #93c5fd;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
   background: #fff;
 }
-.lrc-time-input {
+.ccb-time-input {
   flex: 1;
   border: 0;
   background: transparent;
@@ -602,11 +556,11 @@ export default {
   font-weight: 800;
   letter-spacing: 0.02em;
 }
-.lrc-time-input:focus {
+.ccb-time-input:focus {
   box-shadow: none;
   background: transparent;
 }
-.lrc-btn--set {
+.ccb-btn--set {
   flex: 1 1 230px;
   max-width: 100%;
   min-height: 56px;
@@ -619,25 +573,25 @@ export default {
   justify-content: flex-start;
   gap: 10px;
 }
-.lrc-btn--set:hover:not(:disabled) {
+.ccb-btn--set:hover:not(:disabled) {
   background: linear-gradient(90deg, #13628d, #1874a5);
 }
-.lrc-btn--set:active:not(:disabled) {
+.ccb-btn--set:active:not(:disabled) {
   transform: scale(0.98);
   box-shadow: 0 2px 6px rgba(24, 116, 165, 0.35);
 }
-.lrc-btn--set__text {
+.ccb-btn--set__text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   line-height: 1.15;
   min-width: 0;
 }
-.lrc-btn--set__text strong {
+.ccb-btn--set__text strong {
   font-size: 1.15rem;
   letter-spacing: 0.08em;
 }
-.lrc-btn--set__text small {
+.ccb-btn--set__text small {
   font-weight: 600;
   font-size: 0.72rem;
   opacity: 0.85;
@@ -646,7 +600,7 @@ export default {
 }
 
 /* Trim: satu batang — mundur | nilai | maju */
-.lrc-trimbar {
+.ccb-trimbar {
   display: flex;
   align-items: stretch;
   border: 1px solid #cfd8e6;
@@ -655,7 +609,7 @@ export default {
   background: #fff;
   margin-bottom: 10px;
 }
-.lrc-trimbar__btn {
+.ccb-trimbar__btn {
   flex: 1;
   min-width: 0;
   min-height: 44px;
@@ -668,28 +622,28 @@ export default {
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.lrc-trimbar__btn--down {
+.ccb-trimbar__btn--down {
   color: #b45309;
 }
-.lrc-trimbar__btn--up {
+.ccb-trimbar__btn--up {
   color: #047857;
   border-right: 0;
   border-left: 1px solid #e5e7eb;
 }
-.lrc-trimbar__btn--down:hover:not(:disabled) {
+.ccb-trimbar__btn--down:hover:not(:disabled) {
   background: #fff7ed;
 }
-.lrc-trimbar__btn--up:hover:not(:disabled) {
+.ccb-trimbar__btn--up:hover:not(:disabled) {
   background: #ecfdf5;
 }
-.lrc-trimbar__btn:active:not(:disabled) {
+.ccb-trimbar__btn:active:not(:disabled) {
   filter: brightness(0.94);
 }
-.lrc-trimbar__btn:disabled {
+.ccb-trimbar__btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.lrc-trimbar__value {
+.ccb-trimbar__value {
   flex: 1.4;
   display: flex;
   flex-direction: column;
@@ -700,28 +654,28 @@ export default {
   color: #fff;
   line-height: 1.1;
 }
-.lrc-trimbar__value.is-zero {
+.ccb-trimbar__value.is-zero {
   background: #f1f5f9;
   color: #374151;
 }
-.lrc-trimbar__value .mono {
+.ccb-trimbar__value .mono {
   font-weight: 800;
   font-size: 1rem;
 }
-.lrc-trimbar__value small {
+.ccb-trimbar__value small {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   opacity: 0.8;
 }
-.lrc-suffix {
+.ccb-suffix {
   position: relative;
   width: 150px;
 }
-.lrc-suffix .lrc-input {
+.ccb-suffix .ccb-input {
   padding-right: 40px;
 }
-.lrc-suffix span {
+.ccb-suffix span {
   position: absolute;
   right: 12px;
   top: 50%;
@@ -733,14 +687,14 @@ export default {
 }
 
 /* Mode: kontrol segmen Otomatis / Manual */
-.lrc-seg {
+.ccb-seg {
   display: inline-flex;
   padding: 3px;
   border-radius: 12px;
   background: #f1f5f9;
   border: 1px solid #e5e7eb;
 }
-.lrc-seg button {
+.ccb-seg button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -754,36 +708,28 @@ export default {
   font-size: 0.88rem;
   cursor: pointer;
 }
-.lrc-seg button:hover:not(:disabled):not(.on) {
+.ccb-seg button:hover:not(:disabled):not(.on) {
   color: #1874a5;
   background: #fff;
 }
-.lrc-seg button.on {
+.ccb-seg button.on {
   background: #fff;
   color: #1874a5;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
   cursor: default;
 }
-.lrc-seg button:disabled:not(.on) {
+.ccb-seg button:disabled:not(.on) {
   cursor: default;
 }
 
-.lrc-last__time {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #0f172a;
-}
-.lrc-last .lrc-hint {
-  margin: 0;
-}
 .spacer {
   flex: 1;
 }
-.lrc-log {
+.ccb-log {
   font-size: 0.82rem;
   color: #374151;
 }
-.lrc-log__title {
+.ccb-log__title {
   font-weight: 700;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -791,7 +737,7 @@ export default {
   color: #6b7280;
   margin-bottom: 4px;
 }
-.lrc-log__row {
+.ccb-log__row {
   display: flex;
   gap: 12px;
   padding: 3px 0;

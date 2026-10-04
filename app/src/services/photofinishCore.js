@@ -15,6 +15,8 @@ const NS_PER_SEC = BigInt(1000000000);
 const CLOCK_WINDOW_MS = 5000;
 const CLOCK_SEND_EVERY_MS = 5000;
 const ACK_TIMEOUT_MS = 3000;
+const PF_CLOCK_SAMPLES = 8;
+const PF_CLOCK_EVERY_MS = 60000;
 const HISTORY_MAX = 300; // riwayat hasil Photo Finish yang disimpan (panel "Hasil Photo Finish")
 
 // HARUS identik dengan canonicalJson() di sts-photofinish/api/src/canonical.ts
@@ -77,6 +79,8 @@ function serialLatencyNs(frameBytes, baudRate) {
  * @param {Function} opts.onVerified dipanggil untuk setiap hasil photo finish baru/terkoreksi
  * @param {Function} [opts.onStatus] dipanggil saat status koneksi/antrean berubah
  * @param {Function} [opts.onTrigger] dipanggil untuk setiap perahu yang terdeteksi kamera Photo Finish
+ * @param {Function} [opts.onCalibration] dipanggil saat kalibrasi jam Photo Finish diterima, atau jam
+ *                   server PF baru tersinkron (untuk penyelaras kalibrasi Long Range ⇄ Photo Finish)
  */
 function createPhotofinishClient(opts) {
   const storage = opts.storage;
@@ -87,6 +91,11 @@ function createPhotofinishClient(opts) {
   let clockTimer = null;
   let lastError = null;
   let samples = [];
+  // Jam server API Photo Finish − jam laptop (ms), ping-pong "clock:ping" RTT terkecil.
+  const pfClock = { synced: false, offsetMs: 0, rttMs: null, syncedAt: null };
+  let pfClockTimer = null;
+  // Kalibrasi jam Photo Finish terakhir yang diterima ("pf:calibration", HMAC valid).
+  let remoteCal = null;
 
   // Antrean sinyal — disimpan ke disk agar tidak hilang saat Wi-Fi putus
   // atau aplikasi ditutup sebelum sempat terkirim.
@@ -325,6 +334,52 @@ function createPhotofinishClient(opts) {
     if (touched) historyChanged();
   }
 
+  function laptopNowMs() {
+    return Number(opts.now()) / 1e6; // opts.now() = epoch ns (string)
+  }
+
+  /** Ukur jam server Photo Finish terhadap jam laptop (dipakai konversi kalibrasi). */
+  async function syncPfClock() {
+    const results = [];
+    for (let i = 0; i < PF_CLOCK_SAMPLES && socket && socket.connected; i++) {
+      try {
+        const t0 = laptopNowMs();
+        const res = await socket.timeout(ACK_TIMEOUT_MS).emitWithAck("clock:ping", {});
+        const t1 = laptopNowMs();
+        if (res && res.ok && res.serverNs) results.push({ rtt: t1 - t0, offset: Number(res.serverNs) / 1e6 - (t0 + t1) / 2 });
+      } catch (_e) {
+        // timeout — sampel dilewati
+      }
+    }
+    if (!results.length) return;
+    results.sort(function (a, b) {
+      return a.rtt - b.rtt;
+    });
+    pfClock.offsetMs = results[0].offset;
+    pfClock.rttMs = results[0].rtt;
+    pfClock.synced = true;
+    pfClock.syncedAt = Date.now();
+    if (remoteCal && typeof opts.onCalibration === "function") opts.onCalibration(remoteCal);
+  }
+
+  /** Kirim kalibrasi (sudah dalam basis jam server PF) — diterapkan PF bila lebih baru. */
+  async function sendCalibration(cal) {
+    if (!socket || !socket.connected) return { ok: false, error: "Photo Finish tidak terhubung" };
+    const payload = sign(opts.hmacSecret, {
+      type: "timing:calibration",
+      mode: cal.mode,
+      manualOffsetNs: cal.manualOffsetNs,
+      trimNs: cal.trimNs,
+      updatedAt: cal.updatedAt,
+      note: cal.note || null,
+    });
+    try {
+      return await socket.timeout(ACK_TIMEOUT_MS).emitWithAck("timing:calibration", payload);
+    } catch (_e) {
+      return { ok: false, error: "Photo Finish tidak menjawab (timeout)" };
+    }
+  }
+
   function start() {
     socket = opts.io(opts.apiUrl, {
       auth: { token: opts.deviceToken },
@@ -338,6 +393,12 @@ function createPhotofinishClient(opts) {
       lastError = null;
       emitStatus();
       flush();
+      syncPfClock();
+    });
+    socket.on("pf:calibration", function (msg) {
+      if (!verify(opts.hmacSecret, msg)) return;
+      remoteCal = msg;
+      if (typeof opts.onCalibration === "function") opts.onCalibration(msg);
     });
     socket.on("disconnect", function (reason) {
       emitStatus();
@@ -363,11 +424,14 @@ function createPhotofinishClient(opts) {
       if (typeof opts.onTrigger === "function") opts.onTrigger(msg);
     });
     clockTimer = setInterval(sendClock, CLOCK_SEND_EVERY_MS);
+    pfClockTimer = setInterval(syncPfClock, PF_CLOCK_EVERY_MS);
   }
 
   function stop() {
     if (clockTimer) clearInterval(clockTimer);
+    if (pfClockTimer) clearInterval(pfClockTimer);
     clockTimer = null;
+    pfClockTimer = null;
     if (socket) socket.close();
     socket = null;
   }
@@ -390,6 +454,13 @@ function createPhotofinishClient(opts) {
       });
     },
     status: status,
+    pfClock: function () {
+      return Object.assign({}, pfClock);
+    },
+    remoteCalibration: function () {
+      return remoteCal;
+    },
+    sendCalibration: sendCalibration,
     flush: flush,
   };
 }

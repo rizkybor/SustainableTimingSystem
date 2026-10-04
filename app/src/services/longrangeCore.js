@@ -15,24 +15,21 @@
 //      b. heartbeat START RaceTime2 yang membawa waktu (min-filter)
 //      c. jam lokal laptop
 //      lalu + trim (koreksi halus ms, diatur operator; awal dari LRS_TRIM_MS).
-//   Kalibrasi disimpan (storage "calibration") dan dicatat di log kalibrasi.
+//   Kalibrasi adalah milik sts-timingsystem (clockCalibrationCore.js, satu
+//   jendela "Kalibrasi Jam RaceTime2") dan dipakai bersama STS Photo Finish.
 //
 // Catatan sintaks: main process di-bundle webpack 4 (Electron 13 / Node 14)
 // — JANGAN pakai `?.`, `??`, atau literal BigInt.
 const crypto = require("crypto");
+const { createClockCalibration } = require("./clockCalibrationCore");
 
 const DAY_MS = 86400000;
 const CLOCK_SAMPLES = 8;
 const CLOCK_EVERY_MS = 60000;
 const CLOCK_STATE_EVERY_MS = 15000;
 const PING_TIMEOUT_MS = 2000;
-const HB_WINDOW_MS = 5000;
-const HB_FRESH_MS = 10000;
-const HB_MIN_SAMPLES = 5;
 const SEEN_MAX = 500;
 const HISTORY_MAX = 100;
-const CAL_LOG_MAX = 50;
-const TRIM_LIMIT_MS = 60000;
 
 // HARUS identik dengan canonical() di sts-longrangestart/server/index.mjs.
 function canonical(v) {
@@ -110,6 +107,7 @@ function formatClock(todMs) {
  * @param {Function} [opts.onStart]   dipanggil untuk setiap START baru
  * @param {Function} [opts.onRecall]  dipanggil untuk setiap RECALL baru
  * @param {Function} [opts.onStatus]
+ * @param {Function} [opts.onCalibrated] dipanggil setelah operator mengubah kalibrasi (untuk sinkron ke Photo Finish)
  */
 function createLongrangeClient(opts) {
   const storage = opts.storage;
@@ -118,65 +116,39 @@ function createLongrangeClient(opts) {
   let stateTimer = null;
   let syncing = null;
   let lastError = null;
-  let hbSamples = [];
   const clock = { synced: false, offsetMs: 0, rttMs: null, syncedAt: null };
 
   // startId yang sudah diproses — server mengirim ulang setelah reconnect.
   let seen = storage.load("seen") || [];
   let history = storage.load("history") || [];
-  // Kalibrasi manual jam RaceTime2. manualOffsetMs = jam laptop − jam RaceTime2
-  // (time-of-day); null = tidak manual (heartbeat / jam laptop).
-  const cal = Object.assign(
-    { manualOffsetMs: null, trimMs: Number(opts.trimMs) || 0, revision: 0, updatedAt: null, log: [] },
-    storage.load("calibration") || {}
-  );
+  // Kalibrasi jam RaceTime2 — milik sts-timingsystem (clockCalibrationCore.js),
+  // dipakai bersama Photo Finish. Tanpa opts.calibration (mis. uji), klien ini
+  // membuat kalibrasinya sendiri di storage-nya.
+  const calib = opts.calibration || createClockCalibration({ storage: storage, trimMs: opts.trimMs });
+  calib.onChange(function (kind) {
+    emitStatus();
+    if (kind === "operator" && typeof opts.onCalibrated === "function") opts.onCalibrated();
+  });
 
-  function heartbeatOffset() {
-    const now = Date.now();
-    const fresh = hbSamples.filter(function (s) {
-      return now - s.at <= HB_FRESH_MS;
-    });
-    if (fresh.length >= HB_MIN_SAMPLES) {
-      let min = fresh[0].offsetMs;
-      fresh.forEach(function (s) {
-        if (s.offsetMs < min) min = s.offsetMs;
-      });
-      return min;
-    }
-    return null;
-  }
 
   function basis() {
-    if (cal.manualOffsetMs !== null) return { source: "manual", offsetMs: cal.manualOffsetMs };
-    const hb = heartbeatOffset();
-    if (hb !== null) return { source: "racetime", offsetMs: hb };
-    return { source: "laptop", offsetMs: 0 };
+    return calib.basis();
   }
 
   function status() {
-    const b = basis();
-    return {
-      enabled: true,
-      connected: !!(socket && socket.connected),
-      clockSynced: clock.synced,
-      serverOffsetMs: clock.offsetMs,
-      rttMs: clock.rttMs,
-      basis: b.source,
-      trimMs: cal.trimMs,
-      // Jam Buffer-Timer-Start saat ini = jam lokal laptop − displayOffsetMs (renderer menghitung jam berjalan).
-      displayOffsetMs: b.offsetMs - cal.trimMs,
-      heartbeatAvailable: heartbeatOffset() !== null,
-      calibration: {
-        manual: cal.manualOffsetMs !== null,
-        manualOffsetMs: cal.manualOffsetMs,
-        trimMs: cal.trimMs,
-        revision: cal.revision,
-        updatedAt: cal.updatedAt,
-        log: cal.log.slice(0, 10),
+    return Object.assign(
+      {
+        enabled: true,
+        connected: !!(socket && socket.connected),
+        clockSynced: clock.synced,
+        serverOffsetMs: clock.offsetMs,
+        rttMs: clock.rttMs,
+        lastError: lastError,
+        lastStart: history[0] || null,
       },
-      lastError: lastError,
-      lastStart: history[0] || null,
-    };
+      // basis, trimMs, displayOffsetMs, heartbeatAvailable, calibration
+      calib.summary()
+    );
   }
 
   /**
@@ -188,12 +160,13 @@ function createLongrangeClient(opts) {
     const b = basis();
     const tzMs = -new Date().getTimezoneOffset() * 60000;
     return {
-      todShiftMs: Math.round(-clock.offsetMs + tzMs - (b.offsetMs - cal.trimMs)),
+      todShiftMs: Math.round(-clock.offsetMs + tzMs - (b.offsetMs - calib.trimMs())),
       basis: b.source,
-      trimMs: cal.trimMs,
-      revision: cal.revision,
-      updatedAt: cal.updatedAt,
-      note: cal.log.length ? cal.log[0].note : null,
+      trimMs: calib.trimMs(),
+      revision: calib.state().revision,
+      updatedAt: calib.state().updatedAt,
+      origin: calib.state().origin,
+      note: calib.lastNote(),
     };
   }
 
@@ -241,20 +214,14 @@ function createLongrangeClient(opts) {
 
   /** Frame START RaceTime2 yang MEMBAWA jam berjalan → acuan jam RaceTime2. */
   function heartbeat(p) {
-    const dev = clockToMs(p && p.deviceTime);
-    if (dev === null || !p.hostMs) return;
-    const now = Date.now();
-    hbSamples.push({ at: now, offsetMs: diffDay(localTodMs(Number(p.hostMs)) - dev) });
-    hbSamples = hbSamples.filter(function (s) {
-      return now - s.at <= HB_WINDOW_MS;
-    });
+    calib.heartbeat(p);
   }
 
   /** jam server (epoch ms) → "HH:MM:SS.mmm" basis Buffer-Timer-Start. */
   function toBufferTime(startServerMs) {
     const b = basis();
     const laptopMs = startServerMs - clock.offsetMs;
-    return { time: formatClock(localTodMs(laptopMs) - b.offsetMs + cal.trimMs), basis: b.source };
+    return { time: formatClock(localTodMs(laptopMs) - b.offsetMs + calib.trimMs()), basis: b.source };
   }
 
   /**
@@ -267,45 +234,23 @@ function createLongrangeClient(opts) {
    *   { action: "use-auto" }             hapus kalibrasi manual (heartbeat / jam laptop)
    */
   function calibrate(body) {
-    const b = body || {};
-    const before = { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs };
-    let note = "";
-    if (b.action === "set-time") {
-      const dev = clockToMs(b.deviceTime);
-      const host = Number(b.hostMs);
-      if (dev === null) throw new Error("Format waktu harus HH:MM:SS.mmm");
-      if (!host) throw new Error("hostMs tidak valid");
-      cal.manualOffsetMs = diffDay(localTodMs(host) - dev);
-      cal.trimMs = 0;
-      note = "Set ke " + b.deviceTime;
-    } else if (b.action === "trim" || b.action === "set-trim") {
-      const v = Number(b.action === "trim" ? b.deltaMs : b.trimMs);
-      if (!isFinite(v)) throw new Error("Nilai trim tidak valid");
-      const next = b.action === "trim" ? cal.trimMs + v : v;
-      if (Math.abs(next) > TRIM_LIMIT_MS) throw new Error("Trim maksimal ±" + TRIM_LIMIT_MS / 1000 + " detik");
-      cal.trimMs = Math.round(next * 1000) / 1000;
-      note = b.action === "trim" ? "Trim " + (v > 0 ? "+" : "") + v + " ms" : "Trim = " + cal.trimMs + " ms";
-    } else if (b.action === "reset-trim") {
-      cal.trimMs = 0;
-      note = "Reset trim";
-    } else if (b.action === "freeze-from-racetime") {
-      const hb = heartbeatOffset();
-      if (hb === null) throw new Error("Belum ada heartbeat RaceTime2 berwaktu dalam 10 detik terakhir");
-      cal.manualOffsetMs = hb;
-      note = "Kunci dari heartbeat RaceTime2";
-    } else if (b.action === "use-auto") {
-      cal.manualOffsetMs = null;
-      note = "Kembali otomatis";
-    } else {
-      throw new Error("Aksi kalibrasi tidak dikenal");
-    }
-    cal.revision += 1;
-    cal.updatedAt = new Date().toISOString();
-    cal.log.unshift({ at: cal.updatedAt, action: b.action, note: note, before: before, after: { manualOffsetMs: cal.manualOffsetMs, trimMs: cal.trimMs } });
-    cal.log = cal.log.slice(0, CAL_LOG_MAX);
-    storage.save("calibration", cal);
-    emitStatus();
+    calib.calibrate(body);
     return status();
+  }
+
+  /** Kalibrasi saat ini dalam bentuk yang disinkronkan ke Photo Finish. */
+  function calibrationState() {
+    return calib.state();
+  }
+
+  /**
+   * Terapkan kalibrasi dari Photo Finish (sudah dikonversi ke basis jam laptop
+   * ini) bila LEBIH BARU dari kalibrasi tersimpan. updatedAt ikut disalin
+   * dari sumbernya, sehingga pertukaran berikutnya tidak memantul balik.
+   * @returns {boolean} true bila diterapkan
+   */
+  function applySyncedCalibration(c) {
+    return calib.applySynced(c);
   }
 
   /** Hitung ulang waktu satu start dengan kalibrasi saat ini, lalu terapkan lagi ke halaman race. */
@@ -318,7 +263,7 @@ function createLongrangeClient(opts) {
     if (!entry.originalTime) entry.originalTime = entry.time;
     entry.time = conv.time;
     entry.basis = conv.basis;
-    entry.calibrationRevision = cal.revision;
+    entry.calibrationRevision = calib.state().revision;
     entry.recomputedAt = new Date().toISOString();
     storage.save("history", history);
     // Perbarui waktu yang ditampilkan aplikasi garis start untuk start ini.
@@ -355,7 +300,7 @@ function createLongrangeClient(opts) {
       wave: msg.wave === undefined ? null : msg.wave,
       deviceName: msg.deviceName || null,
       inputMode: msg.inputMode || null,
-      calibrationRevision: cal.revision,
+      calibrationRevision: calib.state().revision,
       receivedAt: new Date().toISOString(),
     };
     if (entry.kind === "RECALL") {
@@ -432,6 +377,8 @@ function createLongrangeClient(opts) {
     syncClock: syncClock,
     toBufferTime: toBufferTime,
     calibrate: calibrate,
+    calibrationState: calibrationState,
+    applySyncedCalibration: applySyncedCalibration,
     clockState: clockState,
     recompute: recompute,
     status: status,
@@ -447,4 +394,6 @@ module.exports = {
   formatClock: formatClock,
   clockToMs: clockToMs,
   localTodMs: localTodMs,
+  diffDay: diffDay,
+  wrapDay: wrapDay,
 };

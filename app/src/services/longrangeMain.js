@@ -1,7 +1,7 @@
 // Integrasi STS Long Range Start di MAIN process Electron.
 //
 // Renderer (serialPortMixin) hanya bicara lewat IPC:
-//   renderer → main : "lr:heartbeat", invoke "lr:status", invoke "lr:recent",
+//   renderer → main : invoke "lr:status", invoke "lr:recent",
 //                     invoke "lr:calibrate", invoke "lr:recompute"
 //   main → renderer : "lr:start", "lr:recall", "lr:status"
 //
@@ -15,6 +15,7 @@ const fs = require("fs");
 const path = require("path");
 const { io } = require("socket.io-client");
 const { createLongrangeClient } = require("./longrangeCore");
+const clockMain = require("./clockMain");
 require("dotenv").config();
 
 let client = null;
@@ -81,6 +82,8 @@ function setupLongrange() {
       timingToken: cfg.timingToken,
       hmacSecret: cfg.hmacSecret,
       trimMs: cfg.trimMs,
+      // Kalibrasi jam milik timing (clockMain.js) — sama dengan Photo Finish.
+      calibration: clockMain.getCalibration(),
       io: io,
       now: hostNowMs,
       storage: storage,
@@ -95,11 +98,12 @@ function setupLongrange() {
       },
     });
     client.start();
+    clockMain.addStatusSource(function () {
+      const st = client.status();
+      return { longrange: { configured: true, connected: st.connected, clockSynced: st.clockSynced, rttMs: st.rttMs } };
+    });
   }
 
-  ipcMain.on("lr:heartbeat", function (_event, p) {
-    if (client && p) client.heartbeat(p);
-  });
   ipcMain.handle("lr:status", function () {
     return client ? client.status() : { enabled: false, connected: false };
   });

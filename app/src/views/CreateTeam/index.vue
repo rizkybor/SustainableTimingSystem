@@ -108,6 +108,16 @@
                 style="border-radius: 12px"
                 variant="outline-secondary"
                 class="mr-2"
+                title="Download template Excel utk Import from Excel"
+                @click="downloadBulkTemplate"
+              >
+                <Icon icon="mdi:file-download-outline" width="18" height="18" />
+                Download Template
+              </b-button>
+              <b-button
+                style="border-radius: 12px"
+                variant="outline-secondary"
+                class="mr-2"
                 :disabled="bulkParsing"
                 @click="$refs.bulkFileInput.click()"
               >
@@ -463,6 +473,138 @@
 
       <div class="stx-modal-body">
         <p class="mb-2 text-muted small">
+          File: <strong>{{ bulkFileName || "-" }}</strong> — format kolom:
+          <strong>Team Name</strong>, <strong>Team Type</strong>,
+          <strong>Country</strong> (lihat
+          <a href="#" @click.prevent="downloadBulkTemplate">template</a>).
+        </p>
+
+        <b-form-group label-class="label-strong">
+          <template #label>
+            Default Team Type
+            <span v-if="bulkNeedsDefaultType" class="text-danger">*</span>
+          </template>
+          <b-form-select
+            size="sm"
+            v-model="bulkTeamType"
+            :options="optionTeamTypes"
+            value-field="value"
+            text-field="name"
+            class="input-soft"
+            style="border-radius: 12px"
+            :disabled="bulkImporting"
+          >
+            <template #first>
+              <b-form-select-option :value="null">-</b-form-select-option>
+            </template>
+          </b-form-select>
+          <small class="text-muted">
+            Dipakai utk baris yang kolom Team Type-nya kosong.
+          </small>
+        </b-form-group>
+
+        <div v-if="!bulkRows.length" class="text-center text-muted py-4">
+          Tidak ada data tim yang ditemukan di file ini. Pastikan file memakai
+          format template (kolom <strong>Team Name</strong> wajib ada).
+        </div>
+        <div v-else class="table-responsive table-rounded-wrapper">
+          <b-table
+            striped
+            small
+            hover
+            :items="bulkRows"
+            :fields="bulkFields"
+            class="um-table mb-0"
+          >
+            <template #head(selected)>
+              <b-form-checkbox
+                :checked="allNewSelected"
+                :indeterminate="someNewSelected && !allNewSelected"
+                :disabled="bulkImporting"
+                @change="toggleSelectAllBulkRows"
+              />
+            </template>
+            <template #cell(selected)="row">
+              <b-form-checkbox
+                v-model="row.item.selected"
+                :disabled="!isBulkRowSelectable(row.item) || bulkImporting"
+              />
+            </template>
+            <template #cell(rowNo)="row">
+              <span class="text-muted">{{ row.item.rowNo }}</span>
+            </template>
+            <template #cell(typeTeam)="row">
+              <span v-if="row.item.typeTeam">
+                {{ teamTypeLabel(row.item.typeTeam) }}
+              </span>
+              <span v-else-if="bulkTeamType" class="text-muted">
+                {{ teamTypeLabel(bulkTeamType) }} (default)
+              </span>
+              <span v-else class="text-danger small">Belum diisi</span>
+            </template>
+            <template #cell(countryCode)="row">
+              <span v-if="row.item.countryCode" class="d-inline-flex align-items-center">
+                <CountryFlag :code="row.item.countryCode" class="mr-1" />
+                {{ row.item.countryCode }}
+              </span>
+              <span v-else class="text-muted">-</span>
+            </template>
+            <template #cell(status)="row">
+              <span v-if="row.item.error" class="status-pill status-danger" :title="row.item.error">
+                {{ row.item.error }}
+              </span>
+              <span v-else-if="row.item.duplicate" class="status-pill status-upcoming">
+                Sudah ada
+              </span>
+              <span v-else class="status-pill status-success">Baru</span>
+            </template>
+          </b-table>
+        </div>
+      </div>
+
+      <div class="stx-modal-footer">
+        <b-button
+          variant="outline-secondary"
+          class="btn-pill"
+          @click="$bvModal.hide('modal-edit-team')"
+        >
+          Cancel
+        </b-button>
+        <b-button variant="primary" class="btn-pill" @click="submitEdit">
+          Save
+        </b-button>
+      </div>
+    </b-modal>
+
+    <!-- Import from Excel: preview + konfirmasi -->
+    <b-modal
+      id="modal-bulk-import-team"
+      v-model="showBulkImportModal"
+      size="lg"
+      scrollable
+      :no-close-on-backdrop="bulkImporting"
+      :no-close-on-esc="bulkImporting"
+      hide-header
+      hide-footer
+      body-class="p-0"
+      content-class="stx-modal-content"
+      centered
+    >
+      <div class="stx-modal-header">
+        <h5>Import Teams from Excel</h5>
+        <button
+          type="button"
+          class="stx-modal-close"
+          aria-label="Close"
+          :disabled="bulkImporting"
+          @click="showBulkImportModal = false"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="stx-modal-body">
+        <p class="mb-2 text-muted small">
           File: <strong>{{ bulkFileName || "-" }}</strong> — kolom
           <strong>Asal PENGPROV</strong> diambil sebagai nama tim.
         </p>
@@ -558,10 +700,23 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import { COUNTRIES } from "@/utils/countries";
 import * as XLSX from "xlsx";
 
-// Nama kolom di file Excel (Google Form response) yang jadi sumber nama tim
-// bulk import — dicocokkan case-insensitive/trim, bukan posisi kolom, supaya
-// tahan kalau urutan kolom lain berubah.
-const BULK_IMPORT_SOURCE_HEADER = "asal pengprov";
+// Format Import from Excel (bulk Create New Team) — 1 baris = 1 tim, kolom
+// sama dgn form Create New Team. Header dicocokkan setelah dinormalisasi
+// (huruf kecil, tanpa spasi/tanda `*`), bukan posisi kolom, supaya tahan
+// urutan kolom/kapitalisasi beda. "Asal PENGPROV" tetap diterima sbg alias
+// Team Name supaya export Google Form lama masih bisa dipakai.
+const BULK_HEADER_ALIASES = {
+  nameTeam: ["teamname", "namatim", "team", "asalpengprov"],
+  typeTeam: ["teamtype", "tipetim", "type", "jenistim"],
+  countryCode: ["country", "countrycode", "negara", "kodenegara"],
+};
+const BULK_TEMPLATE_HEADERS = ["Team Name", "Team Type", "Country"];
+
+function normalizeHeader(h) {
+  return String(h || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
 
 export default {
   name: "SustainableTimingSystemCreateTeam",
@@ -606,10 +761,14 @@ export default {
       showBulkImportModal: false,
       bulkFileName: "",
       bulkTeamType: null,
-      bulkRows: [], // [{ nameTeam, duplicate, selected }]
+      // [{ rowNo, nameTeam, typeTeam, countryCode, error, duplicate, selected }]
+      bulkRows: [],
       bulkFields: [
         { key: "selected", label: "" },
-        { key: "nameTeam", label: "Team Name (Asal PENGPROV)" },
+        { key: "rowNo", label: "Row" },
+        { key: "nameTeam", label: "Team Name" },
+        { key: "typeTeam", label: "Team Type" },
+        { key: "countryCode", label: "Country" },
         { key: "status", label: "Status" },
       ],
     };
@@ -669,19 +828,24 @@ export default {
     selectedBulkCount() {
       return (this.bulkRows || []).filter((r) => r.selected).length;
     },
+    // Default Team Type wajib dipilih hanya kalau ada baris terpilih yang
+    // kolom Team Type-nya kosong.
+    bulkNeedsDefaultType() {
+      return (this.bulkRows || []).some((r) => r.selected && !r.typeTeam);
+    },
     canConfirmBulkImport() {
       return (
         !this.bulkImporting &&
-        !!this.bulkTeamType &&
-        this.selectedBulkCount > 0
+        this.selectedBulkCount > 0 &&
+        (!this.bulkNeedsDefaultType || !!this.bulkTeamType)
       );
     },
     allNewSelected() {
-      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      const selectable = (this.bulkRows || []).filter(this.isBulkRowSelectable);
       return selectable.length > 0 && selectable.every((r) => r.selected);
     },
     someNewSelected() {
-      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      const selectable = (this.bulkRows || []).filter(this.isBulkRowSelectable);
       return selectable.some((r) => r.selected);
     },
   },
@@ -883,32 +1047,65 @@ export default {
             )
           );
 
-          const seen = new Set();
-          const names = [];
-          rows.forEach((row) => {
-            // cari key kolom "Asal PENGPROV" case-insensitive/trim (header
-            // asli bisa beda kapitalisasi/spasi antar-export Google Form)
-            const key = Object.keys(row || {}).find(
-              (k) => k.trim().toLowerCase() === BULK_IMPORT_SOURCE_HEADER
+          // Petakan header asli file -> field (lihat BULK_HEADER_ALIASES)
+          const headerKeys = Object.keys(rows[0] || {});
+          const colOf = {};
+          Object.keys(BULK_HEADER_ALIASES).forEach((field) => {
+            colOf[field] = headerKeys.find((k) =>
+              BULK_HEADER_ALIASES[field].includes(normalizeHeader(k))
             );
-            if (!key) return;
-            const val = String(row[key] || "").trim().toUpperCase();
-            if (!val || seen.has(val)) return;
-            seen.add(val);
-            names.push(val);
           });
 
-          this.bulkRows = names.map((nameTeam) => {
-            const duplicate = existingNames.has(nameTeam);
-            return { nameTeam, duplicate, selected: !duplicate };
+          if (!colOf.nameTeam) {
+            this.bulkRows = [];
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              message: "Format tidak sesuai",
+              detail:
+                'Kolom "Team Name" tidak ditemukan. Gunakan tombol "Download Template" lalu isi sesuai format.',
+            });
+            return;
+          }
+
+          const seen = new Set();
+          const parsed = [];
+          rows.forEach((row, idx) => {
+            const nameTeam = String(row[colOf.nameTeam] || "").trim();
+            if (!nameTeam) return;
+            const nameKey = nameTeam.toUpperCase();
+            if (seen.has(nameKey)) return; // duplikat di dalam file -> ambil yg pertama
+            seen.add(nameKey);
+
+            const rawType = colOf.typeTeam ? row[colOf.typeTeam] : "";
+            const rawCountry = colOf.countryCode ? row[colOf.countryCode] : "";
+            const typeTeam = this.resolveTeamType(rawType);
+            const countryCode = this.resolveCountryCode(rawCountry);
+
+            let error = "";
+            if (nameTeam.length < 2) error = "Nama terlalu pendek";
+            else if (String(rawType || "").trim() && !typeTeam)
+              error = `Team Type "${String(rawType).trim()}" tidak dikenal`;
+            else if (String(rawCountry || "").trim() && !countryCode)
+              error = `Country "${String(rawCountry).trim()}" tidak dikenal`;
+
+            const duplicate = existingNames.has(nameKey);
+            parsed.push({
+              rowNo: idx + 2, // +1 header, +1 karena Excel mulai dari 1
+              nameTeam,
+              typeTeam: typeTeam || "",
+              countryCode: countryCode || "",
+              error,
+              duplicate,
+              selected: !duplicate && !error,
+            });
           });
+          this.bulkRows = parsed;
 
           if (!this.bulkRows.length) {
             ipcRenderer.send("get-alert", {
               type: "warning",
               message: "Tidak ada data",
-              detail:
-                'Kolom "Asal PENGPROV" tidak ditemukan atau kosong di file ini.',
+              detail: 'Kolom "Team Name" kosong di file ini.',
             });
           }
 
@@ -937,24 +1134,99 @@ export default {
 
     toggleSelectAllBulkRows(checked) {
       (this.bulkRows || []).forEach((r) => {
-        if (!r.duplicate) r.selected = checked;
+        if (this.isBulkRowSelectable(r)) r.selected = checked;
       });
+    },
+
+    isBulkRowSelectable(r) {
+      return !!r && !r.duplicate && !r.error;
+    },
+
+    // Cocokkan isi kolom Team Type dgn optionTeamTypes, by value ATAU name
+    // (case-insensitive) — mis. "pengprov" / "Pengprov" / "PENGPROV".
+    resolveTeamType(raw) {
+      const v = String(raw || "").trim().toLowerCase();
+      if (!v) return "";
+      const found = (this.optionTeamTypes || []).find(
+        (o) =>
+          String(o.value || "").toLowerCase() === v ||
+          String(o.name || "").toLowerCase() === v
+      );
+      return found ? String(found.value) : "";
+    },
+
+    teamTypeLabel(value) {
+      const found = (this.optionTeamTypes || []).find(
+        (o) => String(o.value) === String(value)
+      );
+      return found ? found.name : value;
+    },
+
+    // Kolom Country boleh kode ISO 2 huruf ("ID") atau nama ("Indonesia").
+    resolveCountryCode(raw) {
+      const v = String(raw || "").trim();
+      if (!v) return "";
+      const upper = v.toUpperCase();
+      const found = COUNTRIES.find(
+        (c) => c.code === upper || String(c.name).toUpperCase() === upper
+      );
+      return found ? found.code : "";
+    },
+
+    // Template .xlsx: sheet "Teams" (header + contoh) + sheet "Petunjuk"
+    // (aturan kolom + daftar Team Type & kode Country yang valid).
+    downloadBulkTemplate() {
+      const types = (this.optionTeamTypes || []).length
+        ? this.optionTeamTypes
+        : [{ value: "pengprov", name: "Pengprov" }];
+      const exampleType = (types[0] && types[0].name) || "";
+
+      const teamsSheet = XLSX.utils.aoa_to_sheet([
+        BULK_TEMPLATE_HEADERS,
+        ["JAWA BARAT", exampleType, "ID"],
+        ["DKI JAKARTA", exampleType, "ID"],
+      ]);
+      teamsSheet["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 12 }];
+
+      const guide = [
+        ["PETUNJUK IMPORT TEAM"],
+        [],
+        ["Kolom", "Wajib", "Keterangan"],
+        ["Team Name", "Ya", "Nama tim, minimal 2 karakter. Nama yang sudah ada di sistem otomatis dilewati."],
+        ["Team Type", "Tidak", "Salah satu Team Type di bawah. Kalau kosong, pakai Default Team Type yang dipilih saat import."],
+        ["Country", "Tidak", "Kode negara ISO 2 huruf (mis. ID) atau nama negara (mis. Indonesia)."],
+        [],
+        ["Hapus baris contoh di sheet Teams sebelum mengisi data asli. Jangan ubah nama kolom di baris pertama."],
+        [],
+        ["Team Type yang valid"],
+        ...types.map((t) => [t.name]),
+        [],
+        ["Kode Country", "Nama"],
+        ...COUNTRIES.map((c) => [c.code, c.name]),
+      ];
+      const guideSheet = XLSX.utils.aoa_to_sheet(guide);
+      guideSheet["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 90 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, teamsSheet, "Teams");
+      XLSX.utils.book_append_sheet(wb, guideSheet, "Petunjuk");
+      XLSX.writeFile(wb, "Template_Import_Teams.xlsx");
     },
 
     confirmBulkImport() {
       if (!this.canConfirmBulkImport) return;
 
       const docs = (this.bulkRows || [])
-        .filter((r) => r.selected && !r.duplicate)
+        .filter((r) => r.selected && this.isBulkRowSelectable(r))
         .map((r) => ({
-          typeTeam: String(this.bulkTeamType || "").trim(),
+          typeTeam: String(r.typeTeam || this.bulkTeamType || "").trim(),
           nameTeam: r.nameTeam,
           bibTeam: "",
           startOrder: "",
           praStart: "",
           intervalRace: "",
           statusId: 0,
-          countryCode: "",
+          countryCode: r.countryCode || "",
         }));
 
       if (!docs.length) return;

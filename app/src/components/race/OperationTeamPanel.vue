@@ -2,7 +2,7 @@
   <div class="px-5 py-2">
     <div class="card p-3 race-window">
       <div class="mb-3 text-center">
-        <h5 class="section-title">STiming System 424 v2.0.0</h5>
+        <h5 class="section-title">STiming System 424 v3.0.1</h5>
         <!-- Status sumber waktu (jam RaceTime2 + Long Range Start) — di
              header panel, bukan di judul Buffer-Timer-Start, supaya tidak
              mengganggu tampilan card buffer. Klik badge = kalibrasi. -->
@@ -408,16 +408,24 @@ export default {
   border-radius: 12px;
 }
 
+/* Navy brand — senada dgn header tabel Output Racetime & sticky bar
+   (pengganti abu-gelap #383838). */
 .race-window {
-  background: #2f2f2f;
+  background: radial-gradient(
+      700px 260px at 85% 0%,
+      rgba(37, 176, 235, 0.22),
+      transparent 70%
+    ),
+    linear-gradient(160deg, #1f527f 0%, #173f66 55%, #12324f 100%);
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: 0 10px 28px rgba(15, 42, 67, 0.22);
+  transition: box-shadow 0.3s ease;
 }
 
 .race-window:hover {
-  box-shadow: 0 0 15px rgba(0, 180, 255, 0.6), 0 0 30px rgba(0, 180, 255, 0.5),
-    0 0 60px rgba(0, 180, 255, 0.4);
+  box-shadow: 0 10px 28px rgba(15, 42, 67, 0.22),
+    0 0 0 1px rgba(37, 176, 235, 0.35), 0 0 28px rgba(37, 176, 235, 0.3);
 }
 
 .section-title {

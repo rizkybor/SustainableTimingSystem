@@ -92,6 +92,21 @@ function formatTime(raw = "") {
  *   - onClose(portInfo): called when the port closes unexpectedly (device
  *     unplugged, cable fault) — NOT called on a deliberate disconnect().
  */
+/**
+ * Jenis frame RaceTime2 dari header `a` (lihat komentar panjang di dalam
+ * handleChunk() utk asal-usul tiap aturan): "start" | "finish" | "lap" |
+ * null (bukan frame waktu yang dikenali).
+ */
+export function classifyFrame(a) {
+  const flag = a && a.length > 11 ? a[11] : undefined;
+  const subFlag = a && a.length > 13 ? a[13] : undefined;
+  if (flag === "0" && subFlag === "4") return "finish";
+  if (flag === "0" && subFlag === "1") return "lap";
+  if (flag === "0") return "start";
+  if (flag === "2") return "finish";
+  return null;
+}
+
 export function createMicroGateReader(options) {
   options = options || {};
   const baudRate = typeof options.baudRate === "number" ? options.baudRate : 1200;
@@ -147,8 +162,7 @@ export function createMicroGateReader(options) {
       // +1 untuk CR — panjang frame dipakai menghitung waktu transmisi serial.
       const meta = { recvUs: recvUs, frameBytes: a.length + b.length + 1 };
 
-      const flag = a && a.length > 11 ? a[11] : undefined;
-      // a[13] tells apart THREE cases that all otherwise share the same
+      // a[11] = flag byte; a[13] tells apart THREE cases that all otherwise share the same
       // a[11]="0" (confirmed against real captured frames):
       //   "1" -> LAP
       //   "4" -> BUG FIX (2026-09-25): this device's REAL live frames are
@@ -171,19 +185,19 @@ export function createMicroGateReader(options) {
       //          since `b` is empty for this shape), just targeting the
       //          correct field.
       //   other (e.g. "0") -> Start
-      const subFlag = a && a.length > 13 ? a[13] : undefined;
-      if (flag === "0" && subFlag === "4") {
+      // Routing di-ekstrak ke classifyFrame() (export di bawah) supaya
+      // panel Live Feed (OperationTeamPanel) memakai aturan yg PERSIS sama
+      // saat operator klik baris utk menyalin waktunya ke buffer.
+      const kind = classifyFrame(a);
+      if (kind === "finish") {
         const vFinish = formatTime(b);
         if (typeof onFinish === "function") onFinish(vFinish, a, b, meta);
-      } else if (flag === "0" && subFlag === "1") {
+      } else if (kind === "lap") {
         const vLap = formatTime(b);
         if (typeof onLap === "function") onLap(vLap, a, b, meta);
-      } else if (flag === "0") {
+      } else if (kind === "start") {
         const vStart = formatTime(b);
         if (typeof onStart === "function") onStart(vStart, a, b, meta);
-      } else if (flag === "2") {
-        const vFinish = formatTime(b);
-        if (typeof onFinish === "function") onFinish(vFinish, a, b, meta);
       }
     }
   }

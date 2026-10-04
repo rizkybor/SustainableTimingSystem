@@ -226,10 +226,10 @@
          raceStickyBarMixin.js. -->
     <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
 
     <OperationTimePanel
       v-if="roundParticipants && roundParticipants.length"
+      show-photofinish
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="roundParticipants"
@@ -505,7 +505,6 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -519,7 +518,6 @@ const RACE_PAYLOAD_KEY = "raceStartPayload";
 export default {
   name: "SustainableTimingSystemRaftingCrossRace",
   components: {
-    PhotofinishBadge,
     Icon,
     EmptyCard,
     OperationTimePanel,

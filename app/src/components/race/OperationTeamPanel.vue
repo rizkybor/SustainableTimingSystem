@@ -10,6 +10,7 @@
           <span class="time-source-bar__label">Sumber Waktu</span>
           <ClockBadge />
           <LongrangeBadge />
+          <PhotofinishBadge v-if="showPhotofinish" />
         </div>
       </div>
 
@@ -34,15 +35,32 @@
                         Time data is not yet available
                       </td>
                     </tr>
+                    <!-- Klik baris = salin waktunya ke Get Time Start/Finish,
+                         jenisnya ditentukan sama persis dgn routing reader
+                         (lihat feedRow()). -->
                     <tr
                       v-else
                       v-for="(id, index) in digitId"
                       :key="'feed-' + index"
-                      :class="{ 'highlight-row': index === 0 }"
+                      :class="{
+                        'highlight-row': index === 0,
+                        'feed-row--clickable': !!feedRow(index).target,
+                      }"
+                      :title="feedRow(index).hint"
+                      @click="applyFeedRow(index)"
                     >
                       <td>{{ id }}</td>
                       <td>{{ digitTime[index] }}</td>
-                      <td>{{ formatTime(digitTime[index]) }}</td>
+                      <td class="feed-time-cell">
+                        {{ feedRow(index).time }}
+                        <span
+                          v-if="feedRow(index).target"
+                          class="feed-tag"
+                          :class="'feed-tag--' + feedRow(index).target"
+                        >
+                          {{ feedRow(index).label }}
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -74,6 +92,7 @@
                         inputmode="numeric"
                         maxlength="12"
                         class="form-control"
+                        :class="{ 'input-flash': flashField === sec.type }"
                         placeholder="00:00:00.000"
                       />
                     </div>
@@ -156,16 +175,23 @@
 <script>
 import LongrangeBadge from "@/components/longrange/LongrangeBadge.vue";
 import ClockBadge from "@/components/clock/ClockBadge.vue";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
+import { classifyFrame } from "@/utils/microGateReader";
+
+const FEED_TIME_RE = /^\d{1,2}:\d{2}:\d{2}\.\d{1,3}$/;
 
 export default {
   name: "OperationTimePanel",
-  components: { LongrangeBadge, ClockBadge },
+  components: { LongrangeBadge, ClockBadge, PhotofinishBadge },
   data() {
     return {
       // Filter tombol BIB per buffer: "all" (default, posisi tile stabil
       // supaya tidak salah pencet) atau "pending" (sembunyikan yg sudah
       // tercatat).
       filters: { start: "all", finish: "all" },
+      // Field buffer yg baru diisi dari klik Live Feed — dipakai utk efek
+      // kedip singkat supaya operator lihat waktunya masuk ke mana.
+      flashField: null,
     };
   },
   props: {
@@ -183,6 +209,12 @@ export default {
     // false supaya kategori lain (yg tidak punya konsep Heat) tidak
     // terpengaruh.
     requireHeat: { type: Boolean, default: false },
+    // true di halaman yg memakai STS Photo Finish (H2H/Rafting Cross/DRR)
+    // — badge-nya tampil di kapsul "Sumber Waktu" sebelah Long Range Start.
+    showPhotofinish: { type: Boolean, default: false },
+  },
+  beforeDestroy() {
+    clearTimeout(this._flashTimer);
   },
   computed: {
     sections() {
@@ -266,6 +298,44 @@ export default {
       const ms = this._pad3(d.getMilliseconds());
       return `${hh}:${mm}:${ss}.${ms}`;
     },
+    // Info satu baris Live Feed: waktu terformat + ke buffer mana waktunya
+    // masuk kalau diklik. Aturannya SAMA dgn yg dipakai saat data datang:
+    //   "LR…" (Long Range Start)  -> Start
+    //   "PF…" (Photo Finish)      -> Finish
+    //   frame RaceTime2           -> classifyFrame(): start -> Start,
+    //                                finish/lap -> Finish (lihat
+    //                                serialPortMixin onStart/onFinish/onLap)
+    feedRow(index) {
+      const id = String((this.digitId || [])[index] || "");
+      const time = this.formatTime((this.digitTime || [])[index]);
+      let kind = null;
+      if (id.startsWith("LR")) kind = "start";
+      else if (id.startsWith("PF")) kind = "finish";
+      else kind = classifyFrame(id);
+
+      let target = null;
+      if (kind === "start") target = "start";
+      else if (kind === "finish" || kind === "lap") target = "finish";
+      if (!FEED_TIME_RE.test(time)) target = null; // tanpa waktu valid
+
+      const label = kind === "lap" ? "LAP" : target ? target.toUpperCase() : "";
+      const hint = target
+        ? `Klik utk salin ${time} ke Get Time ${target === "start" ? "Start" : "Finish"}`
+        : "";
+      return { time, target, label, hint };
+    },
+    applyFeedRow(index) {
+      const row = this.feedRow(index);
+      if (!row.target) return;
+      const prop = row.target === "start" ? "digitTimeStart" : "digitTimeFinish";
+      this.$emit(`update:${prop}`, row.time);
+      this.flashField = row.target;
+      clearTimeout(this._flashTimer);
+      this._flashTimer = setTimeout(() => {
+        this.flashField = null;
+      }, 700);
+    },
+
     // Data tiap tile BIB utk satu buffer. `index` = posisi ASLI di
     // `participant` (dipakai emit update-time), tetap benar walau difilter.
     tilesFor(type, applyFilter = true) {
@@ -640,6 +710,51 @@ export default {
   }
   .bib-tile__num {
     font-size: 17px;
+  }
+}
+
+/* ===== Live Feed: baris yang bisa diklik ===== */
+.feed-row--clickable {
+  cursor: pointer;
+}
+.table-rounded tbody tr.feed-row--clickable:hover td {
+  background: #e6f4fd !important;
+}
+.feed-time-cell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.feed-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.feed-tag--start {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.feed-tag--finish {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Kedip singkat pada field buffer yg baru diisi dari Live Feed */
+.input-flash {
+  animation: input-flash 0.7s ease;
+}
+@keyframes input-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 176, 235, 0.7);
+    background: #e6f4fd;
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(37, 176, 235, 0);
+    background: #ffffff;
   }
 }
 

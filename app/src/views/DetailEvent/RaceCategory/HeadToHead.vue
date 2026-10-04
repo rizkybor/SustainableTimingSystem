@@ -1152,9 +1152,9 @@
     </div>
 
     <!-- OPERATION TIME (shared component) -->
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="visibleParticipants && visibleParticipants.length"
+      show-photofinish
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="visibleParticipants"
@@ -1646,7 +1646,6 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import H2HGoToHeat from "@/components/race/H2HGoToHeat.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
@@ -1790,7 +1789,6 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
-    PhotofinishBadge,
     H2HGoToHeat,
     OperationTimePanel,
     EmptyCard,

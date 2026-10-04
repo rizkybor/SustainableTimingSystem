@@ -236,9 +236,9 @@
     <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="participantArr && participantArr.length"
+      show-photofinish
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -442,8 +442,21 @@
                         <div
                           v-for="sIdx in drrSectionsCount"
                           :key="'sec-wrap-' + sIdx"
-                          class="pen-grid-item"
+                          class="pen-grid-item pen-sec"
+                          :class="sectionTileClass(item, sIdx - 1)"
                         >
+                          <!-- Header tile: label section + nilai AKTIF
+                               (dari operator ATAU socket judge
+                               sts-jurysystem) — selalu tampil (0 kalau
+                               kosong) supaya tinggi semua tile seragam.
+                               Dropdown di bawahnya SENGAJA selalu blank
+                               (lihat catatan di atas). -->
+                          <div class="pen-sec__head">
+                            <span class="pen-sec__label">S{{ sIdx }}</span>
+                            <span class="pen-sec__value">
+                              {{ sectionPenaltyDisplay(item, sIdx - 1) || "0" }}
+                            </span>
+                          </div>
                           <b-select
                             :key="
                               'sec-' +
@@ -453,9 +466,10 @@
                                 ? item._sectionPickGen[sIdx - 1] || 0
                                 : 0)
                             "
-                            class="small-select"
-                            style="border-radius: 12px; font-weight: 600"
+                            class="pen-sec__select"
+                            size="sm"
                             value=""
+                            :title="'Tambah penalty Section ' + sIdx"
                             @change="
                               updateTimePen(
                                 $event,
@@ -465,9 +479,7 @@
                               )
                             "
                           >
-                            <option disabled value="">
-                              Section {{ sIdx }}
-                            </option>
+                            <option disabled value="">+ Pilih</option>
                             <option
                               v-for="p in penaltiesSection"
                               :key="p.value"
@@ -476,24 +488,6 @@
                               {{ p.label }}
                             </option>
                           </b-select>
-                          <!-- Indikator nilai section AKTIF (dari operator
-                               ATAU socket judge sts-jurysystem) — dropdown
-                               di atas SENGAJA selalu blank (lihat catatan
-                               di atasnya), jadi tanpa ini operator tidak
-                               tahu section mana yang baru saja menerima
-                               penalty dari juri. -->
-                          <span
-                            v-if="sectionPenaltyDisplay(item, sIdx - 1)"
-                            class="section-pen-badge"
-                            :class="{
-                              'section-pen-badge--neg': sectionPenaltyDisplay(
-                                item,
-                                sIdx - 1
-                              ).startsWith('-'),
-                            }"
-                          >
-                            S{{ sIdx }}: {{ sectionPenaltyDisplay(item, sIdx - 1) }}
-                          </span>
                         </div>
                       </div>
                     </td>
@@ -767,7 +761,6 @@ import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -999,7 +992,6 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: {
-    PhotofinishBadge,
     OperationTimePanel,
     EmptyCard,
     Icon,
@@ -2921,6 +2913,13 @@ export default {
     // dipakai badge di sebelah dropdown Pen. Section — supaya operator tahu
     // section mana yg baru saja diupdate (manual ATAU dari socket judge),
     // krn dropdown-nya sendiri sengaja selalu blank (one-shot picker).
+    // Class warna tile Pen. Section: kosong (netral), penalty (+, amber),
+    // bonus (-, hijau).
+    sectionTileClass(item, sectionIndex) {
+      const v = this.sectionPenaltyDisplay(item, sectionIndex);
+      if (!v) return "pen-sec--empty";
+      return v.startsWith("-") ? "pen-sec--bonus" : "pen-sec--penalty";
+    },
     sectionPenaltyDisplay(item, sectionIndex) {
       const arr = item && item.result && item.result.penaltySection;
       const raw = Array.isArray(arr) ? arr[sectionIndex] : null;
@@ -3976,36 +3975,92 @@ export default {
   /* isi 3 baris dulu (kebawah), lalu lanjut buat kolom baru ke samping */
   grid-template-rows: repeat(3, auto);
   grid-auto-flow: column;
-  grid-column-gap: 8px; /* jarak antar kolom */
-  grid-row-gap: 6px; /* jarak antar item vertikal */
+  gap: 6px;
   align-items: start;
+  justify-content: center;
 }
 
-.pen-grid-item {
+/* ===== Tile Pen. Section ===== */
+.pen-sec {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
+  gap: 4px;
+  width: 112px;
+  padding: 5px 6px 6px;
+  border-radius: 10px;
+  border: 1px solid #e3eaf3;
+  background: #ffffff;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.pen-sec:hover {
+  border-color: #b9d7f0;
+  box-shadow: 0 2px 8px rgba(28, 76, 122, 0.08);
 }
 
-/* Badge nilai section aktif — muncul di bawah dropdown-nya begitu ada
-   penalty tersimpan utk section itu (dari operator ATAU judge). */
-.section-pen-badge {
+.pen-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.pen-sec__label {
   font-size: 11px;
-  font-weight: 700;
-  color: #b8860b;
-  background: #fff6e0;
-  border: 1px solid #f0d896;
-  border-radius: 8px;
-  padding: 1px 6px;
-  line-height: 1.5;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.pen-sec__value {
+  min-width: 30px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
   text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: #f1f5f9;
+  color: #94a3b8;
 }
 
-.section-pen-badge--neg {
-  color: #1c7a4c;
-  background: #e6f7ee;
-  border-color: #96d9b8;
+/* Ada penalty (+) */
+.pen-sec--penalty {
+  border-color: #f3d48a;
+  background: #fffbeb;
+}
+.pen-sec--penalty .pen-sec__value {
+  background: #f59e0b;
+  color: #ffffff;
+}
+/* Bonus (-) */
+.pen-sec--bonus {
+  border-color: #9fdcbd;
+  background: #f0fdf6;
+}
+.pen-sec--bonus .pen-sec__value {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+/* `!important` di height/padding: admin-pages.css memaksa SEMUA
+   .custom-select jadi height:44px !important. */
+.pen-sec__select {
+  height: 28px !important;
+  padding: 0 22px 0 8px !important;
+  border-radius: 8px;
+  border: 1px solid #d5dfeb;
+  background-color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1c4c7a;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pen-sec__select:hover {
+  border-color: #25b0eb;
+}
+.pen-sec__select:focus {
+  border-color: #25b0eb;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.2);
 }
 
 /* responsif: di layar kecil, batasi 2 per kolom */

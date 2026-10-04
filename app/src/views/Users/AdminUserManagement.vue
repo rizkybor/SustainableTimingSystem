@@ -1,345 +1,293 @@
 <template>
-  <div class="mt-5">
-    <b-row>
-      <b-col cols="10" offset="1" class="mb-4">
-        <div class="card-wrapper p-3 mb-2">
-          <!-- TOP BAR (breadcrumb + datetime) -->
-          <div
-            class="d-flex align-items-center justify-content-between text-muted small"
-          >
-            <b-breadcrumb class="mb-0">
-              <b-breadcrumb-item to="/">
-                <Icon icon="mdi:home-outline" class="mr-1" />
-                Dashboard
-              </b-breadcrumb-item>
-              <b-breadcrumb-item active>
-                {{ $route.params.pageTitle || "User Management" }}
-              </b-breadcrumb-item>
-            </b-breadcrumb>
-            <div>{{ currentDateTime }}</div>
-          </div>
+  <div class="list-page">
+    <PageHero
+      title="User Management"
+      crumb="User Management"
+      icon="mdi:account-cog-outline"
+      subtitle="Kelola akun juri, main events, dan riwayat tindakannya"
+      :stats="[
+        { label: 'Total Users', value: users.length },
+        { label: 'With Main Events', value: usersWithEventsCount, tone: 'success' },
+        { label: 'Events Available', value: eventOptions.length, tone: 'neutral' },
+      ]"
+      @back="goTo"
+    >
+      <template #actions>
+        <button type="button" class="ph-btn ph-btn--ghost" @click="fetchEvents">
+          <Icon icon="mdi:calendar-sync-outline" />
+          Refresh Events
+        </button>
+        <button type="button" class="ph-btn ph-btn--primary" @click="fetchUsers">
+          <Icon icon="mdi:account-sync-outline" />
+          Refresh Users
+        </button>
+      </template>
+    </PageHero>
+
+    <div class="lp-card">
+      <!-- TOOLBAR -->
+      <div class="lp-toolbar">
+        <div class="lp-search">
+          <Icon icon="mdi:magnify" class="lp-search__icon" />
+          <input
+            v-model="userQuery"
+            type="text"
+            class="lp-search__input"
+            placeholder="Cari username atau email…"
+          />
+          <button v-if="userQuery" type="button" class="lp-search__clear" @click="userQuery = ''">
+            <Icon icon="mdi:close" />
+          </button>
         </div>
 
-        <div
-          class="card-wrapper mt-1"
-          style="
-            padding-left: 45px;
-            padding-right: 45px;
-            padding-bottom: 45px;
-            padding-top: 25px;
-          "
-        >
-          <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
-            <Icon icon="mdi:chevron-left" class="mr-1" />
-            <span>Back</span>
-          </div>
-          <!-- HEADER -->
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div>
-              <h2 class="page-title mb-1">User Management</h2>
-              <p class="page-subtitle mb-0">
-                Manage accounts, main events, and role judges
-              </p>
-            </div>
-            <div class="d-flex align-items-center">
-              <b-button
-                style="border-radius: 12px"
-                variant="outline-secondary"
-                @click="fetchEvents"
-              >
-                <Icon icon="mdi:refresh" width="18" height="18" />
-                Refresh Events
-              </b-button>
-
-              <b-button
-                class="ml-2"
-                style="border-radius: 12px"
-                variant="outline-info"
-                @click="fetchUsers"
-              >
-                <Icon icon="mdi:refresh" width="18" height="18" />
-                Refresh Users
-              </b-button>
-            </div>
-          </div>
-
-          <!-- STAT SUMMARY -->
-          <div class="stat-strip">
-            <div class="stat-card">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:account-multiple-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ users.length }}</div>
-                <div class="stat-card__label">Total Users</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--success">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:calendar-star" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ usersWithEventsCount }}</div>
-                <div class="stat-card__label">With Main Events</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--neutral">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:calendar-multiple" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ eventOptions.length }}</div>
-                <div class="stat-card__label">Events Available</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- LIST USERS -->
-          <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
-            <b-table
-              striped
-              hover
-              small
-              head-variant="light"
-              :items="users"
-              :fields="fields"
-              responsive="md"
-              class="um-table mt-3"
-              :per-page="perPage"
-              :current-page="currentPage"
-              sort-by="createdAt"
-              sort-desc
-              show-empty
-              empty-text=""
+        <div class="lp-filters">
+          <div class="lp-segment" role="group" aria-label="Filter main events">
+            <button
+              v-for="opt in userSegments"
+              :key="opt.value"
+              type="button"
+              class="lp-segment__btn"
+              :class="{ active: userFilter === opt.value }"
+              @click="userFilter = opt.value"
             >
-              <template #empty>
-                <div class="stx-empty-state">
-                  <Icon icon="mdi:account-off-outline" width="40" height="40" />
-                  <div>No user data found</div>
-                  <small>Click "Refresh Users" to reload the list.</small>
-                </div>
-              </template>
-
-              <template #cell(index)="row">
-                <span class="text-muted">
-                  {{ (currentPage - 1) * perPage + row.index + 1 }}
-                </span>
-              </template>
-
-              <!-- Username w/ avatar -->
-              <template #cell(username)="row">
-                <div class="d-flex align-items-center">
-                  <img
-                    :src="row.item.image || fallbackAvatar"
-                    alt="avatar"
-                    class="avatar mr-2"
-                  />
-                  <div class="text-left">
-                    <div class="font-weight-bold text-dark">
-                      {{ row.item.username || "-" }}
-                    </div>
-                    <small class="text-muted">{{ row.item.email }}</small>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Email column -->
-              <template #cell(email)="row">
-                <div class="text-dark font-weight-medium">
-                  {{ row.item.email || "-" }}
-                </div>
-              </template>
-
-              <!-- Main Events (chips) -->
-              <template #cell(mainEvents)="row">
-                <div class="event-list">
-                  <div
-                    v-for="eid in row.item.mainEvents || []"
-                    :key="eid"
-                    class="event-item"
-                    :title="eventName(eid)"
-                  >
-                    • {{ shortEventName(eid) }}
-                  </div>
-                  <div
-                    v-if="!row.item.mainEvents || !row.item.mainEvents.length"
-                    class="text-muted"
-                  >
-                    -
-                  </div>
-                </div>
-              </template>
-
-              <!-- Created At -->
-              <template #cell(createdAt)="row">
-                <span class="text-muted">{{
-                  _formatDateTime(row.item.createdAt)
-                }}</span>
-              </template>
-
-              <!-- Updated At -->
-              <template #cell(updatedAt)="row">
-                <span class="text-muted">{{
-                  _formatDateTime(row.item.updatedAt)
-                }}</span>
-              </template>
-
-              <!-- Actions -->
-              <template #cell(actions)="row">
-                <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  @click="openEdit(row.item)"
-                >
-                  <Icon icon="mdi:pencil" width="16" height="16" />
-                </b-button>
-                <b-button
-                  size="sm"
-                  variant="outline-danger"
-                  class="btn-icon"
-                  @click="deleteUser(row.item.email)"
-                >
-                  <Icon icon="mdi:delete" width="16" height="16" />
-                </b-button>
-              </template>
-            </b-table>
-
-            <b-pagination
-              v-model="currentPage"
-              :total-rows="users.length"
-              :per-page="perPage"
-              align="center"
-              size="md"
-              class="mt-3 custom-pagination"
-            />
+              {{ opt.text }}
+              <span class="lp-segment__count">{{ opt.count }}</span>
+            </button>
           </div>
         </div>
-      </b-col>
-    </b-row>
+      </div>
 
-    <!-- MODAL EDIT -->
+      <!-- TABLE -->
+      <div class="table-responsive lp-table-wrap">
+        <b-table
+          hover
+          :items="filteredUsers"
+          :fields="fields"
+          responsive="md"
+          class="lp-table mb-0"
+          :per-page="perPage"
+          :current-page="currentPage"
+          sort-by="createdAt"
+          sort-desc
+          show-empty
+          empty-text=""
+        >
+          <template #empty>
+            <div class="lp-empty">
+              <Icon icon="mdi:account-off-outline" width="40" height="40" />
+              <div class="lp-empty__title">User tidak ditemukan</div>
+              <small>Ubah pencarian/filter, atau klik "Refresh Users".</small>
+            </div>
+          </template>
+
+          <template #cell(index)="row">
+            <span class="lp-muted">{{ (currentPage - 1) * perPage + row.index + 1 }}</span>
+          </template>
+
+          <template #cell(username)="row">
+            <div class="um-user">
+              <img :src="row.item.image || fallbackAvatar" alt="avatar" class="um-user__avatar" />
+              <div class="um-user__text">
+                <div class="um-user__name">{{ row.item.username || "-" }}</div>
+                <div class="um-user__email">{{ row.item.email || "-" }}</div>
+              </div>
+            </div>
+          </template>
+
+          <template #cell(mainEvents)="row">
+            <div class="um-events">
+              <span
+                v-for="eid in (row.item.mainEvents || []).slice(0, 2)"
+                :key="eid"
+                class="lp-chip um-events__chip"
+                :title="eventName(eid)"
+              >
+                {{ shortEventName(eid) }}
+              </span>
+              <span
+                v-if="(row.item.mainEvents || []).length > 2"
+                class="lp-chip lp-chip--soft"
+                :title="(row.item.mainEvents || []).slice(2).map(eventName).join(', ')"
+              >
+                +{{ row.item.mainEvents.length - 2 }}
+              </span>
+              <span v-if="!row.item.mainEvents || !row.item.mainEvents.length" class="lp-muted">
+                Belum ada event
+              </span>
+            </div>
+          </template>
+
+          <template #cell(createdAt)="row">
+            <span class="lp-date">
+              <Icon icon="mdi:calendar-plus-outline" />
+              {{ _formatDateTime(row.item.createdAt) }}
+            </span>
+          </template>
+
+          <template #cell(updatedAt)="row">
+            <span class="lp-date">
+              <Icon icon="mdi:update" />
+              {{ _formatDateTime(row.item.updatedAt) }}
+            </span>
+          </template>
+
+          <template #cell(actions)="row">
+            <div class="um-actions">
+              <UserJudgeHistoryModal :username="row.item.username" :event-dict="eventDict" />
+              <button type="button" class="lp-icon-btn" title="Edit profil & main events" @click="openEdit(row.item)">
+                <Icon icon="mdi:pencil-outline" />
+              </button>
+              <button type="button" class="lp-icon-btn lp-icon-btn--danger" title="Delete" @click="deleteUser(row.item.email)">
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
+            </div>
+          </template>
+        </b-table>
+      </div>
+
+      <div class="lp-footer">
+        <small class="lp-muted">
+          {{ filteredUsers.length === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
+          {{ Math.min(currentPage * perPage, filteredUsers.length) }}
+          of {{ filteredUsers.length }} users
+        </small>
+        <b-pagination
+          v-model="currentPage"
+          :total-rows="filteredUsers.length"
+          :per-page="perPage"
+          align="center"
+          size="md"
+          class="custom-pagination mb-0"
+          first-number
+          last-number
+        />
+        <div class="lp-perpage">
+          <span class="lp-muted">Rows per page</span>
+          <select v-model.number="perPage" class="lp-perpage__select">
+            <option v-for="n in [10, 20, 50]" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Judges Profile Configuration -->
     <b-modal
       v-model="showEdit"
-      size="xl"
+      size="lg"
       hide-header
       hide-footer
       :no-close-on-esc="true"
       :no-close-on-backdrop="true"
       body-class="p-0"
-      content-class="stx-modal-content"
+      content-class="upm-content"
       centered
     >
-      <!-- Header -->
-      <div class="stx-modal-header">
-        <h5>Judges Profil Configuration</h5>
-        <button
-          type="button"
-          class="stx-modal-close"
-          aria-label="Close"
-          @click="showEdit = false"
-        >
-          <span aria-hidden="true">×</span>
+      <!-- Header profil -->
+      <div class="upm-head">
+        <div class="upm-head__bg"></div>
+        <button type="button" class="upm-close" aria-label="Close" @click="showEdit = false">
+          <Icon icon="mdi:close" />
         </button>
-      </div>
-
-      <!-- Body -->
-      <div class="stx-modal-body">
-        <!-- User Detail -->
-        <div class="text-center py-4">
-          <img
-            :src="editForm.image || fallbackAvatar"
-            alt="Avatar"
-            class="avatar-xl mb-3"
-          />
-          <h4 class="fw-bold mb-1">{{ editForm.username }}</h4>
-          <div class="text-muted">{{ editForm.email }}</div>
-        </div>
-
-        <!-- Main Events -->
-        <div class="section-box">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-bold mb-0">Main Events</h5>
-
-            <!-- Picker + Add -->
-            <div class="d-flex align-items-center" style="gap: 8px">
-              <b-form-select
-                v-model="selectedEventId"
-                :options="eventOptions"
-                class="input-soft"
-                :disabled="!eventOptions.length"
-                style="min-width: 250px"
-              />
-              <b-button
-                size="md"
-                style="min-width: 150px"
-                class="btn-add"
-                @click="addMainEvent"
-              >
-                + Add Event
-              </b-button>
+        <div class="upm-head__inner">
+          <img :src="editForm.image || fallbackAvatar" alt="Avatar" class="upm-avatar" />
+          <div class="upm-head__text">
+            <span class="upm-eyebrow">Judges Profile Configuration</span>
+            <h4 class="upm-name">{{ editForm.username || "-" }}</h4>
+            <div class="upm-email">
+              <Icon icon="mdi:email-outline" />
+              {{ editForm.email || "-" }}
             </div>
           </div>
-
-          <!-- Tabel render dari computed rows -->
-          <b-table
-            :items="mainEventRows"
-            :fields="mainEventFields"
-            responsive
-            bordered
-            class="event-table"
-            show-empty
-            empty-text="Belum ada Main Event"
-          >
-            <!-- kolom No -->
-            <template #cell(no)="row">
-              <span class="text-muted">{{ row.index + 1 }}</span>
-            </template>
-
-            <template #cell(action)="{ item }">
-              <b-button
-                size="sm"
-                variant="outline-danger"
-                class="btn-icon"
-                @click="removeEventById(item.id)"
-                title="Remove"
-              >
-                <Icon icon="mdi:trash-can-outline" width="18" height="18" />
-              </b-button>
-            </template>
-          </b-table>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="stx-modal-footer">
-        <b-button
-          variant="outline-danger"
-          class="btn-pill"
-          @click="showEdit = false"
-        >
-          Cancel
-        </b-button>
-        <b-button variant="primary" class="btn-pill" @click="saveUser">
+      <!-- Main Events -->
+      <div class="upm-body">
+        <div class="upm-section-head">
+          <div>
+            <h5 class="upm-section-title">
+              Main Events
+              <span class="lp-segment__count">{{ mainEventRows.length }}</span>
+            </h5>
+            <p class="upm-section-sub">Event yang bisa diakses juri ini di sts-jurysystem.</p>
+          </div>
+        </div>
+
+        <div class="upm-picker">
+          <div class="lp-select upm-picker__select">
+            <Icon icon="mdi:calendar-search" class="lp-select__icon" />
+            <select v-model="selectedEventId" class="lp-select__input" :disabled="!eventOptions.length">
+              <option value="" disabled>Pilih event…</option>
+              <option v-for="o in eventOptions" :key="o.value" :value="o.value" :disabled="o.disabled">
+                {{ o.text }}
+              </option>
+            </select>
+            <Icon icon="mdi:chevron-down" class="lp-select__chev" />
+          </div>
+          <button type="button" class="upm-add" :disabled="!selectedEventId" @click="addMainEvent">
+            <Icon icon="mdi:plus" />
+            Add Event
+          </button>
+        </div>
+
+        <div v-if="!mainEventRows.length" class="upm-empty">
+          <Icon icon="mdi:calendar-blank-outline" width="32" height="32" />
+          <div>Belum ada Main Event. Pilih event di atas lalu klik <strong>Add Event</strong>.</div>
+        </div>
+
+        <ul v-else class="upm-events">
+          <li v-for="(item, i) in mainEventRows" :key="item.id" class="upm-event">
+            <span class="upm-event__no">{{ i + 1 }}</span>
+            <div class="upm-event__text">
+              <div class="upm-event__name">{{ item.eventName }}</div>
+              <div class="upm-event__meta">
+                <span v-if="item.levelName && item.levelName !== '-'" class="lp-chip">{{ item.levelName }}</span>
+                <span class="lp-date">
+                  <Icon icon="mdi:calendar-blank-outline" />
+                  {{ item.startDateEvent }}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="lp-icon-btn lp-icon-btn--danger"
+              title="Hapus dari Main Events"
+              @click="removeEventById(item.id)"
+            >
+              <Icon icon="mdi:trash-can-outline" />
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="upm-foot">
+        <button type="button" class="upm-btn upm-btn--ghost" @click="showEdit = false">Cancel</button>
+        <button type="button" class="upm-btn upm-btn--primary" @click="saveUser">
+          <Icon icon="mdi:content-save-outline" />
           Update
-        </b-button>
+        </button>
       </div>
     </b-modal>
   </div>
 </template>
 
+
 <script>
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import UserJudgeHistoryModal from "@/components/judge/UserJudgeHistoryModal.vue";
+import PageHero from "@/components/common/PageHero.vue";
 
 export default {
   name: "AdminUserManagement",
-  components: { Icon },
+  components: { Icon, UserJudgeHistoryModal, PageHero },
   data() {
     return {
       perPage: 10,
       currentPage: 1,
       users: [],
+      userQuery: "",
+      userFilter: "ALL", // ALL | with | without (main events)
       editingUserId: "",
       fields: [
         {
@@ -350,7 +298,6 @@ export default {
         }, // ⬅️ NEW
 
         { key: "username", label: "User", class: "align-middle" },
-        { key: "email", label: "Email", class: "align-middle" }, // 🔑 Tambah email
         { key: "mainEvents", label: "Main Events", class: "align-middle" },
         {
           key: "createdAt",
@@ -368,7 +315,7 @@ export default {
           key: "actions",
           label: "Actions",
           class: "text-center align-middle",
-          thStyle: { width: "110px" },
+          thStyle: { width: "150px" },
         },
       ],
       showEdit: false,
@@ -457,10 +404,39 @@ export default {
       }
       return map;
     },
+    filteredUsers() {
+      let list = Array.isArray(this.users) ? this.users : [];
+      const hasEvents = (u) => Array.isArray(u.mainEvents) && u.mainEvents.length > 0;
+      if (this.userFilter === "with") list = list.filter(hasEvents);
+      else if (this.userFilter === "without") list = list.filter((u) => !hasEvents(u));
+      const q = this.userQuery.trim().toLowerCase();
+      if (q) {
+        list = list.filter((u) =>
+          [u.username, u.email].some((v) => String(v || "").toLowerCase().includes(q))
+        );
+      }
+      return list;
+    },
+    userSegments() {
+      const total = (this.users || []).length;
+      return [
+        { value: "ALL", text: "Semua", count: total },
+        { value: "with", text: "Punya Event", count: this.usersWithEventsCount },
+        { value: "without", text: "Belum Ada Event", count: total - this.usersWithEventsCount },
+      ];
+    },
     usersWithEventsCount() {
       return (this.users || []).filter(
         (u) => Array.isArray(u.mainEvents) && u.mainEvents.length > 0
       ).length;
+    },
+  },
+  watch: {
+    userQuery() {
+      this.currentPage = 1;
+    },
+    userFilter() {
+      this.currentPage = 1;
     },
   },
   mounted() {
@@ -760,3 +736,345 @@ export default {
 };
 </script>
 
+<style scoped>
+/* Header: PageHero.vue; kartu/toolbar/tabel: list-pages.css (global). */
+
+/* ---------- Tabel user ---------- */
+.um-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+.um-user__avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #e5e7eb;
+  border: 1px solid #e6edf6;
+}
+.um-user__text {
+  min-width: 0;
+}
+.um-user__name {
+  font-weight: 800;
+  color: #0f172a;
+}
+.um-user__email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.um-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 340px;
+}
+.um-events__chip {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Baris tombol aksi (Riwayat Judge/Edit/Delete) dalam satu flex row dgn
+   gap seragam — UserJudgeHistoryModal membungkus tombolnya dlm <span>. */
+.um-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+/* Samakan tombol Riwayat Judge (b-button di komponen anak) dgn .lp-icon-btn */
+.um-actions ::v-deep .btn-icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0e7490;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.um-actions ::v-deep .btn-icon:hover {
+  border-color: #25b0eb;
+  background: #f0f7ff;
+  color: #1c4c7a;
+}
+
+/* ---------- Modal Judges Profile Configuration ---------- */
+.upm-head {
+  position: relative;
+  color: #fff;
+}
+.upm-head__bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      500px 200px at 90% 0%,
+      rgba(37, 176, 235, 0.45),
+      transparent 70%
+    ),
+    linear-gradient(110deg, #0f2f52 0%, #1c4c7a 55%, #1d7fb8 100%);
+}
+.upm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+.upm-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.upm-head__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 28px 24px;
+}
+.upm-avatar {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 22px;
+  object-fit: cover;
+  background: #e5e7eb;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2),
+    0 10px 24px rgba(0, 0, 0, 0.25);
+}
+.upm-head__text {
+  min-width: 0;
+}
+.upm-eyebrow {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #bae6fd;
+}
+.upm-name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+.upm-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.upm-body {
+  padding: 22px 28px 8px;
+}
+.upm-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+.upm-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.upm-section-sub {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.upm-picker {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.upm-picker__select {
+  flex: 1;
+  min-width: 0;
+}
+.upm-picker__select .lp-select__input {
+  width: 100%;
+}
+.upm-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+.upm-add:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.upm-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.upm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 1px dashed #dbe3ee;
+  border-radius: 14px;
+  background: #fafcff;
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.upm-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.upm-event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e6edf6;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.upm-event:hover {
+  border-color: #b9d7f0;
+  box-shadow: 0 4px 12px rgba(15, 42, 67, 0.06);
+}
+.upm-event__no {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: #e6f4fd;
+  color: #1c4c7a;
+  font-size: 12.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upm-event__text {
+  flex: 1;
+  min-width: 0;
+}
+.upm-event__name {
+  font-weight: 800;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upm-event__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+
+.upm-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 16px 28px;
+  border-top: 1px solid #eef2f7;
+  background: #fbfdff;
+}
+.upm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.upm-btn--ghost {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.upm-btn--ghost:hover {
+  background: #f8fafc;
+}
+.upm-btn--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+.upm-btn--primary:hover {
+  filter: brightness(1.07);
+}
+
+@media (max-width: 575.98px) {
+  .upm-head__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .upm-picker {
+    flex-direction: column;
+  }
+}
+</style>
+
+<style>
+/* Global (bukan scoped): b-modal dipindah ke <body>, jadi .modal-content
+   tidak punya ancestor ber-atribut scoped — ::v-deep tidak akan kena. */
+.upm-content {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+</style>

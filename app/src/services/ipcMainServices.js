@@ -170,6 +170,7 @@ const {
 const {
   insertJudgeActionLog,
   listJudgeActionLogsByEvent,
+  listJudgeActionLogsByJudge,
 } = require("../controllers/INSERT/insertJudgeActionLog");
 const {
   deleteJudgeActionHistory,
@@ -196,6 +197,19 @@ function assertCloudinaryConfig() {
 }
 
 // communication with database
+// "get-alert" / "get-alert-saved": dulu dialog native OS (tidak bisa di-
+// styling). Sekarang diteruskan ke renderer -> AppAlertHost.vue (alert
+// in-app ber-desain). Fallback ke dialog native kalau renderer pengirimnya
+// sudah tidak ada.
+function showAppAlert(event, options, channel) {
+  const sender = event && event.sender;
+  if (sender && !sender.isDestroyed()) {
+    sender.send("app-alert:show", { ...options, channel });
+    return;
+  }
+  dialog.showMessageBox(null, options);
+}
+
 function setupIPCMainHandlers() {
   // Get all users
   ipcMain.on("users:getAll", async (event) => {
@@ -335,6 +349,23 @@ function setupIPCMainHandlers() {
     }
   });
 
+  // Riwayat tindakan SATU juri lintas SEMUA event — dipakai modal "Riwayat
+  // Judge" di User Management (AdminUserManagement.vue), beda dari
+  // judgeLog:listByEvent yang discope per event+kategori race.
+  ipcMain.on("judgeLog:listByJudge", async (event, payload) => {
+    try {
+      const { judge, limit } = payload || {};
+      const items = await listJudgeActionLogsByJudge(judge, { limit });
+      event.reply("judgeLog:listByJudge:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("judgeLog:listByJudge:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
+    }
+  });
+
   // Hapus SELURUH "Riwayat Judge" (log lokal + riwayat penalty milik
   // sts-jurysystem, SEMUA juri) utk satu event + satu kategori race saja
   // — lihat catatan lengkap di deleteJudgeActionHistory.js.
@@ -393,9 +424,7 @@ function setupIPCMainHandlers() {
       };
 
       const mergedOptions = { ...defaultOptions, ...options };
-      dialog.showMessageBox(null, mergedOptions, (response) => {
-        console.log("You clicked:", mergedOptions.buttons[response]);
-      });
+      showAppAlert(event, mergedOptions, "alert");
     } catch (error) {
       event.reply("get-events-reply", []);
     }
@@ -411,9 +440,7 @@ function setupIPCMainHandlers() {
 
       // Menggabungkan default options dengan options yang diterima dari renderer
       const mergedOptions = { ...defaultOptions, ...options };
-      dialog.showMessageBox(null, mergedOptions, (response) => {
-        console.log("You clicked:", mergedOptions.buttons[response]);
-      });
+      showAppAlert(event, mergedOptions, "saved");
     } catch (error) {
       event.reply("get-question-reply", []);
     }

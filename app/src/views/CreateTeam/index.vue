@@ -1,338 +1,258 @@
 <template>
-  <div class="mt-5">
-    <b-row>
-      <b-col cols="10" offset="1" class="mb-4">
-        <div class="card-wrapper p-3 mb-2">
-          <!-- TOP BAR (breadcrumb + datetime) -->
-          <div
-            class="d-flex align-items-center justify-content-between text-muted small"
-          >
-            <b-breadcrumb class="mb-0">
-              <b-breadcrumb-item to="/">
-                <Icon icon="mdi:home-outline" class="mr-1" />
-                Dashboard
-              </b-breadcrumb-item>
-              <b-breadcrumb-item active>
-                {{ $route.params.pageTitle || "All Teams" }}
-              </b-breadcrumb-item>
-            </b-breadcrumb>
-            <div>{{ currentDateTime }}</div>
-          </div>
-        </div>
-
-        <div
-          class="card-wrapper mt-1"
-          style="
-            padding-left: 45px;
-            padding-right: 45px;
-            padding-bottom: 45px;
-            padding-top: 25px;
-          "
+  <div class="list-page">
+    <PageHero
+      title="All Teams"
+      crumb="All Teams"
+      icon="mdi:account-group-outline"
+      subtitle="Buat tim baru dan kelola seluruh tim yang terdaftar"
+      :stats="[
+        { label: 'Total Teams', value: teams.length },
+        { label: 'Active', value: activeTeamCount, tone: 'success' },
+        { label: 'Inactive', value: inactiveTeamCount, tone: 'warning' },
+        { label: 'Team Types', value: teamTypeCount, tone: 'neutral' },
+      ]"
+      @back="goTo"
+    >
+      <template #actions>
+        <button
+          type="button"
+          class="ph-btn ph-btn--ghost"
+          title="Download template Excel utk Import from Excel"
+          @click="downloadBulkTemplate"
         >
-          <div @click="goTo" class="btn-custom d-flex align-items-center mb-3">
-            <Icon icon="mdi:chevron-left" class="mr-1" />
-            <span>Back</span>
-          </div>
-          <div>
-            <h2 class="page-title mb-1">Create New Team</h2>
-            <p class="page-subtitle mb-3">Create new team data</p>
-          </div>
-          <form ref="form-newTeam">
-            <!-- TEAM TYPE -->
-            <b-form-group label-class="label-strong">
-              <template #label>
-                Team Type <span class="text-danger">*</span>
-              </template>
-              <b-form-select
-                size="sm"
-                v-model="formTeam.teamType"
-                :options="optionTeamTypes"
-                value-field="value"
-                text-field="name"
-                class="input-soft"
-                required
-                style="border-radius: 12px"
-              >
-                <template #first>
-                  <b-form-select-option :value="null" disabled
-                    >Select type</b-form-select-option
-                  >
-                </template>
-              </b-form-select>
-            </b-form-group>
+          <Icon icon="mdi:file-download-outline" />
+          Download Template
+        </button>
+        <button
+          type="button"
+          class="ph-btn ph-btn--primary"
+          :disabled="bulkParsing"
+          @click="$refs.bulkFileInput.click()"
+        >
+          <b-spinner v-if="bulkParsing" small />
+          <Icon v-else icon="mdi:file-excel-outline" />
+          {{ bulkParsing ? "Membaca file..." : "Import from Excel" }}
+        </button>
+      </template>
+    </PageHero>
 
-            <!-- TEAM NAME -->
-            <b-form-group label-class="label-strong">
-              <template #label>
-                Team Name <span class="text-danger">*</span>
-              </template>
-              <b-form-input
-                size="sm"
-                v-model="formTeam.teamName"
-                placeholder="Enter team name"
-                class="input-soft"
-                style="border-radius: 12px"
-                required
-              />
-            </b-form-group>
+    <input
+      ref="bulkFileInput"
+      type="file"
+      accept=".xlsx,.xls"
+      class="d-none"
+      @change="onBulkFileSelected"
+    />
 
-            <!-- COUNTRY (optional) -->
-            <b-form-group label="Country (optional)" label-class="label-strong">
-              <b-form-select
-                size="sm"
-                v-model="formTeam.countryCode"
-                :options="countryOptions"
-                value-field="code"
-                text-field="name"
-                class="input-soft"
-                style="border-radius: 12px"
-              >
-                <template #first>
-                  <b-form-select-option :value="''"
-                    >No country</b-form-select-option
-                  >
-                </template>
-              </b-form-select>
-            </b-form-group>
+    <div class="teams-layout">
+      <!-- CREATE NEW TEAM -->
+      <aside class="lp-card teams-form">
+        <div class="lp-card__head">
+          <h5 class="lp-card__title">
+            <Icon icon="mdi:account-plus-outline" />
+            Create New Team
+          </h5>
+        </div>
 
-            <!-- Actions -->
-            <div class="d-flex mt-4 justify-content-end">
-              <input
-                ref="bulkFileInput"
-                type="file"
-                accept=".xlsx,.xls"
-                class="d-none"
-                @change="onBulkFileSelected"
-              />
-              <b-button
-                style="border-radius: 12px"
-                variant="outline-secondary"
-                class="mr-2"
-                :disabled="bulkParsing"
-                @click="$refs.bulkFileInput.click()"
-              >
-                <b-spinner small v-if="bulkParsing" class="mr-1" />
-                <Icon v-else icon="mdi:file-excel-outline" width="18" height="18" />
-                {{ bulkParsing ? "Membaca file..." : "Import from Excel" }}
-              </b-button>
-              <b-button
-                style="border-radius: 12px"
-                variant="outline-info"
-                @click="save()"
-              >
-                <Icon icon="mdi:plus" width="18" height="18" />
-                Save New Team
-              </b-button>
-            </div>
-          </form>
-
-          <!-- Divider -->
-          <div class="section-divider my-5">
-            <span>Teams Overview</span>
-          </div>
-
-          <div>
-            <h2 class="page-title mb-1">List All Teams</h2>
-            <p class="page-subtitle mb-3">
-              View, edit, and delete all teams that have been created.
-            </p>
-          </div>
-
-          <!-- STAT SUMMARY -->
-          <div class="stat-strip">
-            <div class="stat-card">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:account-group-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ teams.length }}</div>
-                <div class="stat-card__label">Total Teams</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--success">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:check-circle-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ activeTeamCount }}</div>
-                <div class="stat-card__label">Active</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--warning">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:close-circle-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ inactiveTeamCount }}</div>
-                <div class="stat-card__label">Inactive</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--neutral">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:shape-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ teamTypeCount }}</div>
-                <div class="stat-card__label">Team Types</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ✅ LIST TEAM -->
-          <div class="d-flex align-items-center mb-3">
-            <label class="mb-0 mr-2 font-weight-bold">Filter:</label>
+        <form ref="form-newTeam" class="teams-form__body" @submit.prevent="save()">
+          <b-form-group label-class="label-strong">
+            <template #label>
+              Team Type <span class="text-danger">*</span>
+            </template>
             <b-form-select
-              style="border-radius: 12px"
-              v-model="filterType"
-              :options="filterTypeOptions"
-              class="input-soft w-auto"
-              size="sm"
+              v-model="formTeam.teamType"
+              :options="optionTeamTypes"
+              value-field="value"
+              text-field="name"
+              class="input-soft"
+              required
+            >
+              <template #first>
+                <b-form-select-option :value="null" disabled>Select type</b-form-select-option>
+              </template>
+            </b-form-select>
+          </b-form-group>
+
+          <b-form-group label-class="label-strong">
+            <template #label>
+              Team Name <span class="text-danger">*</span>
+            </template>
+            <b-form-input
+              v-model="formTeam.teamName"
+              placeholder="Enter team name"
+              class="input-soft"
+              required
             />
-            <b-button
-              v-if="filterType !== 'ALL'"
-              size="sm"
-              class="ml-2 btn-outline-pill"
-              variant="outline-secondary"
-              @click="filterType = 'ALL'"
-              style="border-radius: 12px"
+          </b-form-group>
+
+          <b-form-group label="Country (optional)" label-class="label-strong">
+            <b-form-select
+              v-model="formTeam.countryCode"
+              :options="countryOptions"
+              value-field="code"
+              text-field="name"
+              class="input-soft"
             >
-              Reset
-            </b-button>
+              <template #first>
+                <b-form-select-option :value="''">No country</b-form-select-option>
+              </template>
+            </b-form-select>
+          </b-form-group>
+
+          <button type="submit" class="teams-save">
+            <Icon icon="mdi:plus" />
+            Save New Team
+          </button>
+
+          <p class="teams-form__hint">
+            <Icon icon="mdi:lightbulb-on-outline" />
+            Banyak tim sekaligus? Pakai <strong>Import from Excel</strong> di
+            atas (format: Team Name, Team Type, Country).
+          </p>
+        </form>
+      </aside>
+
+      <!-- LIST ALL TEAMS -->
+      <section class="lp-card teams-list">
+        <div class="lp-toolbar">
+          <div class="lp-search">
+            <Icon icon="mdi:magnify" class="lp-search__icon" />
+            <input
+              v-model="teamQuery"
+              type="text"
+              class="lp-search__input"
+              placeholder="Cari nama tim…"
+            />
+            <button v-if="teamQuery" type="button" class="lp-search__clear" @click="teamQuery = ''">
+              <Icon icon="mdi:close" />
+            </button>
           </div>
-          <!-- TABLE WRAPPER -->
-          <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
-            <b-table
-              striped
-              hover
-              small
-              head-variant="light"
-              :items="filteredTeams"
-              :fields="fields"
-              :per-page="perPage"
-              :current-page="currentPage"
-              class="um-table mt-3"
-              show-empty
-              empty-text=""
-              responsive="md"
-            >
-            
 
-              <!-- ✅ Empty State -->
-              <template #empty>
-                <div class="stx-empty-state">
-                  <Icon icon="mdi:account-group-outline" width="40" height="40" />
-                  <div>No team data found</div>
-                  <small>Try adjusting your filter or add a new team.</small>
-                </div>
-              </template>
-
-              <!-- No / Index -->
-              <template #cell(index)="row">
-                <span class="text-muted">
-                  {{ (currentPage - 1) * perPage + row.index + 1 }}
-                </span>
-              </template>
-
-              <!-- Team Name -->
-              <template #cell(nameTeam)="row">
-                <span class="font-weight-bold text-dark">
-                  {{ row.item.nameTeam || "-" }}
-                </span>
-                <CountryFlag :code="row.item.countryCode" />
-              </template>
-
-              <!-- Type -->
-              <template #cell(typeTeam)="row">
-                <span class="font-weight-bold text-dark">{{
-                  row.item.typeTeam
-                }}</span>
-              </template>
-
-              <!-- Status Pill (Active/Inactive) -->
-              <template #cell(statusId)="row">
-                <span
-                  v-if="row.item.statusId === 0"
-                  class="status-pill status-success"
-                >
-                  <span class="dot"></span> Active
-                </span>
-                <span v-else class="status-pill status-upcoming">
-                  <span class="dot"></span> Inactive
-                </span>
-              </template>
-
-              <!-- Actions -->
-              <template #cell(actions)="row">
-                <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  title="View Details"
-                  @click="viewTeamDetails(row.item)"
-                >
-                  <Icon icon="mdi:eye-outline" width="16" height="16" />
-                </b-button>
-
-                <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  title="Edit"
-                  @click="openEdit(row.item)"
-                >
-                  <Icon icon="mdi:pencil" width="16" height="16" />
-                </b-button>
-
-                <b-button
-                  size="sm"
-                  variant="outline-danger"
-                  class="btn-icon"
-                  title="Delete"
-                  @click="deleteTeam(row.item)"
-                >
-                  <Icon icon="mdi:delete" width="16" height="16" />
-                </b-button>
-              </template>
-            </b-table>
-
-            <!-- PAGINATION (real, sejajar) -->
-            <div
-              class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap"
-              style="gap: 12px"
-            >
-              <!-- kiri: jumlah row ditampilkan -->
-              <small class="text-muted">
-                {{ totalRows === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
-                {{ Math.min(currentPage * perPage, totalRows) }}
-                of {{ totalRows }} teams
-              </small>
-
-              <!-- tengah: pagination -->
-              <b-pagination
-                v-model="currentPage"
-                :total-rows="totalRows"
-                :per-page="perPage"
-                size="md"
-                class="custom-pagination mb-0"
-                first-number
-                last-number
-              />
-
-              <!-- kanan: select rows per page -->
-              <div class="d-flex align-items-center">
-                <span class="mr-2 text-muted">Rows per page</span>
-                <b-form-select
-                  style="width: 110px; border-radius: 12px"
-                  v-model.number="perPage"
-                  :options="[10, 20, 50]"
-                  class="input-soft no-border-select"
-                />
-              </div>
+          <div class="lp-filters">
+            <div class="lp-select">
+              <Icon icon="mdi:shape-outline" class="lp-select__icon" />
+              <select v-model="filterType" class="lp-select__input">
+                <option v-for="o in filterTypeOptions" :key="o.value" :value="o.value">
+                  {{ o.text }}
+                </option>
+              </select>
+              <Icon icon="mdi:chevron-down" class="lp-select__chev" />
             </div>
+
+            <div class="lp-segment" role="group" aria-label="Filter status">
+              <button
+                v-for="opt in teamStatusSegments"
+                :key="opt.value"
+                type="button"
+                class="lp-segment__btn"
+                :class="{ active: filterStatus === opt.value }"
+                @click="filterStatus = opt.value"
+              >
+                {{ opt.text }}
+                <span class="lp-segment__count">{{ opt.count }}</span>
+              </button>
+            </div>
+
+            <button
+              v-if="teamQuery || filterType !== 'ALL' || filterStatus !== 'ALL'"
+              type="button"
+              class="lp-reset"
+              @click="resetTeamFilters"
+            >
+              <Icon icon="mdi:filter-remove-outline" />
+              Reset
+            </button>
           </div>
         </div>
-      </b-col>
-    </b-row>
+
+        <div class="table-responsive lp-table-wrap">
+          <b-table
+            hover
+            :items="filteredTeams"
+            :fields="fields"
+            :per-page="perPage"
+            :current-page="currentPage"
+            class="lp-table mb-0"
+            show-empty
+            empty-text=""
+            responsive="md"
+          >
+            <template #empty>
+              <div class="lp-empty">
+                <Icon icon="mdi:account-group-outline" width="40" height="40" />
+                <div class="lp-empty__title">Tim tidak ditemukan</div>
+                <small>Coba ubah pencarian/filter, atau tambahkan tim baru.</small>
+              </div>
+            </template>
+
+            <template #cell(index)="row">
+              <span class="lp-muted">{{ (currentPage - 1) * perPage + row.index + 1 }}</span>
+            </template>
+
+            <template #cell(nameTeam)="row">
+              <div class="lp-team" @click="viewTeamDetails(row.item)">
+                <span class="lp-team__avatar" :style="{ background: avatarColor(row.item.nameTeam) }">
+                  {{ initials(row.item.nameTeam) }}
+                </span>
+                <span class="lp-team__name">{{ row.item.nameTeam || "-" }}</span>
+                <CountryFlag :code="row.item.countryCode" />
+              </div>
+            </template>
+
+            <template #cell(typeTeam)="row">
+              <span v-if="row.item.typeTeam" class="lp-chip lp-chip--soft">{{ row.item.typeTeam }}</span>
+              <span v-else class="lp-muted">-</span>
+            </template>
+
+            <template #cell(statusId)="row">
+              <span v-if="row.item.statusId === 0" class="lp-status lp-status--on">
+                <span class="lp-status__dot"></span> Active
+              </span>
+              <span v-else class="lp-status lp-status--off">
+                <span class="lp-status__dot"></span> Inactive
+              </span>
+            </template>
+
+            <template #cell(actions)="row">
+              <div class="lp-actions justify-content-end">
+                <button type="button" class="lp-icon-btn" title="View Details" @click="viewTeamDetails(row.item)">
+                  <Icon icon="mdi:eye-outline" />
+                </button>
+                <button type="button" class="lp-icon-btn" title="Edit" @click="openEdit(row.item)">
+                  <Icon icon="mdi:pencil-outline" />
+                </button>
+                <button type="button" class="lp-icon-btn lp-icon-btn--danger" title="Delete" @click="deleteTeam(row.item)">
+                  <Icon icon="mdi:trash-can-outline" />
+                </button>
+              </div>
+            </template>
+          </b-table>
+        </div>
+
+        <div class="lp-footer">
+          <small class="lp-muted">
+            {{ totalRows === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
+            {{ Math.min(currentPage * perPage, totalRows) }}
+            of {{ totalRows }} teams
+          </small>
+          <b-pagination
+            v-model="currentPage"
+            :total-rows="totalRows"
+            :per-page="perPage"
+            size="md"
+            class="custom-pagination mb-0"
+            first-number
+            last-number
+          />
+          <div class="lp-perpage">
+            <span class="lp-muted">Rows per page</span>
+            <select v-model.number="perPage" class="lp-perpage__select">
+              <option v-for="n in [10, 20, 50]" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <!-- ✏️ Edit Team Modal -->
     <b-modal
@@ -418,6 +338,138 @@
             </b-form-select>
           </b-form-group>
         </b-form>
+      </div>
+
+      <div class="stx-modal-footer">
+        <b-button
+          variant="outline-secondary"
+          class="btn-pill"
+          @click="$bvModal.hide('modal-edit-team')"
+        >
+          Cancel
+        </b-button>
+        <b-button variant="primary" class="btn-pill" @click="submitEdit">
+          Save
+        </b-button>
+      </div>
+    </b-modal>
+
+    <!-- Import from Excel: preview + konfirmasi -->
+    <b-modal
+      id="modal-bulk-import-team"
+      v-model="showBulkImportModal"
+      size="lg"
+      scrollable
+      :no-close-on-backdrop="bulkImporting"
+      :no-close-on-esc="bulkImporting"
+      hide-header
+      hide-footer
+      body-class="p-0"
+      content-class="stx-modal-content"
+      centered
+    >
+      <div class="stx-modal-header">
+        <h5>Import Teams from Excel</h5>
+        <button
+          type="button"
+          class="stx-modal-close"
+          aria-label="Close"
+          :disabled="bulkImporting"
+          @click="showBulkImportModal = false"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="stx-modal-body">
+        <p class="mb-2 text-muted small">
+          File: <strong>{{ bulkFileName || "-" }}</strong> — format kolom:
+          <strong>Team Name</strong>, <strong>Team Type</strong>,
+          <strong>Country</strong> (lihat
+          <a href="#" @click.prevent="downloadBulkTemplate">template</a>).
+        </p>
+
+        <b-form-group label-class="label-strong">
+          <template #label>
+            Default Team Type
+            <span v-if="bulkNeedsDefaultType" class="text-danger">*</span>
+          </template>
+          <b-form-select
+            size="sm"
+            v-model="bulkTeamType"
+            :options="optionTeamTypes"
+            value-field="value"
+            text-field="name"
+            class="input-soft"
+            style="border-radius: 12px"
+            :disabled="bulkImporting"
+          >
+            <template #first>
+              <b-form-select-option :value="null">-</b-form-select-option>
+            </template>
+          </b-form-select>
+          <small class="text-muted">
+            Dipakai utk baris yang kolom Team Type-nya kosong.
+          </small>
+        </b-form-group>
+
+        <div v-if="!bulkRows.length" class="text-center text-muted py-4">
+          Tidak ada data tim yang ditemukan di file ini. Pastikan file memakai
+          format template (kolom <strong>Team Name</strong> wajib ada).
+        </div>
+        <div v-else class="table-responsive table-rounded-wrapper">
+          <b-table
+            striped
+            small
+            hover
+            :items="bulkRows"
+            :fields="bulkFields"
+            class="um-table mb-0"
+          >
+            <template #head(selected)>
+              <b-form-checkbox
+                :checked="allNewSelected"
+                :indeterminate="someNewSelected && !allNewSelected"
+                :disabled="bulkImporting"
+                @change="toggleSelectAllBulkRows"
+              />
+            </template>
+            <template #cell(selected)="row">
+              <b-form-checkbox
+                v-model="row.item.selected"
+                :disabled="!isBulkRowSelectable(row.item) || bulkImporting"
+              />
+            </template>
+            <template #cell(rowNo)="row">
+              <span class="text-muted">{{ row.item.rowNo }}</span>
+            </template>
+            <template #cell(typeTeam)="row">
+              <span v-if="row.item.typeTeam">
+                {{ teamTypeLabel(row.item.typeTeam) }}
+              </span>
+              <span v-else-if="bulkTeamType" class="text-muted">
+                {{ teamTypeLabel(bulkTeamType) }} (default)
+              </span>
+              <span v-else class="text-danger small">Belum diisi</span>
+            </template>
+            <template #cell(countryCode)="row">
+              <span v-if="row.item.countryCode" class="d-inline-flex align-items-center">
+                <CountryFlag :code="row.item.countryCode" class="mr-1" />
+                {{ row.item.countryCode }}
+              </span>
+              <span v-else class="text-muted">-</span>
+            </template>
+            <template #cell(status)="row">
+              <span v-if="row.item.error" class="status-pill status-danger" :title="row.item.error">
+                {{ row.item.error }}
+              </span>
+              <span v-else-if="row.item.duplicate" class="status-pill status-upcoming">
+                Sudah ada
+              </span>
+              <span v-else class="status-pill status-success">Baru</span>
+            </template>
+          </b-table>
+        </div>
       </div>
 
       <div class="stx-modal-footer">
@@ -555,17 +607,31 @@
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import PageHero from "@/components/common/PageHero.vue";
 import { COUNTRIES } from "@/utils/countries";
 import * as XLSX from "xlsx";
 
-// Nama kolom di file Excel (Google Form response) yang jadi sumber nama tim
-// bulk import — dicocokkan case-insensitive/trim, bukan posisi kolom, supaya
-// tahan kalau urutan kolom lain berubah.
-const BULK_IMPORT_SOURCE_HEADER = "asal pengprov";
+// Format Import from Excel (bulk Create New Team) — 1 baris = 1 tim, kolom
+// sama dgn form Create New Team. Header dicocokkan setelah dinormalisasi
+// (huruf kecil, tanpa spasi/tanda `*`), bukan posisi kolom, supaya tahan
+// urutan kolom/kapitalisasi beda. "Asal PENGPROV" tetap diterima sbg alias
+// Team Name supaya export Google Form lama masih bisa dipakai.
+const BULK_HEADER_ALIASES = {
+  nameTeam: ["teamname", "namatim", "team", "asalpengprov"],
+  typeTeam: ["teamtype", "tipetim", "type", "jenistim"],
+  countryCode: ["country", "countrycode", "negara", "kodenegara"],
+};
+const BULK_TEMPLATE_HEADERS = ["Team Name", "Team Type", "Country"];
+
+function normalizeHeader(h) {
+  return String(h || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
 
 export default {
   name: "SustainableTimingSystemCreateTeam",
-  components: { Icon, CountryFlag },
+  components: { Icon, CountryFlag, PageHero },
   data() {
     return {
       countryOptions: COUNTRIES,
@@ -578,6 +644,8 @@ export default {
       },
       teams: [], // ✅ list teams
       filterType: "ALL",
+      filterStatus: "ALL", // ALL | active | inactive
+      teamQuery: "",
       currentPage: 1,
       perPage: 10,
       fields: [
@@ -606,10 +674,14 @@ export default {
       showBulkImportModal: false,
       bulkFileName: "",
       bulkTeamType: null,
-      bulkRows: [], // [{ nameTeam, duplicate, selected }]
+      // [{ rowNo, nameTeam, typeTeam, countryCode, error, duplicate, selected }]
+      bulkRows: [],
       bulkFields: [
         { key: "selected", label: "" },
-        { key: "nameTeam", label: "Team Name (Asal PENGPROV)" },
+        { key: "rowNo", label: "Row" },
+        { key: "nameTeam", label: "Team Name" },
+        { key: "typeTeam", label: "Team Type" },
+        { key: "countryCode", label: "Country" },
         { key: "status", label: "Status" },
       ],
     };
@@ -643,10 +715,27 @@ export default {
     },
     // Hasil filter untuk tabel
     filteredTeams() {
-      const list = Array.isArray(this.teams) ? this.teams : [];
-      if (this.filterType === "ALL") return list;
-      const sel = String(this.filterType).toLowerCase();
-      return list.filter((t) => String(t.typeTeam || "").toLowerCase() === sel);
+      let list = Array.isArray(this.teams) ? this.teams : [];
+      if (this.filterType !== "ALL") {
+        const sel = String(this.filterType).toLowerCase();
+        list = list.filter((t) => String(t.typeTeam || "").toLowerCase() === sel);
+      }
+      if (this.filterStatus !== "ALL") {
+        const wantActive = this.filterStatus === "active";
+        list = list.filter((t) => (Number(t.statusId) === 0) === wantActive);
+      }
+      const q = this.teamQuery.trim().toLowerCase();
+      if (q) {
+        list = list.filter((t) => String(t.nameTeam || "").toLowerCase().includes(q));
+      }
+      return list;
+    },
+    teamStatusSegments() {
+      return [
+        { value: "ALL", text: "Semua", count: this.teams.length },
+        { value: "active", text: "Active", count: this.activeTeamCount },
+        { value: "inactive", text: "Inactive", count: this.inactiveTeamCount },
+      ];
     },
 
     activeTeamCount() {
@@ -669,19 +758,24 @@ export default {
     selectedBulkCount() {
       return (this.bulkRows || []).filter((r) => r.selected).length;
     },
+    // Default Team Type wajib dipilih hanya kalau ada baris terpilih yang
+    // kolom Team Type-nya kosong.
+    bulkNeedsDefaultType() {
+      return (this.bulkRows || []).some((r) => r.selected && !r.typeTeam);
+    },
     canConfirmBulkImport() {
       return (
         !this.bulkImporting &&
-        !!this.bulkTeamType &&
-        this.selectedBulkCount > 0
+        this.selectedBulkCount > 0 &&
+        (!this.bulkNeedsDefaultType || !!this.bulkTeamType)
       );
     },
     allNewSelected() {
-      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      const selectable = (this.bulkRows || []).filter(this.isBulkRowSelectable);
       return selectable.length > 0 && selectable.every((r) => r.selected);
     },
     someNewSelected() {
-      const selectable = (this.bulkRows || []).filter((r) => !r.duplicate);
+      const selectable = (this.bulkRows || []).filter(this.isBulkRowSelectable);
       return selectable.some((r) => r.selected);
     },
   },
@@ -721,6 +815,12 @@ export default {
     filterType() {
       this.currentPage = 1;
     },
+    filterStatus() {
+      this.currentPage = 1;
+    },
+    teamQuery() {
+      this.currentPage = 1;
+    },
     teams() {
       // jaga-jaga supaya halaman tidak “kosong” ketika data berubah
       const maxPage = Math.max(1, Math.ceil(this.totalRows / this.perPage));
@@ -728,6 +828,30 @@ export default {
     },
   },
   methods: {
+    resetTeamFilters() {
+      this.teamQuery = "";
+      this.filterType = "ALL";
+      this.filterStatus = "ALL";
+    },
+    initials(name) {
+      const words = String(name || "?").trim().split(/\s+/);
+      return ((words[0] || "?").charAt(0) + (words[1] ? words[1].charAt(0) : "")).toUpperCase();
+    },
+    // Warna avatar stabil per nama tim (sama dgn Home.vue).
+    avatarColor(name) {
+      const palette = [
+        "linear-gradient(135deg,#1c4c7a,#25b0eb)",
+        "linear-gradient(135deg,#0f766e,#2dd4bf)",
+        "linear-gradient(135deg,#7c3aed,#a78bfa)",
+        "linear-gradient(135deg,#c2410c,#fb923c)",
+        "linear-gradient(135deg,#be123c,#fb7185)",
+        "linear-gradient(135deg,#1d4ed8,#60a5fa)",
+      ];
+      let h = 0;
+      const str = String(name || "");
+      for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+      return palette[h % palette.length];
+    },
     resetForm() {
       this.formTeam = {
         teamType: null,
@@ -883,32 +1007,65 @@ export default {
             )
           );
 
-          const seen = new Set();
-          const names = [];
-          rows.forEach((row) => {
-            // cari key kolom "Asal PENGPROV" case-insensitive/trim (header
-            // asli bisa beda kapitalisasi/spasi antar-export Google Form)
-            const key = Object.keys(row || {}).find(
-              (k) => k.trim().toLowerCase() === BULK_IMPORT_SOURCE_HEADER
+          // Petakan header asli file -> field (lihat BULK_HEADER_ALIASES)
+          const headerKeys = Object.keys(rows[0] || {});
+          const colOf = {};
+          Object.keys(BULK_HEADER_ALIASES).forEach((field) => {
+            colOf[field] = headerKeys.find((k) =>
+              BULK_HEADER_ALIASES[field].includes(normalizeHeader(k))
             );
-            if (!key) return;
-            const val = String(row[key] || "").trim().toUpperCase();
-            if (!val || seen.has(val)) return;
-            seen.add(val);
-            names.push(val);
           });
 
-          this.bulkRows = names.map((nameTeam) => {
-            const duplicate = existingNames.has(nameTeam);
-            return { nameTeam, duplicate, selected: !duplicate };
+          if (!colOf.nameTeam) {
+            this.bulkRows = [];
+            ipcRenderer.send("get-alert", {
+              type: "warning",
+              message: "Format tidak sesuai",
+              detail:
+                'Kolom "Team Name" tidak ditemukan. Gunakan tombol "Download Template" lalu isi sesuai format.',
+            });
+            return;
+          }
+
+          const seen = new Set();
+          const parsed = [];
+          rows.forEach((row, idx) => {
+            const nameTeam = String(row[colOf.nameTeam] || "").trim();
+            if (!nameTeam) return;
+            const nameKey = nameTeam.toUpperCase();
+            if (seen.has(nameKey)) return; // duplikat di dalam file -> ambil yg pertama
+            seen.add(nameKey);
+
+            const rawType = colOf.typeTeam ? row[colOf.typeTeam] : "";
+            const rawCountry = colOf.countryCode ? row[colOf.countryCode] : "";
+            const typeTeam = this.resolveTeamType(rawType);
+            const countryCode = this.resolveCountryCode(rawCountry);
+
+            let error = "";
+            if (nameTeam.length < 2) error = "Nama terlalu pendek";
+            else if (String(rawType || "").trim() && !typeTeam)
+              error = `Team Type "${String(rawType).trim()}" tidak dikenal`;
+            else if (String(rawCountry || "").trim() && !countryCode)
+              error = `Country "${String(rawCountry).trim()}" tidak dikenal`;
+
+            const duplicate = existingNames.has(nameKey);
+            parsed.push({
+              rowNo: idx + 2, // +1 header, +1 karena Excel mulai dari 1
+              nameTeam,
+              typeTeam: typeTeam || "",
+              countryCode: countryCode || "",
+              error,
+              duplicate,
+              selected: !duplicate && !error,
+            });
           });
+          this.bulkRows = parsed;
 
           if (!this.bulkRows.length) {
             ipcRenderer.send("get-alert", {
               type: "warning",
               message: "Tidak ada data",
-              detail:
-                'Kolom "Asal PENGPROV" tidak ditemukan atau kosong di file ini.',
+              detail: 'Kolom "Team Name" kosong di file ini.',
             });
           }
 
@@ -937,24 +1094,99 @@ export default {
 
     toggleSelectAllBulkRows(checked) {
       (this.bulkRows || []).forEach((r) => {
-        if (!r.duplicate) r.selected = checked;
+        if (this.isBulkRowSelectable(r)) r.selected = checked;
       });
+    },
+
+    isBulkRowSelectable(r) {
+      return !!r && !r.duplicate && !r.error;
+    },
+
+    // Cocokkan isi kolom Team Type dgn optionTeamTypes, by value ATAU name
+    // (case-insensitive) — mis. "pengprov" / "Pengprov" / "PENGPROV".
+    resolveTeamType(raw) {
+      const v = String(raw || "").trim().toLowerCase();
+      if (!v) return "";
+      const found = (this.optionTeamTypes || []).find(
+        (o) =>
+          String(o.value || "").toLowerCase() === v ||
+          String(o.name || "").toLowerCase() === v
+      );
+      return found ? String(found.value) : "";
+    },
+
+    teamTypeLabel(value) {
+      const found = (this.optionTeamTypes || []).find(
+        (o) => String(o.value) === String(value)
+      );
+      return found ? found.name : value;
+    },
+
+    // Kolom Country boleh kode ISO 2 huruf ("ID") atau nama ("Indonesia").
+    resolveCountryCode(raw) {
+      const v = String(raw || "").trim();
+      if (!v) return "";
+      const upper = v.toUpperCase();
+      const found = COUNTRIES.find(
+        (c) => c.code === upper || String(c.name).toUpperCase() === upper
+      );
+      return found ? found.code : "";
+    },
+
+    // Template .xlsx: sheet "Teams" (header + contoh) + sheet "Petunjuk"
+    // (aturan kolom + daftar Team Type & kode Country yang valid).
+    downloadBulkTemplate() {
+      const types = (this.optionTeamTypes || []).length
+        ? this.optionTeamTypes
+        : [{ value: "pengprov", name: "Pengprov" }];
+      const exampleType = (types[0] && types[0].name) || "";
+
+      const teamsSheet = XLSX.utils.aoa_to_sheet([
+        BULK_TEMPLATE_HEADERS,
+        ["JAWA BARAT", exampleType, "ID"],
+        ["DKI JAKARTA", exampleType, "ID"],
+      ]);
+      teamsSheet["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 12 }];
+
+      const guide = [
+        ["PETUNJUK IMPORT TEAM"],
+        [],
+        ["Kolom", "Wajib", "Keterangan"],
+        ["Team Name", "Ya", "Nama tim, minimal 2 karakter. Nama yang sudah ada di sistem otomatis dilewati."],
+        ["Team Type", "Tidak", "Salah satu Team Type di bawah. Kalau kosong, pakai Default Team Type yang dipilih saat import."],
+        ["Country", "Tidak", "Kode negara ISO 2 huruf (mis. ID) atau nama negara (mis. Indonesia)."],
+        [],
+        ["Hapus baris contoh di sheet Teams sebelum mengisi data asli. Jangan ubah nama kolom di baris pertama."],
+        [],
+        ["Team Type yang valid"],
+        ...types.map((t) => [t.name]),
+        [],
+        ["Kode Country", "Nama"],
+        ...COUNTRIES.map((c) => [c.code, c.name]),
+      ];
+      const guideSheet = XLSX.utils.aoa_to_sheet(guide);
+      guideSheet["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 90 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, teamsSheet, "Teams");
+      XLSX.utils.book_append_sheet(wb, guideSheet, "Petunjuk");
+      XLSX.writeFile(wb, "Template_Import_Teams.xlsx");
     },
 
     confirmBulkImport() {
       if (!this.canConfirmBulkImport) return;
 
       const docs = (this.bulkRows || [])
-        .filter((r) => r.selected && !r.duplicate)
+        .filter((r) => r.selected && this.isBulkRowSelectable(r))
         .map((r) => ({
-          typeTeam: String(this.bulkTeamType || "").trim(),
+          typeTeam: String(r.typeTeam || this.bulkTeamType || "").trim(),
           nameTeam: r.nameTeam,
           bibTeam: "",
           startOrder: "",
           praStart: "",
           intervalRace: "",
           statusId: 0,
-          countryCode: "",
+          countryCode: r.countryCode || "",
         }));
 
       if (!docs.length) return;

@@ -1,0 +1,111 @@
+/*
+ * Tombol toolbar di atas tabel "Output Racetime" — bentuk & warna SERAGAM
+ * di 5 halaman Race Category (Sprint/H2H/Slalom/DRR/Rafting Cross).
+ * Imported global di main.js (sama pola dgn race-category-stickybar.css).
+ *
+ * Pakai: container diberi class `race-toolbar`, tiap tombol `race-tool-btn`
+ * (+ `--primary` utk Save, `--danger` utk Reset All, `is-active` utk toggle
+ * yang sedang ON). Tombol pemicu modal (Riwayat Judge / Field Notes / Fouls
+ * Report) di dalam `.race-toolbar` otomatis ikut bentuk yang sama.
+ *
+ * Selector diberi qualifier `button.` (specificity 0,2,1) supaya menang atas
+ * style scoped tiap komponen (`.jah-trigger[data-v-x]` = 0,2,0).
+ */
+
+.race-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.race-toolbar button.race-tool-btn,
+.race-toolbar button.jah-trigger,
+.race-toolbar button.fnm-trigger,
+.race-toolbar button.frm-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid #cfd8e6;
+  background: #ffffff;
+  color: #1c4c7a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease;
+}
+
+.race-toolbar button.race-tool-btn .mr-1,
+.race-toolbar button.jah-trigger .mr-1 {
+  margin-right: 0 !important; /* jarak ikon-teks sudah diatur `gap` */
+}
+
+.race-toolbar button.race-tool-btn:hover:not(:disabled),
+.race-toolbar button.jah-trigger:hover,
+.race-toolbar button.fnm-trigger:hover,
+.race-toolbar button.frm-trigger:hover {
+  background: #f0f7ff;
+  border-color: #25b0eb;
+  color: #1c4c7a;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.15);
+}
+
+.race-toolbar button.race-tool-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.race-toolbar button.race-tool-btn:focus {
+  outline: none;
+}
+.race-toolbar button.race-tool-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.35);
+}
+
+.race-toolbar button.race-tool-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Toggle yang sedang ON (mis. Sort Ranked aktif) */
+.race-toolbar button.race-tool-btn.is-active {
+  background: #e6f4fd;
+  border-color: #25b0eb;
+  color: #1c4c7a;
+}
+
+/* Primary — aksi simpan */
+.race-toolbar button.race-tool-btn--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(28, 76, 122, 0.25);
+}
+.race-toolbar button.race-tool-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #163d63, #1d9fd6);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(28, 76, 122, 0.35);
+}
+
+/* Danger — aksi destruktif (Reset All) */
+.race-toolbar button.race-tool-btn--danger {
+  background: #ffffff;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+.race-toolbar button.race-tool-btn--danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}

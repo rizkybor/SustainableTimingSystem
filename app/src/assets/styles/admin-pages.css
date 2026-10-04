@@ -369,6 +369,11 @@ legend {
   color: #0ea5e9;
   border-color: #bfdbfe;
 }
+.status-danger {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
 
 /* ===== Avatars & chips ===== */
 .avatar {

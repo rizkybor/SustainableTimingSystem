@@ -1,205 +1,159 @@
 <template>
-  <div class="mt-5">
-    <b-row>
-      <b-col cols="10" offset="1" class="mb-4">
-        <div class="card-wrapper p-3 mb-2">
-          <div
-            class="d-flex align-items-center justify-content-between text-muted small"
-          >
-            <b-breadcrumb class="mb-0">
-              <b-breadcrumb-item to="/">
-                <Icon icon="mdi:home-outline" class="mr-1" />
-                Dashboard
-              </b-breadcrumb-item>
-              <b-breadcrumb-item active>Team Details</b-breadcrumb-item>
-            </b-breadcrumb>
-            <div>{{ currentDateTime }}</div>
+  <div class="list-page">
+    <PageHero
+      :title="teamName"
+      crumb="Team Details"
+      :subtitle="(primaryTypeTeam ? primaryTypeTeam + ' · ' : '') + 'Detail tim, registrasi race & hasilnya'"
+      :stats="[
+        { label: 'Events', value: eventsGrouped.length },
+        { label: 'Race Registrations', value: registrations.length, tone: 'success' },
+        { label: 'Team Records', value: masterRecords.length, tone: 'neutral' },
+      ]"
+    >
+      <template #icon>
+        <span class="td-avatar" :style="{ background: avatarColor(teamName) }">
+          {{ initials(teamName) }}
+        </span>
+      </template>
+      <template #title-suffix>
+        <CountryFlag v-if="primaryCountryCode" :code="primaryCountryCode" class="td-title-flag" />
+      </template>
+    </PageHero>
+
+    <div v-if="loading" class="lp-card td-state">
+      <b-spinner variant="primary" class="mr-2" small /> Memuat data tim…
+    </div>
+
+    <div v-else-if="!masterRecords.length && !registrations.length" class="lp-card td-state">
+      <Icon icon="mdi:account-search-outline" width="40" height="40" />
+      <div class="lp-empty__title mt-2">Data tim "{{ teamName }}" tidak ditemukan.</div>
+    </div>
+
+    <div v-else class="td-layout">
+      <!-- TEAM RECORDS -->
+      <aside class="lp-card td-records">
+        <div class="lp-card__head">
+          <h5 class="lp-card__title">
+            <Icon icon="mdi:card-account-details-outline" />
+            Team Records
+          </h5>
+          <span class="lp-segment__count">{{ masterRecords.length }}</span>
+        </div>
+        <div class="td-records__body">
+          <div v-if="!masterRecords.length" class="lp-muted small">Tidak ada data master tim.</div>
+          <div v-for="(rec, i) in masterRecords" :key="i" class="td-record">
+            <div class="td-record__top">
+              <span class="td-record__name">{{ rec.nameTeam || "-" }}</span>
+              <CountryFlag :code="rec.countryCode" />
+            </div>
+            <div class="td-record__meta">
+              <span v-if="rec.typeTeam" class="lp-chip lp-chip--soft">{{ rec.typeTeam }}</span>
+              <span v-if="rec.bibTeam" class="lp-chip">BIB {{ rec.bibTeam }}</span>
+              <span v-if="rec.statusId === 0" class="lp-status lp-status--on">
+                <span class="lp-status__dot"></span> Active
+              </span>
+              <span v-else class="lp-status lp-status--off">
+                <span class="lp-status__dot"></span> Inactive
+              </span>
+            </div>
           </div>
         </div>
+      </aside>
 
-        <div
-          class="card-wrapper mt-1"
-          style="
-            padding-left: 45px;
-            padding-right: 45px;
-            padding-bottom: 45px;
-            padding-top: 25px;
-          "
-        >
-          <div @click="goBack" class="btn-custom d-flex align-items-center mb-3">
-            <Icon icon="mdi:chevron-left" class="mr-1" />
-            <span>Back</span>
-          </div>
+      <!-- REGISTERED IN -->
+      <section class="td-events">
+        <div class="td-events__head">
+          <h5 class="lp-card__title">
+            <Icon icon="mdi:flag-checkered" />
+            Registered In
+          </h5>
+          <span class="lp-muted small">{{ eventsGrouped.length }} event</span>
+        </div>
 
-          <div v-if="loading" class="text-center text-muted py-5">
-            <b-spinner variant="primary" class="mr-2" /> Memuat data tim…
-          </div>
+        <div v-if="!eventsGrouped.length" class="lp-card td-state">
+          <Icon icon="mdi:calendar-blank-outline" width="34" height="34" />
+          <div>Tim ini belum terdaftar di race manapun.</div>
+        </div>
 
-          <div v-else-if="!masterRecords.length && !registrations.length" class="text-center text-muted py-5">
-            <Icon icon="mdi:account-search-outline" width="40" height="40" style="opacity: 0.5" />
-            <div class="mt-2">Data tim "{{ teamName }}" tidak ditemukan.</div>
-          </div>
-
-          <div v-else>
-            <!-- Header -->
-            <div class="d-flex align-items-center mb-4">
-              <div
-                class="team-avatar mr-3 d-flex align-items-center justify-content-center"
-              >
-                <Icon icon="mdi:account-circle" width="36" height="36" />
+        <article v-for="ev in eventsGrouped" :key="ev.eventId" class="lp-card td-event">
+          <header class="td-event__head">
+            <span class="td-event__icon"><Icon icon="mdi:calendar-star" /></span>
+            <div class="td-event__text">
+              <div class="td-event__name">
+                {{ eventNameLoading(ev.eventId) ? "Memuat…" : (ev.eventName || "(Event tidak ditemukan)") }}
               </div>
-              <div>
-                <h2 class="page-title mb-1">
-                  {{ teamName }}
-                  <CountryFlag v-if="primaryCountryCode" :code="primaryCountryCode" />
-                </h2>
-                <p class="page-subtitle mb-0">
-                  {{ primaryTypeTeam || "-" }} ·
-                  {{ registrations.length }} race registration(s)
-                </p>
+              <div class="lp-muted small">
+                {{ ev.categories.length }} race category registration(s)
               </div>
             </div>
+            <button type="button" class="td-open" @click="openEvent(ev)">
+              Open Event
+              <Icon icon="mdi:arrow-top-right" />
+            </button>
+          </header>
 
-            <!-- Master records -->
-            <div class="section-divider my-4"><span>Team Records</span></div>
-            <div class="table-responsive px-1 pb-2 table-rounded-wrapper mb-4">
-              <b-table
-                striped
-                hover
-                small
-                head-variant="light"
-                :items="masterRecords"
-                :fields="masterFields"
-                class="um-table mt-0"
-                show-empty
-                empty-text="Tidak ada data master tim."
-              >
-                <template #cell(nameTeam)="row">
-                  <span class="font-weight-bold text-dark">{{ row.item.nameTeam || "-" }}</span>
-                  <CountryFlag :code="row.item.countryCode" />
-                </template>
-                <template #cell(bibTeam)="row">
-                  <span v-if="row.item.bibTeam" class="status-pill status-neutral">
-                    <span class="dot"></span> {{ row.item.bibTeam }}
-                  </span>
-                  <span v-else class="text-muted">—</span>
-                </template>
-                <template #cell(statusId)="row">
-                  <span
-                    v-if="row.item.statusId === 0"
-                    class="status-pill status-success"
-                  >
-                    <span class="dot"></span> Active
-                  </span>
-                  <span v-else class="status-pill status-upcoming">
-                    <span class="dot"></span> Inactive
-                  </span>
-                </template>
-              </b-table>
+          <div v-for="(cat, cIdx) in ev.categories" :key="cIdx" class="td-cat">
+            <div class="td-cat__head">
+              <span class="td-race" :class="'td-race--' + raceTone(cat.raceCategory)">
+                {{ raceLabel(cat.raceCategory) }}
+              </span>
+              <span class="td-cat__bucket">
+                {{ cat.divisionName || "-" }} · {{ cat.raceName || "-" }}
+                <template v-if="cat.initialName"> · {{ cat.initialName }}</template>
+              </span>
+              <span v-if="cat.bibTeam" class="lp-chip td-cat__bib">BIB {{ cat.bibTeam }}</span>
             </div>
 
-            <!-- Registered events -->
-            <div class="section-divider my-4"><span>Registered In</span></div>
-
-            <div v-if="!eventsGrouped.length" class="text-center text-muted py-4">
-              Tim ini belum terdaftar di race manapun.
-            </div>
-
-            <div
-              v-for="ev in eventsGrouped"
-              :key="ev.eventId"
-              class="event-card mb-3"
-            >
-              <div class="event-card-header">
-                <div>
-                  <div class="font-weight-bold text-dark">
-                    {{ eventNameLoading(ev.eventId) ? "Memuat…" : (ev.eventName || "(Event tidak ditemukan)") }}
-                  </div>
-                  <div class="text-muted small">
-                    {{ ev.categories.length }} race category registration(s)
-                  </div>
-                </div>
-                <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon"
-                  @click="openEvent(ev)"
-                >
-                  Open Event
-                  <Icon icon="mdi:open-in-new" width="14" height="14" class="ml-1" />
-                </b-button>
+            <div v-if="cat.result" class="td-result">
+              <div class="td-tile" :class="rankTone(cat.result.rankedByCats)">
+                <span class="td-tile__label">
+                  <Icon icon="mdi:podium" /> Ranked
+                </span>
+                <span class="td-tile__value">{{ displayValue(cat.result.rankedByCats) }}</span>
               </div>
+              <div class="td-tile">
+                <span class="td-tile__label">
+                  <Icon icon="mdi:star-four-points-outline" /> Score
+                </span>
+                <span class="td-tile__value">{{ displayValue(cat.result.scored) }}</span>
+              </div>
+            </div>
+            <div v-else class="td-note">
+              {{ loadingResults ? "Memuat hasil…" : "Belum ada hasil." }}
+            </div>
 
-              <div
-                v-for="(cat, cIdx) in ev.categories"
-                :key="cIdx"
-                class="category-row"
-              >
-                <div class="category-row-head">
-                  <div>
-                    <span class="cat-badge">{{ cat.raceCategory || "-" }}</span>
-                    <span class="text-muted small ml-2">
-                      {{ cat.divisionName || "-" }} · {{ cat.raceName || "-" }}
-                      <span v-if="cat.initialName"> • {{ cat.initialName }}</span>
-                    </span>
+            <!-- Timing detail mentah (Sprint/Slalom/DRR saja) -->
+            <template v-if="cat.supportsRawResult">
+              <div v-if="cat.rawRuns.length" class="td-timing">
+                <div v-for="(run, rIdx) in cat.rawRuns" :key="rIdx" class="td-run">
+                  <div class="td-run__label">
+                    <Icon icon="mdi:timer-outline" /> {{ run.label }}
                   </div>
-                  <span v-if="cat.bibTeam" class="status-pill status-neutral">
-                    <span class="dot"></span> BIB {{ cat.bibTeam }}
-                  </span>
-                </div>
-
-                <div v-if="cat.result" class="result-grid mt-2">
-                  <div class="td-field">
-                    <div class="td-label">Ranked</div>
-                    <div class="td-value">{{ cat.result.rankedByCats != null && cat.result.rankedByCats !== "" ? cat.result.rankedByCats : "-" }}</div>
-                  </div>
-                  <div class="td-field">
-                    <div class="td-label">Score</div>
-                    <div class="td-value">{{ cat.result.scored != null && cat.result.scored !== "" ? cat.result.scored : "-" }}</div>
-                  </div>
-                </div>
-                <div v-else class="text-muted small mt-2">
-                  {{ loadingResults ? "Memuat hasil…" : "Belum ada hasil." }}
-                </div>
-
-                <!-- Timing detail mentah (Sprint/Slalom/DRR saja) -->
-                <template v-if="cat.supportsRawResult">
-                  <div v-if="cat.rawRuns.length" class="timing-detail mt-2">
-                    <div
-                      v-for="(run, rIdx) in cat.rawRuns"
-                      :key="rIdx"
-                      class="timing-run"
-                    >
-                      <div class="timing-run-label">{{ run.label }}</div>
-                      <div v-if="run.fields.length" class="result-grid">
-                        <div
-                          class="td-field"
-                          v-for="f in run.fields"
-                          :key="f.label"
-                        >
-                          <div class="td-label">{{ f.label }}</div>
-                          <div class="td-value">{{ f.value }}</div>
-                        </div>
-                      </div>
+                  <div v-if="run.fields.length" class="td-run__grid">
+                    <div v-for="f in run.fields" :key="f.label" class="td-field">
+                      <div class="td-label">{{ f.label }}</div>
+                      <div class="td-value">{{ f.value }}</div>
                     </div>
                   </div>
-                  <div v-else class="text-muted small mt-2">
-                    {{ loadingRawResults ? "Memuat timing detail…" : "Belum ada timing detail." }}
-                  </div>
-                </template>
+                </div>
               </div>
-            </div>
+              <div v-else class="td-note">
+                {{ loadingRawResults ? "Memuat timing detail…" : "Belum ada timing detail." }}
+              </div>
+            </template>
           </div>
-        </div>
-      </b-col>
-    </b-row>
+        </article>
+      </section>
+    </div>
   </div>
 </template>
+
 
 <script>
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import CountryFlag from "@/components/common/CountryFlag.vue";
+import PageHero from "@/components/common/PageHero.vue";
 import { RESULT_FIELD_LABELS, collectFields } from "@/utils/formatRaceResult";
 
 // teamsRegisteredCollection & temporaryOverallEventResults kadang memakai
@@ -241,7 +195,7 @@ function normalizeRawRuns(rawResult) {
 
 export default {
   name: "SustainableTimingSystemTeamDetail",
-  components: { Icon, CountryFlag },
+  components: { Icon, CountryFlag, PageHero },
   data() {
     return {
       loading: true,
@@ -367,6 +321,56 @@ export default {
     this.loadData();
   },
   methods: {
+    // ---- helper tampilan ----
+    displayValue(v) {
+      return v !== null && v !== undefined && v !== "" ? v : "-";
+    },
+    // Warna tile Ranked: emas/perak/perunggu utk juara 1-3.
+    rankTone(v) {
+      const n = Number(v);
+      if (n === 1) return "td-tile--gold";
+      if (n === 2) return "td-tile--silver";
+      if (n === 3) return "td-tile--bronze";
+      return "";
+    },
+    raceTone(raceCategory) {
+      const k = normalizeCategoryKey(raceCategory);
+      return (
+        { SPRINT: "sprint", HEADTOHEAD: "h2h", SLALOM: "slalom", DRR: "drr", RX: "rx" }[k] ||
+        "other"
+      );
+    },
+    raceLabel(raceCategory) {
+      const k = normalizeCategoryKey(raceCategory);
+      return (
+        {
+          SPRINT: "Sprint",
+          HEADTOHEAD: "Head to Head",
+          SLALOM: "Slalom",
+          DRR: "Down River",
+          RX: "Rafting Cross",
+        }[k] || raceCategory || "-"
+      );
+    },
+    initials(name) {
+      const words = String(name || "?").trim().split(/\s+/);
+      return ((words[0] || "?").charAt(0) + (words[1] ? words[1].charAt(0) : "")).toUpperCase();
+    },
+    // Warna avatar stabil per nama tim (sama dgn Home.vue / All Teams).
+    avatarColor(name) {
+      const palette = [
+        "linear-gradient(135deg,#1c4c7a,#25b0eb)",
+        "linear-gradient(135deg,#0f766e,#2dd4bf)",
+        "linear-gradient(135deg,#7c3aed,#a78bfa)",
+        "linear-gradient(135deg,#c2410c,#fb923c)",
+        "linear-gradient(135deg,#be123c,#fb7185)",
+        "linear-gradient(135deg,#1d4ed8,#60a5fa)",
+      ];
+      let h = 0;
+      const str = String(name || "");
+      for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+      return palette[h % palette.length];
+    },
     goBack() {
       this.$router.back();
     },
@@ -515,161 +519,311 @@ export default {
 </script>
 
 <style scoped>
-.team-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #eef3fb;
-  color: #325a8f;
-}
-.btn-custom { cursor: pointer; color: #1c4c7a; font-weight: 600; }
-.page-title { font-weight: 800; color: #0f172a; }
-.page-subtitle { color: #6b7280; font-size: 0.95rem; }
+/* Header & kartu dasar: PageHero.vue + list-pages.css (global). */
 
-.table-rounded-wrapper {
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-  background: #fff;
-}
-.um-table thead th {
-  background: #f1f5f9 !important;
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border-bottom: 2px solid #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.um-table tbody td {
-  background: #fff;
-  color: #374151;
-  font-size: 0.9rem;
-  padding: 0.9rem 0.75rem;
-  vertical-align: middle;
-  border-color: #f1f5f9;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  font-weight: 600;
-  font-size: 0.8rem;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  color: #0f172a;
-}
-.status-success { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
-.status-upcoming { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
-.status-neutral { background: #eff6ff; color: rgb(0, 180, 255); border-color: #bfdbfe; }
-.status-pill .dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; display: inline-block; }
-
-.section-divider {
+.td-avatar {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
   display: flex;
-  align-items: center;
-  text-align: center;
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.section-divider::before,
-.section-divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid #e5e7eb;
-}
-.section-divider:not(:empty)::before { margin-right: 1rem; }
-.section-divider:not(:empty)::after { margin-left: 1rem; }
-.section-divider span {
-  background: #fff;
-  padding: 0 0.75rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  color: #9ca3af;
-}
-
-.btn-icon {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.45rem;
-  border-radius: 10px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+.td-title-flag {
+  vertical-align: middle;
+  margin-left: 6px;
 }
 
-/* Event > Race Category > Result hierarchy */
-.event-card {
-  border: 1px solid #e6ebf4;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+.td-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 40px 16px;
+  color: #94a3b8;
+}
+
+.td-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 20px;
+}
+.td-layout .lp-card {
+  margin-top: 0;
+}
+
+/* ---------- Team Records ---------- */
+.td-records {
+  position: sticky;
+  top: calc(var(--nav-h, 64px) + 16px);
+}
+.td-records__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.td-record {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #eef2f7;
+  background: #fbfdff;
+}
+.td-record__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.td-record__name {
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.td-record__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------- Registered In ---------- */
+.td-events {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.td-events__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.td-event {
   overflow: hidden;
 }
-.event-card-header {
+.td-event__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 14px 18px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #f8fbff, #ffffff);
   border-bottom: 1px solid #eef2f7;
 }
-.category-row {
-  padding: 14px 18px;
-  border-bottom: 1px solid #f1f5f9;
-}
-.category-row:last-child { border-bottom: none; }
-.category-row-head {
+.td-event__icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: #e6f4fd;
+  color: #1c4c7a;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
+  justify-content: center;
+  font-size: 19px;
 }
-.cat-badge {
-  display: inline-block;
+.td-event__text {
+  flex: 1;
+  min-width: 0;
+}
+.td-event__name {
   font-weight: 800;
-  font-size: 12px;
-  letter-spacing: 0.4px;
+  font-size: 15px;
+  color: #0f172a;
+}
+.td-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #d6e3f1;
+  background: #fff;
   color: #1c4c7a;
-  background: #eef6ff;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  padding: 3px 8px;
-}
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-.td-field { min-width: 0; }
-.td-label {
-  font-size: 11px;
-  color: #8a95a3;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 3px;
-}
-.td-value {
-  font-weight: 600;
   font-size: 13px;
-  color: #1f2937;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.td-open:hover {
+  border-color: #25b0eb;
+  background: #f0f7ff;
 }
 
-.timing-detail {
-  border-top: 1px dashed #e6ebf4;
-  padding-top: 10px;
+.td-cat {
+  padding: 14px 18px;
+  border-top: 1px solid #f1f5f9;
 }
-.timing-run + .timing-run { margin-top: 10px; }
-.timing-run-label {
+.td-cat:first-of-type {
+  border-top: none;
+}
+.td-cat__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.td-cat__bucket {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+.td-cat__bib {
+  margin-left: auto;
+}
+
+.td-race {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
   font-weight: 800;
-  font-size: 11px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  color: #fff;
+  background: #64748b;
+}
+.td-race--sprint {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+}
+.td-race--h2h {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+}
+.td-race--slalom {
+  background: linear-gradient(135deg, #0f766e, #2dd4bf);
+}
+.td-race--drr {
+  background: linear-gradient(135deg, #c2410c, #fb923c);
+}
+.td-race--rx {
+  background: linear-gradient(135deg, #be123c, #fb7185);
+}
+
+.td-result {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 160px));
+  gap: 10px;
+  margin-top: 12px;
+}
+.td-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
+  background: #f8fafc;
+}
+.td-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.td-tile__value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.td-tile--gold {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-color: #fcd34d;
+}
+.td-tile--gold .td-tile__value {
+  color: #b45309;
+}
+.td-tile--silver {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  border-color: #cbd5e1;
+}
+.td-tile--silver .td-tile__value {
+  color: #475569;
+}
+.td-tile--bronze {
+  background: linear-gradient(135deg, #fff7ed, #fed7aa);
+  border-color: #fdba74;
+}
+.td-tile--bronze .td-tile__value {
+  color: #9a3412;
+}
+
+.td-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: #94a3b8;
+}
+
+.td-timing {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.td-run {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fbfdff;
+  border: 1px dashed #dbe3ee;
+}
+.td-run__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
   color: #1c4c7a;
-  margin-bottom: 6px;
+}
+.td-run__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px 14px;
+}
+.td-field {
+  min-width: 0;
+}
+.td-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.td-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1099.98px) {
+  .td-layout {
+    grid-template-columns: 1fr;
+  }
+  .td-records {
+    position: static;
+  }
 }
 </style>

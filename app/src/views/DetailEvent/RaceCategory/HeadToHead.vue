@@ -1,80 +1,28 @@
 <template>
   <div>
-    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
-      <!-- TOP BAR (breadcrumb + datetime) -->
-      <div
-        class="d-flex align-items-center justify-content-between text-muted small"
-      >
-        <b-breadcrumb class="mb-0">
-          <b-breadcrumb-item to="/">
-            <Icon icon="mdi:home-outline" class="mr-1" />
-            Dashboard
-          </b-breadcrumb-item>
-          <b-breadcrumb-item
-            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
-          >
-            {{ dataEventSafe.eventName }}
-          </b-breadcrumb-item>
-          <b-breadcrumb-item active>
-            {{ "Head to Head" }}
-          </b-breadcrumb-item>
-        </b-breadcrumb>
-        <div>{{ currentDateTime }}</div>
-      </div>
-    </div>
+    <!-- Breadcrumb + hero bersama 5 Race Category -->
+    <RaceCategoryHero
+      :event="dataEventSafe"
+      race-key="HEAD2HEAD"
+      race-label="Head to Head"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+      :current-date-time="currentDateTime"
+      :active-category="titleCategories || ''"
+    />
 
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
-
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ dataEventSafe.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ dataEventSafe.addressCity || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ dataEventSafe.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ dataEventSafe.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
-
-    <!-- SUBHEADER -->
+    <!-- SUBHEADER: Switch Head to Head Category + kontrol Connect Racetime
+         — sticky (baru position:fixed saat di-scroll, lihat .race-sticky-bar di race-category-
+         stickybar.css), sama pola dgn Sprint/Slalom/DRR/Rafting Cross (atas
+         permintaan user 2026-10-05: dipakai seragam di SEMUA 5 halaman
+         Race Category Details). `ref="stickyBar"` dipakai raceStickyBarMixin
+         di mounted() utk mengukur tinggi spacer di bawahnya. -->
     <div class="px-4">
-      <div class="card-body">
+      <div ref="stickySentinel"></div>
+      <div
+        class="card-body race-sticky-bar"
+        :class="{ 'is-stuck': isBarStuck }"
+        ref="stickyBar"
+      >
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -188,6 +136,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -212,6 +164,10 @@
         </b-row>
       </div>
     </div>
+    <!-- Spacer: hanya terisi saat bar sedang menempel (`is-stuck`, position:
+         fixed) supaya konten di bawahnya tidak loncat/ketutupan. Lihat
+         raceStickyBarMixin.js. -->
+    <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
@@ -246,8 +202,6 @@
             <!-- Info: status realtime juri & laporan -->
             <div class="h2h-action-group h2h-action-group--info">
               <span class="h2h-action-group__label">Info</span>
-              <ConnectionStatusBadge class="h2h-judge-trigger" />
-
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 class="h2h-judge-trigger"
@@ -623,7 +577,7 @@
             </small>
           </div>
           <div
-            class="h2h-actions-panel d-flex flex-wrap"
+            class="h2h-actions-panel race-toolbar"
             v-if="visibleParticipants && visibleParticipants.length"
           >
             <!-- Scope: babak yang sedang aktif -->
@@ -631,7 +585,7 @@
               <span class="h2h-action-group__label">Round</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingRound"
                 @click="printCurrentRoundVuePdf"
                 v-b-tooltip.hover="'Print hasil babak yang sedang aktif'"
@@ -642,7 +596,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingRound"
                 @click="saveCurrentRoundToDB"
                 v-b-tooltip.hover="'Simpan hasil babak aktif ke database'"
@@ -658,7 +612,7 @@
               <span class="h2h-action-group__label">All Rounds</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingAllRounds"
                 @click="printAllRoundVuePdf"
                 v-b-tooltip.hover="'Print seluruh babak sekaligus'"
@@ -669,7 +623,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingAllRounds"
                 @click="saveAllRoundToDB"
                 v-b-tooltip.hover="'Simpan seluruh babak ke database'"
@@ -685,7 +639,7 @@
               <span class="h2h-action-group__label">Overall</span>
               <button
                 type="button"
-                class="h2h-action-btn"
+                class="race-tool-btn"
                 :disabled="isPrintingOverall"
                 @click="printOverallVuePdf"
                 v-b-tooltip.hover="'Print ranking overall kategori ini'"
@@ -696,7 +650,7 @@
               </button>
               <button
                 type="button"
-                class="h2h-action-btn h2h-action-btn--save"
+                class="race-tool-btn race-tool-btn--primary"
                 :disabled="isSavingOverall"
                 @click="saveOverallToDB"
                 v-b-tooltip.hover="'Simpan overall kategori ini ke database'"
@@ -1136,9 +1090,9 @@
     </div>
 
     <!-- OPERATION TIME (shared component) -->
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="visibleParticipants && visibleParticipants.length"
+      show-photofinish
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="visibleParticipants"
@@ -1616,6 +1570,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import logoSts from "@/assets/images/logo-sts.png";
@@ -1628,8 +1583,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import H2HGoToHeat from "@/components/race/H2HGoToHeat.vue";
 import Bracket from "vue-tournament-bracket";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
@@ -1773,7 +1728,7 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
-    PhotofinishBadge,
+    RaceCategoryHero,
     H2HGoToHeat,
     OperationTimePanel,
     EmptyCard,
@@ -1786,7 +1741,12 @@ export default {
     FoulsReportModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
+  mixins: [
+    teamFlagMixin,
+    serialPortMixin,
+    photofinishMixin,
+    raceStickyBarMixin,
+  ],
   data() {
     return {
       connectionState,
@@ -8336,45 +8296,8 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-.switch-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #2b3445;
-}
-
-/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn halaman Details/Sprint */
-.init-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f1f3f7;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.init-tab {
-  border: none;
-  background: transparent;
-  color: #2b3445;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-}
-
-.init-tab:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
-}
-
-.init-tab.active {
-  background: rgb(54, 142, 180);
-  color: #fff;
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-/* ---- End styling utk Switch DRR Category select ---- */
+/* Switch Head to Head Category (.switch-label/.init-tabs/.init-tab)
+   sekarang didefinisikan global di race-category-stickybar.css. */
 
 .btn-action {
   background: #ffffff;
@@ -8539,40 +8462,8 @@ tr.h2h-goto-hit > td:first-child {
   background: #163c61;
 }
 
-/* Connect/Disconnect: .btn-action's white background above wins by default
-   over Bootstrap's .btn-success/.btn-danger (equal specificity, .btn-action
-   declared later) — these overrides use an extra class to win instead. */
-.btn-connect {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-.btn-connect.btn-success {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.btn-connect.btn-success:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
-}
-.btn-connect.btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
-.btn-connect.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-.btn-connect:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+/* .btn-connect sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 .btn-action-racetime {
   background: #ffffff;
@@ -8583,65 +8474,7 @@ tr.h2h-goto-hit > td:first-child {
   padding: 8px 14px;
 }
 
-/* ===== HERO / BANNER ===== */
-.detail-hero {
-  position: relative;
-  overflow: hidden;
-}
-.detail-hero .hero-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  background-size: cover;
-  background-position: center;
-}
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-.detail-hero .hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 50px;
-}
-.detail-hero h2 {
-  color: #fff;
-  font-weight: 800;
-  font-size: clamp(26px, 4.2vw, 46px);
-  line-height: 1.05;
-  margin-bottom: 6px !important;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-  letter-spacing: 0.2px;
-}
-.detail-hero .meta {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(12px, 1.6vw, 16px);
-}
-.hero-logo {
-  width: 150px;
-  height: 150px;
-  margin-right: 10px;
-  border-radius: 30px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
-}
-
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-
+/* Hero/breadcrumb: lihat components/race/RaceCategoryHero.vue */
 /* ===== TABLE WRAPPER: overflow horizontal tanpa mengecilkan kolom ===== */
 .table-wrapper {
   width: 100%;
@@ -8737,21 +8570,8 @@ td {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-/* ===== PORT STATUS ===== */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 0;
-  transition: background-color 0.3s;
-}
-.connected {
-  background: rgb(0, 255, 0);
-}
-.disconnected {
-  background: red;
-}
+/* .status-indicator/.connected/.disconnected sekarang didefinisikan
+   global di race-category-stickybar.css. */
 
 /* ===== BRACKET (refined) ===== */
 .bracket {
@@ -9468,96 +9288,9 @@ thead th[colspan="8"] {
   background-color: #343a40; /* hitam */
 }
 
-/* PATH  */
-.controls-bar {
-  gap: 10px;
-}
-
-/* Pill path */
-.path-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 520px; /* sesuaikan */
-  background: #fff;
-  color: #0f172a;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.path-pill--empty {
-  color: #64748b;
-  background: #f8fafc;
-  border-color: #e5e7eb;
-}
-.path-pill .truncate {
-  display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Meta Panel  */
-.meta-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #eef2f7;
-}
-.meta-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.meta-label {
-  min-width: 120px; /* lebar label tetap */
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
-  font-style: italic;
-}
-.meta-value {
-  font-weight: 600;
-  color: #0f172a; /* slate-900 */
-}
-.badge-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-}
-.badge-chip--blue {
-  background: #eef6ff;
-  color: rgb(0, 180, 255);
-  border-color: #dbeafe;
-}
-
-/* Responsif: di layar kecil, label di atas value */
-@media (max-width: 575.98px) {
-  .meta-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px 0;
-  }
-  .meta-label {
-    min-width: auto;
-  }
-  .meta-panel {
-    padding: 12px;
-  }
-}
+/* .controls-bar/.path-pill/.meta-panel/.meta-row/.meta-label/.meta-value/
+   .badge-chip (+ responsive) sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 .bracket-hidden-info {
   display: flex;

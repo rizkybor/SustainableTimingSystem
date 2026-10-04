@@ -71,8 +71,15 @@
           </div>
         </div>
 
+        <!-- Panel kategori (Sprint/H2H/Slalom/DRR/RX) — dibungkus flex
+             column supaya urutan tampilnya bisa diatur lewat CSS `order`
+             (lihat categoryOrder()) tanpa perlu restrukturisasi markup
+             tiap panel, atas permintaan user (2026-10-05): urutan panel
+             harus ikut urutan array Event Categories di Event Settings,
+             bukan selalu Sprint→H2H→Slalom→DRR→RX. -->
+        <div class="rs-category-panels">
         <!-- SPRINT -->
-        <div class="rs-card mb-3" v-if="showSprint">
+        <div class="rs-card mb-3" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
@@ -325,7 +332,7 @@
         </div>
 
         <!-- HEAD TO HEAD -->
-        <div class="rs-card mb-3" v-if="showH2H">
+        <div class="rs-card mb-3" v-if="showH2H" :style="{ order: categoryOrder('HEAD2HEAD') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
@@ -600,7 +607,7 @@
         </div>
 
         <!-- SLALOM -->
-        <div class="rs-card mb-3" v-if="showSlalom">
+        <div class="rs-card mb-3" v-if="showSlalom" :style="{ order: categoryOrder('SLALOM') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
@@ -821,7 +828,7 @@
         </div>
 
         <!-- DOWN RIVER RACE -->
-        <div class="rs-card mb-3" v-if="showDrr">
+        <div class="rs-card mb-3" v-if="showDrr" :style="{ order: categoryOrder('DRR') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
@@ -1046,7 +1053,7 @@
         </div>
 
         <!-- RAFTING CROSS -->
-        <div class="rs-card mb-3" v-if="showRx">
+        <div class="rs-card mb-3" v-if="showRx" :style="{ order: categoryOrder('RX') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"
@@ -1291,6 +1298,7 @@
             >
             </div>
           </div>
+        </div>
         </div>
 
         <div
@@ -1646,6 +1654,17 @@ export default {
     maxSprintScoreRows: { type: Number, default: 64 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
+    // BUG FIX (2026-10-05): opsional — categoriesEvent event ini, kalau
+    // parent (Details/index.vue) SUDAH punya di memory (this.events.categoriesEvent,
+    // dimuat bareng data event lainnya). Kalau diisi, dipakai LANGSUNG
+    // (sinkron, tanpa IPC sama sekali) utk menentukan panel kategori mana
+    // yang tampil — menghindari race di channel "get-events-byid-reply"
+    // (dipakai bersama >10 komponen lain, lihat eventCategories.js) yang
+    // sebelumnya bisa membuat Slalom/dst tetap tampil padahal operator
+    // sudah tidak memilihnya di Event Categories. null/[] = fallback ke
+    // fetch IPC lama (loadEnabledCategoryKeys) — tetap jalan utk pemanggil
+    // yang belum/tidak mengoper prop ini.
+    categoriesEvent: { type: Array, default: null },
   },
   data() {
     return {
@@ -1771,6 +1790,12 @@ export default {
         }
       },
     },
+    // Prop categoriesEvent bisa saja masih kosong saat modal pertama kali
+    // dibuka (mis. parent belum selesai memuat data event) lalu terisi
+    // belakangan — terapkan ulang begitu nilainya berubah.
+    categoriesEvent() {
+      this.fetchEnabledCategories();
+    },
     "draft.rx.teamsPerHeat"(v) {
       // qualifiers per heat harus selalu < teams per heat; clamp langsung
       // (bukan cuma pas confirm()) supaya tampilan spinbutton tidak pernah
@@ -1792,7 +1817,30 @@ export default {
       this.$set(this.collapsedSections, key, !this.collapsedSections[key]);
     },
     async fetchEnabledCategories() {
+      if (Array.isArray(this.categoriesEvent) && this.categoriesEvent.length) {
+        this.enabledCategoryKeys = new Set(
+          this.categoriesEvent.map((c) => String((c && c.name) || "").toUpperCase())
+        );
+        return;
+      }
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(this.eventId);
+    },
+    // FITUR (2026-10-05, atas permintaan user): urutan tampil panel
+    // kategori ikut urutan array `categoriesEvent` di Event Settings,
+    // bukan selalu Sprint→H2H→Slalom→DRR→RX. `enabledCategoryKeys` (Set)
+    // dibangun dari array itu di loadEnabledCategoryKeys() — urutan
+    // insersi Set JS SELALU mengikuti urutan array sumbernya, jadi
+    // Array.from() di sini otomatis mengembalikan urutan yang sama persis
+    // dgn yang dipilih operator. Dipakai sbg CSS `order` pada tiap panel
+    // (lihat .rs-category-panels), bukan v-for, supaya markup detail tiap
+    // panel (sangat berbeda satu sama lain) tidak perlu dirombak.
+    categoryOrder(key) {
+      const DEFAULT_ORDER = { SPRINT: 0, HEAD2HEAD: 1, SLALOM: 2, DRR: 3, RX: 4 };
+      if (!this.enabledCategoryKeys) {
+        return DEFAULT_ORDER[key] != null ? DEFAULT_ORDER[key] : 99;
+      }
+      const idx = Array.from(this.enabledCategoryKeys).indexOf(key);
+      return idx === -1 ? 99 : idx;
     },
     _clone(obj) {
       try {
@@ -2365,6 +2413,15 @@ export default {
 /* Konten modal (kena karena global) */
 .rounded-20 {
   border-radius: 20px;
+}
+
+/* Panel kategori (Sprint/H2H/Slalom/DRR/RX) — flex column supaya CSS
+   `order` (lihat categoryOrder() di methods) bisa menata ulang urutan
+   tampilnya ikut array Event Categories, tanpa perlu v-for/restrukturisasi
+   markup tiap panel. */
+.rs-category-panels {
+  display: flex;
+  flex-direction: column;
 }
 
 .rs-divider {

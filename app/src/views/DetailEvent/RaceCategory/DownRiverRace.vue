@@ -1,76 +1,14 @@
 <template>
   <div>
-    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
-      <!-- TOP BAR (breadcrumb + datetime) -->
-      <div
-        class="d-flex align-items-center justify-content-between text-muted small"
-      >
-        <b-breadcrumb class="mb-0">
-          <b-breadcrumb-item to="/">
-            <Icon icon="mdi:home-outline" class="mr-1" />
-            Dashboard
-          </b-breadcrumb-item>
-          <b-breadcrumb-item
-            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
-          >
-            {{ dataEventSafe.eventName }}
-          </b-breadcrumb-item>
-          <b-breadcrumb-item active>
-            {{ "Down River Race" }}
-          </b-breadcrumb-item>
-        </b-breadcrumb>
-        <div>{{ currentDateTime }}</div>
-      </div>
-    </div>
-
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
-
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ dataEventSafe.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ dataEventSafe.addressCity || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ dataEventSafe.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ dataEventSafe.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+    <!-- Breadcrumb + hero bersama 5 Race Category -->
+    <RaceCategoryHero
+      :event="dataEventSafe"
+      race-key="DRR"
+      race-label="Down River Race"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+      :current-date-time="currentDateTime"
+      :active-category="titleCategories || ''"
+    />
 
     <!-- UX (2026-09-28): sama persis pola fix "Switch Slalom Category" —
          position:fixed (bukan sticky biasa, parent .px-5 terlalu pendek
@@ -82,7 +20,12 @@
          kehilangan pantauan Racetime. Lihat MEMORY project_slalom_
          sticky_category_switch.md utk detail lengkap pola ini. -->
     <div class="px-5">
-      <div class="card-body drr-sticky-bar" ref="stickyBar">
+      <div ref="stickySentinel"></div>
+      <div
+        class="card-body race-sticky-bar"
+        :class="{ 'is-stuck': isBarStuck }"
+        ref="stickyBar"
+      >
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -197,6 +140,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -221,16 +168,15 @@
         </b-row>
       </div>
     </div>
-    <!-- Spacer: `.drr-sticky-bar` di atas jadi position:fixed (lepas dari
-         normal flow), jadi konten sesudahnya perlu "ruang kosong" pengganti
-         setinggi bar itu supaya tidak ketutupan. Tingginya diukur otomatis
-         lewat ResizeObserver (lihat mounted()) — BUKAN angka statis. -->
-    <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
+    <!-- Spacer: hanya terisi saat bar sedang menempel (`is-stuck`, position:
+         fixed) supaya konten di bawahnya tidak loncat/ketutupan. Lihat
+         raceStickyBarMixin.js. -->
+    <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
-    <div class="ml-5 mb-2"><PhotofinishBadge /></div>
     <OperationTimePanel
       v-if="participantArr && participantArr.length"
+      show-photofinish
       :digit-id="digitId"
       :digit-time="digitTime"
       :participant="participantArr"
@@ -252,9 +198,7 @@
             </div>
           </b-col>
           <b-col cols="6" md="6">
-            <div class="drr-actionbar__buttons">
-              <ConnectionStatusBadge />
-
+            <div class="drr-actionbar__buttons race-toolbar">
               <JudgeActionHistoryModal
                 v-if="currentEventId"
                 :event-id="String(currentEventId)"
@@ -283,7 +227,7 @@
 
               <button
                 type="button"
-                class="btn-action btn-secondary"
+                class="race-tool-btn race-tool-btn--primary"
                 @click="saveResult"
                 :disabled="!currentBucket || !participantArr.length"
                 title="Simpan hasil untuk bucket yang dipilih"
@@ -293,7 +237,7 @@
 
               <button
                 type="button"
-                class="btn-action btn-info"
+                class="race-tool-btn"
                 @click="toggleSortRanked"
                 :disabled="!participantArr.length"
                 title="Urutkan berdasarkan rank naik/turun"
@@ -305,7 +249,7 @@
                    bertanding pada event ini (semua divisi/race/initial) -->
               <button
                 type="button"
-                class="btn-action btn-outline-danger"
+                class="race-tool-btn race-tool-btn--danger"
                 @click="openResetAllModal"
                 title="Hapus semua waktu yang sudah bertanding di DRR (semua kategori) pada event ini"
               >
@@ -436,8 +380,21 @@
                         <div
                           v-for="sIdx in drrSectionsCount"
                           :key="'sec-wrap-' + sIdx"
-                          class="pen-grid-item"
+                          class="pen-grid-item pen-sec"
+                          :class="sectionTileClass(item, sIdx - 1)"
                         >
+                          <!-- Header tile: label section + nilai AKTIF
+                               (dari operator ATAU socket judge
+                               sts-jurysystem) — selalu tampil (0 kalau
+                               kosong) supaya tinggi semua tile seragam.
+                               Dropdown di bawahnya SENGAJA selalu blank
+                               (lihat catatan di atas). -->
+                          <div class="pen-sec__head">
+                            <span class="pen-sec__label">S{{ sIdx }}</span>
+                            <span class="pen-sec__value">
+                              {{ sectionPenaltyDisplay(item, sIdx - 1) || "0" }}
+                            </span>
+                          </div>
                           <b-select
                             :key="
                               'sec-' +
@@ -447,9 +404,10 @@
                                 ? item._sectionPickGen[sIdx - 1] || 0
                                 : 0)
                             "
-                            class="small-select"
-                            style="border-radius: 12px; font-weight: 600"
+                            class="pen-sec__select"
+                            size="sm"
                             value=""
+                            :title="'Tambah penalty Section ' + sIdx"
                             @change="
                               updateTimePen(
                                 $event,
@@ -459,9 +417,7 @@
                               )
                             "
                           >
-                            <option disabled value="">
-                              Section {{ sIdx }}
-                            </option>
+                            <option disabled value="">+ Pilih</option>
                             <option
                               v-for="p in penaltiesSection"
                               :key="p.value"
@@ -470,24 +426,6 @@
                               {{ p.label }}
                             </option>
                           </b-select>
-                          <!-- Indikator nilai section AKTIF (dari operator
-                               ATAU socket judge sts-jurysystem) — dropdown
-                               di atas SENGAJA selalu blank (lihat catatan
-                               di atasnya), jadi tanpa ini operator tidak
-                               tahu section mana yang baru saja menerima
-                               penalty dari juri. -->
-                          <span
-                            v-if="sectionPenaltyDisplay(item, sIdx - 1)"
-                            class="section-pen-badge"
-                            :class="{
-                              'section-pen-badge--neg': sectionPenaltyDisplay(
-                                item,
-                                sIdx - 1
-                              ).startsWith('-'),
-                            }"
-                          >
-                            S{{ sIdx }}: {{ sectionPenaltyDisplay(item, sIdx - 1) }}
-                          </span>
                         </div>
                       </div>
                     </td>
@@ -750,6 +688,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import { logger } from "@/utils/logger";
@@ -759,8 +698,8 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
-import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -992,7 +931,7 @@ function readEventDetailsFromLS() {
 export default {
   name: "SustainableTimingSystemDRRRace",
   components: {
-    PhotofinishBadge,
+    RaceCategoryHero,
     OperationTimePanel,
     EmptyCard,
     Icon,
@@ -1001,7 +940,12 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
+  mixins: [
+    teamFlagMixin,
+    serialPortMixin,
+    photofinishMixin,
+    raceStickyBarMixin,
+  ],
   data() {
     return {
       connectionState,
@@ -1010,10 +954,6 @@ export default {
       fieldNotesRefreshTick: 0,
       isLoading: false,
       defaultImg,
-      // Tinggi terukur `.drr-sticky-bar` (position: fixed) — dipakai
-      // spacer di bawahnya supaya OperationTimePanel/tabel tidak ketutupan.
-      // Diperbarui otomatis via ResizeObserver di mounted().
-      drrStickyBarHeight: 0,
       judgeLogRefreshTick: 0,
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
@@ -1216,24 +1156,6 @@ export default {
   },
   async mounted() {
     const audio = new Audio(tone);
-
-    // Ukur tinggi `.drr-sticky-bar` (position: fixed, lihat CSS) supaya
-    // spacer di bawahnya selalu presisi — ResizeObserver otomatis update
-    // ulang kalau tingginya berubah (mis. tombol Baud Rate wrap ke baris
-    // baru di layar sempit).
-    this.$nextTick(() => {
-      const el = this.$refs.stickyBar;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      this._stickyBarObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          this.drrStickyBarHeight = Math.ceil(entry.contentRect.height);
-        }
-      });
-      this._stickyBarObserver.observe(el);
-    });
-    this.$once("hook:beforeDestroy", () => {
-      if (this._stickyBarObserver) this._stickyBarObserver.disconnect();
-    });
 
     await this.loadDataScore("DRR");
     await this.loadDataPenalties("DRR");
@@ -2931,6 +2853,13 @@ export default {
     // dipakai badge di sebelah dropdown Pen. Section — supaya operator tahu
     // section mana yg baru saja diupdate (manual ATAU dari socket judge),
     // krn dropdown-nya sendiri sengaja selalu blank (one-shot picker).
+    // Class warna tile Pen. Section: kosong (netral), penalty (+, amber),
+    // bonus (-, hijau).
+    sectionTileClass(item, sectionIndex) {
+      const v = this.sectionPenaltyDisplay(item, sectionIndex);
+      if (!v) return "pen-sec--empty";
+      return v.startsWith("-") ? "pen-sec--bonus" : "pen-sec--penalty";
+    },
     sectionPenaltyDisplay(item, sectionIndex) {
       const arr = item && item.result && item.result.penaltySection;
       const raw = Array.isArray(arr) ? arr[sectionIndex] : null;
@@ -3897,25 +3826,11 @@ export default {
 </script>
 
 <style scoped>
-/* UX (2026-09-28): pin Switch DRR Category + kontrol Connect Racetime ke
-   bawah navbar aplikasi (--nav-h, lihat App.vue) selama halaman di-scroll
-   — sama pola persis dgn .slalom-sticky-bar di SlalomRace.vue (position:
-   sticky TIDAK cukup krn parent langsung .px-5 lebih pendek dari bar-nya
-   sendiri; position:fixed dipakai supaya lepas dari batasan tinggi
-   parent, selalu menempel di viewport apa pun panjang tabel Output
-   Racetime di bawahnya). Penting khusus DRR krn race simultan antar
-   Initial & antar kategori, operator perlu respons cepat pindah kategori
-   tanpa kehilangan pantauan Racetime. */
-.drr-sticky-bar {
-  position: fixed;
-  top: var(--nav-h, 64px);
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: #fff;
-  padding: 10px 3rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
+/* Bar "Switch DRR Category" + kontrol Connect Racetime: positioning
+   (position:fixed) & styling sekarang didefinisikan SEKALI secara global
+   di race-category-stickybar.css sbg `.race-sticky-bar` (lihat main.js) —
+   dipakai bersama SEMUA 5 halaman Race Category Details. `ref="stickyBar"`
+   di template tetap dipakai raceStickyBarMixin. */
 
 .racetime-header {
   display: flex;
@@ -3965,46 +3880,8 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-.switch-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #2b3445;
-}
-
-/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn Switch
-   Sprint/Slalom Category */
-.init-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f1f3f7;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.init-tab {
-  border: none;
-  background: transparent;
-  color: #2b3445;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-}
-
-.init-tab:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
-}
-
-.init-tab.active {
-  background: rgb(54, 142, 180);
-  color: #fff;
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-/* ---- End styling utk Switch DRR Category select ---- */
+/* Switch DRR Category (.switch-label/.init-tabs/.init-tab) sekarang
+   didefinisikan global di race-category-stickybar.css. */
 
 .drr-actionbar {
   display: flex;
@@ -4038,36 +3915,92 @@ export default {
   /* isi 3 baris dulu (kebawah), lalu lanjut buat kolom baru ke samping */
   grid-template-rows: repeat(3, auto);
   grid-auto-flow: column;
-  grid-column-gap: 8px; /* jarak antar kolom */
-  grid-row-gap: 6px; /* jarak antar item vertikal */
+  gap: 6px;
   align-items: start;
+  justify-content: center;
 }
 
-.pen-grid-item {
+/* ===== Tile Pen. Section ===== */
+.pen-sec {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
+  gap: 4px;
+  width: 112px;
+  padding: 5px 6px 6px;
+  border-radius: 10px;
+  border: 1px solid #e3eaf3;
+  background: #ffffff;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.pen-sec:hover {
+  border-color: #b9d7f0;
+  box-shadow: 0 2px 8px rgba(28, 76, 122, 0.08);
 }
 
-/* Badge nilai section aktif — muncul di bawah dropdown-nya begitu ada
-   penalty tersimpan utk section itu (dari operator ATAU judge). */
-.section-pen-badge {
+.pen-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.pen-sec__label {
   font-size: 11px;
-  font-weight: 700;
-  color: #b8860b;
-  background: #fff6e0;
-  border: 1px solid #f0d896;
-  border-radius: 8px;
-  padding: 1px 6px;
-  line-height: 1.5;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.pen-sec__value {
+  min-width: 30px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
   text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: #f1f5f9;
+  color: #94a3b8;
 }
 
-.section-pen-badge--neg {
-  color: #1c7a4c;
-  background: #e6f7ee;
-  border-color: #96d9b8;
+/* Ada penalty (+) */
+.pen-sec--penalty {
+  border-color: #f3d48a;
+  background: #fffbeb;
+}
+.pen-sec--penalty .pen-sec__value {
+  background: #f59e0b;
+  color: #ffffff;
+}
+/* Bonus (-) */
+.pen-sec--bonus {
+  border-color: #9fdcbd;
+  background: #f0fdf6;
+}
+.pen-sec--bonus .pen-sec__value {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+/* `!important` di height/padding: admin-pages.css memaksa SEMUA
+   .custom-select jadi height:44px !important. */
+.pen-sec__select {
+  height: 28px !important;
+  padding: 0 22px 0 8px !important;
+  border-radius: 8px;
+  border: 1px solid #d5dfeb;
+  background-color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1c4c7a;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pen-sec__select:hover {
+  border-color: #25b0eb;
+}
+.pen-sec__select:focus {
+  border-color: #25b0eb;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.2);
 }
 
 /* responsif: di layar kecil, batasi 2 per kolom */
@@ -4103,98 +4036,8 @@ export default {
   color: #ffffff;
 }
 
-/* Connect/Disconnect: .btn-action's white background above wins by default
-   over Bootstrap's .btn-success/.btn-danger (equal specificity, .btn-action
-   declared later) — these overrides use an extra class to win instead. */
-.btn-connect {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-.btn-connect.btn-success {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.btn-connect.btn-success:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
-}
-.btn-connect.btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
-.btn-connect.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-.btn-connect:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.detail-hero {
-  position: relative;
-  overflow: hidden;
-}
-.detail-hero .hero-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  background-size: cover;
-  background-position: center;
-}
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-.detail-hero .hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 50px;
-}
-.detail-hero h2 {
-  color: #fff;
-  font-weight: 800;
-  font-size: clamp(26px, 4.2vw, 46px);
-  line-height: 1.05;
-  margin-bottom: 6px !important;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-  letter-spacing: 0.2px;
-}
-.detail-hero .meta {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(12px, 1.6vw, 16px);
-}
-.hero-logo {
-  width: 150px;
-  height: 150px;
-  margin-right: 10px;
-  border-radius: 30px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
-}
-
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  border-radius: 10px;
-}
+/* .btn-connect sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 /* table */
 table {
@@ -4222,22 +4065,6 @@ tbody tr:nth-child(even) {
 th,
 td {
   border: none;
-}
-
-/* port */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 0;
-  transition: background-color 0.3s;
-}
-.connected {
-  background: rgb(0, 255, 0);
-}
-.disconnected {
-  background: red;
 }
 
 .large-bold {
@@ -4301,96 +4128,9 @@ td {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-/* PATH  */
-.controls-bar {
-  gap: 10px;
-}
-
-/* Pill path */
-.path-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 520px; /* sesuaikan */
-  background: #fff;
-  color: #0f172a;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.path-pill--empty {
-  color: #64748b;
-  background: #f8fafc;
-  border-color: #e5e7eb;
-}
-.path-pill .truncate {
-  display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Meta Panel  */
-.meta-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #eef2f7;
-}
-.meta-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.meta-label {
-  min-width: 120px; /* lebar label tetap */
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
-  font-style: italic;
-}
-.meta-value {
-  font-weight: 600;
-  color: #0f172a; /* slate-900 */
-}
-.badge-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-}
-.badge-chip--blue {
-  background: #eef6ff;
-  color: rgb(0, 180, 255);
-  border-color: #dbeafe;
-}
-
-/* Responsif: di layar kecil, label di atas value */
-@media (max-width: 575.98px) {
-  .meta-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px 0;
-  }
-  .meta-label {
-    min-width: auto;
-  }
-  .meta-panel {
-    padding: 12px;
-  }
-}
+/* .controls-bar/.path-pill/.meta-panel/.meta-row/.meta-label/.meta-value/
+   .badge-chip (+ responsive) sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 /* === NEW: Styling area preview JSON (TAMBAHAN) === */
 .json-scroll {

@@ -1,0 +1,282 @@
+/*
+ * Shared design for the "Switch Category + Connect Racetime" sticky bar —
+ * dipakai di SEMUA 5 halaman Race Category Details (Sprint/H2H/Slalom/DRR/
+ * Rafting Cross). Imported SEKALI secara global di src/main.js, sama pola
+ * dgn admin-pages.css — supaya kelimanya benar-benar satu sumber styling
+ * (atas permintaan user 2026-10-05), bukan 5 salinan hampir-identik yang
+ * gampang "meleset" satu sama lain tiap kali salah satu di-redesign.
+ *
+ * Redesign (2026-10-05): sebelumnya flat putih polos + Bootstrap biru
+ * generik (rgb(0,180,255)) yang tidak match palet brand app (#1c4c7a/
+ * #25b0eb dipakai di tombol aktif, OfficialStampToggle, dsb). Disamakan ke
+ * palet brand itu + diberi sedikit depth (gradient tipis, shadow lebih
+ * lembut, border radius konsisten) supaya terasa satu sistem desain,
+ * bukan tempelan terpisah.
+ *
+ * `.race-sticky-bar` = class BARU (position: fixed) yang dipasang di
+ * KELIMA halaman, menggantikan `.slalom-sticky-bar`/`.drr-sticky-bar` yang
+ * dulu cuma ada di 2 dari 5 halaman — lihat catatan ResizeObserver di
+ * masing-masing *Race.vue/HeadToHead.vue/RaftingCross.vue (metode sama
+ * persis, cuma nama file beda).
+ */
+
+/* Posisi normal (belum di-scroll): bar ikut flow halaman, TIDAK menutupi
+   breadcrumb/hero. `.is-stuck` dipasang oleh raceStickyBarMixin.js begitu
+   bar di-scroll melewati bawah Navbar. */
+.race-sticky-bar {
+  transition: box-shadow 0.2s ease;
+}
+
+.race-sticky-bar.is-stuck {
+  position: fixed;
+  top: var(--nav-h, 64px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 14px 3rem;
+  /* Shadow hanya di sisi bawah (spread negatif supaya tidak bocor ke
+     samping/atas) — memisahkan bar dari konten yang di-scroll di bawahnya. */
+  box-shadow: 0 10px 16px -8px rgba(15, 42, 67, 0.22),
+    0 3px 6px -3px rgba(15, 42, 67, 0.1);
+  border-bottom: 1px solid #e6edf6;
+}
+
+/* ===== Meta Panel (Nomor Lomba / Categories / Switch Category) ===== */
+.meta-panel {
+  background: #ffffff;
+  border: 1px solid #e3eaf3;
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.05);
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px dashed #eef2f7;
+}
+.meta-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.meta-label {
+  min-width: 120px;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-style: normal;
+}
+.meta-value {
+  font-weight: 600;
+  color: #0f172a;
+}
+.badge-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+.badge-chip--blue {
+  background: linear-gradient(135deg, #eaf6ff, #e3f0ff);
+  color: #1c4c7a;
+  border-color: #cfe4fb;
+}
+
+@media (max-width: 575.98px) {
+  .meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+  .meta-label {
+    min-width: auto;
+  }
+  .meta-panel {
+    padding: 12px;
+  }
+}
+
+/* ===== Switch Category ===== */
+.switch-label {
+  font-weight: 800;
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #1c4c7a;
+}
+
+.init-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #f1f5fb;
+  padding: 6px;
+  border-radius: 11px;
+  border: 1px solid #e6edf6;
+}
+
+.init-tab {
+  border: none;
+  background: transparent;
+  color: #425266;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 7px 16px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.init-tab:hover {
+  background: #ffffff;
+  color: #1c4c7a;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(28, 76, 122, 0.12);
+}
+
+.init-tab.active {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(28, 76, 122, 0.35);
+}
+
+#sprintBucketSelect,
+#h2hBucketSelect,
+#slalomBucketSelect,
+#drrBucketSelect,
+#rxBucketSelect {
+  border-radius: 12px;
+  border-color: #dde6f1;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ===== Controls (Baud Rate / Connect / Path) ===== */
+.controls-bar {
+  gap: 10px;
+}
+
+.btn-baud-group {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5fb;
+  border: 1px solid #e6edf6;
+  border-radius: 10px;
+  padding: 4px 10px 4px 12px;
+}
+.btn-baud-group .d-inline-flex {
+  gap: 6px;
+}
+
+/* Prefix `.race-sticky-bar` WAJIB: tiap halaman punya `.btn-action` scoped
+   (background putih) yg specificity-nya (0,2,0) seri dgn `.btn-connect
+   .btn-success` — tanpa prefix, menang/kalahnya tergantung urutan CSS. */
+.race-sticky-bar .btn-connect {
+  min-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease, opacity 0.2s ease, transform 0.08s ease;
+}
+.race-sticky-bar .btn-connect:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.race-sticky-bar .btn-connect.btn-success {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  border-color: #16a34a;
+  color: #fff;
+}
+.race-sticky-bar .btn-connect.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #15803d, #16a34a);
+  border-color: #15803d;
+  color: #fff;
+}
+.race-sticky-bar .btn-connect.btn-danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border-color: #dc2626;
+  color: #fff;
+}
+.race-sticky-bar .btn-connect.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  border-color: #b91c1c;
+  color: #fff;
+}
+.race-sticky-bar .btn-connect:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+.status-indicator.connected {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+  animation: race-status-pulse 2s ease-in-out infinite;
+}
+.status-indicator.disconnected {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+}
+@keyframes race-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.08);
+  }
+}
+
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 520px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #e3eaf3;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  font-weight: 600;
+  font-size: 0.86rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.path-pill--empty {
+  color: #94a3b8;
+  background: #f8fafc;
+  border-color: #e5e7eb;
+  font-family: inherit;
+}
+.path-pill .truncate {
+  display: inline-block;
+  max-width: 460px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Badge "Realtime Terhubung" (ConnectionStatusBadge) — diletakkan di baris
+   yang sama dgn path pill di KELIMA halaman, tingginya disamakan dgn pill.
+   `.csb` ikut di selector supaya menang atas style scoped komponennya. */
+.race-sticky-bar .csb.race-realtime-badge {
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}

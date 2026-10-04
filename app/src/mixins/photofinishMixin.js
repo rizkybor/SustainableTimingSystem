@@ -44,9 +44,18 @@ function nextPfSeq() {
 }
 
 /** "HH:MM:SS.mmm" → "HHMMSSmmm" (format mentah Racetime seperti RaceTime2). */
+// "H:MM:SS(.mmm)" -> "HHMMSSmmm" (9 digit). Jam/milidetik dipad dgn benar
+// (mis. "8:14:02.25" -> "081402250"), BUKAN sekadar buang non-digit lalu
+// pad kanan — cara lama membaca "8:14:02.25" sbg 81:40:22.500.
+function toRawTime9(time) {
+  const str = String(time || "").trim();
+  const m = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/.exec(str);
+  if (m) return m[1].padStart(2, "0") + m[2] + m[3] + (m[4] || "").padEnd(3, "0");
+  return (str.replace(/\D+/g, "") + "000000000").slice(0, 9);
+}
+
 function pfRawTime(time) {
-  const digits = String(time || "").replace(/\D+/g, "");
-  return (digits + "000000000").slice(0, 9);
+  return toRawTime9(time);
 }
 
 export function pfRegistrationId(time, seq) {

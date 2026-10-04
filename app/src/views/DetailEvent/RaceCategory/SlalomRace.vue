@@ -1,76 +1,14 @@
 <template>
   <div>
-    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
-      <!-- TOP BAR (breadcrumb + datetime) -->
-      <div
-        class="d-flex align-items-center justify-content-between text-muted small"
-      >
-        <b-breadcrumb class="mb-0">
-          <b-breadcrumb-item to="/">
-            <Icon icon="mdi:home-outline" class="mr-1" />
-            Dashboard
-          </b-breadcrumb-item>
-          <b-breadcrumb-item
-            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
-          >
-            {{ dataEventSafe.eventName }}
-          </b-breadcrumb-item>
-          <b-breadcrumb-item active>
-            {{ "Slalom Race" }}
-          </b-breadcrumb-item>
-        </b-breadcrumb>
-        <div>{{ currentDateTime }}</div>
-      </div>
-    </div>
-
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
-
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ dataEventSafe.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3">
-                <strong class="text-white">Location</strong> :
-                {{ dataEventSafe.addressCity || "-" }}
-              </span>
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ dataEventSafe.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ dataEventSafe.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+    <!-- Breadcrumb + hero bersama 5 Race Category -->
+    <RaceCategoryHero
+      :event="dataEventSafe"
+      race-key="SLALOM"
+      race-label="Slalom Race"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+      :current-date-time="currentDateTime"
+      :active-category="titleCategories || ''"
+    />
 
     <!-- STICKY HEADER -->
     <!-- UX (2026-09-26): dibuat BENAR-BENAR sticky (position: sticky) —
@@ -88,7 +26,12 @@
          LANGSUNG di dalam `.px-5` ini juga (lihat di bawah), bukan sibling
          terpisah sesudahnya. -->
     <div class="px-5">
-      <div class="card-body slalom-sticky-bar" ref="stickyBar">
+      <div ref="stickySentinel"></div>
+      <div
+        class="card-body race-sticky-bar"
+        :class="{ 'is-stuck': isBarStuck }"
+        ref="stickyBar"
+      >
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -201,6 +144,10 @@
               <!-- break line -->
               <div class="w-100"></div>
 
+              <!-- Status realtime juri (posisi seragam di 5 Race Category,
+                   selalu terlihat krn ikut sticky bar) -->
+              <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+
               <!-- path pill -->
               <div class="mb-1">
                 <span
@@ -225,13 +172,10 @@
         </b-row>
       </div>
     </div>
-    <!-- Spacer: `.slalom-sticky-bar` di atas jadi position:fixed (lepas dari
-         normal flow), jadi konten sesudahnya perlu "ruang kosong" pengganti
-         setinggi bar itu supaya tidak ketutupan. Tingginya diukur otomatis
-         lewat ResizeObserver (lihat mounted()/beforeDestroy()) — BUKAN
-         angka statis — supaya tetap presisi walau baris tombol Baud Rate
-         wrap ke bawah di layar sempit. -->
-    <div :style="{ height: stickyBarHeight + 'px' }"></div>
+    <!-- Spacer: hanya terisi saat bar sedang menempel (`is-stuck`, position:
+         fixed) supaya konten di bawahnya tidak loncat/ketutupan. Lihat
+         raceStickyBarMixin.js. -->
+    <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (reuse Sprint) -->
     <OperationTimePanel
@@ -297,12 +241,9 @@
               </small>
             </div>
             <div class="slalom-actionbar">
-              <div class="slalom-actionbar__buttons">
-                <ConnectionStatusBadge class="slalom-judge-trigger" />
-
+              <div class="slalom-actionbar__buttons race-toolbar">
                 <JudgeActionHistoryModal
                   v-if="currentSlalomEventId"
-                  class="slalom-judge-trigger"
                   :event-id="String(currentSlalomEventId)"
                   race-category="slalom"
                   category-label="Slalom"
@@ -319,7 +260,7 @@
                 <!-- SAVE ONLY SESSION 1 -->
                 <button
                   type="button"
-                  class="action-pill action-pill--save"
+                  class="race-tool-btn"
                   @click="saveSession1"
                   :disabled="!teams.length"
                   title="Simpan hanya run/session #1"
@@ -331,7 +272,7 @@
                 <!-- SHOW RESULT SESSION 1 (MODAL) -->
                 <button
                   type="button"
-                  class="action-pill action-pill--view"
+                  class="race-tool-btn"
                   @click="openSession1Modal"
                   title="Tampilkan Result Session 1 dari database"
                 >
@@ -342,7 +283,7 @@
                 <!-- PRINT PDF SESSION 1 -->
                 <button
                   type="button"
-                  class="action-pill action-pill--pdf"
+                  class="race-tool-btn"
                   @click="printPdfSession1"
                   title="Download PDF khusus Session 1"
                 >
@@ -352,7 +293,7 @@
 
                 <button
                   type="button"
-                  class="action-pill action-pill--primary"
+                  class="race-tool-btn race-tool-btn--primary"
                   @click="saveResult"
                   :disabled="!teams.length"
                   title="Simpan hasil Slalom (semua tim & semua run)"
@@ -362,7 +303,7 @@
 
                 <button
                   type="button"
-                  class="action-pill action-pill--sort"
+                  class="race-tool-btn"
                   :class="{ 'is-active': sortBest.enabled }"
                   @click="toggleSortRanked"
                   :disabled="!teams.length"
@@ -385,7 +326,7 @@
                      sudah bertanding pada event ini (semua divisi/race) -->
                 <button
                   type="button"
-                  class="action-pill action-pill--danger"
+                  class="race-tool-btn race-tool-btn--danger"
                   @click="openResetAllModal"
                   title="Hapus semua waktu yang sudah bertanding di Slalom (semua kategori) pada event ini"
                 >
@@ -885,6 +826,7 @@
 import SlalomSession1PdfResult from "../ResultComponent/slalom-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import VueHtml2pdf from "vue-html2pdf";
@@ -896,6 +838,7 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -1109,6 +1052,7 @@ function recomputeSessionFields(session) {
 export default {
   name: "SlalomRacePanel",
   components: {
+    RaceCategoryHero,
     OperationTimePanel,
     EmptyCard,
     VueHtml2pdf,
@@ -1119,15 +1063,11 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin],
+  mixins: [teamFlagMixin, serialPortMixin, raceStickyBarMixin],
 
   data() {
     return {
       connectionState,
-      // Tinggi terukur `.slalom-sticky-bar` (position: fixed) — dipakai
-      // spacer di bawahnya supaya OperationTimePanel/tabel tidak ketutupan.
-      // Diperbarui otomatis via ResizeObserver di mounted().
-      stickyBarHeight: 0,
       slalomCats: { initial: "-", race: "-", division: "-" },
       judgeLogRefreshTick: 0,
       fieldNotesRefreshTick: 0,
@@ -1449,24 +1389,6 @@ export default {
     },
   },
   async mounted() {
-    // Ukur tinggi `.slalom-sticky-bar` (position: fixed, lihat CSS) supaya
-    // spacer di bawahnya selalu presisi — ResizeObserver otomatis update
-    // ulang kalau tingginya berubah (mis. tombol Baud Rate wrap ke baris
-    // baru di layar sempit, atau path device jadi lebih panjang).
-    this.$nextTick(() => {
-      const el = this.$refs.stickyBar;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      this._stickyBarObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          this.stickyBarHeight = Math.ceil(entry.contentRect.height);
-        }
-      });
-      this._stickyBarObserver.observe(el);
-    });
-    this.$once("hook:beforeDestroy", () => {
-      if (this._stickyBarObserver) this._stickyBarObserver.disconnect();
-    });
-
     try {
       const events = localStorage.getItem("eventDetails");
       this.dataEvent = events ? JSON.parse(events) : {};
@@ -4049,34 +3971,12 @@ export default {
 </script>
 
 <style scoped>
-/* UX (2026-09-26): pin Switch Slalom Category + kontrol Connect Racetime
-   ke bawah navbar aplikasi (--nav-h, lihat App.vue) selama halaman
-   di-scroll — supaya keduanya tetap terjangkau tanpa scroll balik ke atas
-   saat operator sedang memantau OperationTimePanel/tabel Output Racetime
-   di bawahnya (penting khusus utk Slalom krn start bisa terjadi
-   berdekatan/simultan antar tim, operator perlu respons cepat pindah
-   kategori TANPA kehilangan pantauan Racetime). z-index di bawah navbar
-   (1000, lihat App.vue .app-header) tapi di atas konten halaman lainnya. */
-.slalom-sticky-bar {
-  /* `position: sticky` butuh parent langsungnya (.px-5) lebih tinggi dari
-     elemen ini sendiri supaya ada "ruang" menempel saat di-scroll — tidak
-     praktis dipenuhi kalau semua konten (OperationTimePanel + tabel Output
-     Racetime, bisa sangat panjang) harus jadi child langsung .px-5. Pakai
-     `position: fixed` supaya benar-benar lepas dari batasan tinggi parent
-     — SELALU menempel di viewport apa pun panjang halaman di bawahnya.
-     Konsekuensinya: elemen ini keluar dari normal flow, jadi butuh spacer
-     (lihat div kosong sesudah .px-5 di template) supaya konten di
-     bawahnya tidak ketutupan — tingginya diukur otomatis via
-     ResizeObserver di mounted(), lihat stickyBarHeight. */
-  position: fixed;
-  top: var(--nav-h, 64px);
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: #fff;
-  padding: 10px 3rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
+/* Bar "Switch Slalom Category" + kontrol Connect Racetime: positioning
+   (position:fixed) & styling sekarang didefinisikan SEKALI secara global
+   di race-category-stickybar.css sbg `.race-sticky-bar` (lihat main.js) —
+   dipakai bersama SEMUA 5 halaman Race Category Details, bukan cuma
+   Slalom. Detail kenapa fixed (bukan sticky) ada di komentar file itu.
+   `ref="stickyBar"` di template dipakai raceStickyBarMixin.js. */
 
 .racetime-header {
   display: flex;
@@ -4117,46 +4017,9 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-.switch-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #2b3445;
-}
-
-/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn Switch Sprint/
-   H2H Category */
-.init-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f1f3f7;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.init-tab {
-  border: none;
-  background: transparent;
-  color: #2b3445;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-}
-
-.init-tab:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
-}
-
-.init-tab.active {
-  background: rgb(54, 142, 180);
-  color: #fff;
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-/* ---- End styling utk Switch Slalom Category select ---- */
+/* Switch Slalom Category (.switch-label/.init-tabs/.init-tab) sekarang
+   didefinisikan global di race-category-stickybar.css (dipakai bersama
+   5 halaman Race Category Details, lihat main.js). */
 
 /* ---- Styling utk penalty section select ---- */
 .small-select {
@@ -4308,119 +4171,10 @@ export default {
   color: #ffffff;
 }
 
-/* Connect/Disconnect: .btn-action's white background above (and its :hover
-   rule) win by default over Bootstrap's .btn-success/.btn-danger (equal
-   specificity, .btn-action declared later) — these overrides use an extra
-   class to win instead. */
-.btn-connect {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-.btn-connect.btn-success {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.btn-connect.btn-success:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
-  color: #fff;
-}
-.btn-connect.btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
-.btn-connect.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-  color: #fff;
-}
-.btn-connect:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+/* .btn-connect (+ .status-indicator/.connected/.disconnected/.path-pill
+   dst) sekarang didefinisikan global di race-category-stickybar.css. */
 
-/* ===== HERO / BANNER ===== */
-.detail-hero {
-  position: relative;
-  overflow: hidden;
-}
-.detail-hero .hero-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  background-size: cover;
-  background-position: center;
-}
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-.detail-hero .hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 50px;
-}
-.detail-hero h2 {
-  color: #fff;
-  font-weight: 800;
-  font-size: clamp(26px, 4.2vw, 46px);
-  line-height: 1.05;
-  margin-bottom: 6px !important;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-  letter-spacing: 0.2px;
-}
-.detail-hero .meta {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(12px, 1.6vw, 16px);
-}
-.hero-logo {
-  width: 150px;
-  height: 150px;
-  margin-right: 10px;
-  border-radius: 30px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
-}
-
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-
-/* ===== Port indicator ===== */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 0;
-  transition: background-color 0.3s;
-}
-.connected {
-  background: rgb(0, 255, 0);
-}
-.disconnected {
-  background: red;
-}
-
+/* Hero/breadcrumb: lihat components/race/RaceCategoryHero.vue */
 /* ===== Table look ===== */
 .table-responsive {
   overflow-x: auto;
@@ -4498,96 +4252,9 @@ td {
   }
 }
 
-/* PATH  */
-.controls-bar {
-  gap: 10px;
-}
-
-/* Pill path */
-.path-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 520px; /* sesuaikan */
-  background: #fff;
-  color: #0f172a;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.path-pill--empty {
-  color: #64748b;
-  background: #f8fafc;
-  border-color: #e5e7eb;
-}
-.path-pill .truncate {
-  display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Meta Panel  */
-.meta-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #eef2f7;
-}
-.meta-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.meta-label {
-  min-width: 120px; /* lebar label tetap */
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
-  font-style: italic;
-}
-.meta-value {
-  font-weight: 600;
-  color: #0f172a; /* slate-900 */
-}
-.badge-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-}
-.badge-chip--blue {
-  background: #eef6ff;
-  color: rgb(0, 180, 255);
-  border-color: #dbeafe;
-}
-
-/* Responsif: di layar kecil, label di atas value */
-@media (max-width: 575.98px) {
-  .meta-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px 0;
-  }
-  .meta-label {
-    min-width: auto;
-  }
-  .meta-panel {
-    padding: 12px;
-  }
-}
+/* .controls-bar/.path-pill/.meta-panel/.meta-row/.meta-label/.meta-value/
+   .badge-chip (+ responsive) sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 /* --- Slalom Action Bar --- */
 .slalom-actionbar {
@@ -4605,8 +4272,10 @@ td {
 
 .slalom-actionbar__buttons {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 @media (max-width: 767.98px) {
@@ -4654,103 +4323,7 @@ td {
   color: #9aa3af;
 }
 
-/* ---- Redesign: Save Session/Result Session/Save Result/Sort Ranked ---- */
-.action-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 13px;
-  border: 1.5px solid transparent;
-  color: #fff;
-  transition: transform 0.15s ease, box-shadow 0.15s ease,
-    background-color 0.15s ease, opacity 0.15s ease;
-}
-.action-pill:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.action-pill:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-.action-pill--save {
-  background: linear-gradient(135deg, #22b165, #148a3b);
-  box-shadow: 0 4px 12px rgba(20, 138, 59, 0.3);
-}
-.action-pill--save:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(20, 138, 59, 0.4);
-}
-.action-pill--view {
-  background: linear-gradient(135deg, #2f96e0, #1c6fb0);
-  box-shadow: 0 4px 12px rgba(28, 111, 176, 0.3);
-}
-.action-pill--view:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(28, 111, 176, 0.4);
-}
-.action-pill--pdf {
-  background: linear-gradient(135deg, #f5a623, #d9860f);
-  box-shadow: 0 4px 12px rgba(217, 134, 15, 0.3);
-}
-.action-pill--pdf:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(217, 134, 15, 0.4);
-}
-.action-pill--primary {
-  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-}
-.action-pill--primary:hover:not(:disabled) {
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
-}
-.action-pill--sort {
-  background: #fff;
-  color: #37475a;
-  border-color: #dbe0e8;
-}
-.action-pill--sort:hover:not(:disabled) {
-  border-color: #1c6fb0;
-  color: #1c6fb0;
-  background: #f2f9fd;
-}
-
-/* Tombol trigger "Riwayat Judge" (komponen terpisah, style-nya sendiri)
-   disamakan dgn .action-pill--sort (varian netral) di sini supaya tidak
-   njomplang di antara pill Save/View/PDF berwarna. Class pembeda
-   (.slalom-judge-trigger) dipakai spy specificity-nya pasti menang lawan
-   .jah-trigger bawaan komponen, bukan cuma menang urutan compile CSS. */
-.slalom-judge-trigger ::v-deep .jah-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  color: #37475a;
-  border: 1.5px solid #dbe0e8;
-  font-weight: 700;
-  font-size: 13px;
-  border-radius: 999px;
-  padding: 9px 16px;
-}
-.slalom-judge-trigger ::v-deep .jah-trigger:hover {
-  border-color: #1c6fb0;
-  color: #1c6fb0;
-  background: #f2f9fd;
-}
-.action-pill--sort.is-active {
-  background: linear-gradient(135deg, #6c5ce7, #4834d4);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(72, 52, 212, 0.35);
-}
-.action-pill--danger {
-  background: #fff;
-  color: #d9364f;
-  border-color: #f0c4cc;
-}
-.action-pill--danger:hover:not(:disabled) {
-  background: #fdecef;
-  border-color: #d9364f;
-  box-shadow: 0 4px 12px rgba(217, 54, 79, 0.2);
-}
+/* Tombol toolbar Output Racetime (Save Session 1/Result Session 1/PDF/
+   Save Result/Sort Ranked/Reset All + trigger Riwayat Judge/Field Notes)
+   sekarang diatur global di race-category-toolbar.css. */
 </style>

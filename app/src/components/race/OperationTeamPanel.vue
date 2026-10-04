@@ -3,11 +3,15 @@
     <div class="card p-3 race-window">
       <div class="mb-3 text-center">
         <h5 class="section-title">STiming System 424 v2.0.0</h5>
-        <small class="section-desc">
-          Modul ini menampilkan live feed registrasi dan buffer timer untuk
-          start dan finish. Gunakan tombol BIB untuk mencatat waktu secara
-          real-time.
-        </small>
+        <!-- Status sumber waktu (jam RaceTime2 + Long Range Start) — di
+             header panel, bukan di judul Buffer-Timer-Start, supaya tidak
+             mengganggu tampilan card buffer. Klik badge = kalibrasi. -->
+        <div class="time-source-bar">
+          <span class="time-source-bar__label">Sumber Waktu</span>
+          <ClockBadge />
+          <LongrangeBadge />
+          <PhotofinishBadge v-if="showPhotofinish" />
+        </div>
       </div>
 
       <div>
@@ -31,15 +35,32 @@
                         Time data is not yet available
                       </td>
                     </tr>
+                    <!-- Klik baris = salin waktunya ke Get Time Start/Finish,
+                         jenisnya ditentukan sama persis dgn routing reader
+                         (lihat feedRow()). -->
                     <tr
                       v-else
                       v-for="(id, index) in digitId"
                       :key="'feed-' + index"
-                      :class="{ 'highlight-row': index === 0 }"
+                      :class="{
+                        'highlight-row': index === 0,
+                        'feed-row--clickable': !!feedRow(index).target,
+                      }"
+                      :title="feedRow(index).hint"
+                      @click="applyFeedRow(index)"
                     >
                       <td>{{ id }}</td>
                       <td>{{ digitTime[index] }}</td>
-                      <td>{{ formatTime(digitTime[index]) }}</td>
+                      <td class="feed-time-cell">
+                        {{ feedRow(index).time }}
+                        <span
+                          v-if="feedRow(index).target"
+                          class="feed-tag"
+                          :class="'feed-tag--' + feedRow(index).target"
+                        >
+                          {{ feedRow(index).label }}
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -47,149 +68,103 @@
             </div>
           </b-col>
 
-          <!-- RIGHT: Start / Finish Buffer & Buttons -->
+          <!-- RIGHT: Start / Finish Buffer & tombol BIB (grid tile) -->
           <b-col cols="12" md class="pl-md-3">
-            <!-- START -->
-            <div class="card card-fixed">
-              <!-- tingginya tetap -->
-              <div class="card-body h-100 d-flex flex-column">
+            <div
+              v-for="sec in sections"
+              :key="sec.type"
+              class="card card-fixed"
+              :class="{ 'mt-3': sec.type === 'finish' }"
+            >
+              <div class="card-body h-100">
                 <b-row no-gutters class="h-100">
-                  <!-- kiri: judul + input (tetap) -->
-                  <b-col class="d-flex flex-column pr-md-3">
-                    <h5 class="card-title d-flex flex-wrap align-items-center" style="font-weight: 800; gap: 8px">
-                      Buffer-Timer-Start
-                      <ClockBadge />
-                      <LongrangeBadge />
-                    </h5>
-                    <b-row>
-                      <b-col>
-                        <p>Get Time Start</p>
-                        <div class="input-group mb-3">
-                          <input
-                            :value="digitTimeStart"
-                            @input="onTimerInput($event, 'digitTimeStart')"
-                            type="text"
-                            inputmode="numeric"
-                            maxlength="12"
-                            class="form-control"
-                            placeholder="00:00:00.000"
-                          />
-                        </div>
-                      </b-col>
-                    </b-row>
-                  </b-col>
-
-                  <!-- kanan: tombol (scroll di sini) -->
-                  <b-col
-                    cols="12"
-                    md="4"
-                    class="d-flex flex-column h-100 min-h-0 mt-3 mt-md-0"
-                  >
-                    <div class="btn-scroll">
-                      <button
-                        v-for="(button, index) in participant"
-                        :key="'start-' + index"
-                        type="button"
-                        class="btn custom-btn btn-block"
-                        :disabled="
-                          hasStartTime(button) ||
-                          isByeTeam(button) ||
-                          needsHeat(button)
-                        "
-                        :class="
-                          hasStartTime(button) || isByeTeam(button) || needsHeat(button)
-                            ? 'btn-secondary'
-                            : 'btn-info'
-                        "
-                        :title="
-                          isByeTeam(button)
-                            ? 'Tim BYE — tidak perlu waktu'
-                            : needsHeat(button)
-                            ? 'Heat belum ditentukan — assign dulu lewat bagan'
-                            : ''
-                        "
-                        @click="
-                          $emit('update-time', digitTimeStart, index, 'start')
-                        "
-                      >
-                        {{ "BIB " + getBib(button) }}
-                      </button>
-                    </div>
-                  </b-col>
-                </b-row>
-              </div>
-            </div>
-            <!-- END START -->
-
-            <br />
-
-            <!-- FINISH -->
-            <div class="card card-fixed">
-              <div class="card-body h-100 d-flex flex-column">
-                <b-row no-gutters class="h-100">
-                  <b-col class="d-flex flex-column pr-md-3">
+                  <!-- kiri: judul + input buffer -->
+                  <b-col cols="12" lg="4" class="d-flex flex-column pr-lg-3">
                     <h5 class="card-title" style="font-weight: 800">
-                      Buffer-Timer-Finish
+                      {{ sec.title }}
                     </h5>
-                    <b-row>
-                      <b-col>
-                        <p>Get Time Finish</p>
-                        <div class="input-group mb-3">
-                          <input
-                            :value="digitTimeFinish"
-                            @input="onTimerInput($event, 'digitTimeFinish')"
-                            type="text"
-                            inputmode="numeric"
-                            maxlength="12"
-                            class="form-control"
-                            placeholder="00:00:00.000"
-                          />
-                        </div>
-                      </b-col>
-                    </b-row>
+                    <p class="mb-1">{{ sec.inputLabel }}</p>
+                    <div class="input-group mb-3">
+                      <input
+                        :value="sec.value"
+                        @input="onTimerInput($event, sec.prop)"
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="12"
+                        class="form-control"
+                        :class="{ 'input-flash': flashField === sec.type }"
+                        placeholder="00:00:00.000"
+                      />
+                    </div>
                   </b-col>
 
-                  <!-- kanan: tombol (scroll di sini) -->
+                  <!-- kanan: grid tombol BIB (scroll di sini) -->
                   <b-col
                     cols="12"
-                    md="4"
-                    class="d-flex flex-column h-100 min-h-0 mt-3 mt-md-0"
+                    lg="8"
+                    class="d-flex flex-column h-100 min-h-0 mt-2 mt-lg-0"
                   >
+                    <div class="bib-toolbar">
+                      <span class="bib-toolbar__count">
+                        {{ doneCount(sec.type) }}/{{ participant.length }}
+                        tercatat
+                      </span>
+                      <div class="bib-filter" role="group">
+                        <button
+                          type="button"
+                          class="bib-filter__btn"
+                          :class="{ active: filters[sec.type] === 'pending' }"
+                          @click="filters[sec.type] = 'pending'"
+                        >
+                          Belum ({{ pendingCount(sec.type) }})
+                        </button>
+                        <button
+                          type="button"
+                          class="bib-filter__btn"
+                          :class="{ active: filters[sec.type] === 'all' }"
+                          @click="filters[sec.type] = 'all'"
+                        >
+                          Semua ({{ participant.length }})
+                        </button>
+                      </div>
+                    </div>
+
                     <div class="btn-scroll">
-                      <button
-                        v-for="(button, index) in participant"
-                        :key="'finish-' + index"
-                        type="button"
-                        class="btn custom-btn btn-block"
-                        :disabled="
-                          hasFinishTime(button) ||
-                          isByeTeam(button) ||
-                          needsHeat(button)
-                        "
-                        :class="
-                          hasFinishTime(button) || isByeTeam(button) || needsHeat(button)
-                            ? 'btn-secondary'
-                            : 'btn-info'
-                        "
-                        :title="
-                          isByeTeam(button)
-                            ? 'Tim BYE — tidak perlu waktu'
-                            : needsHeat(button)
-                            ? 'Heat belum ditentukan — assign dulu lewat bagan'
-                            : ''
-                        "
-                        @click="
-                          $emit('update-time', digitTimeFinish, index, 'finish')
-                        "
+                      <div class="bib-grid">
+                        <button
+                          v-for="tile in tilesFor(sec.type)"
+                          :key="sec.type + '-' + tile.index"
+                          type="button"
+                          class="bib-tile"
+                          :class="'bib-tile--' + tile.state"
+                          :disabled="tile.state !== 'ready'"
+                          :title="tile.title"
+                          @click="
+                            $emit('update-time', sec.value, tile.index, sec.type)
+                          "
+                        >
+                          <span class="bib-tile__num">
+                            <span v-if="tile.state === 'done'" class="bib-tile__check">✓</span>
+                            {{ tile.bib }}
+                          </span>
+                          <span class="bib-tile__sub">{{ tile.sub }}</span>
+                        </button>
+                      </div>
+                      <div
+                        v-if="!tilesFor(sec.type).length"
+                        class="bib-empty"
                       >
-                        {{ "BIB " + getBib(button) }}
-                      </button>
+                        {{
+                          participant.length
+                            ? "Semua tim sudah tercatat."
+                            : "Belum ada tim."
+                        }}
+                      </div>
                     </div>
                   </b-col>
                 </b-row>
               </div>
             </div>
-            <!-- END FINISH -->
           </b-col>
         </b-row>
       </div>
@@ -200,13 +175,23 @@
 <script>
 import LongrangeBadge from "@/components/longrange/LongrangeBadge.vue";
 import ClockBadge from "@/components/clock/ClockBadge.vue";
+import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
+import { classifyFrame } from "@/utils/microGateReader";
+
+const FEED_TIME_RE = /^\d{1,2}:\d{2}:\d{2}\.\d{1,3}$/;
 
 export default {
   name: "OperationTimePanel",
-  components: { LongrangeBadge, ClockBadge },
+  components: { LongrangeBadge, ClockBadge, PhotofinishBadge },
   data() {
     return {
-      a: null,
+      // Filter tombol BIB per buffer: "all" (default, posisi tile stabil
+      // supaya tidak salah pencet) atau "pending" (sembunyikan yg sudah
+      // tercatat).
+      filters: { start: "all", finish: "all" },
+      // Field buffer yg baru diisi dari klik Live Feed — dipakai utk efek
+      // kedip singkat supaya operator lihat waktunya masuk ke mana.
+      flashField: null,
     };
   },
   props: {
@@ -224,8 +209,33 @@ export default {
     // false supaya kategori lain (yg tidak punya konsep Heat) tidak
     // terpengaruh.
     requireHeat: { type: Boolean, default: false },
+    // true di halaman yg memakai STS Photo Finish (H2H/Rafting Cross/DRR)
+    // — badge-nya tampil di kapsul "Sumber Waktu" sebelah Long Range Start.
+    showPhotofinish: { type: Boolean, default: false },
   },
-  computed: {},
+  beforeDestroy() {
+    clearTimeout(this._flashTimer);
+  },
+  computed: {
+    sections() {
+      return [
+        {
+          type: "start",
+          title: "Buffer-Timer-Start",
+          inputLabel: "Get Time Start",
+          prop: "digitTimeStart",
+          value: this.digitTimeStart,
+        },
+        {
+          type: "finish",
+          title: "Buffer-Timer-Finish",
+          inputLabel: "Get Time Finish",
+          prop: "digitTimeFinish",
+          value: this.digitTimeFinish,
+        },
+      ];
+    },
+  },
   methods: {
     // Buffer-Timer-Start / Buffer-Timer-Finish HANYA boleh diisi format
     // HH:MM:SS.mmm — operator cuma ketik angkanya (mis. dari hasil baca
@@ -288,6 +298,87 @@ export default {
       const ms = this._pad3(d.getMilliseconds());
       return `${hh}:${mm}:${ss}.${ms}`;
     },
+    // Info satu baris Live Feed: waktu terformat + ke buffer mana waktunya
+    // masuk kalau diklik. Aturannya SAMA dgn yg dipakai saat data datang:
+    //   "LR…" (Long Range Start)  -> Start
+    //   "PF…" (Photo Finish)      -> Finish
+    //   frame RaceTime2           -> classifyFrame(): start -> Start,
+    //                                finish/lap -> Finish (lihat
+    //                                serialPortMixin onStart/onFinish/onLap)
+    feedRow(index) {
+      const id = String((this.digitId || [])[index] || "");
+      const time = this.formatTime((this.digitTime || [])[index]);
+      let kind = null;
+      if (id.startsWith("LR")) kind = "start";
+      else if (id.startsWith("PF")) kind = "finish";
+      else kind = classifyFrame(id);
+
+      let target = null;
+      if (kind === "start") target = "start";
+      else if (kind === "finish" || kind === "lap") target = "finish";
+      if (!FEED_TIME_RE.test(time)) target = null; // tanpa waktu valid
+
+      const label = kind === "lap" ? "LAP" : target ? target.toUpperCase() : "";
+      const hint = target
+        ? `Klik utk salin ${time} ke Get Time ${target === "start" ? "Start" : "Finish"}`
+        : "";
+      return { time, target, label, hint };
+    },
+    applyFeedRow(index) {
+      const row = this.feedRow(index);
+      if (!row.target) return;
+      const prop = row.target === "start" ? "digitTimeStart" : "digitTimeFinish";
+      this.$emit(`update:${prop}`, row.time);
+      this.flashField = row.target;
+      clearTimeout(this._flashTimer);
+      this._flashTimer = setTimeout(() => {
+        this.flashField = null;
+      }, 700);
+    },
+
+    // Data tiap tile BIB utk satu buffer. `index` = posisi ASLI di
+    // `participant` (dipakai emit update-time), tetap benar walau difilter.
+    tilesFor(type, applyFilter = true) {
+      const isStart = type === "start";
+      const tiles = (this.participant || []).map((btn, index) => {
+        const done = isStart ? this.hasStartTime(btn) : this.hasFinishTime(btn);
+        const bye = this.isByeTeam(btn);
+        const noHeat = this.needsHeat(btn);
+        const name = String((btn && (btn.nameTeam || btn.teamName)) || "-");
+        let state = "ready";
+        let sub = name;
+        let title = name;
+        if (bye) {
+          state = "blocked";
+          sub = "BYE";
+          title = "Tim BYE — tidak perlu waktu";
+        } else if (noHeat) {
+          state = "blocked";
+          sub = "Belum Heat";
+          title = "Heat belum ditentukan — assign dulu lewat bagan";
+        } else if (done) {
+          state = "done";
+          const t = isStart ? btn.result.startTime : btn.result.finishTime;
+          sub = this.formatTime(t);
+          title = `${name} — ${isStart ? "start" : "finish"} ${sub}`;
+        }
+        return { index, bib: this.getBib(btn), state, sub, title };
+      });
+      if (applyFilter && this.filters[type] === "pending") {
+        return tiles.filter((t) => t.state === "ready");
+      }
+      return tiles;
+    },
+    pendingCount(type) {
+      return this.tilesFor(type, false).filter((t) => t.state === "ready")
+        .length;
+    },
+    doneCount(type) {
+      const isStart = type === "start";
+      return (this.participant || []).filter((btn) =>
+        isStart ? this.hasStartTime(btn) : this.hasFinishTime(btn)
+      ).length;
+    },
     hasStartTime(btn) {
       return btn && btn.result && !!btn.result.startTime;
     },
@@ -341,13 +432,28 @@ export default {
   margin: 0 auto;
 }
 
-.card-time {
-  border-radius: 20px;
+.time-source-bar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.time-source-bar__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.custom-btn {
-  margin: 5px;
-  width: 120px;
+.card-time {
+  border-radius: 20px;
 }
 
 /* Panel putih, ukuran tetap */
@@ -356,12 +462,6 @@ export default {
   border: 1px solid #e6ebf4;
   border-radius: 20px;
   overflow: hidden;
-}
-
-/* Tinggi SELALU tetap; scroll jika konten lebih */
-.feed-scroll {
-  height: 500px;
-  overflow: auto;
 }
 
 /* Tabel rapi + header lengket (opsional) */
@@ -405,22 +505,21 @@ export default {
   border: none;
 }
 
-.card-fixed.finish {
-  height: 300px;
-}
-
-/* default (≥992px: md ke atas) */
+/* ===== Layout tinggi tetap =====
+   Feed (kiri) setinggi 2 card buffer + jarak di antaranya, supaya kolom
+   kiri & kanan rata bawah. Tombol BIB scroll di dalam card-nya sendiri. */
 .feed-scroll {
-  height: 500px;
+  height: 596px; /* 2 x 290 + 16 (mt-3) */
   overflow: auto;
 }
 .card-fixed {
-  height: 260px;
+  height: 290px;
   border-radius: 15px;
   overflow: hidden;
 }
 .card-fixed .card-body {
   height: 100%;
+  padding: 16px 18px;
 }
 .card-fixed .row {
   height: 100%;
@@ -429,92 +528,234 @@ export default {
   min-height: 0;
 }
 .btn-scroll {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 4px;
+  padding: 2px 4px 4px 2px;
   -webkit-overflow-scrolling: touch;
 }
 
-/* ≤1199px (lg ke bawah): sedikit lebih pendek */
+/* ===== Toolbar di atas grid: jumlah tercatat + filter Belum/Semua ===== */
+.bib-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.bib-toolbar__count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+.bib-filter {
+  display: inline-flex;
+  background: #f1f5fb;
+  border: 1px solid #e6edf6;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 2px;
+}
+.bib-filter__btn {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.bib-filter__btn:hover {
+  color: #1c4c7a;
+}
+.bib-filter__btn.active {
+  background: #ffffff;
+  color: #1c4c7a;
+  box-shadow: 0 1px 4px rgba(28, 76, 122, 0.15);
+}
+
+/* ===== Grid tile BIB ===== */
+.bib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.bib-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 64px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.08s ease, box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+.bib-tile__num {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.bib-tile__check {
+  font-size: 14px;
+  margin-right: 2px;
+}
+.bib-tile__sub {
+  max-width: 100%;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Siap dicatat — paling menonjol */
+.bib-tile--ready {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(28, 76, 122, 0.25);
+}
+.bib-tile--ready .bib-tile__sub {
+  color: rgba(255, 255, 255, 0.85);
+}
+.bib-tile--ready:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.35);
+}
+.bib-tile--ready:active {
+  transform: scale(0.96);
+}
+.bib-tile--ready:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.45);
+}
+
+/* Sudah tercatat — tampil waktunya */
+.bib-tile--done {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  cursor: default;
+}
+.bib-tile--done .bib-tile__sub {
+  color: #059669;
+}
+
+/* BYE / belum Heat — tidak bisa diklik */
+.bib-tile--blocked {
+  background: repeating-linear-gradient(
+    -45deg,
+    #f1f5f9,
+    #f1f5f9 6px,
+    #e8edf3 6px,
+    #e8edf3 12px
+  );
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.bib-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 24px 8px;
+}
+
+/* ===== Responsif ===== */
 @media (max-width: 1199.98px) {
   .feed-scroll {
-    height: 420px;
+    height: 556px; /* 2 x 270 + 16 */
   }
   .card-fixed {
-    height: 240px;
+    height: 270px;
   }
 }
 
-/* ≤991px (md ke bawah / tablet & mobile): stack vertikal */
+/* < lg: judul/input di atas, grid di bawah — card butuh lebih tinggi */
 @media (max-width: 991.98px) {
   .feed-panel {
     border-radius: 16px;
   }
   .feed-scroll {
     height: 320px;
-  } /* feed jadi sedikit lebih rendah */
+  }
   .card-fixed {
-    height: 260px;
-  } /* card tetap fixed */
-  .btn-scroll {
-    max-height: 100%;
-  } /* pastikan tetap scroll */
+    height: 380px;
+  }
 }
 
-/* ≤575px (xs): lebih kompak di ponsel kecil */
 @media (max-width: 575.98px) {
   .feed-scroll {
     height: 260px;
   }
-  .card-fixed {
-    height: 240px;
+  .bib-grid {
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    gap: 6px;
   }
-  .custom-btn {
-    margin: 4px 0;
-  } /* tombol lebih rapat */
+  .bib-tile {
+    height: 56px;
+  }
+  .bib-tile__num {
+    font-size: 17px;
+  }
 }
 
-/* Card START fixed height */
-.card-fixed {
-  border-radius: 15px;
-  height: 240px;
-  /* atur sesuai selera */
-  overflow: hidden;
-  /* cegah isi mendorong card */
+/* ===== Live Feed: baris yang bisa diklik ===== */
+.feed-row--clickable {
+  cursor: pointer;
+}
+.table-rounded tbody tr.feed-row--clickable:hover td {
+  background: #e6f4fd !important;
+}
+.feed-time-cell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.feed-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.feed-tag--start {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.feed-tag--finish {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
-.card-fixed .card-body {
-  height: 100%;
+/* Kedip singkat pada field buffer yg baru diisi dari Live Feed */
+.input-flash {
+  animation: input-flash 0.7s ease;
 }
-
-.card-fixed .row {
-  height: 100%;
-}
-
-/* supaya kolom kanan bisa menyusut & jadi container scroll */
-.min-h-0 {
-  min-height: 0;
-}
-
-/* area tombol yang scroll */
-.btn-scroll {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* tombol rapi */
-.custom-btn {
-  margin: 6px 0;
-  border-radius: 10px;
-  font-size: 18px;
-}
-
-.btn-block {
-  width: 100%;
+@keyframes input-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 176, 235, 0.7);
+    background: #e6f4fd;
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(37, 176, 235, 0);
+    background: #ffffff;
+  }
 }
 
 .highlight-row td {

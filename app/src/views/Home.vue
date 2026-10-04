@@ -25,166 +25,138 @@
       </div>
     </div>
 
-    <!-- 2) JUMBOTRON -->
-    <section class="sts-jumbotron">
-      <b-container>
-        <b-row>
-          <b-col cols="12" md="7" class="py-4">
-            <h1 class="display-5 font-weight-bold mb-3">
-              Sustainable Timing System
-            </h1>
-            <p class="lead mb-4">
-              Everything you need for a successful competition.
+    <!-- HERO -->
+    <section class="home-hero">
+      <div class="home-hero__bg"></div>
+      <b-container class="home-hero__inner">
+        <b-row class="align-items-center">
+          <b-col cols="12" lg="7" class="py-2">
+            <span class="home-hero__eyebrow">
+              <Icon icon="mdi:timer-outline" class="mr-1" />
+              Timing &amp; Results · Arung Jeram
+            </span>
+            <h1 class="home-hero__title">Sustainable Timing System</h1>
+            <p class="home-hero__lead">
+              Everything you need for a successful competition — dari
+              registrasi tim, timing RaceTime2, penalty juri realtime, sampai
+              hasil resmi.
             </p>
-            <b-button
-              size="md"
-              variant="warning"
-              class="btn-action px-4"
-              @click="goTo('events')"
-            >
-              Explore Event
-            </b-button>
+            <div class="home-hero__cta">
+              <button type="button" class="hero-btn hero-btn--primary" @click="goTo('events')">
+                <Icon icon="mdi:calendar-search" />
+                Explore Events
+              </button>
+              <button type="button" class="hero-btn hero-btn--ghost" @click="goTo('create-new')">
+                <Icon icon="mdi:plus" />
+                Create Event
+              </button>
+            </div>
           </b-col>
-          <b-col
-            cols="12"
-            md="5"
-            class="d-flex align-items-center justify-content-center mt-4 mt-md-0"
-          >
-            <!-- <div
-              class="hero-image placeholder d-flex align-items-center justify-content-center m-5"
-            >
-            </div> -->
+
+          <!-- Statistik ringkas -->
+          <b-col cols="12" lg="5" class="mt-4 mt-lg-0">
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <span class="hero-stat__value">{{ loading ? "–" : activeEventCount }}</span>
+                <span class="hero-stat__label">Event Aktif</span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat__value">{{ loading ? "–" : events.length }}</span>
+                <span class="hero-stat__label">Total Event</span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat__value">{{ teams.length }}</span>
+                <span class="hero-stat__label">Tim Terdaftar</span>
+              </div>
+              <div
+                class="hero-stat hero-stat--wide"
+                :class="{ 'hero-stat--clickable': !!nextEvent }"
+                @click="nextEvent && onClickEvent(nextEvent.ev)"
+              >
+                <span class="hero-stat__label">Event Terdekat</span>
+                <template v-if="nextEvent">
+                  <span class="hero-stat__name">{{ nextEvent.ev.eventName || "-" }}</span>
+                  <span class="hero-stat__meta">
+                    <span class="status-dot" :class="'status-dot--' + nextEvent.status.key"></span>
+                    {{ nextEvent.status.text }} ·
+                    {{ formatDateShort(nextEvent.ev.startDateEvent) }}
+                  </span>
+                </template>
+                <span v-else class="hero-stat__meta">
+                  {{ loading ? "Memuat…" : "Belum ada event aktif" }}
+                </span>
+              </div>
+            </div>
           </b-col>
         </b-row>
       </b-container>
     </section>
 
-    <b-container class="mt-4 mb-5">
-      <!-- 3) ACTION CARDS -->
-      <b-row>
-        <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card">
-            <div class="d-flex flex-column align-items-center text-center p-2">
-              <div
-                class="mb-2 d-flex align-items-center justify-content-center"
-              >
-                <img
-                  src="@/assets/images/ico-create-new-events.png"
-                  alt="See all"
-                  class="ml-1 icon-see-all"
-                />
-              </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">Create a new Events</h5>
-              <small class="text-muted d-block mb-3">
-                Define event details and set up everything competition.
-              </small>
-              <b-button
-                variant="secondary"
-                class="btn-action w-100"
-                @click="goTo('create-new')"
-              >
-                Create Event
-              </b-button>
-            </div>
-          </b-card>
-        </b-col>
+    <b-container class="home-body">
+      <!-- QUICK ACTIONS -->
+      <div class="section-head">
+        <h5 class="section-head__title">Quick Actions</h5>
+      </div>
+      <div class="quick-grid">
+        <button type="button" class="quick-card" @click="goTo('create-new')">
+          <span class="quick-card__icon">
+            <img src="@/assets/images/ico-create-new-events.png" alt="" />
+          </span>
+          <span class="quick-card__text">
+            <span class="quick-card__title">Create a new Event</span>
+            <span class="quick-card__desc">Atur detail event & seluruh kebutuhan kompetisi.</span>
+          </span>
+          <Icon icon="mdi:chevron-right" class="quick-card__chev" />
+        </button>
 
-        <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card">
-            <div class="d-flex flex-column align-items-center text-center p-2">
-              <div
-                class="mb-2 d-flex align-items-center justify-content-center"
-              >
-                <img
-                  src="@/assets/images/ico-create-new-teams.png"
-                  alt="See all"
-                  class="ml-1 icon-see-all"
-                />
-              </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">Create a new Teams</h5>
-              <small class="text-muted d-block mb-3">
-                Add team names, members, and their roles for easy organization.
-              </small>
-              <b-button
-                variant="secondary"
-                class="btn-action btn-outline-info w-100"
-                @click="goTo('team-create')"
-              >
-                Manage All Teams
-              </b-button>
-            </div>
-          </b-card>
-        </b-col>
+        <button type="button" class="quick-card" @click="goTo('team-create')">
+          <span class="quick-card__icon">
+            <img src="@/assets/images/ico-create-new-teams.png" alt="" />
+          </span>
+          <span class="quick-card__text">
+            <span class="quick-card__title">Manage All Teams</span>
+            <span class="quick-card__desc">Tambah tim, tipe tim, dan negara — satu per satu atau import Excel.</span>
+          </span>
+          <Icon icon="mdi:chevron-right" class="quick-card__chev" />
+        </button>
 
-        <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card">
-            <div class="d-flex flex-column align-items-center text-center p-2">
-              <div
-                class="mb-2 d-flex align-items-center justify-content-center"
-              >
-                <img
-                  src="@/assets/images/ico-jury-accounts.png"
-                  alt="See all"
-                  class="ml-1 icon-see-all"
-                />
-              </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">
-                Jury's Account Management
-              </h5>
-              <small class="text-muted d-block mb-3">
-                Management jury accounts and assign roles to manage evaluation
-                efficiently.
-              </small>
-              <b-button
-                variant="secondary"
-                class="btn-action btn-outline-info w-100"
-                @click="goTo('admin/users')"
-              >
-                Manage Accounts
-              </b-button>
-            </div>
-          </b-card>
-        </b-col>
+        <button type="button" class="quick-card" @click="goTo('admin/users')">
+          <span class="quick-card__icon">
+            <img src="@/assets/images/ico-jury-accounts.png" alt="" />
+          </span>
+          <span class="quick-card__text">
+            <span class="quick-card__title">Jury's Account Management</span>
+            <span class="quick-card__desc">Kelola akun juri & assignment tugasnya per event.</span>
+          </span>
+          <Icon icon="mdi:chevron-right" class="quick-card__chev" />
+        </button>
 
-        <b-col cols="12" md="4" class="mb-4">
-          <b-card class="action-card">
-            <div class="d-flex flex-column align-items-center text-center p-2">
-              <div
-                class="mb-2 d-flex align-items-center justify-content-center"
-              >
-                <Icon icon="mdi:card-account-details-outline" width="48" height="48" />
-              </div>
-              <h5 class="mb-1 mt-3 font-weight-bold">
-                SI Card Reader Test
-                <b-badge variant="warning" class="ml-1">temp</b-badge>
-              </h5>
-              <small class="text-muted d-block mb-3">
-                Halaman percobaan integrasi SPORTident card reader (dev only).
-              </small>
-              <b-button
-                variant="secondary"
-                class="btn-action btn-outline-info w-100"
-                @click="goTo('si-test')"
-              >
-                Open SI Test
-              </b-button>
-            </div>
-          </b-card>
-        </b-col>
-      </b-row>
+        <button type="button" class="quick-card quick-card--dev" @click="goTo('si-test')">
+          <span class="quick-card__icon quick-card__icon--glyph">
+            <Icon icon="mdi:card-account-details-outline" width="26" height="26" />
+          </span>
+          <span class="quick-card__text">
+            <span class="quick-card__title">
+              SI Card Reader Test
+              <span class="quick-card__tag">temp</span>
+            </span>
+            <span class="quick-card__desc">Percobaan integrasi SPORTident card reader (dev only).</span>
+          </span>
+          <Icon icon="mdi:chevron-right" class="quick-card__chev" />
+        </button>
+      </div>
 
-      <!-- 4) EVENTS LIST (SLIDER) -->
-      <section class="d-flex align-items-center justify-content-between mb-2">
-        <h5 class="font-weight-bold mb-0">Events List</h5>
-        <b-button
-          variant="link"
-          class="see-all-link p-0"
-          @click="goTo('events')"
-        >
+      <!-- EVENTS LIST (SLIDER) -->
+      <div class="section-head mt-5">
+        <h5 class="section-head__title">
+          Events List
+          <span v-if="!loading && events.length" class="section-head__count">{{ events.length }}</span>
+        </h5>
+        <b-button variant="link" class="see-all-link p-0" @click="goTo('events')">
           See all
           <Icon icon="mdi:arrow-right" class="ml-1 see-all-icon" />
         </b-button>
-      </section>
+      </div>
 
       <div class="cards-slider">
         <div v-if="!loading && events.length" class="slider-track">
@@ -195,98 +167,97 @@
             :class="{ 'is-inactive': isInactive(ev) }"
             :aria-disabled="isInactive(ev)"
             :tabindex="isInactive(ev) ? -1 : 0"
+            :title="isInactive(ev) ? 'Event inactive — aktifkan lewat backdoor' : ''"
             @click="onClickEvent(ev)"
+            @keydown.enter="onClickEvent(ev)"
           >
-            <div v-if="isInactive(ev)" class="expired-overlay">
-              <div class="expired-text">
-                <div class="expired-title">Expired Date</div>
-                <small class="expired-sub"
-                  >change activated event on backdoors</small
-                >
-              </div>
-            </div>
-
-            <div
-              class="event-thumb d-flex align-items-center justify-content-center"
-            >
+            <div class="event-thumb">
               <img
                 :src="posterSrc(ev) || defaultImg"
                 alt="Poster"
                 class="event-img"
                 @error="onPosterError"
               />
+              <span class="event-status" :class="'event-status--' + eventStatus(ev).key">
+                <span class="status-dot" :class="'status-dot--' + eventStatus(ev).key"></span>
+                {{ eventStatus(ev).text }}
+              </span>
             </div>
             <div class="event-body">
-              <div class="font-weight-bold mb-1 text-truncate">
-                {{ ev.eventName || "Event Name" }}
+              <div class="event-title">{{ ev.eventName || "Event Name" }}</div>
+              <div class="event-meta">
+                <Icon icon="mdi:map-marker-outline" />
+                <span class="text-truncate">{{ eventLocation(ev) }}</span>
               </div>
-              <small class="text-muted d-block mb-2">
-                {{ ev.riverName || "Undefined" }} -
-                {{ ev.addressState || "Colorado" }},
-                {{ ev.addressCity || "USA" }}
-              </small>
-              <div class="event-separator"></div>
-              <small class="text-muted d-block">
-                Date : {{ formatDateShort(ev.startDateEvent) }} –
-                {{ formatDateShort(ev.endDateEvent) }}
-              </small>
+              <div class="event-meta">
+                <Icon icon="mdi:calendar-blank-outline" />
+                <span>
+                  {{ formatDateShort(ev.startDateEvent) }} –
+                  {{ formatDateShort(ev.endDateEvent) }}
+                </span>
+              </div>
             </div>
           </article>
         </div>
 
-        <div v-if="loading" class="w-100">
-          <b-skeleton-img height="180px" class="mr-3 mb-3" />
-          <b-skeleton-img height="180px" class="mr-3 mb-3" />
-          <b-skeleton-img height="180px" class="mr-3 mb-3" />
+        <div v-if="loading" class="slider-track">
+          <div v-for="n in 4" :key="'sk-' + n" class="event-card event-card--skeleton">
+            <b-skeleton-img height="150px" no-aspect />
+            <div class="event-body">
+              <b-skeleton width="80%" />
+              <b-skeleton width="60%" />
+              <b-skeleton width="50%" />
+            </div>
+          </div>
         </div>
 
-        <div
-          v-if="!loading && !events.length"
-          class="text-center text-muted py-5"
-        >
-          Belum ada event.
+        <div v-if="!loading && !events.length" class="empty-state">
+          <Icon icon="mdi:calendar-remove-outline" width="34" height="34" />
+          <div>Belum ada event.</div>
+          <button type="button" class="hero-btn hero-btn--soft mt-2" @click="goTo('create-new')">
+            <Icon icon="mdi:plus" /> Create Event
+          </button>
         </div>
       </div>
 
-      <!-- 5) TEAMS REGISTERED (SLIDER) -->
-      <section
-        class="d-flex align-items-center justify-content-between mt-4 mb-2"
-      >
-        <h5 class="font-weight-bold mb-0">Teams Registered</h5>
-        <b-button
-          variant="link"
-          class="see-all-link p-0"
-          @click="goTo('team-create')"
-        >
+      <!-- TEAMS REGISTERED (SLIDER) -->
+      <div class="section-head mt-5">
+        <h5 class="section-head__title">
+          Teams Registered
+          <span v-if="teams.length" class="section-head__count">{{ teams.length }}</span>
+        </h5>
+        <b-button variant="link" class="see-all-link p-0" @click="goTo('team-create')">
           See all
           <Icon icon="mdi:arrow-right" class="ml-1 see-all-icon" />
         </b-button>
-      </section>
+      </div>
 
       <div class="cards-slider">
-        <div v-if="teams.length" class="slider-track">
-          <article v-for="(t, tIdx) in teams" :key="tIdx" class="team-card">
-            <div class="d-flex align-items-center mb-2">
-              <div
-                class="team-avatar mr-2 d-flex align-items-center justify-content-center"
-              >
-                <Icon icon="mdi:account-circle" width="28" height="28" />
-              </div>
-              <div class="font-weight-bold text-truncate">{{ t.name }}</div>
+        <div v-if="teams.length" class="slider-track slider-track--teams">
+          <article
+            v-for="(t, tIdx) in teams"
+            :key="tIdx"
+            class="team-card"
+            tabindex="0"
+            @click="viewTeam(t)"
+            @keydown.enter="viewTeam(t)"
+          >
+            <span class="team-avatar" :style="{ background: avatarColor(t.name) }">
+              {{ initials(t.name) }}
+            </span>
+            <div class="team-info">
+              <div class="team-name" :title="t.name">{{ t.name }}</div>
+              <span class="team-type">{{ t.typeTeam }}</span>
             </div>
-            <small class="text-muted d-block mb-3">{{ t.typeTeam }}</small>
-            <b-button
-              size="sm"
-              variant="secondary"
-              class="btn-action w-100"
-              @click.stop="viewTeam(t)"
-            >
-              View Details
-            </b-button>
+            <Icon icon="mdi:chevron-right" class="team-chev" />
           </article>
         </div>
-        <div v-else class="text-center text-muted py-5">
-          Belum ada team terdaftar.
+        <div v-else class="empty-state">
+          <Icon icon="mdi:account-group-outline" width="34" height="34" />
+          <div>Belum ada team terdaftar.</div>
+          <button type="button" class="hero-btn hero-btn--soft mt-2" @click="goTo('team-create')">
+            <Icon icon="mdi:plus" /> Tambah Team
+          </button>
         </div>
       </div>
     </b-container>
@@ -324,6 +295,28 @@ export default {
     this.loadTeamsRegistered();
   },
   computed: {
+    activeEventCount() {
+      return (this.events || []).filter((ev) => !this.isInactive(ev)).length;
+    },
+    // Event aktif terdekat utk kartu "Event Terdekat" di hero: yang sedang
+    // berlangsung dulu, lalu upcoming paling dekat.
+    nextEvent() {
+      const rank = { live: 0, upcoming: 1 };
+      const list = (this.events || [])
+        .filter((ev) => !this.isInactive(ev))
+        .map((ev) => ({ ev, status: this.eventStatus(ev) }))
+        .filter((x) => x.status.key in rank);
+      list.sort((a, b) => {
+        if (rank[a.status.key] !== rank[b.status.key]) {
+          return rank[a.status.key] - rank[b.status.key];
+        }
+        return (
+          new Date(a.ev.startDateEvent).getTime() -
+          new Date(b.ev.startDateEvent).getTime()
+        );
+      });
+      return list[0] || null;
+    },
     sortedEvents() {
       var now = new Date();
 
@@ -428,6 +421,57 @@ export default {
       var year = dt.getFullYear();
 
       return day + " " + month + " " + year;
+    },
+    // Status tampilan event: inactive (statusEvent bukan "activated"),
+    // live (hari ini di antara start..end), upcoming, atau done.
+    eventStatus(ev) {
+      if (this.isInactive(ev)) return { key: "inactive", text: "Inactive" };
+      const start = new Date(ev.startDateEvent);
+      const end = new Date(ev.endDateEvent || ev.startDateEvent);
+      if (isNaN(start)) return { key: "upcoming", text: "Upcoming" };
+      const now = new Date();
+      const dayStart = new Date(start);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(isNaN(end) ? start : end);
+      dayEnd.setHours(23, 59, 59, 999);
+      if (now >= dayStart && now <= dayEnd) {
+        return { key: "live", text: "Berlangsung" };
+      }
+      if (now < dayStart) {
+        const days = Math.ceil((dayStart - now) / 86400000);
+        return {
+          key: "upcoming",
+          text: days <= 1 ? "Besok" : `${days} hari lagi`,
+        };
+      }
+      return { key: "done", text: "Selesai" };
+    },
+    eventLocation(ev) {
+      const parts = [ev.riverName, ev.addressCity, ev.addressState]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+      return parts.length ? parts.join(" · ") : "Lokasi belum diisi";
+    },
+    initials(name) {
+      const words = String(name || "?").trim().split(/\s+/);
+      return (
+        (words[0] || "?").charAt(0) + (words[1] ? words[1].charAt(0) : "")
+      ).toUpperCase();
+    },
+    // Warna avatar stabil per nama tim (hash sederhana -> palet brand).
+    avatarColor(name) {
+      const palette = [
+        "linear-gradient(135deg,#1c4c7a,#25b0eb)",
+        "linear-gradient(135deg,#0f766e,#2dd4bf)",
+        "linear-gradient(135deg,#7c3aed,#a78bfa)",
+        "linear-gradient(135deg,#c2410c,#fb923c)",
+        "linear-gradient(135deg,#be123c,#fb7185)",
+        "linear-gradient(135deg,#1d4ed8,#60a5fa)",
+      ];
+      let h = 0;
+      const str = String(name || "");
+      for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+      return palette[h % palette.length];
     },
     isInactive(ev) {
       var st = ev && ev.statusEvent ? String(ev.statusEvent) : "";
@@ -558,297 +602,562 @@ export default {
 
 <!-- PLAIN CSS (NO SCSS) -->
 <style scoped>
-:root {
-  --sts-blue: red;
-  --sts-muted: #8793b5;
+/* ===================== HOME (redesign) =====================
+   Palet brand sama dgn halaman lain (#1c4c7a navy, #25b0eb sky). */
+
+.sts-page {
+  background: #f5f8fc;
+  min-height: 100%;
+  padding-bottom: 48px;
 }
 
-.btn-action {
-  background: #ffffff;
-  border: 1px solid #cfd8e6;
-  color: #1c4c7a;
-  font-weight: 700;
-  padding: 8px 14px;
-  border-radius: 12px;
-}
-
-.btn-action:hover {
-  background-color: #1f6fa3 !important;
-  border: none;
-}
-
-/* NAVBAR */
-.sts-navbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: #fff;
-}
-
-.brand-box {
-  height: 28px;
-  width: 28px;
-  border-radius: 6px;
-  background: #e9eefb;
-  color: #6b7bb6;
-}
-
-/* JUMBOTRON */
-.sts-jumbotron {
-  padding: 120px;
+/* ---------- HERO ---------- */
+.home-hero {
   position: relative;
-  background-image: url("https://images.unsplash.com/uploads/141327328038701afeede/eda0fb7c?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  background-size: cover;
-  background-position: center;
-  border-bottom: 1px solid #e9edf5;
+  overflow: hidden;
   color: #fff;
-  /* agar teks tetap terlihat */
+  padding: 56px 0;
 }
-
-.sts-jumbotron::before {
-  content: "";
+.home-hero__bg {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  /* overlay hitam transparan */
-  z-index: 1;
+  background-image: linear-gradient(
+      100deg,
+      rgba(12, 35, 60, 0.92) 0%,
+      rgba(20, 62, 102, 0.8) 45%,
+      rgba(37, 176, 235, 0.35) 100%
+    ),
+    url("https://images.unsplash.com/uploads/141327328038701afeede/eda0fb7c?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
 }
-
-.sts-jumbotron > * {
+.home-hero__inner {
   position: relative;
-  z-index: 2;
-  /* konten tetap di atas overlay */
+}
+.home-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+}
+.home-hero__title {
+  margin: 16px 0 10px;
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.home-hero__lead {
+  max-width: 560px;
+  margin-bottom: 26px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+.home-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.sts-jumbotron .hero-image {
-  max-width: 100%;
-  border-radius: 20px;
-  /* background: #dfe7f7; */
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=40&w=400&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  box-shadow: 0 6px 24px rgba(31, 51, 117, 0.08);
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.18s ease,
+    background-color 0.18s ease, filter 0.18s ease;
+}
+.hero-btn:active {
+  transform: translateY(1px);
+}
+.hero-btn--primary {
+  background: linear-gradient(135deg, #25b0eb, #1c8fc7);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(37, 176, 235, 0.4);
+}
+.hero-btn--primary:hover {
+  filter: brightness(1.07);
+  box-shadow: 0 10px 26px rgba(37, 176, 235, 0.5);
+}
+.hero-btn--ghost {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+.hero-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.hero-btn--soft {
+  height: 38px;
+  padding: 0 16px;
+  background: #e6f4fd;
+  color: #1c4c7a;
+  border-color: #cfe4fb;
+}
+.hero-btn--soft:hover {
+  background: #d7edfb;
 }
 
-/* ACTION CARDS */
-.action-card {
-  border-radius: 20px;
-  border: 1px solid #eef0f6;
-  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06); /* base tipis */
-  transition: box-shadow 160ms ease, transform 160ms ease,
-    border-color 160ms ease;
-  will-change: transform, box-shadow;
+/* Statistik (glass cards) */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
-.action-card:hover,
-.action-card:focus-within {
-  border-color: rgba(0, 180, 255, 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
-    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
-    0 8px 32px rgba(0, 180, 255, 0.2);
-  z-index: 1;
+.hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
 }
-
-.btn-secondary {
-  background: #cfd6e6;
-  border-color: #cfd6e6;
-  color: #2b3450;
+.hero-stat--wide {
+  grid-column: 1 / -1;
 }
-
-.btn-primary {
-  background: var(--sts-blue);
-  border-color: var(--sts-blue);
+.hero-stat--clickable {
+  cursor: pointer;
+  transition: background-color 0.18s ease;
 }
-
-/* SLIDER (Events & Teams) */
-.cards-slider {
+.hero-stat--clickable:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.hero-stat__value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.hero-stat__label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.hero-stat__name {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 800;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hero-stat__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
 }
 
+/* ---------- STATUS DOT (dipakai hero & kartu event) ---------- */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: #94a3b8;
+}
+.status-dot--live {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+  animation: home-pulse 1.8s ease-in-out infinite;
+}
+.status-dot--upcoming {
+  background: #38bdf8;
+}
+.status-dot--done {
+  background: #94a3b8;
+}
+.status-dot--inactive {
+  background: #ef4444;
+}
+@keyframes home-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.08);
+  }
+}
+
+/* ---------- BODY / SECTION HEAD ---------- */
+.home-body {
+  margin-top: 28px;
+  position: relative;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.section-head__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+.section-head__count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e6f4fd;
+  color: #1c4c7a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ---------- QUICK ACTIONS ---------- */
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.quick-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid #e6edf6;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 42, 67, 0.08);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.quick-card:hover {
+  transform: translateY(-3px);
+  border-color: #b9d7f0;
+  box-shadow: 0 14px 30px rgba(15, 42, 67, 0.14);
+}
+.quick-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.4);
+}
+.quick-card__icon {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eaf6ff, #dcefff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.quick-card__icon img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.quick-card__icon--glyph {
+  color: #1c4c7a;
+}
+.quick-card__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.quick-card__title {
+  font-weight: 800;
+  font-size: 14px;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.quick-card__desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+.quick-card__tag {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.quick-card__chev {
+  flex: none;
+  font-size: 20px;
+  color: #94a3b8;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.quick-card:hover .quick-card__chev {
+  transform: translateX(3px);
+  color: #25b0eb;
+}
+.quick-card--dev {
+  border-style: dashed;
+}
+
+/* ---------- SLIDER ---------- */
+.cards-slider {
+  position: relative;
+}
 .slider-track {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc(33.333% - 12px);
+  grid-auto-columns: calc((100% - 3 * 16px) / 4);
   gap: 16px;
   overflow-x: auto;
-  padding-bottom: 4px;
   scroll-snap-type: x mandatory;
+  padding: 4px 2px 14px;
+  scrollbar-width: thin;
 }
-
 .slider-track > * {
   scroll-snap-align: start;
 }
-
-@media (min-width: 1200px) {
-  .slider-track {
-    grid-auto-columns: calc(25% - 12px);
-  }
+.slider-track--teams {
+  grid-auto-columns: calc((100% - 4 * 12px) / 5);
+  gap: 12px;
 }
 
-@media (max-width: 991.98px) {
-  .slider-track {
-    grid-auto-columns: calc(50% - 10px);
-  }
-}
-
-@media (max-width: 575.98px) {
-  .slider-track {
-    grid-auto-columns: 85%;
-  }
-}
-
-/* EVENT CARD */
-/* Pastikan semua card punya tinggi seragam */
+/* ---------- EVENT CARD ---------- */
 .event-card {
-  position: relative; /* ADD */
   display: flex;
   flex-direction: column;
-  height: 100%;
-  border: 1px solid #dfe5f2;
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid #e6edf6;
   background: #fff;
-  box-shadow: 0 6px 18px rgba(44, 92, 255, 0.06);
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease,
-    filter 0.12s ease;
-}
-
-/* state Inactive: gelap, tidak bisa di-hover/klik */
-.event-card.is-inactive {
-  filter: grayscale(1);
-  opacity: 0.55;
-  pointer-events: none; /* disable klik & hover */
-  cursor: not-allowed;
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
-}
-
-/* overlay tulisan Expired di tengah card */
-.expired-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column; /* biar stacked */
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 0 12px;
-  font-weight: 700;
-  font-size: 1.1rem;
-  text-transform: uppercase;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.38);
-  z-index: 3;
-}
-
-.expired-text .expired-title {
-  font-size: 1.6rem;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-
-.expired-text .expired-sub {
-  font-size: 0.8rem;
-  font-weight: 400;
-  text-transform: none;
-  opacity: 0.9;
-}
-
-/* optional: matikan efek zoom gambar ketika inactive */
-.event-card.is-inactive .event-img:hover {
-  transform: none;
-}
-
-.event-card:hover {
-  border-color: rgba(0, 180, 255, 0.6);
-  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
-    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
-    0 8px 32px rgba(0, 180, 255, 0.2);
-  z-index: 1;
-}
-
-/* Bagian gambar tetap fix */
-.event-thumb {
-  height: 160px;
-  /* lebih kecil biar space text cukup */
-  background: #e8edf6;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-  flex-shrink: 0;
-}
-
-/* Bagian body isi teks fleksibel */
-.event-body {
-  flex-grow: 1;
-  /* isi text isi space sisa */
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  /* biar badge tetap di bawah */
-  padding: 12px 18px 18px;
-}
-
-/* Pastikan teks rapi */
-.event-body small {
-  line-height: 1.5;
-  display: block;
-}
-
-/* TEAM CARD */
-.team-card {
-  border: 1px solid #dfe5f2;
-  border-radius: 12px;
-  background: #fff;
-  padding: 14px;
-  box-shadow: 0 6px 18px rgba(44, 92, 255, 0.06);
-}
-
-.team-card:hover {
-  border-color: rgba(0, 180, 255, 0.6);
-  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.1),
-    0 10px 24px rgba(17, 24, 39, 0.08), 0 0 0 1px rgba(0, 180, 255, 0.18),
-    0 8px 32px rgba(0, 180, 255, 0.2);
-  z-index: 1;
-}
-
-.team-avatar {
-  height: 40px;
-  width: 40px;
-  border-radius: 999px;
-  background: #eff3ff;
-  color: #5da0da;
-}
-
-/* FOOTER */
-/* .sts-footer{ border-top:1px solid #e6eaf2; background:#eef3f7; } */
-
-/* MISC */
-.placeholder {
-  color: #8793b5;
-}
-
-.event-thumb {
-  width: 100%;
-  height: 210px;
   overflow: hidden;
-  border-radius: 8px;
-  background: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.event-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(15, 42, 67, 0.14);
+}
+.event-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.4);
+}
+.event-card.is-inactive {
+  cursor: not-allowed;
+}
+.event-card.is-inactive:hover {
+  transform: none;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.06);
+}
+.event-card.is-inactive .event-img {
+  filter: grayscale(1) brightness(0.85);
+}
+.event-card.is-inactive .event-body {
+  opacity: 0.6;
+}
+.event-card--skeleton {
+  cursor: default;
 }
 
+.event-thumb {
+  position: relative;
+  height: 150px;
+  background: #e8edf6;
+  overflow: hidden;
+}
 .event-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
-  transition: transform 0.6s ease;
+  transition: transform 0.35s ease;
 }
-.event-img:hover {
-  transform: scale(1.1);
+.event-card:not(.is-inactive):hover .event-img {
+  transform: scale(1.05);
+}
+.event-status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  font-size: 11.5px;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.event-status--inactive {
+  color: #b91c1c;
 }
 
-.event-separator {
-  border-top: 1px solid #e0e6f0;
-  margin: 6px 0;
+.event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px 14px;
+}
+.event-title {
+  font-weight: 800;
+  font-size: 14.5px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.event-meta svg {
+  flex: none;
+  color: #94a3b8;
+}
+
+/* ---------- TEAM CARD ---------- */
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #e6edf6;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 42, 67, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.team-card:hover {
+  transform: translateY(-2px);
+  border-color: #b9d7f0;
+  box-shadow: 0 10px 22px rgba(15, 42, 67, 0.1);
+}
+.team-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.4);
+}
+.team-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.team-info {
+  flex: 1;
+  min-width: 0;
+}
+.team-name {
+  font-weight: 800;
+  font-size: 13.5px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-type {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.team-chev {
+  flex: none;
+  color: #cbd5e1;
+  font-size: 18px;
+}
+.team-card:hover .team-chev {
+  color: #25b0eb;
+}
+
+/* ---------- EMPTY STATE ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 36px 16px;
+  border: 1px dashed #dbe3ee;
+  border-radius: 16px;
+  background: #fafcff;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 1199.98px) {
+  .quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .slider-track--teams {
+    grid-auto-columns: calc((100% - 3 * 12px) / 4);
+  }
+}
+@media (max-width: 991.98px) {
+  .home-hero {
+    padding: 40px 0 56px;
+  }
+  .slider-track {
+    grid-auto-columns: calc((100% - 2 * 16px) / 3);
+  }
+  .slider-track--teams {
+    grid-auto-columns: calc((100% - 2 * 12px) / 3);
+  }
+}
+@media (max-width: 767.98px) {
+  .slider-track {
+    grid-auto-columns: calc((100% - 16px) / 2);
+  }
+  .slider-track--teams {
+    grid-auto-columns: calc((100% - 12px) / 2);
+  }
+}
+@media (max-width: 575.98px) {
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+  .hero-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .slider-track,
+  .slider-track--teams {
+    grid-auto-columns: 82%;
+  }
 }
 
 /* ===== Intro fullscreen ===== */

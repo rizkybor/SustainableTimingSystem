@@ -209,14 +209,14 @@
                           >
                             <img :src="m.attachment.url" alt="Gambar" class="chat-attachment-image" @load="scrollToBottom" />
                           </button>
-                          <template v-if="m.text">
-                            <span
+                          <span v-if="m.text" class="chat-message-text"
+                            ><span
                               v-for="(tok, ti) in renderMessageTokens(m.text)"
                               :key="ti"
                               :class="{ 'chat-mention': tok.mention }"
                               >{{ tok.text }}</span
-                            >
-                          </template>
+                            ></span
+                          >
                         </template>
                         <span class="chat-message-bubble-time">{{ formatTime(m.createdAt) }}</span>
                       </div>
@@ -334,10 +334,13 @@
                   >
                     <Icon icon="mdi:image-outline" width="18" height="18" />
                   </button>
-                  <input
+                  <!-- textarea (bukan input) supaya Enter = baris baru;
+                       kirim lewat tombol atau Ctrl/⌘ + Enter. Tinggi
+                       mengikuti isi (autoGrowComposer), maks ~5 baris. -->
+                  <textarea
                     ref="composerInput"
                     v-model="draft"
-                    type="text"
+                    rows="1"
                     class="chat-composer-input"
                     :placeholder="
                       uploading
@@ -348,12 +351,12 @@
                     @input="onDraftInput"
                     @keydown="onComposerKeydown"
                     @blur="onComposerBlur"
-                  />
+                  ></textarea>
                   <button
                     type="submit"
                     class="chat-send-btn"
                     :disabled="sending || uploading || !draft.trim()"
-                    title="Kirim"
+                    title="Kirim (Ctrl/⌘ + Enter)"
                   >
                     <Icon v-if="!sending" icon="mdi:send" width="17" height="17" />
                     <b-spinner v-else small variant="light" />
@@ -870,6 +873,7 @@ export default {
           const list = this.messagesByCategory[category] || [];
           this.$set(this.messagesByCategory, category, [...list, res.message]);
           this.draft = "";
+          this.$nextTick(this.autoGrowComposer);
           this.showMentionList = false;
           this.replyingTo = null;
           this.$nextTick(() => this.scrollToBottom());
@@ -922,7 +926,16 @@ export default {
     /* =========================================================
      * @MENTION AUTOCOMPLETE
      * =======================================================*/
+    // Tinggi textarea composer mengikuti isi (maks diatur CSS max-height).
+    autoGrowComposer() {
+      const el = this.$refs.composerInput;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+    },
+
     onDraftInput() {
+      this.autoGrowComposer();
       const input = this.$refs.composerInput;
       const cursorPos = input ? input.selectionStart : this.draft.length;
       const textBeforeCursor = this.draft.slice(0, cursorPos);
@@ -938,7 +951,19 @@ export default {
     },
 
     onComposerKeydown(e) {
-      if (!this.showMentionList || !this.mentionSuggestions.length) return;
+      const mentionOpen =
+        this.showMentionList && this.mentionSuggestions.length;
+      // Enter biasa / Shift+Enter = baris baru (perilaku default textarea).
+      // Ctrl/⌘ + Enter = kirim. Saat daftar @mention terbuka, Enter tetap
+      // dipakai memilih nama (ditangani di bawah).
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !mentionOpen) {
+        e.preventDefault();
+        if (!this.sending && !this.uploading && this.draft.trim()) {
+          this.sendMessage();
+        }
+        return;
+      }
+      if (!mentionOpen) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         this.mentionActiveIndex =
@@ -971,6 +996,7 @@ export default {
         this.mentionStartIndex + 1 + this.mentionQuery.length
       );
       this.draft = `${before}@${name} ${after}`;
+      this.$nextTick(this.autoGrowComposer);
       this.showMentionList = false;
 
       this.$nextTick(() => {
@@ -1668,6 +1694,9 @@ export default {
   font-weight: 700;
   color: #374151;
 }
+.chat-message-text {
+  white-space: pre-wrap; /* tampilkan baris baru dari Enter di composer */
+}
 .chat-message-bubble {
   font-size: 13px;
   line-height: 1.45;
@@ -1887,7 +1916,7 @@ export default {
 
 .chat-composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   padding: 10px;
   border-top: 1px solid #eef1f5;
@@ -1898,9 +1927,15 @@ export default {
   flex: 1;
   border: 1px solid #e5e9ef;
   background: #f7f9fb;
-  border-radius: 999px;
+  border-radius: 19px;
   padding: 9px 16px;
   font-size: 13px;
+  line-height: 1.4;
+  font-family: inherit;
+  resize: none;
+  height: 38px; /* = 1 baris; autoGrowComposer() menyesuaikan */
+  max-height: 110px; /* ~5 baris, lebih dari itu scroll */
+  overflow-y: auto;
   outline: none;
   transition: border-color 0.15s ease, background 0.15s ease;
   min-width: 0;

@@ -237,6 +237,7 @@
       :max-section="MAX_SECTION"
       :event-id="eventId"
       :event-name="safeEventName"
+      :categories-event="events && events.categoriesEvent"
       @update-settings="onUpdateRaceSettings"
     />
 
@@ -246,6 +247,7 @@
       :settings="judgeSettings"
       :event-id="eventId"
       :event-name="safeEventName"
+      :categories-event="events && events.categoriesEvent"
       @update-judges="onUpdateJudgeSettings"
     />
 

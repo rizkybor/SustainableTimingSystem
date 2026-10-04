@@ -20,8 +20,14 @@
     <!-- Body -->
     <div v-if="!loading" class="p-4">
       <div class="p-2 p-md-3">
+        <!-- Panel kategori (Sprint/H2H/Slalom/DRR/RX) — dibungkus flex
+             column supaya urutan tampilnya bisa diatur lewat CSS `order`
+             (lihat categoryOrder()), atas permintaan user (2026-10-05):
+             urutan panel harus ikut urutan array Event Categories di
+             Event Settings, bukan selalu Sprint→H2H→Slalom→DRR→RX. -->
+        <div class="rs-category-panels">
         <!-- SPRINT -->
-        <section class="rs-card mb-3" v-if="showSprint">
+        <section class="rs-card mb-3" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
           <div class="rs-section-title rs-section-toggle" @click="toggleSection('sprint')">
             <Icon
               :icon="
@@ -62,7 +68,7 @@
         </section>
 
         <!-- HEAD TO HEAD -->
-        <section class="rs-card mb-3" v-if="showH2H">
+        <section class="rs-card mb-3" v-if="showH2H" :style="{ order: categoryOrder('HEAD2HEAD') }">
           <div class="rs-section-title rs-section-toggle" @click="toggleSection('h2h')">
             <Icon
               :icon="
@@ -123,7 +129,7 @@
         </section>
 
         <!-- SLALOM -->
-        <section class="rs-card mb-3" v-if="showSlalom">
+        <section class="rs-card mb-3" v-if="showSlalom" :style="{ order: categoryOrder('SLALOM') }">
           <div class="rs-section-title rs-section-toggle" @click="toggleSection('slalom')">
             <Icon
               :icon="
@@ -194,7 +200,7 @@
         </section>
 
         <!-- RAFTING CROSS -->
-        <section class="rs-card mb-3" v-if="showRx">
+        <section class="rs-card mb-3" v-if="showRx" :style="{ order: categoryOrder('RX') }">
           <div class="rs-section-title rs-section-toggle" @click="toggleSection('rx')">
             <Icon
               :icon="
@@ -255,7 +261,7 @@
         </section>
 
         <!-- DOWN RIVER RACE -->
-        <section class="rs-card mb-3" v-if="showDrr">
+        <section class="rs-card mb-3" v-if="showDrr" :style="{ order: categoryOrder('DRR') }">
           <div class="rs-section-title rs-section-toggle" @click="toggleSection('drr')">
             <Icon
               :icon="
@@ -320,6 +326,7 @@
           </b-row>
           </div>
         </section>
+        </div>
 
         <div
           v-if="!showSprint && !showH2H && !showSlalom && !showDrr && !showRx"
@@ -499,6 +506,11 @@ export default {
     maxSection: { type: Number, default: 4 },
     eventId: { type: String, default: "" },
     eventName: { type: String, default: "" },
+    // BUG FIX (2026-10-05): sama pola dgn RaceSettings.vue — opsional,
+    // categoriesEvent event ini kalau parent SUDAH punya di memory, dipakai
+    // langsung (sinkron) menghindari race channel "get-events-byid-reply"
+    // yang dipakai bersama banyak komponen lain.
+    categoriesEvent: { type: Array, default: null },
   },
 
   data: function () {
@@ -648,6 +660,9 @@ export default {
         if (!this.localShow) this.draft = mergeWithDefaults(newVal);
       },
     },
+    categoriesEvent: function () {
+      this.fetchEnabledCategories();
+    },
   },
 
   mounted: function () {
@@ -668,7 +683,27 @@ export default {
       this.$set(this.collapsedSections, key, !this.collapsedSections[key]);
     },
     fetchEnabledCategories: async function () {
+      if (Array.isArray(this.categoriesEvent) && this.categoriesEvent.length) {
+        this.enabledCategoryKeys = new Set(
+          this.categoriesEvent.map(function (c) {
+            return String((c && c.name) || "").toUpperCase();
+          })
+        );
+        return;
+      }
       this.enabledCategoryKeys = await loadEnabledCategoryKeys(this.eventId);
+    },
+    // FITUR (2026-10-05, atas permintaan user): urutan tampil panel
+    // kategori ikut urutan array `categoriesEvent` di Event Settings —
+    // sama persis dgn categoryOrder() di RaceSettings.vue. Urutan insersi
+    // Set JS (enabledCategoryKeys) mengikuti urutan array sumbernya.
+    categoryOrder: function (key) {
+      var DEFAULT_ORDER = { SPRINT: 0, HEAD2HEAD: 1, SLALOM: 2, DRR: 3, RX: 4 };
+      if (!this.enabledCategoryKeys) {
+        return DEFAULT_ORDER[key] != null ? DEFAULT_ORDER[key] : 99;
+      }
+      var idx = Array.from(this.enabledCategoryKeys).indexOf(key);
+      return idx === -1 ? 99 : idx;
     },
     getSectionValue: function (n) {
       var s = "";
@@ -1661,6 +1696,17 @@ export default {
 <style>
 .rounded-20 {
   border-radius: 20px;
+}
+
+/* Panel kategori (Sprint/H2H/Slalom/DRR/RX) — flex column supaya CSS
+   `order` (lihat categoryOrder() di methods) bisa menata ulang urutan
+   tampilnya ikut array Event Categories. Didefinisikan juga di
+   RaceSettings.vue (unscoped, jadi sebenarnya sudah global) — diulang di
+   sini supaya tidak diam-diam bergantung pada file lain itu dimuat lebih
+   dulu. */
+.rs-category-panels {
+  display: flex;
+  flex-direction: column;
 }
 
 .btn-close-red {

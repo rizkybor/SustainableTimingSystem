@@ -82,7 +82,12 @@
          kehilangan pantauan Racetime. Lihat MEMORY project_slalom_
          sticky_category_switch.md utk detail lengkap pola ini. -->
     <div class="px-5">
-      <div class="card-body drr-sticky-bar" ref="stickyBar">
+      <div ref="stickySentinel"></div>
+      <div
+        class="card-body race-sticky-bar"
+        :class="{ 'is-stuck': isBarStuck }"
+        ref="stickyBar"
+      >
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -221,11 +226,10 @@
         </b-row>
       </div>
     </div>
-    <!-- Spacer: `.drr-sticky-bar` di atas jadi position:fixed (lepas dari
-         normal flow), jadi konten sesudahnya perlu "ruang kosong" pengganti
-         setinggi bar itu supaya tidak ketutupan. Tingginya diukur otomatis
-         lewat ResizeObserver (lihat mounted()) — BUKAN angka statis. -->
-    <div :style="{ height: drrStickyBarHeight + 'px' }"></div>
+    <!-- Spacer: hanya terisi saat bar sedang menempel (`is-stuck`, position:
+         fixed) supaya konten di bawahnya tidak loncat/ketutupan. Lihat
+         raceStickyBarMixin.js. -->
+    <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- OPERATION TIME (shared component like Sprint) -->
     <div class="ml-5 mb-2"><PhotofinishBadge /></div>
@@ -759,6 +763,7 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
 import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import { createBucketCache } from "@/utils/localBucketCache";
@@ -1001,7 +1006,12 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
+  mixins: [
+    teamFlagMixin,
+    serialPortMixin,
+    photofinishMixin,
+    raceStickyBarMixin,
+  ],
   data() {
     return {
       connectionState,
@@ -1010,10 +1020,6 @@ export default {
       fieldNotesRefreshTick: 0,
       isLoading: false,
       defaultImg,
-      // Tinggi terukur `.drr-sticky-bar` (position: fixed) — dipakai
-      // spacer di bawahnya supaya OperationTimePanel/tabel tidak ketutupan.
-      // Diperbarui otomatis via ResizeObserver di mounted().
-      drrStickyBarHeight: 0,
       judgeLogRefreshTick: 0,
       drrBucketOptions: [],
       drrBucketMap: Object.create(null),
@@ -1216,24 +1222,6 @@ export default {
   },
   async mounted() {
     const audio = new Audio(tone);
-
-    // Ukur tinggi `.drr-sticky-bar` (position: fixed, lihat CSS) supaya
-    // spacer di bawahnya selalu presisi — ResizeObserver otomatis update
-    // ulang kalau tingginya berubah (mis. tombol Baud Rate wrap ke baris
-    // baru di layar sempit).
-    this.$nextTick(() => {
-      const el = this.$refs.stickyBar;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      this._stickyBarObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          this.drrStickyBarHeight = Math.ceil(entry.contentRect.height);
-        }
-      });
-      this._stickyBarObserver.observe(el);
-    });
-    this.$once("hook:beforeDestroy", () => {
-      if (this._stickyBarObserver) this._stickyBarObserver.disconnect();
-    });
 
     await this.loadDataScore("DRR");
     await this.loadDataPenalties("DRR");
@@ -3897,25 +3885,11 @@ export default {
 </script>
 
 <style scoped>
-/* UX (2026-09-28): pin Switch DRR Category + kontrol Connect Racetime ke
-   bawah navbar aplikasi (--nav-h, lihat App.vue) selama halaman di-scroll
-   — sama pola persis dgn .slalom-sticky-bar di SlalomRace.vue (position:
-   sticky TIDAK cukup krn parent langsung .px-5 lebih pendek dari bar-nya
-   sendiri; position:fixed dipakai supaya lepas dari batasan tinggi
-   parent, selalu menempel di viewport apa pun panjang tabel Output
-   Racetime di bawahnya). Penting khusus DRR krn race simultan antar
-   Initial & antar kategori, operator perlu respons cepat pindah kategori
-   tanpa kehilangan pantauan Racetime. */
-.drr-sticky-bar {
-  position: fixed;
-  top: var(--nav-h, 64px);
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: #fff;
-  padding: 10px 3rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
+/* Bar "Switch DRR Category" + kontrol Connect Racetime: positioning
+   (position:fixed) & styling sekarang didefinisikan SEKALI secara global
+   di race-category-stickybar.css sbg `.race-sticky-bar` (lihat main.js) —
+   dipakai bersama SEMUA 5 halaman Race Category Details. `ref="stickyBar"`
+   di template tetap dipakai raceStickyBarMixin. */
 
 .racetime-header {
   display: flex;
@@ -3965,46 +3939,8 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-.switch-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #2b3445;
-}
-
-/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn Switch
-   Sprint/Slalom Category */
-.init-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f1f3f7;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.init-tab {
-  border: none;
-  background: transparent;
-  color: #2b3445;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-}
-
-.init-tab:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
-}
-
-.init-tab.active {
-  background: rgb(54, 142, 180);
-  color: #fff;
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-/* ---- End styling utk Switch DRR Category select ---- */
+/* Switch DRR Category (.switch-label/.init-tabs/.init-tab) sekarang
+   didefinisikan global di race-category-stickybar.css. */
 
 .drr-actionbar {
   display: flex;
@@ -4103,40 +4039,8 @@ export default {
   color: #ffffff;
 }
 
-/* Connect/Disconnect: .btn-action's white background above wins by default
-   over Bootstrap's .btn-success/.btn-danger (equal specificity, .btn-action
-   declared later) — these overrides use an extra class to win instead. */
-.btn-connect {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-.btn-connect.btn-success {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.btn-connect.btn-success:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
-}
-.btn-connect.btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
-.btn-connect.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-.btn-connect:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+/* .btn-connect sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 .detail-hero {
   position: relative;
@@ -4224,22 +4128,6 @@ td {
   border: none;
 }
 
-/* port */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 0;
-  transition: background-color 0.3s;
-}
-.connected {
-  background: rgb(0, 255, 0);
-}
-.disconnected {
-  background: red;
-}
-
 .large-bold {
   font-size: 1.2rem;
   font-weight: bold;
@@ -4301,96 +4189,9 @@ td {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-/* PATH  */
-.controls-bar {
-  gap: 10px;
-}
-
-/* Pill path */
-.path-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 520px; /* sesuaikan */
-  background: #fff;
-  color: #0f172a;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.path-pill--empty {
-  color: #64748b;
-  background: #f8fafc;
-  border-color: #e5e7eb;
-}
-.path-pill .truncate {
-  display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Meta Panel  */
-.meta-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #eef2f7;
-}
-.meta-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.meta-label {
-  min-width: 120px; /* lebar label tetap */
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
-  font-style: italic;
-}
-.meta-value {
-  font-weight: 600;
-  color: #0f172a; /* slate-900 */
-}
-.badge-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-}
-.badge-chip--blue {
-  background: #eef6ff;
-  color: rgb(0, 180, 255);
-  border-color: #dbeafe;
-}
-
-/* Responsif: di layar kecil, label di atas value */
-@media (max-width: 575.98px) {
-  .meta-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px 0;
-  }
-  .meta-label {
-    min-width: auto;
-  }
-  .meta-panel {
-    padding: 12px;
-  }
-}
+/* .controls-bar/.path-pill/.meta-panel/.meta-row/.meta-label/.meta-value/
+   .badge-chip (+ responsive) sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 /* === NEW: Styling area preview JSON (TAMBAHAN) === */
 .json-scroll {

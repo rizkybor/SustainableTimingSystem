@@ -72,9 +72,19 @@
       </b-container>
     </section>
 
-    <!-- SUBHEADER -->
+    <!-- SUBHEADER: Switch Head to Head Category + kontrol Connect Racetime
+         — sticky (baru position:fixed saat di-scroll, lihat .race-sticky-bar di race-category-
+         stickybar.css), sama pola dgn Sprint/Slalom/DRR/Rafting Cross (atas
+         permintaan user 2026-10-05: dipakai seragam di SEMUA 5 halaman
+         Race Category Details). `ref="stickyBar"` dipakai raceStickyBarMixin
+         di mounted() utk mengukur tinggi spacer di bawahnya. -->
     <div class="px-4">
-      <div class="card-body">
+      <div ref="stickySentinel"></div>
+      <div
+        class="card-body race-sticky-bar"
+        :class="{ 'is-stuck': isBarStuck }"
+        ref="stickyBar"
+      >
         <b-row>
           <b-col>
             <div class="meta-panel">
@@ -212,6 +222,10 @@
         </b-row>
       </div>
     </div>
+    <!-- Spacer: hanya terisi saat bar sedang menempel (`is-stuck`, position:
+         fixed) supaya konten di bawahnya tidak loncat/ketutupan. Lihat
+         raceStickyBarMixin.js. -->
+    <div :style="{ height: stickySpacerHeight + 'px' }"></div>
 
     <!-- BRACKET -->
     <div class="px-5 mt-2 mb-4">
@@ -1628,6 +1642,7 @@ import tone from "../../../assets/tone/tone_message.mp3";
 import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
+import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
 import PhotofinishBadge from "@/components/photofinish/PhotofinishBadge.vue";
 import H2HGoToHeat from "@/components/race/H2HGoToHeat.vue";
@@ -1786,7 +1801,12 @@ export default {
     FoulsReportModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, photofinishMixin],
+  mixins: [
+    teamFlagMixin,
+    serialPortMixin,
+    photofinishMixin,
+    raceStickyBarMixin,
+  ],
   data() {
     return {
       connectionState,
@@ -8336,45 +8356,8 @@ export default {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-.switch-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #2b3445;
-}
-
-/* Tab pilih Initial (Youth/Junior/Open dll) — gaya sama dgn halaman Details/Sprint */
-.init-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f1f3f7;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.init-tab {
-  border: none;
-  background: transparent;
-  color: #2b3445;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-}
-
-.init-tab:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
-}
-
-.init-tab.active {
-  background: rgb(54, 142, 180);
-  color: #fff;
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
-/* ---- End styling utk Switch DRR Category select ---- */
+/* Switch Head to Head Category (.switch-label/.init-tabs/.init-tab)
+   sekarang didefinisikan global di race-category-stickybar.css. */
 
 .btn-action {
   background: #ffffff;
@@ -8539,40 +8522,8 @@ tr.h2h-goto-hit > td:first-child {
   background: #163c61;
 }
 
-/* Connect/Disconnect: .btn-action's white background above wins by default
-   over Bootstrap's .btn-success/.btn-danger (equal specificity, .btn-action
-   declared later) — these overrides use an extra class to win instead. */
-.btn-connect {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-.btn-connect.btn-success {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.btn-connect.btn-success:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
-}
-.btn-connect.btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
-.btn-connect.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-.btn-connect:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+/* .btn-connect sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 .btn-action-racetime {
   background: #ffffff;
@@ -8737,21 +8688,8 @@ td {
   box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
 }
 
-/* ===== PORT STATUS ===== */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 0;
-  transition: background-color 0.3s;
-}
-.connected {
-  background: rgb(0, 255, 0);
-}
-.disconnected {
-  background: red;
-}
+/* .status-indicator/.connected/.disconnected sekarang didefinisikan
+   global di race-category-stickybar.css. */
 
 /* ===== BRACKET (refined) ===== */
 .bracket {
@@ -9468,96 +9406,9 @@ thead th[colspan="8"] {
   background-color: #343a40; /* hitam */
 }
 
-/* PATH  */
-.controls-bar {
-  gap: 10px;
-}
-
-/* Pill path */
-.path-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 520px; /* sesuaikan */
-  background: #fff;
-  color: #0f172a;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.path-pill--empty {
-  color: #64748b;
-  background: #f8fafc;
-  border-color: #e5e7eb;
-}
-.path-pill .truncate {
-  display: inline-block;
-  max-width: 460px; /* = max-width pill - padding + ikon */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Meta Panel  */
-.meta-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #eef2f7;
-}
-.meta-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.meta-label {
-  min-width: 120px; /* lebar label tetap */
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #334155; /* slate-700 */
-  font-style: italic;
-}
-.meta-value {
-  font-weight: 600;
-  color: #0f172a; /* slate-900 */
-}
-.badge-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-}
-.badge-chip--blue {
-  background: #eef6ff;
-  color: rgb(0, 180, 255);
-  border-color: #dbeafe;
-}
-
-/* Responsif: di layar kecil, label di atas value */
-@media (max-width: 575.98px) {
-  .meta-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px 0;
-  }
-  .meta-label {
-    min-width: auto;
-  }
-  .meta-panel {
-    padding: 12px;
-  }
-}
+/* .controls-bar/.path-pill/.meta-panel/.meta-row/.meta-label/.meta-value/
+   .badge-chip (+ responsive) sekarang didefinisikan global di
+   race-category-stickybar.css. */
 
 .bracket-hidden-info {
   display: flex;

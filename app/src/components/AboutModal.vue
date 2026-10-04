@@ -118,6 +118,35 @@
           resmi dari aplikasi ini bisa dipantau live di sana.
         </p>
       </div>
+
+      <!-- STS PHOTO FINISH CONNECTION -->
+      <div class="about-section">
+        <div class="about-section__title">Keterhubungan dengan STS Photo Finish</div>
+        <p class="about-text">
+          Bila dikonfigurasi, aplikasi ini terhubung ke <strong>STS Photo
+          Finish</strong> — sistem kamera garis finish yang memverifikasi
+          urutan & waktu finish dari rekaman video. Sinyal finish dari
+          RaceTime2 dikirim ke sana secara real-time, dan hasil yang sudah
+          diverifikasi kamera diterapkan otomatis ke Finish Time tim terkait
+          di halaman race (Head to Head, Rafting Cross, Down River Race).
+          Jam RaceTime2 (kalibrasi) juga disinkronkan dua arah dengan Photo
+          Finish, jadi keduanya selalu memakai acuan waktu yang sama.
+        </p>
+      </div>
+
+      <!-- STS LONG RANGE START CONNECTION -->
+      <div class="about-section">
+        <div class="about-section__title">Keterhubungan dengan STS Long Range Start</div>
+        <p class="about-text">
+          Bila dikonfigurasi, aplikasi ini terhubung ke <strong>STS Long
+          Range Start</strong> — sistem start jarak jauh (pistol start PS-77)
+          untuk garis start yang berada jauh dari garis finish/RaceTime2.
+          Waktu start yang dikirim dari sana otomatis masuk ke
+          Buffer-Timer-Start, dikonversi ke jam RaceTime2 memakai kalibrasi
+          jam yang sama dengan Photo Finish — supaya waktu start & finish
+          tetap konsisten walau dicatat dari dua lokasi berbeda.
+        </p>
+      </div>
     </div>
   </b-modal>
 </template>

@@ -14,6 +14,7 @@ import 'bootstrap-vue/dist/bootstrap-vue.css'
 import '@/assets/styles/admin-pages.css'
 import '@/assets/styles/race-category-stickybar.css'
 import '@/assets/styles/race-category-toolbar.css'
+import '@/assets/styles/list-pages.css'
 
 import BootstrapVue from 'bootstrap-vue'
 

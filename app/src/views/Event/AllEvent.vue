@@ -1,300 +1,222 @@
 <template>
-  <div class="mt-5">
-    <b-row>
-      <b-col cols="10" offset="1" class="mb-4">
-        <div class="card-wrapper p-3 mb-2">
-          <!-- TOP BAR (breadcrumb + datetime) -->
-          <div
-            class="d-flex align-items-center justify-content-between text-muted small"
-          >
-            <b-breadcrumb class="mb-0">
-              <b-breadcrumb-item to="/">
-                <Icon icon="mdi:home-outline" class="mr-1" />
-                Dashboard
-              </b-breadcrumb-item>
-              <b-breadcrumb-item active>
-                {{ $route.params.pageTitle || "List Event" }}
-              </b-breadcrumb-item>
-            </b-breadcrumb>
-            <div>{{ currentDateTime }}</div>
-          </div>
+  <div class="list-page">
+    <PageHero
+      title="All Events"
+      crumb="All Events"
+      icon="mdi:calendar-multiple"
+      subtitle="Kelola daftar event, level, tanggal, status, dan aksi"
+      :stats="[
+        { label: 'Total Events', value: normalizedEvents.length },
+        { label: 'Active', value: activeEventCount, tone: 'success' },
+        { label: 'Inactive', value: inactiveEventCount, tone: 'warning' },
+      ]"
+    >
+      <template #actions>
+        <button type="button" class="ph-btn ph-btn--primary" @click="goTo('create-new')">
+          <Icon icon="mdi:plus" />
+          Create New Event
+        </button>
+      </template>
+    </PageHero>
+
+    <div class="lp-card">
+      <!-- TOOLBAR -->
+      <div class="lp-toolbar">
+        <div class="lp-search">
+          <Icon icon="mdi:magnify" class="lp-search__icon" />
+          <input
+            v-model="query"
+            type="text"
+            class="lp-search__input"
+            placeholder="Cari nama event, level, atau tanggal…"
+          />
+          <button v-if="query" type="button" class="lp-search__clear" @click="query = ''">
+            <Icon icon="mdi:close" />
+          </button>
         </div>
 
-        <!-- HEADER -->
-        <div
-          class="card-wrapper mt-1"
-          style="
-            padding-left: 45px;
-            padding-right: 45px;
-            padding-bottom: 45px;
-            padding-top: 25px;
-          "
+        <div class="lp-filters">
+          <div class="lp-select">
+            <Icon icon="mdi:filter-variant" class="lp-select__icon" />
+            <select v-model="levelFilter" class="lp-select__input">
+              <option v-for="o in levelOptionsUI" :key="o.value" :value="o.value">
+                {{ o.value ? o.text : "Semua level" }}
+              </option>
+            </select>
+            <Icon icon="mdi:chevron-down" class="lp-select__chev" />
+          </div>
+
+          <div class="lp-segment" role="group" aria-label="Filter status">
+            <button
+              v-for="opt in statusSegments"
+              :key="opt.value"
+              type="button"
+              class="lp-segment__btn"
+              :class="{ active: statusFilter === opt.value }"
+              @click="statusFilter = opt.value"
+            >
+              {{ opt.text }}
+              <span class="lp-segment__count">{{ opt.count }}</span>
+            </button>
+          </div>
+
+          <button
+            v-if="query || levelFilter || statusFilter"
+            type="button"
+            class="lp-reset"
+            @click="resetFilters"
+          >
+            <Icon icon="mdi:filter-remove-outline" />
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-responsive lp-table-wrap">
+        <b-table
+          hover
+          :items="filteredEvents"
+          :fields="fields"
+          :per-page="perPage"
+          :current-page="currentPage"
+          class="lp-table mb-0"
+          show-empty
+          empty-text=""
+          responsive="md"
+          :busy="loading"
         >
-          <div
-            @click="goBack"
-            class="btn-custom d-flex align-items-center mb-3"
-          >
-            <Icon icon="mdi:chevron-left" class="mr-1" />
-            <span>Back</span>
-          </div>
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div>
-              <h2 class="page-title mb-1">All Events</h2>
-              <p class="page-subtitle mb-0">
-                Kelola daftar event, level, tanggal, status, dan aksi
-              </p>
+          <template #table-busy>
+            <div class="text-center my-4 text-muted">
+              <b-spinner small class="mr-2" /> Loading events…
             </div>
-            <div class="d-flex align-items-center">
-              <b-button
-                style="border-radius: 12px"
-                variant="outline-info"
-                class="w-100"
-                @click="goTo('create-new')"
-              >
-                <Icon icon="mdi:plus" width="18" height="18" />
-                Create New Event
-              </b-button>
-            </div>
-          </div>
+          </template>
 
-          <!-- STAT SUMMARY -->
-          <div class="stat-strip">
-            <div class="stat-card">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:calendar-multiple" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ normalizedEvents.length }}</div>
-                <div class="stat-card__label">Total Events</div>
-              </div>
+          <template #empty>
+            <div class="lp-empty">
+              <Icon icon="mdi:calendar-blank-outline" width="40" height="40" />
+              <div class="lp-empty__title">Event tidak ditemukan</div>
+              <small>Coba ubah pencarian/filter, atau buat event baru.</small>
             </div>
-            <div class="stat-card stat-card--success">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:calendar-check-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ activeEventCount }}</div>
-                <div class="stat-card__label">Active</div>
-              </div>
-            </div>
-            <div class="stat-card stat-card--warning">
-              <div class="stat-card__icon">
-                <Icon icon="mdi:calendar-remove-outline" />
-              </div>
-              <div>
-                <div class="stat-card__value">{{ inactiveEventCount }}</div>
-                <div class="stat-card__label">Inactive</div>
-              </div>
-            </div>
-          </div>
+          </template>
 
-          <!-- TOOLBAR: Search (pojok kiri) + Filters (pojok kanan) — satu
-               baris, sejajar. Filter by Event & Filter by Status
-               bersebelahan di grup kanan (margin-left:auto, BUKAN
-               justify-content-between, supaya kalau window sempit & baris
-               ke-wrap, grup filter tetap nempel kanan — bukan malah balik
-               ke kiri krn cuma sendirian di barisnya). -->
-          <div
-            class="d-flex align-items-center flex-wrap pt-3 pb-1"
-            style="gap: 12px"
-          >
-            <!-- Search -->
-            <b-input-group class="input-group-soft" style="max-width: 320px">
-              <template #prepend>
-                <span class="input-icon-left">
-                  <Icon icon="mdi:magnify" />
-                </span>
-              </template>
-              <b-form-input
-                v-model="query"
-                placeholder="Search event name, level, date…"
-                class="no-border-input"
-              />
-            </b-input-group>
+          <template #cell(no)="row">
+            <span class="lp-muted">
+              {{ (currentPage - 1) * perPage + row.index + 1 }}
+            </span>
+          </template>
 
+          <!-- Event: poster + nama (klik = buka detail) + lokasi -->
+          <template #cell(name)="row">
             <div
-              class="d-flex align-items-center flex-nowrap ml-auto"
-              style="gap: 12px"
+              class="lp-event"
+              :class="{ 'lp-event--disabled': row.item.status !== 'activated' }"
+              :title="row.item.status !== 'activated' ? 'Event inactive — aktifkan dulu utk membuka detail' : 'Buka detail event'"
+              @click="openEvent(row.item)"
             >
-              <!-- Filter Level -->
-              <b-input-group class="input-group-soft" style="max-width: 220px">
-                <template #prepend>
-                  <span class="input-icon-left">
-                    <Icon icon="mdi:filter-variant" />
-                  </span>
-                </template>
-                <b-form-select
-                  v-model="levelFilter"
-                  :options="levelOptionsUI"
-                  class="no-border-select"
-                />
-                <template #append>
-                  <span class="input-icon-right">
-                    <Icon icon="mdi:chevron-down" />
-                  </span>
-                </template>
-              </b-input-group>
-
-              <!-- Filter Status -->
-              <b-input-group class="input-group-soft" style="max-width: 220px">
-                <template #prepend>
-                  <span class="input-icon-left">
-                    <Icon icon="mdi:filter-variant" />
-                  </span>
-                </template>
-                <b-form-select
-                  v-model="statusFilter"
-                  :options="statusOptionsUI"
-                  class="no-border-select"
-                />
-                <template #append>
-                  <span class="input-icon-right">
-                    <Icon icon="mdi:chevron-down" />
-                  </span>
-                </template>
-              </b-input-group>
-
-              <b-button
-                v-if="query || levelFilter || statusFilter"
-                size="sm"
-                variant="outline-secondary"
-                style="border-radius: 12px"
-                @click="resetFilters"
-              >
-                Reset
-              </b-button>
-            </div>
-          </div>
-
-          <!-- TABLE WRAPPER -->
-          <div class="table-responsive mt-3 px-3 pb-3 table-rounded-wrapper">
-            <b-table
-              striped
-              hover
-              small
-              head-variant="light"
-              :items="filteredEvents"
-              :fields="fields"
-              :per-page="perPage"
-              :current-page="currentPage"
-              class="um-table mt-3"
-              show-empty
-              empty-text=""
-              responsive="md"
-              :busy="loading"
-            >
-              <template #table-busy>
-                <div class="text-center my-3">
-                  <b-spinner small class="mr-2" /> Loading events…
-                </div>
-              </template>
-
-              <template #empty>
-                <div class="stx-empty-state">
-                  <Icon icon="mdi:calendar-blank-outline" width="40" height="40" />
-                  <div>No event data found</div>
-                  <small
-                    >Try adjusting your search/filter or create a new
-                    event.</small
-                  >
-                </div>
-              </template>
-
-              <!-- Kolom No -->
-              <template #cell(no)="row">
-                <span class="text-muted">
-                  {{ (currentPage - 1) * perPage + row.index + 1 }}
-                </span>
-              </template>
-
-              <!-- Status Pill -->
-              <template #cell(status)="row">
-                <span
-                  v-if="row.item && row.item.status === 'inactive'"
-                  class="status-pill status-upcoming"
-                >
-                  <span class="dot"></span> Inactive
-                </span>
-                <span v-else class="status-pill status-success">
-                  <span class="dot"></span> Active
-                </span>
-              </template>
-
-              <!-- Actions -->
-              <template #cell(actions)="row">
-                <div class="d-flex align-items-center justify-content-center" style="gap: 8px">
-                  <b-form-checkbox
-                    switch
-                    size="lg"
-                    :checked="row.item.status === 'activated'"
-                    :disabled="togglingId === String(row.item._id)"
-                    :title="row.item.status === 'activated' ? 'Klik utk set Inactive' : 'Klik utk set Active'"
-                    @change="toggleEventStatus(row.item)"
-                  />
-                  <b-button
-                    size="sm"
-                    variant="outline-danger"
-                    class="btn-icon"
-                    @click="confirmDeleteEvent(row.item)"
-                  >
-                    <Icon icon="mdi:delete" width="16" height="16" />
-                  </b-button>
-                </div>
-              </template>
-            </b-table>
-
-            <!-- PAGINATION (real, sejajar) -->
-            <div
-              class="d-flex align-items-center justify-content-between mt-3 px-2 flex-wrap"
-              style="gap: 12px"
-            >
-              <!-- kiri: jumlah row ditampilkan -->
-              <small class="text-muted">
-                {{ filteredEvents.length === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
-                {{ Math.min(currentPage * perPage, filteredEvents.length) }}
-                of {{ filteredEvents.length }} events
-              </small>
-
-              <!-- tengah: pagination -->
-              <b-pagination
-                v-model="currentPage"
-                :total-rows="filteredEvents.length"
-                :per-page="perPage"
-                align="center"
-                size="md"
-                class="custom-pagination mb-0"
-                first-number
-                last-number
+              <img
+                :src="posterSrc(row.item) || defaultImg"
+                alt=""
+                class="lp-event__thumb"
+                @error="onPosterError"
               />
-
-              <!-- kanan: select rows per page -->
-              <div class="d-flex align-items-center">
-                <span class="mr-2 text-muted">Rows per page</span>
-                <b-form-select
-                  v-model.number="perPage"
-                  :options="[10, 20, 50]"
-                  class="input-soft no-border-select"
-                  style="width: 110px; border-radius: 12px"
-                />
+              <div class="lp-event__text">
+                <div class="lp-event__name">{{ row.item.name }}</div>
+                <div class="lp-event__loc">
+                  <Icon icon="mdi:map-marker-outline" />
+                  {{ eventLocation(row.item) }}
+                </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <template #cell(level)="row">
+            <span v-if="row.item.level" class="lp-chip">{{ row.item.level }}</span>
+            <span v-else class="lp-muted">-</span>
+          </template>
+
+          <template #cell(date)="row">
+            <span class="lp-date">
+              <Icon icon="mdi:calendar-blank-outline" />
+              {{ row.item.date || "-" }}
+            </span>
+          </template>
+
+          <template #cell(status)="row">
+            <span v-if="row.item.status === 'inactive'" class="lp-status lp-status--off">
+              <span class="lp-status__dot"></span> Inactive
+            </span>
+            <span v-else class="lp-status lp-status--on">
+              <span class="lp-status__dot"></span> Active
+            </span>
+          </template>
+
+          <template #cell(actions)="row">
+            <div class="lp-actions">
+              <b-form-checkbox
+                switch
+                size="lg"
+                :checked="row.item.status === 'activated'"
+                :disabled="togglingId === String(row.item._id)"
+                :title="row.item.status === 'activated' ? 'Klik utk set Inactive' : 'Klik utk set Active'"
+                @change="toggleEventStatus(row.item)"
+              />
+              <button
+                type="button"
+                class="lp-icon-btn lp-icon-btn--danger"
+                title="Hapus event"
+                @click="confirmDeleteEvent(row.item)"
+              >
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
+            </div>
+          </template>
+        </b-table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="lp-footer">
+        <small class="lp-muted">
+          {{ filteredEvents.length === 0 ? 0 : (currentPage - 1) * perPage + 1 }} –
+          {{ Math.min(currentPage * perPage, filteredEvents.length) }}
+          of {{ filteredEvents.length }} events
+        </small>
+
+        <b-pagination
+          v-model="currentPage"
+          :total-rows="filteredEvents.length"
+          :per-page="perPage"
+          align="center"
+          size="md"
+          class="custom-pagination mb-0"
+          first-number
+          last-number
+        />
+
+        <div class="lp-perpage">
+          <span class="lp-muted">Rows per page</span>
+          <select v-model.number="perPage" class="lp-perpage__select">
+            <option v-for="n in [10, 20, 50]" :key="n" :value="n">{{ n }}</option>
+          </select>
         </div>
-      </b-col>
-    </b-row>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
+import PageHero from "@/components/common/PageHero.vue";
+import defaultImg from "@/assets/images/default-first.jpeg";
 
 export default {
   name: "AllEvents",
-  components: { Icon },
+  components: { Icon, PageHero },
   data() {
     return {
       loading: false,
+      defaultImg,
       // _id (string) event yg lagi diproses toggle status-nya — dipakai
       // disable switch itu doang selama IPC round-trip, bukan seluruh tabel.
       togglingId: "",
@@ -342,6 +264,20 @@ export default {
 
   mounted() {
     this.getEvents(); // load saat halaman dibuka
+  },
+
+  watch: {
+    // Filter/pencarian berubah -> balik ke halaman 1 supaya hasil tidak
+    // "kosong" krn masih di halaman yg sudah tidak ada.
+    query() {
+      this.currentPage = 1;
+    },
+    levelFilter() {
+      this.currentPage = 1;
+    },
+    statusFilter() {
+      this.currentPage = 1;
+    },
   },
 
   computed: {
@@ -411,6 +347,14 @@ export default {
       return rows;
     },
 
+    // Tombol segmen filter status (value sama dgn statusFilter lama).
+    statusSegments() {
+      return [
+        { value: "", text: "Semua", count: this.normalizedEvents.length },
+        { value: "activated", text: "Active", count: this.activeEventCount },
+        { value: "inactive", text: "Inactive", count: this.inactiveEventCount },
+      ];
+    },
     activeEventCount() {
       return this.normalizedEvents.filter((e) => e.status === "activated")
         .length;
@@ -455,6 +399,37 @@ export default {
     goBack() {
       if (this.$router) this.$router.back();
       else this.$emit("back");
+    },
+
+    // Klik nama event -> detail (event inactive diblokir, sama dgn Home).
+    openEvent(item) {
+      if (!item || item.status !== "activated") return;
+      const id = item._id ? String(item._id) : "";
+      if (id) this.$router.push("/event-detail/" + id);
+    },
+    eventLocation(ev) {
+      const parts = [ev.riverName, ev.addressCity, ev.addressState]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+      return parts.length ? parts.join(" · ") : "Lokasi belum diisi";
+    },
+    // Sama dgn posterSrc() di Home.vue.
+    posterSrc(ev) {
+      if (!ev) return "";
+      if (ev.poster && ev.poster.secure_url) return String(ev.poster.secure_url);
+      if (ev.poster_url) return String(ev.poster_url);
+      const p = ev.poster || {};
+      const pub = p.public_id ? String(p.public_id) : "";
+      if (!pub) return "";
+      const ver = p.version !== undefined && p.version !== null ? "v" + p.version + "/" : "";
+      const ext = p.format ? "." + String(p.format) : "";
+      return "https://res.cloudinary.com/kikiaka/image/upload/" + ver + pub + ext;
+    },
+    onPosterError(e) {
+      if (e && e.target) {
+        e.target.onerror = null;
+        e.target.src = this.defaultImg;
+      }
     },
 
     resetFilters() {

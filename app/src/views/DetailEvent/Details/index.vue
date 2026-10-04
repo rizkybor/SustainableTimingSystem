@@ -884,11 +884,23 @@ export default {
       const enabled = Array.isArray(this.events && this.events.categoriesEvent)
         ? this.events.categoriesEvent
         : [];
-      const enabledKeys = new Set(
-        enabled.map((e) => String((e && e.name) || "").toUpperCase())
-      );
-      if (!enabledKeys.size) return this.raceCategories;
-      return this.raceCategories.filter((c) => enabledKeys.has(c.key));
+      // Urutan kartu MENGIKUTI urutan array categoriesEvent (Event
+      // Settings), bukan urutan tetap raceCategories — sama dgn urutan panel
+      // di Race/Judges Settings (lihat categoryOrder() di RaceSettings.vue).
+      const byKey = {};
+      this.raceCategories.forEach((c) => {
+        byKey[c.key] = c;
+      });
+      const seen = new Set();
+      const ordered = [];
+      enabled.forEach((e) => {
+        const key = String((e && e.name) || "").toUpperCase();
+        if (byKey[key] && !seen.has(key)) {
+          seen.add(key);
+          ordered.push(byKey[key]);
+        }
+      });
+      return ordered.length ? ordered : this.raceCategories;
     },
     // Kombinasi Division/Race yang aktif utk event ini (dari
     // DIVISION_RACE_COMBOS, difilter oleh showPanel) — satu-satunya sumber

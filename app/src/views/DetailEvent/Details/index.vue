@@ -66,166 +66,227 @@
             </div>
           </b-col>
 
-          <!-- Backup/Restore/Reset Data -->
-          <b-col cols="auto" class="ml-auto hero-actions d-flex flex-column align-items-stretch">
-            <b-button class="btn-race-settings mb-2" @click="openBackupModal">
-              <Icon icon="mdi:database-export-outline" class="mr-1" />
-              Backup Data
-            </b-button>
-
-            <b-button class="btn-race-settings mb-2" @click="openRestoreModal">
-              <Icon icon="mdi:database-import-outline" class="mr-1" />
-              Restore Data
-            </b-button>
-
-            <b-button
-              variant="outline-danger"
-              class="btn-race-reset"
-              @click="openResetDataModal"
-            >
-              Reset Data
-            </b-button>
-          </b-col>
         </b-row>
       </b-container>
     </section>
 
     <b-container class="mt-4 mb-5">
-      <div class="mb-2 d-flex justify-content-md-end">
-        <b-button class="btn-race-settings mr-2" @click="showTeamRosterModal = true">
-          <Icon icon="mdi:account-group-outline" class="mr-1" />
-          Team Roster
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="goToJudgeActivityHistory">
-          <Icon icon="mdi:history" class="mr-1" />
-          Judges Activity History
-        </b-button>
-
-        <b-button
-          class="btn-race-settings mr-2"
-          @click="goToEventOverallResult"
-        >
-          <Icon icon="mdi:trophy-outline" class="mr-1" />
-          Event Overall Result
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="openEventSettings">
-          Event Settings
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="openJudgeSettings">
-          Judges Settings
-        </b-button>
-
-        <b-button class="btn-race-settings mr-2" @click="openRaceSettings">
-          Race Settings
-        </b-button>
-      </div>
-
-      <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR/RAFTINGCROSS) -->
-      <h5 class="font-weight-bold mb-3">Race Categories</h5>
-      <b-row>
-        <b-col
-          cols="12"
-          md="3"
-          v-for="c in availableRaceCategories"
-          :key="c.key"
-          class="mb-3"
-        >
-          <div
-            class="race-card"
-            :class="{ active: raceActive.selected.name === c.key }"
-            @click="selectCategory(c)"
-          >
-            <div class="race-icon">
-              <!-- <Icon :icon="c.icon" width="28" height="28" /> -->
-              <img class="icon-event" :src="c.icon" width="60" height="60" />
-            </div>
-            <div class="h6 font-weight-bold mb-1 text-center">
-              {{ c.title }}
-            </div>
-            <small class="text-muted d-block text-center">{{ c.desc }}</small>
+      <!-- TOOLBAR: dua grup — akses cepat (lihat data) vs konfigurasi event -->
+      <div class="ev-toolbar">
+        <div class="ev-toolbar__group">
+          <span class="ev-toolbar__label">Quick Access</span>
+          <div class="ev-toolbar__buttons">
+            <b-button class="btn-race-settings" @click="showTeamRosterModal = true">
+              <Icon icon="mdi:account-group-outline" class="mr-1" />
+              Team Roster
+            </b-button>
+            <b-button class="btn-race-settings" @click="goToJudgeActivityHistory">
+              <Icon icon="mdi:history" class="mr-1" />
+              Judges Activity History
+            </b-button>
+            <b-button class="btn-race-settings" @click="goToEventOverallResult">
+              <Icon icon="mdi:trophy-outline" class="mr-1" />
+              Event Overall Result
+            </b-button>
           </div>
-        </b-col>
-      </b-row>
+        </div>
 
-      <!-- INITIAL TABS (Youth/Junior/Open dlsb) -->
-      <h5 class="font-weight-bold mb-3 mt-4">Initials Category</h5>
-      <div class="init-tabs" v-if="(events.categoriesInitial || []).length">
-        <button
-          v-for="i in events.categoriesInitial"
-          :key="i.name"
-          type="button"
-          class="init-tab"
-          :class="{ active: initialActive.selected.name === i.name }"
-          @click="selectInitial(i)"
+        <div class="ev-toolbar__group">
+          <span class="ev-toolbar__label">Configuration</span>
+          <div class="ev-toolbar__buttons">
+            <b-button class="btn-race-settings" @click="openEventSettings">
+              <Icon icon="mdi:calendar-edit-outline" class="mr-1" />
+              Event Settings
+            </b-button>
+            <b-button class="btn-race-settings" @click="openJudgeSettings">
+              <Icon icon="mdi:gavel" class="mr-1" />
+              Judges Settings
+            </b-button>
+            <b-button class="btn-race-settings" @click="openRaceSettings">
+              <Icon icon="mdi:cog-outline" class="mr-1" />
+              Race Settings
+            </b-button>
+
+            <!-- Data event: Backup/Restore/Reset -->
+            <span class="ev-toolbar__sep" aria-hidden="true"></span>
+            <b-button class="btn-race-settings" @click="openBackupModal">
+              <Icon icon="mdi:database-export-outline" class="mr-1" />
+              Backup Data
+            </b-button>
+            <b-button class="btn-race-settings" @click="openRestoreModal">
+              <Icon icon="mdi:database-import-outline" class="mr-1" />
+              Restore Data
+            </b-button>
+            <b-button
+              variant="outline-danger"
+              class="btn-race-reset"
+              @click="openResetDataModal"
+            >
+              <Icon icon="mdi:database-remove-outline" class="mr-1" />
+              Reset Data
+            </b-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pilih Race Category + Initial Category -->
+      <div class="ev-section">
+        <div class="ev-section__head">
+          <div>
+            <h5 class="ev-section__title">Race Categories</h5>
+            <div class="ev-section__sub">Pilih nomor lomba yang akan dikelola</div>
+          </div>
+        </div>
+
+        <!-- CATEGORIES (klik untuk ganti eventName: SPRINT/H2H/SLALOM/DRR/RAFTINGCROSS) -->
+        <b-row>
+          <b-col
+            cols="12"
+            sm="6"
+            lg="3"
+            v-for="c in availableRaceCategories"
+            :key="c.key"
+            class="mb-3"
+          >
+            <div
+              class="race-card"
+              :class="{ active: raceActive.selected.name === c.key }"
+              @click="selectCategory(c)"
+            >
+              <Icon
+                v-if="raceActive.selected.name === c.key"
+                icon="mdi:check-circle"
+                class="race-card__check"
+                width="20"
+                height="20"
+              />
+              <div class="race-icon">
+                <img class="icon-event" :src="c.icon" width="60" height="60" />
+              </div>
+              <div class="h6 font-weight-bold mb-1 text-center">
+                {{ c.title }}
+              </div>
+              <small class="text-muted d-block text-center">{{ c.desc }}</small>
+            </div>
+          </b-col>
+        </b-row>
+
+        <div class="ev-section__divider"></div>
+
+        <div class="ev-section__head">
+          <div>
+            <h5 class="ev-section__title">Initials Category</h5>
+            <div class="ev-section__sub">Kelompok umur / kelas peserta</div>
+          </div>
+        </div>
+
+        <!-- INITIAL TABS (Youth/Junior/Open dlsb) -->
+        <div class="init-tabs" v-if="(events.categoriesInitial || []).length">
+          <button
+            v-for="i in events.categoriesInitial"
+            :key="i.name"
+            type="button"
+            class="init-tab"
+            :class="{ active: initialActive.selected.name === i.name }"
+            @click="selectInitial(i)"
+          >
+            {{ i.name }}
+          </button>
+        </div>
+        <div v-else class="text-muted small">
+          Belum ada Initial Category untuk event ini.
+        </div>
+
+        <div class="ev-section__divider"></div>
+
+        <!-- Registered Teams -->
+        <div class="ev-section__head ev-section__head--teams">
+          <div class="flex-grow-1">
+            <h5 class="ev-section__title">
+              Registered Teams – {{ activeCategoryTitle }} Category
+            </h5>
+            <div class="ev-section__sub">
+              Atur tim per divisi/race sebelum memulai lomba
+            </div>
+          </div>
+          <div class="ev-summary">
+            <span class="ev-chip">{{ activeCategoryTitle }}</span>
+            <span v-if="initialActive.selected.name" class="ev-chip">
+              {{ initialActive.selected.name }}
+            </span>
+            <span class="ev-chip ev-chip--count">
+              <Icon icon="mdi:account-multiple-outline" class="mr-1" />
+              {{ totalRegisteredTeamsForActiveCategory }} tim
+            </span>
+          </div>
+        </div>
+  
+        <!-- PANELS -->
+        <team-panel
+          v-for="(combo, comboIdx) in visibleDivisionRaceCombos"
+          :key="combo.panelKey"
+          :class="comboIdx === 0 ? 'mt-2' : 'mt-4'"
+          :title="combo.title"
+          :division="combo.division"
+          :race="combo.race"
+          :event-name="raceActive.selected.name"
+          :initial-name="initialActive.selected.name"
+          :default-collapsed="comboIdx !== 0"
+          :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
+          :teams-available="availableFor(combo.division, combo.race)"
+          :competed-set="competedSetFor(combo.panelKey)"
+          :h2h-status-map="h2hStatusFor(combo.panelKey)"
+          :slalom-status-map="slalomStatusFor(combo.panelKey)"
+          :draft="draftMap[combo.panelKey]"
+          :loading="loadingByPanel[combo.panelKey]"
+          @add-draft="addDraft(combo.division, combo.race)"
+          @draft-change="onDraftChange(combo.division, combo.race, $event)"
+          @draft-save="saveDraft(combo.division, combo.race)"
+          @draft-cancel="cancelDraft(combo.division, combo.race)"
+          @delete-row="deleteRow(combo.division, combo.race, $event)"
+          @start-race="handleStartRace"
+          @show-result="showResult(combo.division, combo.race)"
+        />
+
+
+        <div v-if="!visibleDivisionRaceCombos.length" class="ev-empty">
+          <Icon icon="mdi:table-off" width="32" height="32" class="mb-2" />
+          <div>Belum ada konfigurasi divisi/race untuk event ini.</div>
+        </div>
+  
+        <!-- Peringatan: H2H butuh minimal 3 tim terdaftar sebelum di-start -->
+        <b-alert
+          :show="showH2HMinTeamsWarning"
+          variant="danger"
+          class="mt-4 mb-0 d-flex align-items-center"
         >
-          {{ i.name }}
-        </button>
+          <Icon icon="mdi:alert-octagon-outline" width="20" height="20" class="mr-2" />
+          <span>
+            Minimal <strong>3 tim</strong> harus ter-assign di tabel Registered
+            Teams – HEAD2HEAD Category sebelum memulai race. Saat ini baru
+            <strong>{{ totalRegisteredTeamsForActiveCategory }} tim</strong>
+            terdaftar.
+          </span>
+        </b-alert>
       </div>
 
-      <!-- TITLE -->
-      <div class="d-flex align-items-center justify-content-between mt-5 mb-2">
-        <h5 class="font-weight-bold mb-0">
-          Registered Teams – {{ raceActive.selected.name }} Category
-        </h5>
-      </div>
 
-      <!-- PANELS -->
-      <team-panel
-        v-for="(combo, comboIdx) in visibleDivisionRaceCombos"
-        :key="combo.panelKey"
-        :class="comboIdx === 0 ? 'mt-2' : 'mt-4'"
-        :title="combo.title"
-        :division="combo.division"
-        :race="combo.race"
-        :event-name="raceActive.selected.name"
-        :initial-name="initialActive.selected.name"
-        :default-collapsed="comboIdx !== 0"
-        :rows="getTeamsBy(combo.division, combo.race, raceActive.selected.name)"
-        :teams-available="availableFor(combo.division, combo.race)"
-        :competed-set="competedSetFor(combo.panelKey)"
-        :h2h-status-map="h2hStatusFor(combo.panelKey)"
-        :slalom-status-map="slalomStatusFor(combo.panelKey)"
-        :draft="draftMap[combo.panelKey]"
-        :loading="loadingByPanel[combo.panelKey]"
-        @add-draft="addDraft(combo.division, combo.race)"
-        @draft-change="onDraftChange(combo.division, combo.race, $event)"
-        @draft-save="saveDraft(combo.division, combo.race)"
-        @draft-cancel="cancelDraft(combo.division, combo.race)"
-        @delete-row="deleteRow(combo.division, combo.race, $event)"
-        @start-race="handleStartRace"
-        @show-result="showResult(combo.division, combo.race)"
-      />
 
-      <div v-if="!visibleDivisionRaceCombos.length" class="text-center text-muted py-5">
-        Belum ada konfigurasi divisi/race untuk event ini.
-      </div>
-
-      <!-- Peringatan: H2H butuh minimal 3 tim terdaftar sebelum di-start -->
-      <b-alert
-        :show="showH2HMinTeamsWarning"
-        variant="danger"
-        class="mt-4 mb-0 d-flex align-items-center"
-      >
-        <Icon icon="mdi:alert-octagon-outline" width="20" height="20" class="mr-2" />
-        <span>
-          Minimal <strong>3 tim</strong> harus ter-assign di tabel Registered
-          Teams – HEAD2HEAD Category sebelum memulai race. Saat ini baru
-          <strong>{{ totalRegisteredTeamsForActiveCategory }} tim</strong>
-          terdaftar.
-        </span>
-      </b-alert>
-
-      <div class="d-flex align-items-center justify-content-end mt-5 mb-2">
-        <b-button
-          variant="primary"
-          class="btn-add"
-          @click="handleStartRaceAll()"
-        >
+      <!-- ACTION BAR: ringkasan + START -->
+      <div class="ev-actionbar">
+        <div class="ev-actionbar__info">
+          <div class="ev-actionbar__title">Siap memulai lomba?</div>
+          <div class="ev-actionbar__sub">
+            {{ totalRegisteredTeamsForActiveCategory }} tim terdaftar di
+            <strong>{{ activeCategoryTitle }}</strong>
+            <template v-if="initialActive.selected.name">
+              · {{ initialActive.selected.name }}
+            </template>
+          </div>
+        </div>
+        <b-button class="btn-add" @click="handleStartRaceAll()">
           <Icon icon="mdi:flag-variant" class="mr-2" />
-          START {{ this.raceActive.selected.name }} RACE
+          START {{ raceActive.selected.name }} RACE
         </b-button>
       </div>
     </b-container>
@@ -755,6 +816,13 @@ export default {
       return this.events && this.events.eventName ? this.events.eventName : "";
     },
 
+    // Nama tampilan kategori aktif (mis. "Head to Head", bukan "HEAD2HEAD")
+    // utk judul/ringkasan Registered Teams.
+    activeCategoryTitle() {
+      const key = this.raceActive.selected.name;
+      const found = this.raceCategories.find((c) => c.key === key);
+      return found ? found.title : key || "-";
+    },
     // hanya tampilkan kartu kategori yang aktif di categoriesEvent event ini
     availableRaceCategories() {
       const enabled = Array.isArray(this.events && this.events.categoriesEvent)
@@ -3163,41 +3231,168 @@ export default {
   }
 }
 
-/* Backup/Restore/Reset Data di pojok kanan hero — wrap ke bawah kalau
-   sempit, jangan menempel judul event */
-.hero-actions {
+/* ===== TOOLBAR (Quick Access / Configuration) ===== */
+.ev-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px 24px;
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 22px rgba(15, 42, 67, 0.06);
+}
+.ev-toolbar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ev-toolbar__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.ev-toolbar__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ev-toolbar__sep {
+  width: 1px;
+  align-self: stretch;
+  background: #e2e8f0;
+  margin: 2px 4px;
+}
+
+/* ===== SECTION ===== */
+.ev-section {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 18px;
+  padding: 20px 22px 22px;
+  box-shadow: 0 8px 22px rgba(15, 42, 67, 0.06);
+}
+.ev-section__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ev-section__head--teams {
+  flex-wrap: wrap;
+  margin-top: 36px;
+  margin-bottom: 8px;
+}
+.ev-section__title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #0f172a;
+  margin: 0;
+}
+.ev-section__sub {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+.ev-section__divider {
+  height: 1px;
+  background: #eef2f7;
+  margin: 10px 0 20px;
+}
+
+
+.ev-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ev-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: linear-gradient(135deg, #eaf6ff, #e3f0ff);
+  color: #1c4c7a;
+  border: 1px solid #cfe4fb;
+}
+.ev-chip--count {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+.ev-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 40px 16px;
+  border: 1px dashed #dbe3ee;
+  border-radius: 16px;
+  background: #fafcff;
   margin-top: 8px;
 }
 
-@media (max-width: 991px) {
-  .hero-actions {
-    width: 100%;
-    align-items: stretch !important;
-    margin-top: 16px;
-  }
+/* ===== ACTION BAR (START) ===== */
+.ev-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 32px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f4f9ff 0%, #eef6ff 100%);
+  border: 1px solid #d9e8f8;
+}
+.ev-actionbar__title {
+  font-weight: 800;
+  color: #0f172a;
+}
+.ev-actionbar__sub {
+  font-size: 0.86rem;
+  color: #475569;
+  margin-top: 2px;
 }
 
-/* CARDS */
+/* ===== RACE CATEGORY CARDS ===== */
 .race-card {
+  position: relative;
   border: 1px solid #e6ebf4;
   border-radius: 16px;
   background: #fff;
   padding: 16px;
   height: 100%;
-  box-shadow: 0 12px 26px rgba(31, 56, 104, 0.08);
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  box-shadow: 0 6px 16px rgba(31, 56, 104, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    border-color 0.15s ease;
   cursor: pointer;
 }
 
 .race-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 16px 32px rgba(31, 56, 104, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(31, 56, 104, 0.12);
   border-color: #cdd9f0;
 }
 
 .race-card.active {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+  border-color: #25b0eb;
+  background: linear-gradient(180deg, #ffffff 0%, #f3faff 100%);
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.18),
+    0 12px 26px rgba(28, 76, 122, 0.14);
+}
+
+.race-card__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #25b0eb;
 }
 
 .race-icon {
@@ -3212,39 +3407,38 @@ export default {
   justify-content: center;
 }
 
-/* INITIAL TABS */
+/* ===== INITIAL TABS (palet sama dgn race-category-stickybar.css) ===== */
 .init-tabs {
-  display: flex;
-  gap: 12px;
-  background: #f1f3f7;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #f1f5fb;
   padding: 6px;
-  border-radius: 10px;
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
 }
 
 .init-tab {
   border: none;
   background: transparent;
-  color: #2b3445;
+  color: #425266;
   font-weight: 700;
-  padding: 10px 18px;
-  border-radius: 8px;
-  transition: all 0.25s ease;
+  padding: 9px 20px;
+  border-radius: 9px;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Hover state */
 .init-tab:hover {
-  background: #dbeafe; /* biru muda */
-  color: #1e3a8a; /* biru navy */
+  background: #ffffff;
+  color: #1c4c7a;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 180, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(28, 76, 122, 0.12);
 }
 
-/* Active state */
 .init-tab.active {
-  background: rgb(54, 142, 180);
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
   color: #fff;
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
+  box-shadow: 0 4px 14px rgba(28, 76, 122, 0.35);
 }
 
 /* TABLE & BUTTONS - class dipakai juga di TeamPanel.vue */
@@ -3285,21 +3479,26 @@ export default {
 }
 
 .btn-add {
-  background: #ffffff;
-  border: 1px solid #cfd8e6;
-  color: #1c4c7a;
-  font-weight: 700;
-  border-radius: 15px;
-  padding: 18px 44px;
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  border: none;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border-radius: 12px;
+  padding: 14px 36px;
+  box-shadow: 0 8px 20px rgba(28, 76, 122, 0.3);
+  transition: transform 0.08s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
-/* Hover effect */
-.btn-add:hover {
-  background: #f0f8ff; /* biru muda lembut */
-  border-color: #1c4c7a;
-  color: #0d2f4f;
-  box-shadow: 0 0 12px rgba(0, 180, 255, 0.5);
-  cursor: pointer;
+.btn-add:hover,
+.btn-add:focus {
+  color: #ffffff;
+  filter: brightness(1.06);
+  box-shadow: 0 10px 26px rgba(28, 76, 122, 0.4);
+}
+
+.btn-add:active {
+  transform: translateY(1px);
 }
 
 .team-table {

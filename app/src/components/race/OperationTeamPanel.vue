@@ -361,6 +361,13 @@ export default {
           const t = isStart ? btn.result.startTime : btn.result.finishTime;
           sub = this.formatTime(t);
           title = `${name} — ${isStart ? "start" : "finish"} ${sub}`;
+        } else if (!isStart && !this.hasStartTime(btn)) {
+          // Cegah salah catat: BIB Finish baru bisa diklik setelah BIB yg
+          // sama sudah dicatat di Buffer-Timer-Start. Utk Slalom,
+          // hasStartTime() membaca run/sesi yg sedang dipilih.
+          state = "waiting";
+          sub = "Belum Start";
+          title = `${name} — klik BIB ini di Buffer-Timer-Start dulu`;
         }
         return { index, bib: this.getBib(btn), state, sub, title };
       });
@@ -673,6 +680,18 @@ export default {
   border-color: #e2e8f0;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+/* Finish menunggu Start — tidak bisa diklik sampai BIB-nya di-start */
+.bib-tile--waiting {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+.bib-tile--waiting .bib-tile__sub {
+  color: #f59e0b;
+  font-weight: 700;
 }
 
 .bib-empty {

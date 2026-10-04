@@ -58,6 +58,7 @@
                   <b-col class="d-flex flex-column pr-md-3">
                     <h5 class="card-title d-flex flex-wrap align-items-center" style="font-weight: 800; gap: 8px">
                       Buffer-Timer-Start
+                      <ClockBadge />
                       <LongrangeBadge />
                     </h5>
                     <b-row>
@@ -198,10 +199,11 @@
 
 <script>
 import LongrangeBadge from "@/components/longrange/LongrangeBadge.vue";
+import ClockBadge from "@/components/clock/ClockBadge.vue";
 
 export default {
   name: "OperationTimePanel",
-  components: { LongrangeBadge },
+  components: { LongrangeBadge, ClockBadge },
   data() {
     return {
       a: null,

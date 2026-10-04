@@ -11,11 +11,12 @@
 // Aktif bila integrasi Photo Finish DAN Long Range sama-sama dikonfigurasi.
 // Matikan dengan CLOCK_SYNC=off di .env.
 const { reconcile } = require("./clockSyncCore");
+const clockMain = require("./clockMain");
 
 const RECONCILE_EVERY_MS = 60000;
 
 let pf = null; // klien photofinishCore
-let lr = null; // klien longrangeCore
+let lr = null; // { calibrationState(), applySyncedCalibration() } — kalibrasi jam milik timing
 let nowMs = null;
 let timer = null;
 let busy = false;
@@ -37,11 +38,12 @@ async function run() {
   if (!clock.synced || !remote) return; // tunggu jam PF tersinkron & kalibrasi PF diterima
   const d = reconcile(remote, lr.calibrationState(), nowMs(), clock.offsetMs);
   if (d.action === "toLongrange") {
-    if (lr.applySyncedCalibration(d.cal)) log("Long Range mengikuti kalibrasi Photo Finish (" + d.cal.updatedAt + ")");
+    if (lr.applySyncedCalibration(d.cal)) log("Kalibrasi timing mengikuti Photo Finish (" + d.cal.updatedAt + ")");
   } else if (d.action === "toPhotofinish") {
-    const res = await pf.sendCalibration(Object.assign({}, d.cal, { note: "dari Long Range Start" }));
-    if (res && res.ok) log(res.applied ? "Photo Finish mengikuti kalibrasi Long Range (" + d.cal.updatedAt + ")" : "Photo Finish punya kalibrasi lebih baru");
+    const res = await pf.sendCalibration(Object.assign({}, d.cal, { note: "dari sts-timingsystem" }));
+    if (res && res.ok) log(res.applied ? "Photo Finish mengikuti kalibrasi timing (" + d.cal.updatedAt + ")" : "Photo Finish punya kalibrasi lebih baru");
     else log("gagal mengirim kalibrasi ke Photo Finish: " + ((res && res.error) || "?") + " — dicoba lagi nanti");
+    clockMain.notifyStatus();
   }
 }
 
@@ -72,12 +74,29 @@ function start() {
   schedule();
 }
 
+/** Kalibrasi jam timing (clockCalibrationCore) — dipasang otomatis saat Photo Finish dipasang. */
+function attachCalibration(calib, now) {
+  lr = { calibrationState: calib.state, applySyncedCalibration: calib.applySynced };
+  nowMs = now;
+  calib.onChange(function (kind) {
+    if (kind === "operator") schedule();
+  });
+  start();
+}
+
+function hostNowMs() {
+  const perf = require("perf_hooks").performance;
+  return perf.timeOrigin + perf.now();
+}
+
 module.exports = {
   /** dari photofinishMain.js */
   attachPhotofinish: function (client) {
     pf = client;
+    if (!lr) attachCalibration(clockMain.getCalibration(), hostNowMs);
     start();
   },
+  attachCalibration: attachCalibration,
   /** dari longrangeMain.js; now = jam laptop (epoch ms) yang sama dgn klien Long Range */
   attachLongrange: function (client, now) {
     lr = client;

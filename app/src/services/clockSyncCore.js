@@ -16,7 +16,7 @@
 // Catatan sintaks: di-bundle webpack 4 (Electron 13 / Node 14) — JANGAN
 // pakai `?.`, `??`, atau literal BigInt.
 /* global BigInt */
-const { diffDay, localTodMs, wrapDay } = require("./longrangeCore");
+const { diffDay, localTodMs, wrapDay } = require("./clockCalibrationCore");
 
 const NS_PER_US = BigInt(1000);
 

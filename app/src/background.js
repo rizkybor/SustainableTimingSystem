@@ -15,6 +15,11 @@ let mainWindow = null;
 const { setupIPCMainHandlers } = require("./services/ipcMainServices");
 setupIPCMainHandlers();
 
+// Kalibrasi jam RaceTime2 — satu sumber untuk timing, Long Range Start & Photo
+// Finish (lihat services/clockMain.js). Selalu aktif; dipasang lebih dulu.
+const { setupClock } = require("./services/clockMain");
+setupClock();
+
 // STS Photo Finish — nonaktif otomatis bila tidak dikonfigurasi
 // (lihat services/photofinishMain.js).
 const { setupPhotofinish } = require("./services/photofinishMain");

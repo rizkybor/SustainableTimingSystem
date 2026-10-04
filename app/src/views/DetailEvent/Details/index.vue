@@ -7,66 +7,79 @@
     </div>
   </div>
   <div v-else class="sts-detail">
+    <!-- BREADCRUMB -->
     <b-container class="mt-3">
-      <div class="text-muted small mb-2">
-        Events /
-        <span class="text-body">{{ events.eventName || "Event" }}</span>
-      </div>
+      <nav class="ev-crumbs" aria-label="breadcrumb">
+        <router-link to="/" class="ev-crumbs__link">
+          <Icon icon="mdi:home-outline" />
+          Dashboard
+        </router-link>
+        <Icon icon="mdi:chevron-right" class="ev-crumbs__sep" />
+        <router-link to="/events" class="ev-crumbs__link">Events</router-link>
+        <Icon icon="mdi:chevron-right" class="ev-crumbs__sep" />
+        <span class="ev-crumbs__current">{{ events.eventName || "Event" }}</span>
+      </nav>
     </b-container>
 
     <!-- HERO -->
     <section class="detail-hero">
       <div class="hero-bg"></div>
       <b-container class="hero-inner">
-        <b-row class="align-items-center mt-3">
+        <div class="hero-layout">
           <!-- logo -->
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo mr-2 d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
+          <div class="hero-logo">
+            <img
+              :src="hasEventLogo ? eventLogoUrl : defaultImg"
+              alt="Event Logo"
+              class="event-logo-img"
+            />
+          </div>
 
           <!-- judul + meta -->
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ events.eventName || "-" }}
-            </h2>
-            <div class="meta">
-              <span class="mr-3" style="font-size: 18px"
-                ><strong class="text-white">River</strong> :
-                {{ events.riverName || "-" }}</span
-              >
-              <span class="mr-3" style="font-size: 18px"
-                ><strong class="text-white">Level</strong> :
-                {{ events.levelName || "-" }}</span
-              >
+          <div class="hero-text">
+            <div class="hero-topline">
+              <span class="hero-status" :class="'hero-status--' + heroStatus.key">
+                <span class="hero-status__dot"></span>
+                {{ heroStatus.text }}
+              </span>
+              <span v-if="heroDateRange" class="hero-date">
+                <Icon icon="mdi:calendar-blank-outline" />
+                {{ heroDateRange }}
+              </span>
             </div>
-            <div class="meta">
-              <span class="mr-3" style="font-size: 18px"
-                ><strong class="text-white">Location</strong> :
-                {{ events.addressCity || "-" }},
-                {{ events.addressProvince || "-" }} -
-                {{ events.addressState || "-" }}</span
-              >
-            </div>
-          </b-col>
 
-        </b-row>
+            <h2 class="hero-title">{{ events.eventName || "-" }}</h2>
+
+            <div class="hero-chips">
+              <span class="hero-chip">
+                <Icon icon="mdi:waves" />
+                <span class="hero-chip__label">River</span>
+                {{ events.riverName || "-" }}
+              </span>
+              <span class="hero-chip">
+                <Icon icon="mdi:signal-cellular-3" />
+                <span class="hero-chip__label">Level</span>
+                {{ events.levelName || "-" }}
+              </span>
+              <span class="hero-chip">
+                <Icon icon="mdi:map-marker-outline" />
+                <span class="hero-chip__label">Location</span>
+                {{ heroLocation }}
+              </span>
+            </div>
+
+            <div class="hero-summary">
+              <span>
+                <strong>{{ availableRaceCategories.length }}</strong> Nomor Lomba
+              </span>
+              <span class="hero-summary__sep"></span>
+              <span>
+                <strong>{{ (events.categoriesInitial || []).length }}</strong>
+                Initial Category
+              </span>
+            </div>
+          </div>
+        </div>
       </b-container>
     </section>
 
@@ -816,6 +829,49 @@ export default {
       return this.events && this.events.eventName ? this.events.eventName : "";
     },
 
+    // Status event utk badge hero (sama logikanya dgn kartu event di Home).
+    heroStatus() {
+      const ev = this.events || {};
+      const st = String(ev.statusEvent || "").toLowerCase();
+      if (st && st !== "activated") return { key: "inactive", text: "Inactive" };
+      const start = new Date(ev.startDateEvent);
+      if (isNaN(start)) return { key: "upcoming", text: "Terjadwal" };
+      const end = new Date(ev.endDateEvent || ev.startDateEvent);
+      const dayStart = new Date(start);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(isNaN(end) ? start : end);
+      dayEnd.setHours(23, 59, 59, 999);
+      const now = new Date();
+      if (now >= dayStart && now <= dayEnd) return { key: "live", text: "Berlangsung" };
+      if (now < dayStart) {
+        const days = Math.ceil((dayStart - now) / 86400000);
+        return { key: "upcoming", text: days <= 1 ? "Besok" : `${days} hari lagi` };
+      }
+      return { key: "done", text: "Selesai" };
+    },
+    heroDateRange() {
+      const ev = this.events || {};
+      const fmt = (v) => {
+        const d = new Date(v);
+        if (!v || isNaN(d)) return "";
+        return d.toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      };
+      const a = fmt(ev.startDateEvent);
+      const b = fmt(ev.endDateEvent);
+      if (!a) return "";
+      return b && b !== a ? `${a} – ${b}` : a;
+    },
+    heroLocation() {
+      const ev = this.events || {};
+      const parts = [ev.addressCity, ev.addressProvince, ev.addressState]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+      return parts.length ? parts.join(", ") : "-";
+    },
     // Nama tampilan kategori aktif (mis. "Head to Head", bukan "HEAD2HEAD")
     // utk judul/ringkasan Registered Teams.
     activeCategoryTitle() {
@@ -3148,86 +3204,217 @@ export default {
   transform: scale(2.5);
 }
 
+/* ===== BREADCRUMB ===== */
+.ev-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.ev-crumbs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.ev-crumbs__link:hover {
+  color: #1c4c7a;
+  text-decoration: none;
+}
+.ev-crumbs__sep {
+  color: #cbd5e1;
+}
+.ev-crumbs__current {
+  color: #0f172a;
+  font-weight: 700;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ===== HERO / BANNER ===== */
 .detail-hero {
   position: relative;
-  min-height: 230px;
   overflow: hidden;
 }
-
-/* Foto background */
 .detail-hero .hero-bg {
   position: absolute;
   inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-image: linear-gradient(
+      100deg,
+      rgba(12, 35, 60, 0.93) 0%,
+      rgba(20, 62, 102, 0.82) 50%,
+      rgba(37, 176, 235, 0.4) 100%
+    ),
+    url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   background-size: cover;
   background-position: center;
 }
-
-/* Overlay gelap halus (ganti brightness filter) */
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-
-/* Konten di atas background */
 .detail-hero .hero-inner {
   position: relative;
   z-index: 1;
-  padding: 22px 22px;
-  /* beri ruang kiri-kanan */
+  padding: 32px 15px;
 }
 
-/* Judul besar putih + shadow kuat */
-.detail-hero h2 {
-  color: #fff;
-  font-weight: 800;
-  font-size: clamp(26px, 4.2vw, 46px);
-  line-height: 1.05;
-  margin-bottom: 6px !important;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-  letter-spacing: 0.2px;
-}
-
-/* Sub-info (lokasi, sungai, level) */
-.detail-hero .meta {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(12px, 1.6vw, 16px);
+.hero-layout {
+  display: flex;
+  align-items: center;
+  gap: 28px;
 }
 
 .hero-logo {
-  width: 150px;
-  height: 150px;
-  margin-right: 10px;
-  border-radius: 30px;
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: 24px;
   background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
+  padding: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25),
+    0 0 0 4px rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
+  overflow: hidden;
+}
+.event-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
 }
 
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
+.hero-text {
+  flex: 1;
+  min-width: 0;
+  color: #fff;
+}
+
+.hero-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.hero-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+}
+.hero-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.hero-status--live .hero-status__dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+.hero-status--upcoming .hero-status__dot {
+  background: #38bdf8;
+}
+.hero-status--inactive {
+  color: #b91c1c;
+}
+.hero-status--inactive .hero-status__dot {
+  background: #ef4444;
+}
+.hero-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin: 0 0 14px;
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(26px, 3.6vw, 40px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 12px;
   border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+}
+.hero-chip svg {
+  color: #7dd3fc;
+  flex: none;
+}
+.hero-chip__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.hero-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.hero-summary strong {
+  color: #fff;
+  font-size: 15px;
+}
+.hero-summary__sep {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 /* Responsif kecil: logo di atas, teks di bawah */
 @media (max-width: 767px) {
-  .detail-hero .hero-inner {
-    padding: 18px 14px;
+  .hero-layout {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
-
   .hero-logo {
-    margin-bottom: 12px;
+    width: 96px;
+    height: 96px;
+    border-radius: 18px;
   }
 }
 

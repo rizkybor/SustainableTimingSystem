@@ -1,76 +1,14 @@
 <template>
   <div>
-    <div class="card-wrapper p-3 mb-2 mt-5 mx-5">
-      <!-- TOP BAR (breadcrumb + datetime) -->
-      <div
-        class="d-flex align-items-center justify-content-between text-muted small"
-      >
-        <b-breadcrumb class="mb-0">
-          <b-breadcrumb-item to="/">
-            <Icon icon="mdi:home-outline" class="mr-1" />
-            Dashboard
-          </b-breadcrumb-item>
-          <b-breadcrumb-item
-            :to="{ name: 'detail-event', params: { id: $route.params.id } }"
-          >
-            {{ dataEventSafe.eventName }}
-          </b-breadcrumb-item>
-          <b-breadcrumb-item active>
-            {{ "Head to Head" }}
-          </b-breadcrumb-item>
-        </b-breadcrumb>
-        <div>{{ currentDateTime }}</div>
-      </div>
-    </div>
-
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
-
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ dataEventSafe.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3"
-                ><strong class="text-white">Location</strong> :
-                {{ dataEventSafe.addressCity || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ dataEventSafe.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ dataEventSafe.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+    <!-- Breadcrumb + hero bersama 5 Race Category -->
+    <RaceCategoryHero
+      :event="dataEventSafe"
+      race-key="HEAD2HEAD"
+      race-label="Head to Head"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+      :current-date-time="currentDateTime"
+      :active-category="titleCategories || ''"
+    />
 
     <!-- SUBHEADER: Switch Head to Head Category + kontrol Connect Racetime
          — sticky (baru position:fixed saat di-scroll, lihat .race-sticky-bar di race-category-
@@ -1632,6 +1570,7 @@
 <script>
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import EmptyCard from "@/components/cards/card-empty.vue";
 import defaultImg from "@/assets/images/default-second.jpeg";
 import logoSts from "@/assets/images/logo-sts.png";
@@ -1789,6 +1728,7 @@ function loadRaceStartPayloadForH2H() {
 export default {
   name: "SustainableTimingSystemH2HRace",
   components: {
+    RaceCategoryHero,
     H2HGoToHeat,
     OperationTimePanel,
     EmptyCard,
@@ -8534,65 +8474,7 @@ tr.h2h-goto-hit > td:first-child {
   padding: 8px 14px;
 }
 
-/* ===== HERO / BANNER ===== */
-.detail-hero {
-  position: relative;
-  overflow: hidden;
-}
-.detail-hero .hero-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1709810953776-ee6027ff8104?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-  background-size: cover;
-  background-position: center;
-}
-.detail-hero .hero-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45));
-}
-.detail-hero .hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 50px;
-}
-.detail-hero h2 {
-  color: #fff;
-  font-weight: 800;
-  font-size: clamp(26px, 4.2vw, 46px);
-  line-height: 1.05;
-  margin-bottom: 6px !important;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-  letter-spacing: 0.2px;
-}
-.detail-hero .meta {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(12px, 1.6vw, 16px);
-}
-.hero-logo {
-  width: 150px;
-  height: 150px;
-  margin-right: 10px;
-  border-radius: 30px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0 20px rgba(0, 128, 255, 0.6);
-}
-
-.event-logo-img {
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-
+/* Hero/breadcrumb: lihat components/race/RaceCategoryHero.vue */
 /* ===== TABLE WRAPPER: overflow horizontal tanpa mengecilkan kolom ===== */
 .table-wrapper {
   width: 100%;

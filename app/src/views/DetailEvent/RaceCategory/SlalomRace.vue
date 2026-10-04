@@ -4185,28 +4185,58 @@ table {
   border-collapse: collapse;
   border-radius: 12px;
   overflow: hidden;
+  background: #ffffff;
+  /* garis tepi tipis + bayangan halus (pengganti border, aman dgn
+     border-collapse) */
+  box-shadow: 0 0 0 1px #e3eaf3, 0 6px 18px rgba(15, 42, 67, 0.06);
 }
+/* Tabel Output Racetime — header navy brand (pengganti #383838), zebra
+   lembut, garis antar baris tipis. Selector SENGAJA tetap sama dgn versi
+   lama supaya spesifisitasnya tidak berubah & aturan fungsional (highlight
+   baris/sel, status, dsb) tetap menang seperti sebelumnya. */
 thead {
-  background: #383838;
+  background: linear-gradient(180deg, #1f527f 0%, #1a456c 100%);
   color: #fff;
   font-weight: 600;
 }
 thead th {
-  padding: 12px 15px;
+  padding: 12px 14px;
   text-align: left;
-  font-size: 14px;
-  border-bottom: 2px solid #f1f1f1;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  border-bottom: none;
 }
 tbody tr:nth-child(odd) {
-  background: #f9f9f9;
+  background: #ffffff;
 }
 tbody tr:nth-child(even) {
-  background: #f2f2f2;
+  background: #f7fafd;
 }
 th,
 td {
   border: none;
   text-align: center;
+}
+/* Garis pemisah header 2 baris (rowspan), garis antar baris, angka
+   tabular (waktu sejajar), & sorot baris saat hover — pakai box-shadow
+   (bukan background) supaya warna highlight fungsional per baris/sel
+   tidak tertimpa. */
+thead tr + tr th {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+tbody td {
+  border-top: 1px solid #edf2f7;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+tbody tr:first-child td {
+  border-top: none;
+}
+tbody tr:hover > td {
+  box-shadow: inset 0 1px 0 #cfe4fb, inset 0 -1px 0 #cfe4fb;
 }
 
 /* Header clickable cue */

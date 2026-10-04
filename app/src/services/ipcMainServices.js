@@ -170,6 +170,7 @@ const {
 const {
   insertJudgeActionLog,
   listJudgeActionLogsByEvent,
+  listJudgeActionLogsByJudge,
 } = require("../controllers/INSERT/insertJudgeActionLog");
 const {
   deleteJudgeActionHistory,
@@ -328,6 +329,23 @@ function setupIPCMainHandlers() {
       event.reply("judgeLog:listByEvent:reply", { ok: true, items });
     } catch (err) {
       event.reply("judgeLog:listByEvent:reply", {
+        ok: false,
+        items: [],
+        error: err.message,
+      });
+    }
+  });
+
+  // Riwayat tindakan SATU juri lintas SEMUA event — dipakai modal "Riwayat
+  // Judge" di User Management (AdminUserManagement.vue), beda dari
+  // judgeLog:listByEvent yang discope per event+kategori race.
+  ipcMain.on("judgeLog:listByJudge", async (event, payload) => {
+    try {
+      const { judge, limit } = payload || {};
+      const items = await listJudgeActionLogsByJudge(judge, { limit });
+      event.reply("judgeLog:listByJudge:reply", { ok: true, items });
+    } catch (err) {
+      event.reply("judgeLog:listByJudge:reply", {
         ok: false,
         items: [],
         error: err.message,

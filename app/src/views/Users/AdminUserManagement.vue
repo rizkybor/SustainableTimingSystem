@@ -186,22 +186,30 @@
 
               <!-- Actions -->
               <template #cell(actions)="row">
-                <b-button
-                  size="sm"
-                  variant="outline-secondary"
-                  class="btn-icon mr-2"
-                  @click="openEdit(row.item)"
-                >
-                  <Icon icon="mdi:pencil" width="16" height="16" />
-                </b-button>
-                <b-button
-                  size="sm"
-                  variant="outline-danger"
-                  class="btn-icon"
-                  @click="deleteUser(row.item.email)"
-                >
-                  <Icon icon="mdi:delete" width="16" height="16" />
-                </b-button>
+                <div class="um-actions">
+                  <UserJudgeHistoryModal
+                    :username="row.item.username"
+                    :event-dict="eventDict"
+                  />
+                  <b-button
+                    size="sm"
+                    variant="outline-secondary"
+                    class="btn-icon"
+                    title="Edit"
+                    @click="openEdit(row.item)"
+                  >
+                    <Icon icon="mdi:pencil" width="16" height="16" />
+                  </b-button>
+                  <b-button
+                    size="sm"
+                    variant="outline-danger"
+                    class="btn-icon"
+                    title="Delete"
+                    @click="deleteUser(row.item.email)"
+                  >
+                    <Icon icon="mdi:delete" width="16" height="16" />
+                  </b-button>
+                </div>
               </template>
             </b-table>
 
@@ -331,10 +339,11 @@
 <script>
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
+import UserJudgeHistoryModal from "@/components/judge/UserJudgeHistoryModal.vue";
 
 export default {
   name: "AdminUserManagement",
-  components: { Icon },
+  components: { Icon, UserJudgeHistoryModal },
   data() {
     return {
       perPage: 10,
@@ -368,7 +377,7 @@ export default {
           key: "actions",
           label: "Actions",
           class: "text-center align-middle",
-          thStyle: { width: "110px" },
+          thStyle: { width: "150px" },
         },
       ],
       showEdit: false,
@@ -759,4 +768,19 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Baris tombol aksi (Riwayat Judge/Edit/Delete) — sebelumnya cuma
+   mengandalkan margin-right (mr-2) antar <b-button>, jadi tidak rapi:
+   UserJudgeHistoryModal.vue membungkus tombolnya sendiri dalam <span>
+   (bukan <b-button> langsung), jadi spacing & perataan vertikalnya beda
+   dari dua tombol lain yang tidak ikut terbungkus apa pun. Satu flex row
+   dgn gap seragam menyamakan jarak & perataan ketiganya. */
+.um-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+</style>
 

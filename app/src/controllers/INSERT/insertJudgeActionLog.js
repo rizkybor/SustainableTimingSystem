@@ -84,8 +84,39 @@ async function listJudgeActionLogsByEvent(eventId, raceCategory, opts) {
   return items;
 }
 
+// LIST: riwayat tindakan SATU juri, LINTAS SEMUA event (dipakai User
+// Management → "Riwayat Judge" per user, atas permintaan user 2026-10-05).
+// Beda dari listJudgeActionLogsByEvent() yang di-scope per event+kategori
+// (dipakai di halaman race) — di sini scope-nya per `judge` (username dari
+// sts-jurysystem), supaya admin bisa lihat SEMUA tindakan satu juri across
+// event & kategori, lalu difilter sendiri by Event/Task di sisi UI.
+async function listJudgeActionLogsByJudge(judgeUsername, opts) {
+  var options = opts || {};
+  var limit = Number.isFinite(options.limit) ? options.limit : 1000;
+  limit = Math.min(Math.max(limit, 1), 5000);
+
+  var username = String(judgeUsername || "").trim();
+  if (!username) return [];
+
+  var db = await getDb();
+  var col = db.collection("judgeActionLogs");
+
+  var items = await col
+    .find({ judge: username })
+    .sort({ receivedAt: -1 })
+    .limit(limit)
+    .toArray();
+
+  items.forEach(function (it) {
+    it._id = String(it._id);
+  });
+
+  return items;
+}
+
 module.exports = {
   insertJudgeActionLog,
   listJudgeActionLogsByEvent,
+  listJudgeActionLogsByJudge,
   VALID_CATEGORIES,
 };

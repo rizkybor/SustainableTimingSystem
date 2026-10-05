@@ -120,6 +120,7 @@ const {
   notifySlalomTeamStarted,
   notifyOfficialStatusChanged,
   notifySprintTeamFinished,
+  notifyResultsUpdated,
   notifyDrrTeamFinished,
   notifySlalomTeamFinished,
   notifyH2HTeamFinished,
@@ -136,6 +137,9 @@ const {
 const {
   upsertSprintTeamStatus,
 } = require("../controllers/INSERT/upsertSprintTeamStatus");
+const {
+  upsertSprintLiveState,
+} = require("../controllers/INSERT/upsertSprintLiveState");
 const {
   upsertSlalomTeamStatus,
 } = require("../controllers/INSERT/upsertSlalomTeamStatus");
@@ -1006,6 +1010,27 @@ function setupIPCMainHandlers() {
   // sprint:team-started.
   ipcMain.on("sprint:team-finished", (_event, payload) => {
     notifySprintTeamFinished(payload || {});
+  });
+
+  // Live Result Sprint per langkah input (Start/PS/PF/Finish/flag/Reset) —
+  // tulis langsung ke sprintlivepreviews lalu broadcast results:updated
+  // supaya Live Result jurysystem langsung refetch. Fire-and-forget.
+  // Dikirim oleh sprintLiveStateMixin.js (SprintRace.vue).
+  ipcMain.on("sprint:live-state", (_event, payload) => {
+    const b = (payload && payload.bucket) || {};
+    upsertSprintLiveState(payload || {})
+      .then(() => {
+        notifyResultsUpdated({
+          eventId: String(b.eventId || ""),
+          category: "SPRINT",
+          initialId: String(b.initialId || ""),
+          divisionId: String(b.divisionId || ""),
+          raceId: String(b.raceId || ""),
+        });
+      })
+      .catch((err) => {
+        console.error("⚠️ [sprint:live-state] gagal upsert:", err);
+      });
   });
 
   // Broadcast LIVE PREVIEW begitu satu team DRR genuinely selesai (Start &

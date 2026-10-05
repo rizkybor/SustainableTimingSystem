@@ -485,6 +485,7 @@ import ConnectionStatusBadge from "@/components/judge/ConnectionStatusBadge.vue"
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
+import sprintLiveStateMixin from "@/mixins/sprintLiveStateMixin";
 import { buildCategoryStatusKey } from "@/utils/officialStamp";
 
 /** ===== helpers: baca payload baru dari localStorage ===== */
@@ -662,7 +663,7 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, raceStickyBarMixin],
+  mixins: [teamFlagMixin, serialPortMixin, raceStickyBarMixin, sprintLiveStateMixin],
   data() {
     return {
       isLoading: false,

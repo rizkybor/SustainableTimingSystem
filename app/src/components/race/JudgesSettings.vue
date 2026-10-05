@@ -2,365 +2,388 @@
   <b-modal
     :id="id"
     v-model="localShow"
-    hide-footer
     centered
     size="xl"
-    body-class="p-0"
-    content-class="rounded-20 overflow-hidden rs-modal"
+    body-class="p-0 jsm-body"
+    header-class="p-0 border-0"
+    footer-class="jsm-footer"
+    content-class="jsm-content"
     scrollable
   >
     <!-- Header -->
     <template #modal-header>
-      <div class="d-flex justify-content-between align-items-center w-100">
-        <h5 class="mb-0 font-weight-bold">Judges Configuration</h5>
-        <b-button size="sm" class="btn-close-red" @click="close">✕</b-button>
+      <div class="jsm-head">
+        <div class="jsm-head__bg"></div>
+        <button type="button" class="jsm-close" aria-label="Close" @click="close">
+          <Icon icon="mdi:close" />
+        </button>
+        <div class="jsm-head__inner">
+          <span class="jsm-head__icon"><Icon icon="mdi:gavel" /></span>
+          <div class="jsm-head__text">
+            <span class="jsm-eyebrow">Judges Configuration</span>
+            <h5 class="jsm-title">{{ eventName || "Penugasan Juri" }}</h5>
+            <p class="jsm-sub">Tetapkan juri untuk setiap posisi di tiap nomor lomba.</p>
+          </div>
+          <div v-if="!loading && assignmentSummary.total" class="jsm-head__summary">
+            <span class="jsm-summary__value">
+              {{ assignmentSummary.done }}<small>/{{ assignmentSummary.total }}</small>
+            </span>
+            <span class="jsm-summary__label">posisi terisi</span>
+            <div class="jsm-summary__bar">
+              <span :style="{ width: assignmentSummary.percent + '%' }"></span>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
 
     <!-- Body -->
-    <div v-if="!loading" class="p-4">
-      <div class="p-2 p-md-3">
-        <!-- Panel kategori (Sprint/H2H/Slalom/DRR/RX) — dibungkus flex
-             column supaya urutan tampilnya bisa diatur lewat CSS `order`
-             (lihat categoryOrder()), atas permintaan user (2026-10-05):
-             urutan panel harus ikut urutan array Event Categories di
-             Event Settings, bukan selalu Sprint→H2H→Slalom→DRR→RX. -->
-        <div class="rs-category-panels">
+    <div v-if="!loading" class="jsm-wrap">
+      <!-- Panel kategori (Sprint/H2H/Slalom/DRR/RX) — flex column supaya
+           urutan tampilnya bisa diatur lewat CSS `order` (lihat
+           categoryOrder()): ikut urutan array Event Categories di Event
+           Settings, bukan selalu Sprint→H2H→Slalom→DRR→RX. -->
+      <div class="rs-category-panels">
         <!-- SPRINT -->
-        <section class="rs-card mb-3" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
-          <div class="rs-section-title rs-section-toggle" @click="toggleSection('sprint')">
-            <Icon
-              :icon="
-                collapsedSections.sprint ? 'mdi:chevron-right' : 'mdi:chevron-down'
-              "
-              class="mr-1"
-            />
-            Sprint Judges
-          </div>
-          <div v-show="!collapsedSections.sprint">
-          <b-row>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Start</label>
-              <SearchableSelect
-                v-model="draft.sprint.juryStart"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Finish</label>
-              <SearchableSelect
-                v-model="draft.sprint.juryFinish"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
+        <section class="jsm-cat" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
+          <header class="jsm-cat__head" @click="toggleSection('sprint')">
+            <img :src="raceIcons.SPRINT" alt="" class="jsm-cat__icon" />
+            <div class="jsm-cat__titles">
+              <div class="jsm-cat__title">Sprint</div>
+              <div class="jsm-cat__desc">Juri Start &amp; Finish</div>
+            </div>
+            <span class="jsm-count" :class="countTone(categoryFill.sprint)">
+              {{ categoryFill.sprint.done }}/{{ categoryFill.sprint.total }} terisi
+            </span>
+            <Icon icon="mdi:chevron-down" class="jsm-chev" :class="{ 'is-collapsed': collapsedSections.sprint }" />
+          </header>
+          <div v-show="!collapsedSections.sprint" class="jsm-cat__body">
+            <div class="jsm-group">Start &amp; Finish</div>
+            <div class="jsm-grid jsm-grid--2">
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-variant-outline" /> Jury Start</label>
+                <SearchableSelect
+                  v-model="draft.sprint.juryStart"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-checkered" /> Jury Finish</label>
+                <SearchableSelect
+                  v-model="draft.sprint.juryFinish"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+            </div>
           </div>
         </section>
 
         <!-- HEAD TO HEAD -->
-        <section class="rs-card mb-3" v-if="showH2H" :style="{ order: categoryOrder('HEAD2HEAD') }">
-          <div class="rs-section-title rs-section-toggle" @click="toggleSection('h2h')">
-            <Icon
-              :icon="
-                collapsedSections.h2h ? 'mdi:chevron-right' : 'mdi:chevron-down'
-              "
-              class="mr-1"
-            />
-            Head to Head Judges
-          </div>
-          <div v-show="!collapsedSections.h2h">
-          <b-row>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Start</label>
-              <SearchableSelect
-                v-model="draft.h2h.juryStart"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Finish</label>
-              <SearchableSelect
-                v-model="draft.h2h.juryFinish"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col
-              md="3"
-              class="mb-3"
-              v-for="key in enabledBouyanKeys"
-              :key="key"
-            >
-              <label class="form-label">Bouyan {{ key }}</label>
-              <SearchableSelect
-                v-model="draft.h2hValues[key]"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
+        <section class="jsm-cat" v-if="showH2H" :style="{ order: categoryOrder('HEAD2HEAD') }">
+          <header class="jsm-cat__head" @click="toggleSection('h2h')">
+            <img :src="raceIcons.HEAD2HEAD" alt="" class="jsm-cat__icon" />
+            <div class="jsm-cat__titles">
+              <div class="jsm-cat__title">Head to Head</div>
+              <div class="jsm-cat__desc">Juri Start &amp; Finish + Bouyan</div>
+            </div>
+            <span class="jsm-count" :class="countTone(categoryFill.h2h)">
+              {{ categoryFill.h2h.done }}/{{ categoryFill.h2h.total }} terisi
+            </span>
+            <Icon icon="mdi:chevron-down" class="jsm-chev" :class="{ 'is-collapsed': collapsedSections.h2h }" />
+          </header>
+          <div v-show="!collapsedSections.h2h" class="jsm-cat__body">
+            <div class="jsm-group">Start &amp; Finish</div>
+            <div class="jsm-grid jsm-grid--2">
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-variant-outline" /> Jury Start</label>
+                <SearchableSelect
+                  v-model="draft.h2h.juryStart"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-checkered" /> Jury Finish</label>
+                <SearchableSelect
+                  v-model="draft.h2h.juryFinish"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+            </div>
+            <template v-if="enabledBouyanKeys.length">
+              <div class="jsm-group">Posisi Bouyan</div>
+              <div class="jsm-grid jsm-grid--4">
+                <div class="jsm-field" v-for="key in enabledBouyanKeys" :key="key">
+                  <label class="jsm-label"><Icon icon="mdi:map-marker-radius-outline" /> Bouyan {{ key }}</label>
+                  <SearchableSelect
+                    v-model="draft.h2hValues[key]"
+                    @input="hasLocalEdits = true"
+                    :options="selectOptions"
+                    placeholder="Select jury name"
+                    search-placeholder="Search jury…"
+                    :clearable="true"
+                    :show-empty-option="false"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </section>
 
         <!-- SLALOM -->
-        <section class="rs-card mb-3" v-if="showSlalom" :style="{ order: categoryOrder('SLALOM') }">
-          <div class="rs-section-title rs-section-toggle" @click="toggleSection('slalom')">
-            <Icon
-              :icon="
-                collapsedSections.slalom ? 'mdi:chevron-right' : 'mdi:chevron-down'
-              "
-              class="mr-1"
-            />
-            Slalom Judges
-          </div>
-          <div v-show="!collapsedSections.slalom">
-          <b-row>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Start</label>
-              <SearchableSelect
-                v-model="draft.slalom.juryStart"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Finish</label>
-              <SearchableSelect
-                v-model="draft.slalom.juryFinish"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col
-              md="3"
-              class="mb-3"
-              v-for="n in gatesCount"
-              :key="'gate-' + n"
-            >
-              <label class="form-label">Gate {{ n }}</label>
-              <SearchableSelect
-                :key="
-                  'gate-' +
-                  n +
-                  '-' +
-                  (draft.slalom.gates && draft.slalom.gates[n]
-                    ? String(draft.slalom.gates[n])
-                    : '')
-                "
-                :value="getGateValue(n)"
-                @input="onGateInput(n, $event)"
-                @change="onGateInput(n, $event)"
-                @clear="onGateClear(n)"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
+        <section class="jsm-cat" v-if="showSlalom" :style="{ order: categoryOrder('SLALOM') }">
+          <header class="jsm-cat__head" @click="toggleSection('slalom')">
+            <img :src="raceIcons.SLALOM" alt="" class="jsm-cat__icon" />
+            <div class="jsm-cat__titles">
+              <div class="jsm-cat__title">Slalom</div>
+              <div class="jsm-cat__desc">Juri Start &amp; Finish + {{ gatesCount }} Gate</div>
+            </div>
+            <span class="jsm-count" :class="countTone(categoryFill.slalom)">
+              {{ categoryFill.slalom.done }}/{{ categoryFill.slalom.total }} terisi
+            </span>
+            <Icon icon="mdi:chevron-down" class="jsm-chev" :class="{ 'is-collapsed': collapsedSections.slalom }" />
+          </header>
+          <div v-show="!collapsedSections.slalom" class="jsm-cat__body">
+            <div class="jsm-group">Start &amp; Finish</div>
+            <div class="jsm-grid jsm-grid--2">
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-variant-outline" /> Jury Start</label>
+                <SearchableSelect
+                  v-model="draft.slalom.juryStart"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-checkered" /> Jury Finish</label>
+                <SearchableSelect
+                  v-model="draft.slalom.juryFinish"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+            </div>
+            <template v-if="gatesCount">
+              <div class="jsm-group">Posisi Gate</div>
+              <div class="jsm-grid jsm-grid--4">
+                <div class="jsm-field" v-for="n in gatesCount" :key="'gate-' + n">
+                  <label class="jsm-label"><Icon icon="mdi:gate" /> Gate {{ n }}</label>
+                  <SearchableSelect
+                    :key="
+                      'gate-' +
+                      n +
+                      '-' +
+                      (draft.slalom.gates && draft.slalom.gates[n]
+                        ? String(draft.slalom.gates[n])
+                        : '')
+                    "
+                    :value="getGateValue(n)"
+                    @input="onGateInput(n, $event)"
+                    @change="onGateInput(n, $event)"
+                    @clear="onGateClear(n)"
+                    :options="selectOptions"
+                    placeholder="Select jury name"
+                    search-placeholder="Search jury…"
+                    :clearable="true"
+                    :show-empty-option="false"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </section>
 
         <!-- RAFTING CROSS -->
-        <section class="rs-card mb-3" v-if="showRx" :style="{ order: categoryOrder('RX') }">
-          <div class="rs-section-title rs-section-toggle" @click="toggleSection('rx')">
-            <Icon
-              :icon="
-                collapsedSections.rx ? 'mdi:chevron-right' : 'mdi:chevron-down'
-              "
-              class="mr-1"
-            />
-            Rafting Cross Judges
-          </div>
-          <div v-show="!collapsedSections.rx">
-          <b-row>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Start</label>
-              <SearchableSelect
-                v-model="draft.rx.juryStart"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Finish</label>
-              <SearchableSelect
-                v-model="draft.rx.juryFinish"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col
-              md="3"
-              class="mb-3"
-              v-for="key in enabledRxGateKeys"
-              :key="key"
-            >
-              <label class="form-label">{{ rxGateLabel(key) }}</label>
-              <SearchableSelect
-                v-model="draft.rxValues[key]"
-                @input="hasLocalEdits = true"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
+        <section class="jsm-cat" v-if="showRx" :style="{ order: categoryOrder('RX') }">
+          <header class="jsm-cat__head" @click="toggleSection('rx')">
+            <img :src="raceIcons.RX" alt="" class="jsm-cat__icon" />
+            <div class="jsm-cat__titles">
+              <div class="jsm-cat__title">Rafting Cross</div>
+              <div class="jsm-cat__desc">Juri Start &amp; Finish + Gate</div>
+            </div>
+            <span class="jsm-count" :class="countTone(categoryFill.rx)">
+              {{ categoryFill.rx.done }}/{{ categoryFill.rx.total }} terisi
+            </span>
+            <Icon icon="mdi:chevron-down" class="jsm-chev" :class="{ 'is-collapsed': collapsedSections.rx }" />
+          </header>
+          <div v-show="!collapsedSections.rx" class="jsm-cat__body">
+            <div class="jsm-group">Start &amp; Finish</div>
+            <div class="jsm-grid jsm-grid--2">
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-variant-outline" /> Jury Start</label>
+                <SearchableSelect
+                  v-model="draft.rx.juryStart"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-checkered" /> Jury Finish</label>
+                <SearchableSelect
+                  v-model="draft.rx.juryFinish"
+                  @input="hasLocalEdits = true"
+                  :options="selectOptions"
+                  placeholder="Select jury name"
+                  search-placeholder="Search jury…"
+                  :clearable="true"
+                  :show-empty-option="false"
+                />
+              </div>
+            </div>
+            <template v-if="enabledRxGateKeys.length">
+              <div class="jsm-group">Posisi Gate</div>
+              <div class="jsm-grid jsm-grid--4">
+                <div class="jsm-field" v-for="key in enabledRxGateKeys" :key="key">
+                  <label class="jsm-label"><Icon icon="mdi:gate" /> {{ rxGateLabel(key) }}</label>
+                  <SearchableSelect
+                    v-model="draft.rxValues[key]"
+                    @input="hasLocalEdits = true"
+                    :options="selectOptions"
+                    placeholder="Select jury name"
+                    search-placeholder="Search jury…"
+                    :clearable="true"
+                    :show-empty-option="false"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </section>
 
         <!-- DOWN RIVER RACE -->
-        <section class="rs-card mb-3" v-if="showDrr" :style="{ order: categoryOrder('DRR') }">
-          <div class="rs-section-title rs-section-toggle" @click="toggleSection('drr')">
-            <Icon
-              :icon="
-                collapsedSections.drr ? 'mdi:chevron-right' : 'mdi:chevron-down'
-              "
-              class="mr-1"
-            />
-            Down River Race Judges
-          </div>
-          <div v-show="!collapsedSections.drr">
-          <b-row>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Start</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
-                v-model="draft.drr.juryStart"
-                @change="hasLocalEdits = true"
-              />
-            </b-col>
-            <b-col md="6" class="mb-3">
-              <label class="form-label">Jury Finish</label>
-              <b-form-select
-                class="rs-select"
-                :disabled="saving"
-                :options="resolvedJuryOptions"
-                v-model="draft.drr.juryFinish"
-                @change="hasLocalEdits = true"
-              />
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col
-              md="3"
-              class="mb-3"
-              v-for="n in sectionsCount"
-              :key="'section-' + n"
-            >
-              <label class="form-label">Section {{ n }}</label>
-              <SearchableSelect
-                :key="
-                  'section-' +
-                  n +
-                  '-' +
-                  (draft.drr.sections && draft.drr.sections[n]
-                    ? String(draft.drr.sections[n])
-                    : '')
-                "
-                :value="getSectionValue(n)"
-                @input="onSectionInput(n, $event)"
-                @change="onSectionInput(n, $event)"
-                @clear="onSectionClear(n)"
-                :options="selectOptions"
-                placeholder="Select jury name"
-                search-placeholder="Search jury…"
-                :clearable="true"
-                :show-empty-option="false"
-              />
-            </b-col>
-          </b-row>
+        <section class="jsm-cat" v-if="showDrr" :style="{ order: categoryOrder('DRR') }">
+          <header class="jsm-cat__head" @click="toggleSection('drr')">
+            <img :src="raceIcons.DRR" alt="" class="jsm-cat__icon" />
+            <div class="jsm-cat__titles">
+              <div class="jsm-cat__title">Down River Race</div>
+              <div class="jsm-cat__desc">Juri Start &amp; Finish + {{ sectionsCount }} Section</div>
+            </div>
+            <span class="jsm-count" :class="countTone(categoryFill.drr)">
+              {{ categoryFill.drr.done }}/{{ categoryFill.drr.total }} terisi
+            </span>
+            <Icon icon="mdi:chevron-down" class="jsm-chev" :class="{ 'is-collapsed': collapsedSections.drr }" />
+          </header>
+          <div v-show="!collapsedSections.drr" class="jsm-cat__body">
+            <div class="jsm-group">Start &amp; Finish</div>
+            <div class="jsm-grid jsm-grid--2">
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-variant-outline" /> Jury Start</label>
+                <b-form-select
+                  class="rs-select"
+                  :disabled="saving"
+                  :options="resolvedJuryOptions"
+                  v-model="draft.drr.juryStart"
+                  @change="hasLocalEdits = true"
+                />
+              </div>
+              <div class="jsm-field">
+                <label class="jsm-label"><Icon icon="mdi:flag-checkered" /> Jury Finish</label>
+                <b-form-select
+                  class="rs-select"
+                  :disabled="saving"
+                  :options="resolvedJuryOptions"
+                  v-model="draft.drr.juryFinish"
+                  @change="hasLocalEdits = true"
+                />
+              </div>
+            </div>
+            <template v-if="sectionsCount">
+              <div class="jsm-group">Posisi Section</div>
+              <div class="jsm-grid jsm-grid--4">
+                <div class="jsm-field" v-for="n in sectionsCount" :key="'section-' + n">
+                  <label class="jsm-label"><Icon icon="mdi:map-marker-path" /> Section {{ n }}</label>
+                  <SearchableSelect
+                    :key="
+                      'section-' +
+                      n +
+                      '-' +
+                      (draft.drr.sections && draft.drr.sections[n]
+                        ? String(draft.drr.sections[n])
+                        : '')
+                    "
+                    :value="getSectionValue(n)"
+                    @input="onSectionInput(n, $event)"
+                    @change="onSectionInput(n, $event)"
+                    @clear="onSectionClear(n)"
+                    :options="selectOptions"
+                    placeholder="Select jury name"
+                    search-placeholder="Search jury…"
+                    :clearable="true"
+                    :show-empty-option="false"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </section>
-        </div>
+      </div>
 
-        <div
-          v-if="!showSprint && !showH2H && !showSlalom && !showDrr && !showRx"
-          class="text-center text-muted py-4"
-        >
+      <div
+        v-if="!showSprint && !showH2H && !showSlalom && !showDrr && !showRx"
+        class="jsm-empty"
+      >
+        <Icon icon="mdi:clipboard-alert-outline" width="34" height="34" />
+        <div>
           Belum ada Race Category yang dipilih untuk event ini. Atur dulu di
           Event Settings.
-        </div>
-
-        <!-- Footer -->
-        <div class="d-flex justify-content-between align-items-center mt-4">
-          <b-button
-            style="border-radius: 12px"
-            variant="outline-danger"
-            class="px-4 rounded-12"
-            :disabled="saving"
-            @click="close"
-          >
-            Cancel
-          </b-button>
-          <b-button
-            style="border-radius: 12px"
-            class="px-4 btn-confirm"
-            variant="outline-primary"
-            :disabled="saving"
-            @click="confirm"
-          >
-            {{ saving ? "Saving…" : "Update" }}
-          </b-button>
         </div>
       </div>
     </div>
 
-    <div v-else class="p-5 text-center text-muted">Loading…</div>
+    <div v-else class="jsm-loading">
+      <b-spinner small class="mr-2" /> Memuat konfigurasi juri…
+    </div>
+
+    <!-- Footer (menempel di bawah modal) -->
+    <template #modal-footer>
+      <div class="jsm-foot">
+        <span class="jsm-foot__hint">
+          <Icon icon="mdi:information-outline" />
+          Perubahan baru tersimpan setelah klik Update.
+        </span>
+        <div class="jsm-foot__actions">
+          <button type="button" class="jsm-btn jsm-btn--ghost" :disabled="saving" @click="close">
+            Cancel
+          </button>
+          <button type="button" class="jsm-btn jsm-btn--primary" :disabled="saving || loading" @click="confirm">
+            <b-spinner v-if="saving" small />
+            <Icon v-else icon="mdi:content-save-outline" />
+            {{ saving ? "Saving…" : "Update" }}
+          </button>
+        </div>
+      </div>
+    </template>
   </b-modal>
 </template>
 
@@ -369,6 +392,25 @@ import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import SearchableSelect from "@/components/SearchableSelect.vue";
 import { loadEnabledCategoryKeys } from "@/utils/eventCategories";
+import sprintPng from "@/assets/images/Rectangle-3.png";
+import h2hPng from "@/assets/images/Rectangle-4.png";
+import slalomPng from "@/assets/images/Rectangle-4-1.png";
+import drrPng from "@/assets/images/Rectangle-4-2.png";
+import rxPng from "@/assets/images/Rectangle-5.png";
+
+// Ikon nomor lomba di header tiap kartu kategori (gambar yg sama dgn kartu
+// Race Categories di Event Detail).
+const RACE_ICONS = {
+  SPRINT: sprintPng,
+  HEAD2HEAD: h2hPng,
+  SLALOM: slalomPng,
+  DRR: drrPng,
+  RX: rxPng,
+};
+
+function isFilled(v) {
+  return v !== null && v !== undefined && String(v).trim() !== "";
+}
 
 /* ========= helpers ========= */
 function pickId(u) {
@@ -538,6 +580,7 @@ export default {
       // (chevron kanan). Default SEMUA true (tersembunyi) — beda dari
       // Race Settings yang default terbuka — supaya modal ini tidak
       // langsung penuh saat dibuka.
+      raceIcons: RACE_ICONS,
       collapsedSections: {
         sprint: true,
         h2h: true,
@@ -549,6 +592,52 @@ export default {
   },
 
   computed: {
+    // Jumlah posisi juri yang sudah terisi per kategori (badge "x/y terisi").
+    categoryFill: function () {
+      const d = this.draft || {};
+      const count = (vals) => ({
+        done: vals.filter(isFilled).length,
+        total: vals.length,
+      });
+      const range = (n) => Array.from({ length: Number(n) || 0 }, (_, i) => i + 1);
+      return {
+        sprint: count([d.sprint && d.sprint.juryStart, d.sprint && d.sprint.juryFinish]),
+        h2h: count(
+          [d.h2h && d.h2h.juryStart, d.h2h && d.h2h.juryFinish].concat(
+            (this.enabledBouyanKeys || []).map((k) => d.h2hValues && d.h2hValues[k])
+          )
+        ),
+        slalom: count(
+          [d.slalom && d.slalom.juryStart, d.slalom && d.slalom.juryFinish].concat(
+            range(this.gatesCount).map((n) => this.getGateValue(n))
+          )
+        ),
+        rx: count(
+          [d.rx && d.rx.juryStart, d.rx && d.rx.juryFinish].concat(
+            (this.enabledRxGateKeys || []).map((k) => d.rxValues && d.rxValues[k])
+          )
+        ),
+        drr: count(
+          [d.drr && d.drr.juryStart, d.drr && d.drr.juryFinish].concat(
+            range(this.sectionsCount).map((n) => this.getSectionValue(n))
+          )
+        ),
+      };
+    },
+    // Ringkasan total di header — cuma kategori yang tampil di event ini.
+    assignmentSummary: function () {
+      const f = this.categoryFill;
+      const parts = [
+        this.showSprint && f.sprint,
+        this.showH2H && f.h2h,
+        this.showSlalom && f.slalom,
+        this.showRx && f.rx,
+        this.showDrr && f.drr,
+      ].filter(Boolean);
+      const done = parts.reduce((n, p) => n + p.done, 0);
+      const total = parts.reduce((n, p) => n + p.total, 0);
+      return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
+    },
     showSprint: function () {
       return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SPRINT");
     },
@@ -679,6 +768,11 @@ export default {
   },
 
   methods: {
+    countTone: function (fill) {
+      if (!fill || !fill.total) return "is-empty";
+      if (fill.done === fill.total) return "is-full";
+      return fill.done ? "is-partial" : "is-empty";
+    },
     toggleSection: function (key) {
       this.$set(this.collapsedSections, key, !this.collapsedSections[key]);
     },
@@ -1829,5 +1923,354 @@ export default {
   background: #0d789d;
   color: #ffffff;
   border-color: #0d789d;
+}
+</style>
+
+<style>
+/* ===== Judges Configuration (redesign) =====
+   Global (bukan scoped) krn b-modal dirender di <body> & elemen pembungkus
+   (.modal-content/.modal-body/.modal-footer) dibuat BootstrapVue, bukan
+   template ini. Semua kelas berawalan `jsm-` supaya tidak bentrok. */
+
+.jsm-content {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+.jsm-body {
+  background: #f5f8fc;
+}
+
+/* ---------- Header ---------- */
+.jsm-head {
+  position: relative;
+  width: 100%;
+  color: #fff;
+}
+.jsm-head__bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(520px 200px at 88% 0%, rgba(37, 176, 235, 0.45), transparent 70%),
+    linear-gradient(110deg, #0f2f52 0%, #1c4c7a 55%, #1d7fb8 100%);
+}
+.jsm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+.jsm-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.jsm-head__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 64px 20px 26px;
+}
+.jsm-head__icon {
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.jsm-head__text {
+  flex: 1;
+  min-width: 0;
+}
+.jsm-eyebrow {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #bae6fd;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.jsm-title {
+  margin: 5px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jsm-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.jsm-head__summary {
+  flex: none;
+  min-width: 150px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  text-align: right;
+}
+.jsm-summary__value {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.jsm-summary__value small {
+  font-size: 14px;
+  opacity: 0.7;
+}
+.jsm-summary__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.jsm-summary__bar {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.jsm-summary__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #4ade80;
+  transition: width 0.3s ease;
+}
+
+/* ---------- Body ---------- */
+.jsm-wrap {
+  padding: 20px 22px 8px;
+}
+.jsm-wrap .rs-category-panels {
+  gap: 14px;
+}
+.jsm-loading,
+.jsm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  color: #94a3b8;
+  text-align: center;
+}
+.jsm-loading {
+  flex-direction: row;
+  justify-content: center;
+}
+
+/* Kartu kategori */
+.jsm-cat {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.05);
+}
+.jsm-cat__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 16px;
+  transition: background-color 0.15s ease;
+}
+.jsm-cat__head:hover {
+  background: #f8fbff;
+}
+.jsm-cat__icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #e6edf6;
+}
+.jsm-cat__titles {
+  flex: 1;
+  min-width: 0;
+}
+.jsm-cat__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.jsm-cat__desc {
+  font-size: 12px;
+  color: #64748b;
+}
+.jsm-count {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+.jsm-count.is-full {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.jsm-count.is-partial {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.jsm-count.is-empty {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+.jsm-chev {
+  flex: none;
+  font-size: 22px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+.jsm-chev.is-collapsed {
+  transform: rotate(-90deg);
+}
+.jsm-cat__body {
+  padding: 4px 18px 18px;
+  border-top: 1px solid #eef2f7;
+}
+.jsm-group {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.jsm-grid {
+  display: grid;
+  gap: 12px 14px;
+}
+.jsm-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.jsm-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.jsm-field {
+  min-width: 0;
+}
+.jsm-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+.jsm-label svg {
+  color: #25b0eb;
+  font-size: 15px;
+}
+
+/* ---------- Footer ---------- */
+.jsm-footer {
+  padding: 0;
+  border-top: 1px solid #e6edf6;
+  background: #ffffff;
+}
+.jsm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 22px;
+}
+.jsm-foot__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.jsm-foot__actions {
+  display: flex;
+  gap: 8px;
+}
+.jsm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 0.15s ease, background-color 0.15s ease;
+}
+.jsm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.jsm-btn--ghost {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.jsm-btn--ghost:hover:not(:disabled) {
+  background: #f8fafc;
+}
+.jsm-btn--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+.jsm-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+
+@media (max-width: 991.98px) {
+  .jsm-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .jsm-head__summary {
+    display: none;
+  }
+}
+@media (max-width: 575.98px) {
+  .jsm-grid--2,
+  .jsm-grid--4 {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

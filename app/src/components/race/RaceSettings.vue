@@ -2,28 +2,39 @@
   <b-modal
     :id="id"
     v-model="localShow"
-    hide-footer
     centered
     size="xl"
-    body-class="p-0"
-    content-class="rounded-20 overflow-hidden rs-modal"
+    body-class="p-0 rsm-body"
+    header-class="p-0 border-0"
+    footer-class="rsm-footer"
+    content-class="rsm-content"
     scrollable
   >
     <template #modal-header>
-      <div class="d-flex justify-content-between align-items-center w-100">
-        <h5 class="mb-0 font-weight-bold">Race Setting</h5>
-        <!-- 🔸 pakai class custom agar sesuai desain -->
-        <b-button size="sm" class="btn-close-red" @click="localShow = false">
-          ✕
-        </b-button>
+      <div class="rsm-head">
+        <div class="rsm-head__bg"></div>
+        <button type="button" class="rsm-close" aria-label="Close" @click="localShow = false">
+          <Icon icon="mdi:close" />
+        </button>
+        <div class="rsm-head__inner">
+          <span class="rsm-head__icon"><Icon icon="mdi:cog-outline" /></span>
+          <div class="rsm-head__text">
+            <span class="rsm-eyebrow">Race Setting</span>
+            <h5 class="rsm-title">{{ eventName || "Pengaturan Lomba" }}</h5>
+            <p class="rsm-sub">
+              Protest time, pilihan penalty, gate/section/bouyan, score by rank,
+              dan kolom PDF per nomor lomba.
+            </p>
+          </div>
+        </div>
       </div>
     </template>
 
     <!-- Body -->
-    <div class="p-4" v-if="!loading">
-      <div class="p-4">
+    <div class="rsm-wrap" v-if="!loading">
+      <div>
         <!-- GENERAL: Protest Time -->
-        <div class="rs-card mb-3">
+        <div class="rs-card rsm-general mb-3">
           <div class="px-3 py-3">
             <div class="h4 font-weight-bold mb-1">General</div>
             <div class="font-weight-bold mb-1">Protest Time</div>
@@ -1309,26 +1320,32 @@
           Event Settings.
         </div>
 
-        <!-- Footer -->
-        <div class="d-flex justify-content-between align-items-center mt-4">
-          <b-button
-            style="border-radius: 12px"
-            variant="outline-danger"
-            @click="close"
-            >Cancel</b-button
-          >
-          <b-button
-            style="border-radius: 12px"
-            class="px-4 btn-confirm"
-            variant="outline-primary"
-            @click="confirm"
-            >Update</b-button
-          >
-        </div>
       </div>
     </div>
 
-    <div v-else class="p-5 text-center text-muted">Loading…</div>
+    <div v-else class="rsm-loading">
+      <b-spinner small class="mr-2" /> Memuat pengaturan lomba…
+    </div>
+
+    <!-- Footer (menempel di bawah modal) -->
+    <template #modal-footer>
+      <div class="rsm-foot">
+        <span class="rsm-foot__hint">
+          <Icon icon="mdi:information-outline" />
+          Perubahan baru tersimpan setelah klik Update.
+        </span>
+        <div class="rsm-foot__actions">
+          <button type="button" class="rsm-btn rsm-btn--ghost" :disabled="saving" @click="close">
+            Cancel
+          </button>
+          <button type="button" class="rsm-btn rsm-btn--primary" :disabled="saving || loading" @click="confirm">
+            <b-spinner v-if="saving" small />
+            <Icon v-else icon="mdi:content-save-outline" />
+            {{ saving ? "Saving…" : "Update" }}
+          </button>
+        </div>
+      </div>
+    </template>
   </b-modal>
 </template>
 
@@ -2556,3 +2573,306 @@ export default {
   border-color: #0d789d;
 }
 </style>
+
+<style>
+/* ===== Race Setting (redesign) =====
+   Global krn b-modal dirender di <body>; SEMUA selector dibatasi ke
+   .rsm-content (content-class modal ini) supaya tidak bocor ke halaman lain
+   — markup & binding isi modal tidak diubah, cuma tampilannya. */
+.rsm-content {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+.rsm-body {
+  background: #f5f8fc;
+}
+.rsm-footer {
+  padding: 0;
+  border-top: 1px solid #e6edf6;
+  background: #ffffff;
+}
+
+/* Header */
+.rsm-head {
+  position: relative;
+  width: 100%;
+  color: #fff;
+}
+.rsm-head__bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(520px 200px at 88% 0%, rgba(37, 176, 235, 0.45), transparent 70%),
+    linear-gradient(110deg, #0f2f52 0%, #1c4c7a 55%, #1d7fb8 100%);
+}
+.rsm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+.rsm-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.rsm-head__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 64px 20px 26px;
+}
+.rsm-head__icon {
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.rsm-head__text {
+  min-width: 0;
+}
+.rsm-eyebrow {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #bae6fd;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.rsm-title {
+  margin: 5px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rsm-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Body */
+.rsm-wrap {
+  padding: 20px 22px 8px;
+}
+.rsm-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  color: #94a3b8;
+}
+.rsm-content .rs-category-panels {
+  gap: 14px;
+}
+.rsm-content .rs-category-panels > .rs-card,
+.rsm-content .rs-card.rsm-general {
+  margin-bottom: 0 !important;
+}
+.rsm-content .rsm-general {
+  margin-bottom: 14px !important;
+}
+
+/* Kartu kategori */
+.rsm-content .rs-card {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.05);
+}
+.rsm-content .rs-card > .px-3.py-3 {
+  padding: 16px 20px !important;
+}
+/* Judul kartu (General / nama kategori) */
+.rsm-content .rs-card .h4 {
+  font-size: 16px;
+  font-weight: 800 !important;
+  color: #0f172a;
+}
+.rsm-content .rs-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin: -6px -8px 10px !important;
+  padding: 6px 8px;
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+.rsm-content .rs-header-row:hover {
+  background: #f8fbff;
+}
+.rsm-content .rs-section-banner {
+  order: -1;
+  width: 40px;
+  height: 40px;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
+}
+.rsm-content .rs-header-text {
+  font-size: 16px;
+  gap: 2px;
+}
+.rsm-content .rs-header-text svg {
+  order: 2;
+  margin-left: 6px;
+  color: #94a3b8;
+}
+
+/* Sub-judul tiap blok (Pilihan Pen. Start, Score by Rank, PDF Result, …) */
+.rsm-content .rs-card .font-weight-bold {
+  font-size: 13.5px;
+  color: #1c4c7a;
+}
+.rsm-content .rs-card .h4.font-weight-bold {
+  color: #0f172a;
+}
+.rsm-content .rs-card small.text-muted {
+  font-size: 12px;
+  color: #64748b !important;
+}
+.rsm-content .rs-divider {
+  border: none;
+  height: 1px;
+  background: #eef2f7;
+  margin: 16px 0;
+}
+
+/* Input */
+.rsm-content .rs-card .form-control,
+.rsm-content .rs-card .custom-select {
+  border-radius: 10px !important;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  font-size: 13.5px;
+}
+.rsm-content .rs-card .form-control:focus,
+.rsm-content .rs-card .custom-select:focus {
+  background: #ffffff;
+  border-color: #25b0eb;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.15);
+}
+.rsm-content .b-form-spinbutton {
+  border-radius: 10px;
+  border-color: #e2e8f0;
+}
+
+/* Tombol "+ Tambah" & hapus baris */
+.rsm-content .rs-card .btn-outline-primary.btn-sm {
+  border-radius: 9px !important;
+  border-color: #cfe4fb;
+  background: #eef6ff;
+  color: #1c4c7a;
+  font-weight: 700;
+  padding: 4px 12px;
+}
+.rsm-content .rs-card .btn-outline-primary.btn-sm:hover:not(:disabled) {
+  background: #1c4c7a;
+  border-color: #1c4c7a;
+  color: #ffffff;
+}
+.rsm-content .rs-card .btn-outline-danger.btn-sm {
+  border-radius: 9px !important;
+  border-color: #fecaca;
+  color: #dc2626;
+  background: #ffffff;
+}
+.rsm-content .rs-card .btn-outline-danger.btn-sm:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+/* Switch PDF Result */
+.rsm-content .rs-switch .custom-control-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+.rsm-content .custom-switch .custom-control-input:checked ~ .custom-control-label::before {
+  background: #1c8fc7;
+  border-color: #1c8fc7;
+}
+
+/* Footer */
+.rsm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 22px;
+}
+.rsm-foot__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.rsm-foot__actions {
+  display: flex;
+  gap: 8px;
+}
+.rsm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.rsm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.rsm-btn--ghost {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.rsm-btn--ghost:hover:not(:disabled) {
+  background: #f8fafc;
+}
+.rsm-btn--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+.rsm-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+</style>
+

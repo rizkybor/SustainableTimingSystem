@@ -1,53 +1,18 @@
 <template>
-  <div class="result-wrap p-3 mb-2 mt-5">
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <img
-                :src="hasEventLogo ? eventLogoUrl : defaultImg"
-                alt="Event Logo"
-                class="event-logo-img"
-              />
-            </div>
-          </b-col>
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ eventInfo.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3">
-                <strong class="text-white">Location</strong> :
-                {{ eventInfo.addressCity || "-" }}
-              </span>
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ eventInfo.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ eventInfo.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+  <div class="result-wrap rp-page">
+    <!-- Breadcrumb + hero bersama (sama dgn halaman Race Category) -->
+    <RaceCategoryHero
+      :event="eventInfo"
+      race-key=""
+      race-label="Event Overall Result"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+    />
 
     <!-- Top bar -->
     <div class="topbar">
-      <div class="crumbs">
-        <span class="sep">›</span>
-        <router-link :to="`/event-detail/${$route.params.id}`" class="muted">
-          Dashboard
-        </router-link>
-        <span class="sep">›</span>
-        <span class="muted">Event Overall Result</span>
+      <div class="rp-toolbar-title">
+        <Icon icon="mdi:trophy-outline" />
+        Event Overall Result
       </div>
 
       <div class="right-actions">
@@ -99,12 +64,11 @@
       <b-alert show variant="danger" v-if="error" class="mb-3">{{
         error
       }}</b-alert>
-      <div v-if="loading" class="loading-row">
-        <b-spinner small class="mr-2" /> Loading results...
-      </div>
+      <!-- Skeleton saat data hasil di-fetch -->
+      <ResultTableSkeleton v-if="showResultSkeleton" :cols="7" :rows="4" :tables="2" />
 
       <EmptyStateFull
-        v-if="!loading && buckets.length === 0"
+        v-if="!showResultSkeleton && buckets.length === 0"
         :img-src="require('@/assets/images/404.png')"
         title="No data available"
         subtitle="Belum ada Overall Score yang tersimpan untuk event ini."
@@ -112,7 +76,7 @@
         @primary="goBack"
       />
 
-      <div v-else class="bucket-list">
+      <div v-else-if="!showResultSkeleton" class="bucket-list">
         <div
           class="bucket-block"
           v-for="(b, bIdx) in buckets"
@@ -224,6 +188,9 @@
 </template>
 
 <script>
+import ResultTableSkeleton from "@/components/result/ResultTableSkeleton.vue";
+import resultSkeletonMixin from "@/mixins/resultSkeletonMixin";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import { ipcRenderer } from "electron";
 import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import EventOverallPdf from "../DetailEvent/ResultComponent/Overall/event-overall-pdfResult.vue";
@@ -248,13 +215,15 @@ export default {
   name: "EventOverallResult",
   components: {
     Icon,
+    RaceCategoryHero,
+    ResultTableSkeleton,
     EmptyStateFull,
     EventOverallPdf,
     VueHtml2pdf,
     CountryFlag,
     OfficialStampToggle,
   },
-  mixins: [teamFlagMixin],
+  mixins: [resultSkeletonMixin, teamFlagMixin],
   data() {
     return {
       defaultImg,
@@ -337,6 +306,7 @@ export default {
       await this.loadAllBuckets(eventId);
       await this.loadRaceSettings(eventId);
     }
+    this.bootDone = true;
   },
   methods: {
     async loadRaceSettings(eventId) {

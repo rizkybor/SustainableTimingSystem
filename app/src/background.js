@@ -130,7 +130,9 @@ function bootApp() {
   createMain(preloadPath);
 
   const splashStart = Date.now();
-  const MIN_SPLASH_MS = 5000;
+  // Durasi minimal splash tampil (meski jendela utama sudah siap lebih
+  // cepat) — dinaikkan dari 5 dtk ke 7 dtk atas permintaan user.
+  const MIN_SPLASH_MS = 7000;
   const MAX_SPLASH_MS = 15000;
 
   mainWindow.once("ready-to-show", function () {

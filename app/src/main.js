@@ -16,6 +16,7 @@ import '@/assets/styles/race-category-stickybar.css'
 import '@/assets/styles/race-category-toolbar.css'
 import '@/assets/styles/list-pages.css'
 import '@/assets/styles/judge-history-modal.css'
+import '@/assets/styles/result-pages.css'
 
 import BootstrapVue from 'bootstrap-vue'
 

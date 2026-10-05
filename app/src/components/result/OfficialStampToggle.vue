@@ -41,76 +41,102 @@
       hide-footer
       centered
       size="md"
-      body-class="ost-modal-body"
-      content-class="ost-modal-content"
+      body-class="p-0"
+      content-class="ost-content"
     >
-      <button
-        type="button"
-        class="ost-modal-close"
-        aria-label="Tutup"
-        @click="showModal = false"
-      >
-        <Icon icon="mdi:close" width="16" height="16" />
-      </button>
-
-      <div class="ost-modal-icon" :class="'ost-modal-icon--' + status">
-        <Icon icon="mdi:clock-edit-outline" width="22" height="22" />
-      </div>
-
-      <h3 class="ost-modal-title">Atur Waktu Penetapan Status</h3>
-      <p class="ost-modal-desc">
-        Waktu ditetapkannya status
-        <span class="ost-modal-badge" :class="'ost-modal-badge--' + status">{{
-          statusLabel
-        }}</span>
-        untuk kategori ini — ditampilkan di stempel PDF &amp; Live Result.
-        Default otomatis mengikuti waktu saat status dipilih; ubah di sini
-        kalau perlu koreksi manual.
-      </p>
-
-      <div class="ost-field">
-        <label class="ost-field-label">Zona Waktu</label>
-        <b-form-radio-group
-          v-model="manualTz"
-          :options="TZ_OPTIONS"
-          button-variant="outline-primary"
-          buttons
-          size="sm"
-          class="ost-tz-group"
-        />
-      </div>
-
-      <div class="ost-field">
-        <label class="ost-field-label">
-          Tanggal &amp; Waktu
-          <span class="ost-field-label-hint">({{ manualTz }})</span>
-        </label>
-        <div class="ost-datetime-wrap">
-          <Icon
-            icon="mdi:calendar-clock-outline"
-            width="16"
-            height="16"
-            class="ost-datetime-icon"
-          />
-          <b-form-input
-            type="datetime-local"
-            v-model="manualDateTime"
-            class="ost-datetime-input"
-          />
+      <!-- Header (warna mengikuti status) -->
+      <div class="ost-head" :class="'ost-head--' + status">
+        <button
+          type="button"
+          class="ost-head__close"
+          aria-label="Tutup"
+          @click="showModal = false"
+        >
+          <Icon icon="mdi:close" width="18" height="18" />
+        </button>
+        <span class="ost-head__icon">
+          <Icon icon="mdi:clock-edit-outline" width="24" height="24" />
+        </span>
+        <div class="ost-head__text">
+          <span class="ost-head__eyebrow">Penetapan Status</span>
+          <h3 class="ost-head__title">Atur Waktu Penetapan Status</h3>
+          <span class="ost-head__status">
+            <span class="ost-head__dot"></span>
+            {{ statusLabel }}
+          </span>
         </div>
       </div>
 
-      <div class="ost-modal-actions">
-        <button
-          type="button"
-          class="ost-btn ost-btn--ghost"
-          @click="showModal = false"
-        >
+      <div class="ost-body">
+        <p class="ost-desc">
+          Waktu ditetapkannya status untuk kategori ini — ditampilkan di
+          stempel PDF &amp; Live Result. Default otomatis mengikuti waktu saat
+          status dipilih; ubah di sini kalau perlu koreksi manual.
+        </p>
+
+        <!-- Zona waktu -->
+        <div class="ost-field">
+          <label class="ost-field-label">Zona Waktu</label>
+          <div class="ost-tz" role="group" aria-label="Zona waktu">
+            <button
+              v-for="z in TZ_OPTIONS"
+              :key="z"
+              type="button"
+              class="ost-tz__btn"
+              :class="{ active: manualTz === z }"
+              @click="manualTz = z"
+            >
+              {{ z }}
+              <small>UTC+{{ tzOffset(z) }}</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tanggal & waktu -->
+        <div class="ost-field">
+          <div class="ost-field-row">
+            <label class="ost-field-label mb-0">
+              Tanggal &amp; Waktu
+              <span class="ost-field-label-hint">({{ manualTz }})</span>
+            </label>
+            <button type="button" class="ost-now-btn" @click="useNow">
+              <Icon icon="mdi:clock-fast" width="14" height="14" />
+              Gunakan waktu sekarang
+            </button>
+          </div>
+          <div class="ost-datetime-wrap">
+            <Icon
+              icon="mdi:calendar-clock-outline"
+              width="17"
+              height="17"
+              class="ost-datetime-icon"
+            />
+            <input
+              v-model="manualDateTime"
+              type="datetime-local"
+              class="ost-datetime-input"
+            />
+          </div>
+        </div>
+
+        <!-- Pratinjau teks stempel -->
+        <div class="ost-preview" :class="'ost-preview--' + status">
+          <span class="ost-preview__label">Pratinjau waktu penetapan</span>
+          <span class="ost-preview__value">
+            <Icon icon="mdi:stamper" width="15" height="15" />
+            {{ manualPreview || "Isi tanggal & waktu dulu" }}
+          </span>
+        </div>
+      </div>
+
+      <div class="ost-foot">
+        <button type="button" class="ost-btn ost-btn--ghost" @click="showModal = false">
           Batal
         </button>
         <button
           type="button"
           class="ost-btn ost-btn--primary"
+          :disabled="!manualDateTime"
           @click="confirmManual"
         >
           <Icon icon="mdi:content-save-outline" width="15" height="15" />
@@ -177,6 +203,15 @@ export default {
     },
   },
   computed: {
+    // Pratinjau teks "Ditetapkan: …" dari isian modal (wall-clock pada zona
+    // yg dipilih) — dipakai kotak pratinjau di modal.
+    manualPreview() {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(this.manualDateTime || "");
+      if (!m) return "";
+      const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+      const mon = months[Number(m[2]) - 1] || m[2];
+      return `Ditetapkan: ${m[3]} ${mon} ${m[1]} ${m[4]}.${m[5]} ${this.manualTz}`;
+    },
     statusLabel() {
       return RESULT_STATUS_LABELS[this.status] || RESULT_STATUS_LABELS.provisional;
     },
@@ -207,6 +242,12 @@ export default {
     },
   },
   methods: {
+    tzOffset(z) {
+      return TZ_OFFSET_HOURS[z] || 7;
+    },
+    useNow() {
+      this.manualDateTime = this.formatForTz(new Date(), this.manualTz);
+    },
     // Format instant (Date) jadi wall-clock string "YYYY-MM-DDTHH:mm" utk
     // input datetime-local, pada zona `tz` — geser epoch sesuai offset
     // tetap zona itu lalu baca komponen UTC-nya, supaya benar TERLEPAS
@@ -376,200 +417,241 @@ export default {
 }
 
 /* ===================== Modal "Atur Waktu Penetapan Status" ===================== */
-:deep(.ost-modal-content) {
-  border: none;
-  border-radius: 18px;
-  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-}
-:deep(.ost-modal-body) {
-  padding: 28px 26px 22px;
+.ost-head {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 56px 20px 22px;
+  color: #fff;
+  background: linear-gradient(110deg, #0f2f52 0%, #1c4c7a 55%, #1d7fb8 100%);
 }
-
-.ost-modal-close {
+.ost-head--provisional { background: linear-gradient(110deg, #7c2d12 0%, #b45309 55%, #d97706 100%); }
+.ost-head--unofficial { background: linear-gradient(110deg, #7f1d1d 0%, #b91c1c 55%, #dc2626 100%); }
+.ost-head--official { background: linear-gradient(110deg, #14532d 0%, #15803d 55%, #16a34a 100%); }
+.ost-head__close {
   position: absolute;
   top: 14px;
   right: 14px;
-  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: #f1f5f9;
-  color: #64748b;
-  border-radius: 999px;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
 }
-.ost-modal-close:hover {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.ost-modal-icon {
-  display: inline-flex;
+.ost-head__close:hover { background: rgba(255, 255, 255, 0.22); }
+.ost-head__icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #eef6ff;
-  color: #2f6ea5;
-  margin-bottom: 14px;
 }
-.ost-modal-icon--provisional {
-  background: #fef3e2;
-  color: #b45309;
+.ost-head__text { min-width: 0; }
+.ost-head__eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
-.ost-modal-icon--unofficial {
-  background: #fdecec;
-  color: #c0392b;
-}
-.ost-modal-icon--official {
-  background: #e7f7ee;
-  color: #148a3b;
-}
-
-.ost-modal-title {
+.ost-head__title {
+  margin: 2px 0 6px;
   font-size: 17px;
   font-weight: 800;
-  color: #0f172a;
-  margin: 0 0 8px;
   letter-spacing: -0.01em;
 }
-
-.ost-modal-desc {
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #64748b;
-  margin: 0 0 20px;
-}
-
-.ost-modal-badge {
-  display: inline-block;
-  font-weight: 800;
+.ost-head__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
   font-size: 11px;
-  letter-spacing: 0.02em;
-  padding: 1px 7px;
-  border-radius: 5px;
-  color: #1e293b;
-  background: #eef2f7;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.ost-modal-badge--provisional {
-  color: #b45309;
-  background: #fef3e2;
-}
-.ost-modal-badge--unofficial {
-  color: #c0392b;
-  background: #fdecec;
-}
-.ost-modal-badge--official {
-  color: #148a3b;
-  background: #e7f7ee;
-}
+.ost-head__dot { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+.ost-head--provisional .ost-head__dot { background: #d97706; }
+.ost-head--unofficial .ost-head__dot { background: #dc2626; }
+.ost-head--official .ost-head__dot { background: #16a34a; }
 
-.ost-field {
-  margin-bottom: 18px;
+.ost-body { padding: 20px 22px 6px; }
+.ost-desc { margin: 0 0 18px; font-size: 12.5px; line-height: 1.55; color: #64748b; }
+.ost-field { margin-bottom: 16px; }
+.ost-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .ost-field-label {
   display: block;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #334155;
+}
+.ost-field-label-hint { font-weight: 600; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+
+.ost-tz {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5fb;
+  border: 1px solid #e6edf6;
+}
+.ost-tz__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.ost-tz__btn small { font-size: 10px; font-weight: 600; opacity: 0.75; }
+.ost-tz__btn:hover { color: #1c4c7a; }
+.ost-tz__btn.active {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(28, 76, 122, 0.25);
+}
+
+.ost-now-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  border: 1px solid #d6e3f1;
+  background: #fff;
+  color: #1c4c7a;
   font-size: 11.5px;
   font-weight: 700;
-  color: #334155;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
+  cursor: pointer;
 }
-.ost-field-label-hint {
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: none;
-  letter-spacing: 0;
-}
+.ost-now-btn:hover { border-color: #25b0eb; background: #f0f7ff; }
 
-/* Bootstrap .btn-group merapatkan tombol jadi satu blok nyambung (margin-
-   left negatif + border-radius cuma di ujung kiri/kanan) — gap saja tidak
-   cukup krn keduanya "berebut" jarak antar tombol. Lepas semua perilaku
-   nyambung itu supaya WIB/WITA/WIT tampil sbg 3 pill terpisah dgn jarak
-   yg jelas. */
-.ost-tz-group :deep(.btn-group) {
-  display: flex;
-  gap: 8px;
-}
-.ost-tz-group :deep(.btn) {
-  border-radius: 8px !important;
+.ost-datetime-wrap { position: relative; display: flex; align-items: center; }
+.ost-datetime-icon { position: absolute; left: 12px; color: #94a3b8; pointer-events: none; }
+.ost-datetime-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 38px;
+  border-radius: 11px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font: inherit;
   font-weight: 700;
-  font-size: 12px;
-  margin-left: 0 !important;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.ost-datetime-input:focus {
+  background: #fff;
+  border-color: #25b0eb;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.15);
 }
 
-.ost-datetime-wrap {
-  position: relative;
+.ost-preview {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
 }
-.ost-datetime-icon {
-  position: absolute;
-  left: 12px;
+.ost-preview__label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: #94a3b8;
-  pointer-events: none;
 }
-:deep(.ost-datetime-input) {
-  padding-left: 36px;
-  height: 42px;
-  border-radius: 10px;
-  border: 1px solid #dde3ec;
-  font-weight: 600;
-  color: #1e293b;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+.ost-preview__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
 }
-:deep(.ost-datetime-input:focus) {
-  border-color: #2f6ea5;
-  box-shadow: 0 0 0 3px rgba(47, 110, 165, 0.12);
-}
+.ost-preview--provisional { border-color: #fcd34d; background: #fffbeb; }
+.ost-preview--provisional .ost-preview__value { color: #b45309; }
+.ost-preview--unofficial { border-color: #fca5a5; background: #fef2f2; }
+.ost-preview--unofficial .ost-preview__value { color: #b91c1c; }
+.ost-preview--official { border-color: #86efac; background: #f0fdf4; }
+.ost-preview--official .ost-preview__value { color: #15803d; }
 
-.ost-modal-actions {
+.ost-foot {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
+  padding: 14px 22px;
+  border-top: 1px solid #eef2f7;
+  background: #fbfdff;
 }
-
 .ost-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 18px;
-  border-radius: 10px;
-  font-size: 12.5px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 11px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  border: 1px solid transparent;
+  transition: filter 0.15s ease, background-color 0.15s ease, transform 0.08s ease;
 }
-.ost-btn:active {
-  transform: translateY(1px);
-}
-.ost-btn--ghost {
-  background: #fff;
-  border: 1px solid #dde3ec;
-  color: #475569;
-}
-.ost-btn--ghost:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
+.ost-btn:active:not(:disabled) { transform: translateY(1px); }
+.ost-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ost-btn--ghost { background: #fff; border-color: #e2e8f0; color: #475569; }
+.ost-btn--ghost:hover { background: #f8fafc; }
 .ost-btn--primary {
-  background: linear-gradient(135deg, #3aa3ec, #1c6fb0);
-  border: 1px solid #1c6fb0;
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
   color: #fff;
-  box-shadow: 0 6px 16px -4px rgba(28, 111, 176, 0.45);
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
 }
-.ost-btn--primary:hover {
-  background: linear-gradient(135deg, #46addb, #2178bb);
-  box-shadow: 0 8px 20px -4px rgba(28, 111, 176, 0.55);
+.ost-btn--primary:hover:not(:disabled) { filter: brightness(1.07); }
+</style>
+
+<style>
+/* Kartu modal — GLOBAL krn b-modal dirender di <body> (dulu `:deep()` di
+   blok scoped tidak pernah kena, sudut & bayangan kartu tidak tampil). */
+.ost-content {
+  border: none;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
 }
 </style>
+

@@ -1,123 +1,283 @@
-<html>
+<!DOCTYPE html>
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STiming System 424</title>
     <style>
+      /* Splash window: 500x200, frameless & transparent (lihat
+         createSplash() di src/background.js, zoom 0.7). Kartu membulat
+         mengisi jendela; sisa area transparan supaya sudutnya tampil. */
+      * {
+        box-sizing: border-box;
+      }
       html,
       body {
         height: 100%;
         margin: 0;
-        overflow: hidden; /* ⬅️ hindari scroll */
+        overflow: hidden;
+        background: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
       }
 
-      body {
+      .card {
+        position: absolute;
+        inset: 10px;
+        display: flex;
+        flex-direction: column;
+        border-radius: 22px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e6edf6;
+        box-shadow: 0 10px 30px rgba(15, 42, 67, 0.22);
+        animation: card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      @keyframes card-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* Aksen gradient brand di tepi atas */
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #1c4c7a, #25b0eb, #1c4c7a);
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        padding: 18px 30px 8px;
+        min-height: 0;
+      }
+
+      /* Logo animasi (gif 500x200, logo di tengah) dicrop ke kotak */
+      .logo {
+        flex: none;
+        width: 132px;
+        height: 132px;
+        border-radius: 28px;
         background-color: #f9f9fa;
         background-image: url("assets/gif/sts.gif");
         background-repeat: no-repeat;
         background-position: center center;
-        background-size: contain;
-        height: 100%;
-        margin: 0;
+        background-size: 460px 184px;
+        box-shadow: inset 0 0 0 1px #e6edf6, 0 8px 20px rgba(28, 76, 122, 0.12);
       }
 
-      .flex {
-        -webkit-box-flex: 1;
-        -ms-flex: 1 1 auto;
-        flex: 1 1 auto;
+      .info {
+        flex: 1;
+        min-width: 0;
+      }
+      .eyebrow {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: #e6f4fd;
+        color: #1c4c7a;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .title {
+        margin: 8px 0 12px;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: #0f172a;
+        white-space: nowrap;
       }
 
-      .loader {
-        border: 5px solid rgba(18, 65, 145, 255);
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+      }
+      .status .dot {
+        width: 9px;
+        height: 9px;
         border-radius: 50%;
-        border-top: 5px solid #ffffff;
-        width: 40px;
-        height: 40px;
-        -webkit-animation: spin 1s linear infinite;
-        animation: spin 1s linear infinite;
-        margin: auto;
-        left: 0;
-        right: 0;
-        top: 0px;
+        background: #25b0eb;
+        box-shadow: 0 0 0 0 rgba(37, 176, 235, 0.5);
+        animation: pulse 1.4s ease-out infinite;
+      }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(37, 176, 235, 0.55);
+        }
+        100% {
+          box-shadow: 0 0 0 9px rgba(37, 176, 235, 0);
+        }
+      }
+      .ellipsis::after {
+        content: "";
+        display: inline-block;
+        width: 1.2em;
+        text-align: left;
+        animation: dots 1.4s steps(4, end) infinite;
+      }
+      @keyframes dots {
+        0% {
+          content: "";
+        }
+        25% {
+          content: ".";
+        }
+        50% {
+          content: "..";
+        }
+        75% {
+          content: "...";
+        }
+      }
+
+      /* Progress bar indeterminate */
+      .progress {
+        position: relative;
+        height: 6px;
+        margin: 12px 0 14px;
+        border-radius: 999px;
+        background: #eef2f7;
+        overflow: hidden;
+      }
+      .progress span {
+        position: absolute;
+        top: 0;
         bottom: 0;
-        position: fixed;
+        width: 38%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #1c4c7a, #25b0eb);
+        animation: slide 1.5s ease-in-out infinite;
       }
-
-      @-webkit-keyframes spin {
+      @keyframes slide {
         0% {
-          -webkit-transform: rotate(0deg);
+          left: -40%;
         }
         100% {
-          -webkit-transform: rotate(360deg);
+          left: 100%;
         }
       }
 
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
+      .versions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e6edf6;
+        color: #475569;
+        font-size: 11.5px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .chip b {
+        color: #1c4c7a;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
       }
 
-      .center {
-        border: none !important;
-        text-align: center;
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 30px;
+        border-top: 1px solid #eef2f7;
+        background: #fbfdff;
+        color: #64748b;
+        font-size: 11.5px;
+        white-space: nowrap;
+      }
+      .footer a,
+      .footer strong {
+        color: #1c4c7a;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .card,
+        .status .dot,
+        .ellipsis::after,
+        .progress span {
+          animation: none;
+        }
+        .progress span {
+          left: 0;
+          width: 100%;
+          opacity: 0.6;
+        }
       }
     </style>
   </head>
 
   <body>
-    <h3
-      style="
-        display: flex;
-        margin-top: 10px;
-        justify-content: center;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 14px;
-        color: rgb(49, 111, 185);
-      "
-    >
-      Sustainable Timing System v2.0.0 is Starting...
-    </h3>
+    <div class="card" role="status" aria-live="polite">
+      <div class="main">
+        <div class="logo" aria-label="STiming System 424 logo"></div>
 
-    <p
-      style="
-        display: flex;
-        align-items: end;
-        justify-content: center;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 12px;
-        color: rgb(49, 111, 185);
-      "
-    >
-      We are using node :
-      <script>
-        document.write(process.versions.node);
-      </script>
-      , Chrome :
-      <script>
-        document.write(process.versions.chrome);
-      </script>
-      , and Electron :
-      <script>
-        document.write(process.versions.electron);
-      </script>
-      .
-    </p>
+        <div class="info">
+          <span class="eyebrow">Sustainable Timing System</span>
+          <div class="title">STiming System 424</div>
 
-    <small
-      style="
-        position: fixed;
-        bottom: 10px;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 12px;
-        color: rgb(49, 111, 185);
-      "
-    >
-      📨 Technical Support : jendelacakradigital@gmail.com | ©2025 STiming System 424
-    </small>
+          <div class="status">
+            <span class="dot"></span>
+            <span class="ellipsis">Memulai aplikasi</span>
+          </div>
+          <div class="progress"><span></span></div>
+
+          <div class="versions">
+            <span class="chip">Node <b id="v-node">-</b></span>
+            <span class="chip">Chrome <b id="v-chrome">-</b></span>
+            <span class="chip">Electron <b id="v-electron">-</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>📨 Technical Support: <strong>jendelacakradigital@gmail.com</strong></span>
+        <span>©2025 <strong>STiming System 424</strong></span>
+      </div>
+    </div>
+
+    <script>
+      // Versi runtime (nodeIntegration aktif di jendela splash). Diisi lewat
+      // textContent (bukan document.write) & aman kalau `process` tidak ada.
+      (function () {
+        var v = (typeof process !== "undefined" && process.versions) || {};
+        var set = function (id, val) {
+          var el = document.getElementById(id);
+          if (el && val) el.textContent = String(val).split(".").slice(0, 3).join(".");
+        };
+        set("v-node", v.node);
+        set("v-chrome", v.chrome);
+        set("v-electron", v.electron);
+      })();
+    </script>
   </body>
 </html>

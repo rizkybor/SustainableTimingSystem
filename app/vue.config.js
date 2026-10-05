@@ -58,6 +58,13 @@ module.exports = {
           oneClick: false,
           perMachine: true,
           include: "nsis/installer.nsh",
+          // Tampilan wizard installer (BMP 24-bit, ukuran wajib persis) —
+          // dibuat ulang lewat: python3 scripts/generate-installer-images.py
+          installerSidebar: "nsis/assets/installerSidebar.bmp",
+          uninstallerSidebar: "nsis/assets/uninstallerSidebar.bmp",
+          installerHeader: "nsis/assets/installerHeader.bmp",
+          installerIcon: "src/assets/icons/icon.ico",
+          uninstallerIcon: "src/assets/icons/icon.ico",
         },
         linux: {
           icon: "src/assets/icons/icon.png",

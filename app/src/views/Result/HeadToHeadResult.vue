@@ -460,8 +460,8 @@
           :data="pdfEventData"
           pdfMode="allround"
           :pdfOverallPkg="pdfOverallPkg"
-          :status="resultStatus"
-          :officialSetAt="officialSetAt"
+          :status="overallStatus"
+          :officialSetAt="overallSetAt"
           :headToHeadCats="h2hCats"
           :countryMap="_teamCountryMap"
         />
@@ -589,7 +589,31 @@ export default {
   },
 
   computed: {
+    // FITUR (2026-10-06): status Provisional/Unofficial/Official H2H kini
+    // PER BABAK — toggle di kanan atas mengikuti tab yg sedang dibuka:
+    // tab "Overall" = key bucket lama (h2h__div__race__init, tidak berubah),
+    // tab babak = key bucket + "__round__<roundId>". Dibaca juga oleh Live
+    // Result sts-jurysystem (badge per babak di bracket).
+    activeStatusKey() {
+      if (!this.resultCategoryKey) return "";
+      return this.activeTab && this.activeTab !== "overall"
+        ? `${this.resultCategoryKey}__round__${this.activeTab}`
+        : this.resultCategoryKey;
+    },
     officialSetAt() {
+      const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
+      if (!m) return "";
+      if (this.activeStatusKey !== this.resultCategoryKey) {
+        return m[this.activeStatusKey] || "";
+      }
+      return m[this.resultCategoryKey] || m.h2h || "";
+    },
+    // Status & waktu bucket (tab Overall) — dipakai PDF "allround" supaya
+    // stempelnya tetap status hasil akhir, tidak ikut tab babak yg dibuka.
+    overallStatus() {
+      return deriveResultStatus(this.eventInfo, this.resultCategoryKey, "h2h");
+    },
+    overallSetAt() {
       const m = this.eventInfo && this.eventInfo.resultsOfficialSetAt;
       return (m && m[this.resultCategoryKey]) || (m && m.h2h) || "";
     },
@@ -877,11 +901,7 @@ export default {
               raceId: q.raceId,
               initialId: q.initialId,
             });
-            this.resultStatus = deriveResultStatus(
-              this.eventInfo,
-              this.resultCategoryKey,
-              "h2h"
-            );
+            this.refreshTabStatus();
             resolve();
           });
         });
@@ -906,6 +926,9 @@ export default {
       const q = this.$route.query || {};
       const eventId = String(q.eventId || this.eventInfo._id || "");
       if (!eventId || typeof ipcRenderer === "undefined") return;
+      // Dikunci di awal — tab bisa saja berganti sblm balasan datang.
+      const statusKey = this.activeStatusKey;
+      if (!statusKey) return;
 
       await new Promise((resolve) => {
         ipcRenderer.once("event:set-official-reply", (_e, res) => {
@@ -916,15 +939,15 @@ export default {
               resultTimezone: res.resultTimezone || this.eventInfo.resultTimezone,
               resultsStatusByCategory: {
                 ...(this.eventInfo.resultsStatusByCategory || {}),
-                [this.resultCategoryKey]: nextStatus,
+                [statusKey]: nextStatus,
               },
               resultsOfficialByCategory: {
                 ...(this.eventInfo.resultsOfficialByCategory || {}),
-                [this.resultCategoryKey]: nextStatus === "official",
+                [statusKey]: nextStatus === "official",
               },
               resultsOfficialSetAt: {
                 ...(this.eventInfo.resultsOfficialSetAt || {}),
-                [this.resultCategoryKey]: res.setAt || new Date().toISOString(),
+                [statusKey]: res.setAt || new Date().toISOString(),
               },
             };
           } else {
@@ -941,7 +964,7 @@ export default {
         });
         ipcRenderer.send("event:set-official", {
           eventId,
-          category: this.resultCategoryKey,
+          category: statusKey,
           status: nextStatus,
           timestamp: timestamp || undefined,
           resultTimezone: resultTimezone || undefined,
@@ -1073,9 +1096,22 @@ export default {
 
     selectTab(id) {
       this.activeTab = id;
+      this.refreshTabStatus();
       if (id !== "overall") {
         this.buildEditRowsForRound(id);
       }
+    },
+
+    // Status tab aktif — babak TIDAK fallback ke status bucket/flat lama
+    // (babak yg belum pernah di-set = Provisional), tab Overall tetap pakai
+    // fallback lama deriveResultStatus() spt sebelumnya.
+    refreshTabStatus() {
+      const isRound = this.activeStatusKey !== this.resultCategoryKey;
+      this.resultStatus = deriveResultStatus(
+        this.eventInfo,
+        this.activeStatusKey,
+        isRound ? undefined : "h2h"
+      );
     },
 
     // Bangun daftar baris editable utk satu babak: semua tim yg SUDAH
@@ -1326,7 +1362,7 @@ export default {
               if (typeof ipcRenderer !== "undefined" && this.resultCategoryKey) {
                 ipcRenderer.send("event:touch-result-timestamp", {
                   eventId: String(bucket.eventId),
-                  category: this.resultCategoryKey,
+                  category: `${this.resultCategoryKey}__round__${round.id}`,
                 });
               }
             } else {

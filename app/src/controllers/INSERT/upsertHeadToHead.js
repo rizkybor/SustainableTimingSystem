@@ -36,7 +36,29 @@ async function ensureIndexes(db) {
  *  - upsertBracket(bucket, rounds, { showBronze, settings })
  *  - getBracket(bucket)
  *  ========================================= */
-async function upsertBracket(bucket, rounds, { showBronze = true, settings = {} } = {}) {
+// BUG FIX (2026-10-06): saveBracketToDB() di renderer dipanggil beruntun
+// tanpa saling menunggu (tiap slot diisi, pemenang berubah, auto-advance),
+// dan ipcMain menjalankan handler-nya PARALEL — latensi createIndex/update
+// yg beda2 bikin snapshot LAMA bisa mendarat SETELAH snapshot baru (mis.
+// Final B cuma berisi 1 dari 2 tim kalah Semifinal -> tampil BYE). Semua
+// tulis ke dokumen bracket yg sama (key) diantrikan berurutan di sini.
+const _bracketWriteQueues = new Map();
+function enqueueBracketWrite(key, task) {
+  const prev = _bracketWriteQueues.get(key) || Promise.resolve();
+  const run = prev.catch(() => {}).then(task);
+  const tail = run.catch(() => {});
+  _bracketWriteQueues.set(key, tail);
+  tail.then(() => {
+    if (_bracketWriteQueues.get(key) === tail) _bracketWriteQueues.delete(key);
+  });
+  return run;
+}
+
+async function upsertBracket(bucket, rounds, opts = {}) {
+  return enqueueBracketWrite(makeKey(bucket), () => _upsertBracket(bucket, rounds, opts));
+}
+
+async function _upsertBracket(bucket, rounds, { showBronze = true, settings = {} } = {}) {
   const db = await getDb();
   await ensureIndexes(db);
 
@@ -110,6 +132,12 @@ async function getBracket(bucket) {
 // tanggung jawab caller (HeadToHead.vue) yang SUDAH py info Heat usage
 // lintas kategori dari getAllBracketsForEvent().
 async function assignHeatDirect(bucket, roundId, matchIndex, heat) {
+  return enqueueBracketWrite(makeKey(bucket), () =>
+    _assignHeatDirect(bucket, roundId, matchIndex, heat)
+  );
+}
+
+async function _assignHeatDirect(bucket, roundId, matchIndex, heat) {
   const db = await getDb();
   await ensureIndexes(db);
 

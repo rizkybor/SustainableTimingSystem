@@ -2,256 +2,234 @@
   <b-modal
     :id="id"
     v-model="show"
-    hide-footer
     centered
     size="xl"
-    body-class="p-0"
-    content-class="rounded-20 overflow-hidden rs-modal"
+    body-class="p-0 esm-body"
+    header-class="p-0 border-0"
+    footer-class="esm-footer"
+    content-class="esm-content"
     scrollable
   >
     <!-- Header -->
     <template #modal-header>
-      <div class="d-flex justify-content-between align-items-center w-100">
-        <h5 class="mb-0 font-weight-bold">Event Setting</h5>
-        <button type="button" class="btn-icon" @click="show = false">✕</button>
+      <div class="esm-head">
+        <div class="esm-head__bg"></div>
+        <button type="button" class="esm-close" aria-label="Close" @click="show = false">
+          <Icon icon="mdi:close" />
+        </button>
+        <div class="esm-head__inner">
+          <span class="esm-head__icon"><Icon icon="mdi:calendar-edit-outline" /></span>
+          <div class="esm-head__text">
+            <span class="esm-eyebrow">Event Setting</span>
+            <h5 class="esm-title">{{ eventName || form.eventName || "-" }}</h5>
+            <p class="esm-sub">ID: {{ eventId || "-" }}</p>
+          </div>
+        </div>
       </div>
     </template>
 
-    <!-- Body -->
-    <div class="p-4 modal-inner">
-      <div class="text-muted small mb-3">
-        Event: <strong>{{ eventName || "-" }}</strong> (ID: {{ eventId || "-" }})
-      </div>
+    <!-- Body: navigasi tab (kiri) + konten (kanan). Semua panel tetap
+         ter-render (v-show), jadi isian & input file tidak hilang saat
+         pindah tab. -->
+    <div class="esm-layout">
+      <nav class="esm-nav" aria-label="Bagian Event Setting">
+        <button
+          v-for="t in esmTabs"
+          :key="t.key"
+          type="button"
+          class="esm-nav__item"
+          :class="{ active: esmTab === t.key }"
+          @click="esmTab = t.key"
+        >
+          <Icon :icon="t.icon" class="esm-nav__icon" />
+          <span class="esm-nav__label">{{ t.label }}</span>
+          <span v-if="t.badge" class="esm-nav__badge">{{ t.badge }}</span>
+        </button>
+      </nav>
 
-      <div class="cardish">
-        <!-- ===================== Event Information ===================== -->
-        <section class="uploader-section">
-          <div class="section-title">Event Information</div>
-
-          <b-row>
-            <b-col md="4">
-              <b-form-group label="Event Level">
-                <b-form-select
-                  v-model="form.levelName"
-                  :options="sortedOptionLevels"
-                  value-field="name"
-                  text-field="name"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="4">
-              <b-form-group label="Event Name">
-                <b-form-input
-                  size="sm"
-                  v-model="form.eventName"
-                  placeholder="Enter your event name"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="4">
-              <b-form-group label="River Name">
-                <b-form-input
-                  size="sm"
-                  v-model="form.riverName"
-                  placeholder="Enter river name"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col md="4">
-              <b-form-group label="District">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressDistrict"
-                  placeholder="Enter District"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="4">
-              <b-form-group label="Sub District">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressSubDistrict"
-                  placeholder="Enter Sub District"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="4">
-              <b-form-group label="Village">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressVillage"
-                  placeholder="Enter Village"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <b-col md="3">
-              <b-form-group label="City">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressCity"
-                  placeholder="Enter City"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="3">
-              <b-form-group label="Province">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressProvince"
-                  placeholder="Enter Province"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="3">
-              <b-form-group label="ZIP Code">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressZipCode"
-                  placeholder="Enter ZIP Code"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="3">
-              <b-form-group label="State">
-                <b-form-input
-                  size="sm"
-                  v-model="form.addressState"
-                  placeholder="Enter State"
-                  class="br-15"
-                />
-              </b-form-group>
-            </b-col>
-          </b-row>
-
-          <b-row>
-            <!-- BUG FIX: b-form-datepicker (dropdown) ke-tutup/klik
-                 ke-intercept oleh elemen field lain di modal ini — kuirk
-                 rendering Chromium pada <legend>/fieldset yang TIDAK bisa
-                 diperbaiki murni via CSS (z-index, transform, overflow
-                 modal, pointer-events semua sudah dicoba). Diganti total
-                 ke <b-calendar> (SELALU tampil inline, TIDAK ADA
-                 popup/dropdown) — sama fix pattern dgn CreateEvent.vue. -->
-            <b-col md="6">
-              <b-form-group label="Start Date">
-                <div class="stx-inline-calendar-value">
-                  {{ form.startDateEvent || "Belum ada tanggal dipilih" }}
-                </div>
-                <b-calendar
-                  v-model="form.startDateEvent"
-                  class="mb-2 br-15 stx-inline-calendar"
-                  block
-                />
-              </b-form-group>
-            </b-col>
-            <b-col md="6">
-              <b-form-group label="End Date">
-                <div class="stx-inline-calendar-value">
-                  {{ form.endDateEvent || "Belum ada tanggal dipilih" }}
-                </div>
-                <b-calendar
-                  :disabled="form.startDateEvent === ''"
-                  v-model="form.endDateEvent"
-                  class="mb-2 br-15 stx-inline-calendar"
-                  :min="form.startDateEvent"
-                  block
-                />
-              </b-form-group>
-            </b-col>
-          </b-row>
-
-          <b-form-group label="Event Categories" label-cols="3">
-            <multiselect
-              v-model="form.categoriesEvent"
-              :options="optionCategories"
-              placeholder="Select event categories"
-              multiple
-              track-by="value"
-              label="name"
-            />
-          </b-form-group>
-
-          <b-form-group label="Division Categories" label-cols="3">
-            <multiselect
-              v-model="form.categoriesDivision"
-              :options="optionDivisions"
-              placeholder="Select division categories"
-              multiple
-              track-by="value"
-              label="name"
-            />
-          </b-form-group>
-
-          <b-form-group label="Race Categories" label-cols="3">
-            <multiselect
-              v-model="form.categoriesRace"
-              :options="optionRaces"
-              placeholder="Select race categories"
-              multiple
-              track-by="value"
-              label="name"
-            />
-          </b-form-group>
-
-          <b-form-group label="Initial Categories" label-cols="3">
-            <multiselect
-              v-model="form.categoriesInitial"
-              :options="optionInitials"
-              placeholder="Select initial categories"
-              multiple
-              track-by="value"
-              label="name"
-            />
-          </b-form-group>
-
-          <!-- Zona Waktu Event — 1 pengaturan berlaku utk SEMUA tampilan
-               Protest/Unofficial/Official Time (badge Result, stempel PDF,
-               Live Result sts-jurysystem). Lihat officialStamp.js. -->
-          <b-form-group label="Zona Waktu Event" label-cols="3">
-            <b-form-radio-group
-              v-model="form.resultTimezone"
-              :options="['WIB', 'WITA', 'WIT']"
-              button-variant="outline-primary"
-              buttons
-            />
-            <small class="text-muted d-block mt-1">
-              Dipakai utk semua tampilan waktu Provisional/Unofficial/Official
-              (badge Result, stempel PDF, Live Result di sts-jurysystem).
-            </small>
-          </b-form-group>
-        </section>
-
-        <!-- ===================== Poster Event ===================== -->
-        <section class="uploader-section">
-          <div class="section-title">Poster Event</div>
-          <div class="text-muted small mb-2">
-            Ditampilkan sebagai gambar kartu event di halaman Events List.
+      <div class="esm-panels">
+        <!-- ===================== Informasi Event ===================== -->
+        <section v-show="esmTab === 'info'" class="esm-panel">
+          <header class="esm-panel__head">
+            <h6 class="esm-panel__title">Informasi Event</h6>
+            <p class="esm-panel__desc">Tingkat, nama event, sungai, dan alamat lengkap lokasi.</p>
+          </header>
+          <div class="esm-grid esm-grid--3">
+            <b-form-group label="Event Level" label-class="esm-label">
+              <b-form-select
+                v-model="form.levelName"
+                :options="sortedOptionLevels"
+                value-field="name"
+                text-field="name"
+                class="br-15"
+              />
+            </b-form-group>
+            <b-form-group label="Event Name" label-class="esm-label">
+              <b-form-input v-model="form.eventName" placeholder="Enter your event name" class="br-15" />
+            </b-form-group>
+            <b-form-group label="River Name" label-class="esm-label">
+              <b-form-input v-model="form.riverName" placeholder="Enter river name" class="br-15" />
+            </b-form-group>
           </div>
 
-          <div class="sig-upload">
-            <div class="sig-upload-row">
-              <img
-                v-if="posterPreview || posterUrl"
-                :src="posterPreview || posterUrl"
-                class="poster-thumb"
-                alt="Poster preview"
-              />
-              <div v-else class="poster-thumb poster-thumb-empty">No poster</div>
+          <div class="esm-subhead"><Icon icon="mdi:map-marker-outline" /> Alamat Lokasi</div>
+          <div class="esm-grid esm-grid--3">
+            <b-form-group label="District" label-class="esm-label">
+              <b-form-input v-model="form.addressDistrict" placeholder="Enter District" class="br-15" />
+            </b-form-group>
+            <b-form-group label="Sub District" label-class="esm-label">
+              <b-form-input v-model="form.addressSubDistrict" placeholder="Enter Sub District" class="br-15" />
+            </b-form-group>
+            <b-form-group label="Village" label-class="esm-label">
+              <b-form-input v-model="form.addressVillage" placeholder="Enter Village" class="br-15" />
+            </b-form-group>
+          </div>
+          <div class="esm-grid esm-grid--4">
+            <b-form-group label="City" label-class="esm-label">
+              <b-form-input v-model="form.addressCity" placeholder="Enter City" class="br-15" />
+            </b-form-group>
+            <b-form-group label="Province" label-class="esm-label">
+              <b-form-input v-model="form.addressProvince" placeholder="Enter Province" class="br-15" />
+            </b-form-group>
+            <b-form-group label="ZIP Code" label-class="esm-label">
+              <b-form-input v-model="form.addressZipCode" placeholder="Enter ZIP Code" class="br-15" />
+            </b-form-group>
+            <b-form-group label="State" label-class="esm-label">
+              <b-form-input v-model="form.addressState" placeholder="Enter State" class="br-15" />
+            </b-form-group>
+          </div>
+        </section>
 
+        <!-- ===================== Jadwal & Zona Waktu ===================== -->
+        <section v-show="esmTab === 'schedule'" class="esm-panel">
+          <header class="esm-panel__head">
+            <h6 class="esm-panel__title">Jadwal &amp; Zona Waktu</h6>
+            <p class="esm-panel__desc">Rentang tanggal event dan zona waktu untuk semua tampilan waktu resmi.</p>
+          </header>
+          <!-- BUG FIX lama: b-form-datepicker (dropdown) ke-tutup/klik
+               ke-intercept field lain (kuirk Chromium <legend>/fieldset) —
+               diganti <b-calendar> inline (TANPA popup), sama fix pattern
+               dgn CreateEvent.vue. -->
+          <div class="esm-grid esm-grid--2">
+            <b-form-group label="Start Date" label-class="esm-label">
+              <div class="esm-date" :class="{ 'is-empty': !form.startDateEvent }">
+                <Icon icon="mdi:calendar-start" />
+                {{ form.startDateEvent || "Belum ada tanggal dipilih" }}
+              </div>
+              <b-calendar v-model="form.startDateEvent" class="br-15 stx-inline-calendar" block />
+            </b-form-group>
+            <b-form-group label="End Date" label-class="esm-label">
+              <div class="esm-date" :class="{ 'is-empty': !form.endDateEvent }">
+                <Icon icon="mdi:calendar-end" />
+                {{ form.endDateEvent || (form.startDateEvent ? "Belum ada tanggal dipilih" : "Pilih Start Date dulu") }}
+              </div>
+              <b-calendar
+                :disabled="form.startDateEvent === ''"
+                v-model="form.endDateEvent"
+                class="br-15 stx-inline-calendar"
+                :min="form.startDateEvent"
+                block
+              />
+            </b-form-group>
+          </div>
+
+          <!-- Zona Waktu Event — 1 pengaturan utk SEMUA tampilan Protest/
+               Unofficial/Official Time (badge Result, stempel PDF, Live
+               Result sts-jurysystem). Lihat officialStamp.js. -->
+          <div class="esm-subhead"><Icon icon="mdi:earth" /> Zona Waktu Event</div>
+          <div class="esm-tz">
+            <button
+              v-for="tz in ['WIB', 'WITA', 'WIT']"
+              :key="tz"
+              type="button"
+              class="esm-tz__btn"
+              :class="{ active: form.resultTimezone === tz }"
+              @click="form.resultTimezone = tz"
+            >
+              {{ tz }}
+            </button>
+          </div>
+          <small class="esm-help">
+            Dipakai utk semua tampilan waktu Provisional/Unofficial/Official
+            (badge Result, stempel PDF, Live Result di sts-jurysystem).
+          </small>
+        </section>
+
+        <!-- ===================== Kategori Lomba ===================== -->
+        <section v-show="esmTab === 'categories'" class="esm-panel esm-panel--overflow">
+          <header class="esm-panel__head">
+            <h6 class="esm-panel__title">Kategori Lomba</h6>
+            <p class="esm-panel__desc">
+              Urutan Event Categories menentukan urutan kartu di Event Detail serta
+              panel di Race/Judges Settings.
+            </p>
+          </header>
+          <div class="esm-grid esm-grid--2">
+            <b-form-group label="Event Categories" label-class="esm-label">
+              <multiselect
+                v-model="form.categoriesEvent"
+                :options="optionCategories"
+                placeholder="Select event categories"
+                multiple
+                track-by="value"
+                label="name"
+              />
+            </b-form-group>
+            <b-form-group label="Division Categories" label-class="esm-label">
+              <multiselect
+                v-model="form.categoriesDivision"
+                :options="optionDivisions"
+                placeholder="Select division categories"
+                multiple
+                track-by="value"
+                label="name"
+              />
+            </b-form-group>
+            <b-form-group label="Race Categories" label-class="esm-label">
+              <multiselect
+                v-model="form.categoriesRace"
+                :options="optionRaces"
+                placeholder="Select race categories"
+                multiple
+                track-by="value"
+                label="name"
+              />
+            </b-form-group>
+            <b-form-group label="Initial Categories" label-class="esm-label">
+              <multiselect
+                v-model="form.categoriesInitial"
+                :options="optionInitials"
+                placeholder="Select initial categories"
+                multiple
+                track-by="value"
+                label="name"
+              />
+            </b-form-group>
+          </div>
+        </section>
+
+        <!-- ===================== Media ===================== -->
+        <section v-show="esmTab === 'media'" class="esm-panel">
+          <header class="esm-panel__head">
+            <h6 class="esm-panel__title">Media</h6>
+            <p class="esm-panel__desc">Poster untuk kartu event, logo event, dan logo sponsor.</p>
+          </header>
+
+          <!-- Poster -->
+          <div class="esm-subhead"><Icon icon="mdi:image-outline" /> Poster Event</div>
+          <div class="esm-poster">
+            <img
+              v-if="posterPreview || posterUrl"
+              :src="posterPreview || posterUrl"
+              class="poster-thumb"
+              alt="Poster preview"
+            />
+            <div v-else class="poster-thumb poster-thumb-empty">
+              <Icon icon="mdi:image-plus-outline" width="26" height="26" />
+              No poster
+            </div>
+            <div class="esm-poster__side">
+              <div class="esm-help mb-2">Ditampilkan sebagai gambar kartu event di halaman Events List.</div>
               <div class="sig-upload-actions">
                 <input
                   ref="posterInput"
@@ -260,27 +238,24 @@
                   class="d-none"
                   @change="onPosterFileChange"
                 />
-                <b-button size="sm" variant="outline-primary" @click="$refs.posterInput.click()">
-                  Choose Image
-                </b-button>
-                <b-button
+                <button type="button" class="esm-mini" @click="$refs.posterInput.click()">
+                  <Icon icon="mdi:upload" /> {{ posterPreview || posterUrl ? "Ganti" : "Choose Image" }}
+                </button>
+                <button
                   v-if="posterPreview || posterUrl"
-                  size="sm"
-                  variant="outline-danger"
+                  type="button"
+                  class="esm-mini esm-mini--danger"
                   @click="removePosterFile"
                 >
-                  Remove
-                </b-button>
+                  <Icon icon="mdi:trash-can-outline" /> Remove
+                </button>
               </div>
+              <div class="esm-hint">PNG/JPEG, maksimum {{ maxSizeMB }}MB</div>
             </div>
-            <div class="hint-danger mt-1">PNG/JPEG, maksimum {{ maxSizeMB }}MB</div>
           </div>
-        </section>
 
-        <!-- ===================== Event Logo ===================== -->
-        <section class="uploader-section">
-          <div class="section-title">Event Logo</div>
-
+          <!-- Event Logo -->
+          <div class="esm-subhead"><Icon icon="mdi:shield-star-outline" /> Event Logo</div>
           <div
             class="dropzone"
             :class="{ 'is-dragover': dzEventDragover }"
@@ -291,9 +266,9 @@
             @click="onBrowse('event')"
           >
             <div class="dz-invite">
-              <div class="dz-icon">⤓</div>
-              <div class="dz-title">Drag &amp; Drop atau pilih file untuk upload</div>
-              <div class="dz-sub">PNG maksimum {{ maxSizeMB }}MB</div>
+              <Icon icon="mdi:cloud-upload-outline" class="dz-icon" />
+              <div class="dz-title">Drag &amp; Drop atau klik untuk pilih file</div>
+              <div class="dz-sub">PNG maksimum {{ maxSizeMB }}MB · max {{ maxFiles }} file (termasuk yang sudah ada)</div>
             </div>
             <input
               ref="eventInput"
@@ -304,9 +279,6 @@
               @change="onFileChange('event', $event)"
             />
           </div>
-          <div class="hint-danger">Max {{ maxFiles }} file (termasuk yang sudah ada)</div>
-
-          <!-- File baru (belum diupload) -->
           <div v-if="eventFiles.length" class="file-list">
             <div
               class="file-pill"
@@ -316,35 +288,23 @@
               <span class="file-ext">PNG</span>
               <span class="file-name" :title="f.name">{{ f.name }}</span>
               <span class="file-size">{{ formatBytes(f.size) }}</span>
-              <button class="file-del" @click.stop="removeFile('event', idx)" title="Remove">🗑️</button>
+              <button class="file-del" @click.stop="removeFile('event', idx)" title="Remove">
+                <Icon icon="mdi:close" />
+              </button>
             </div>
           </div>
-
-          <!-- Existing images as thumbnails -->
           <div v-if="keepEventUrls.length" class="gallery">
-            <div
-              v-for="(u, i) in keepEventUrls"
-              :key="'evt-thumb-' + i"
-              class="thumb"
-            >
-              <img
-                class="thumb-img"
-                :src="thumbFromUrl(u)"
-                :alt="fileNameFromUrl(u)"
-                loading="lazy"
-              />
-              <div class="thumb-caption" :title="fileNameFromUrl(u)">
-                {{ fileNameFromUrl(u) }}
-              </div>
-              <button class="thumb-del" @click.stop="deleteExisting('event', u)" title="Delete">🗑</button>
+            <div v-for="(u, i) in keepEventUrls" :key="'evt-thumb-' + i" class="thumb">
+              <img class="thumb-img" :src="thumbFromUrl(u)" :alt="fileNameFromUrl(u)" loading="lazy" />
+              <div class="thumb-caption" :title="fileNameFromUrl(u)">{{ fileNameFromUrl(u) }}</div>
+              <button class="thumb-del" @click.stop="deleteExisting('event', u)" title="Delete">
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
             </div>
           </div>
-        </section>
 
-        <!-- ===================== Sponsorship Logo ===================== -->
-        <section class="uploader-section mt-4">
-          <div class="section-title">Sponsorship Logo</div>
-
+          <!-- Sponsorship Logo -->
+          <div class="esm-subhead"><Icon icon="mdi:handshake-outline" /> Sponsorship Logo</div>
           <div
             class="dropzone"
             :class="{ 'is-dragover': dzSponsorDragover }"
@@ -355,9 +315,9 @@
             @click="onBrowse('sponsor')"
           >
             <div class="dz-invite">
-              <div class="dz-icon">⤓</div>
-              <div class="dz-title">Drag &amp; Drop atau pilih file untuk upload</div>
-              <div class="dz-sub">PNG maksimum {{ maxSizeMB }}MB</div>
+              <Icon icon="mdi:cloud-upload-outline" class="dz-icon" />
+              <div class="dz-title">Drag &amp; Drop atau klik untuk pilih file</div>
+              <div class="dz-sub">PNG maksimum {{ maxSizeMB }}MB · max {{ maxFiles }} file (termasuk yang sudah ada)</div>
             </div>
             <input
               ref="sponsorInput"
@@ -368,9 +328,6 @@
               @change="onFileChange('sponsor', $event)"
             />
           </div>
-          <div class="hint-danger">Max {{ maxFiles }} file (termasuk yang sudah ada)</div>
-
-          <!-- File baru -->
           <div v-if="sponsorFiles.length" class="file-list">
             <div
               class="file-pill"
@@ -380,204 +337,166 @@
               <span class="file-ext">PNG</span>
               <span class="file-name" :title="f.name">{{ f.name }}</span>
               <span class="file-size">{{ formatBytes(f.size) }}</span>
-              <button class="file-del" @click.stop="removeFile('sponsor', idx)" title="Remove">🗑️</button>
+              <button class="file-del" @click.stop="removeFile('sponsor', idx)" title="Remove">
+                <Icon icon="mdi:close" />
+              </button>
             </div>
           </div>
-
-          <!-- Existing images as thumbnails -->
           <div v-if="keepSponsorUrls.length" class="gallery">
-            <div
-              v-for="(u, i) in keepSponsorUrls"
-              :key="'spn-thumb-' + i"
-              class="thumb"
-            >
-              <img
-                class="thumb-img"
-                :src="thumbFromUrl(u)"
-                :alt="fileNameFromUrl(u)"
-                loading="lazy"
-              />
-              <div class="thumb-caption" :title="fileNameFromUrl(u)">
-                {{ fileNameFromUrl(u) }}
-              </div>
-              <button class="thumb-del" @click.stop="deleteExisting('sponsor', u)" title="Delete">🗑</button>
+            <div v-for="(u, i) in keepSponsorUrls" :key="'spn-thumb-' + i" class="thumb">
+              <img class="thumb-img" :src="thumbFromUrl(u)" :alt="fileNameFromUrl(u)" loading="lazy" />
+              <div class="thumb-caption" :title="fileNameFromUrl(u)">{{ fileNameFromUrl(u) }}</div>
+              <button class="thumb-del" @click.stop="deleteExisting('sponsor', u)" title="Delete">
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
             </div>
           </div>
         </section>
 
-        <!-- ===================== Comitte ===================== -->
-        <section class="uploader-section mt-4">
-          <div class="section-title">Comitte</div>
+        <!-- ===================== Komite & Tanda Tangan ===================== -->
+        <section v-show="esmTab === 'committee'" class="esm-panel">
+          <header class="esm-panel__head">
+            <h6 class="esm-panel__title">Komite &amp; Tanda Tangan</h6>
+            <p class="esm-panel__desc">Nama & tanda tangan (PNG, opsional) untuk dokumen hasil resmi.</p>
+          </header>
 
-          <b-row>
-            <b-col md="6">
-              <b-form-group label="Technical Delegate">
-                <b-form-input
-                  size="sm"
-                  v-model="form.technicalDelegate"
-                  placeholder="Enter technical delegate name"
-                  class="br-15"
-                />
+          <div class="esm-grid esm-grid--3">
+            <!-- Technical Delegate -->
+            <div class="esm-person">
+              <b-form-group label="Technical Delegate" label-class="esm-label">
+                <b-form-input v-model="form.technicalDelegate" placeholder="Enter name" class="br-15" />
               </b-form-group>
-
-              <div class="sig-upload">
-                <div class="sig-upload-label">Signature (optional, PNG)</div>
-                <div class="sig-upload-row">
-                  <img
+              <div class="esm-sig">
+                <img
+                  v-if="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
+                  :src="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
+                  class="sig-thumb"
+                  alt="Technical Delegate signature"
+                />
+                <div v-else class="sig-thumb sig-thumb-empty"><Icon icon="mdi:draw" /> No signature</div>
+                <input ref="tdSignatureInput" type="file" accept="image/png" class="d-none" @change="onTechnicalDelegateSignatureChange" />
+                <div class="sig-upload-actions">
+                  <button type="button" class="esm-mini" @click="$refs.tdSignatureInput.click()">
+                    <Icon icon="mdi:upload" />
+                    {{ technicalDelegateSignaturePreview || technicalDelegateSignatureUrl ? "Ganti" : "Choose PNG" }}
+                  </button>
+                  <button
                     v-if="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
-                    :src="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
-                    class="sig-thumb"
-                    alt="Technical Delegate signature"
-                  />
-                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
-
-                  <div class="sig-upload-actions">
-                    <input
-                      ref="tdSignatureInput"
-                      type="file"
-                      accept="image/png"
-                      class="d-none"
-                      @change="onTechnicalDelegateSignatureChange"
-                    />
-                    <b-button size="sm" variant="outline-primary" @click="$refs.tdSignatureInput.click()">
-                      Choose PNG
-                    </b-button>
-                    <b-button
-                      v-if="technicalDelegateSignaturePreview || technicalDelegateSignatureUrl"
-                      size="sm"
-                      variant="outline-danger"
-                      @click="removeTechnicalDelegateSignatureFile"
-                    >
-                      Remove
-                    </b-button>
-                  </div>
+                    type="button"
+                    class="esm-mini esm-mini--danger"
+                    @click="removeTechnicalDelegateSignatureFile"
+                  >
+                    <Icon icon="mdi:trash-can-outline" />
+                  </button>
                 </div>
               </div>
-            </b-col>
-            <b-col md="6">
-              <b-form-group label="Race Director">
-                <b-form-input
-                  size="sm"
-                  v-model="form.raceDirector"
-                  placeholder="Enter race director name"
-                  class="br-15"
-                />
-              </b-form-group>
+            </div>
 
-              <div class="sig-upload">
-                <div class="sig-upload-label">Signature (optional, PNG)</div>
-                <div class="sig-upload-row">
-                  <img
+            <!-- Race Director -->
+            <div class="esm-person">
+              <b-form-group label="Race Director" label-class="esm-label">
+                <b-form-input v-model="form.raceDirector" placeholder="Enter name" class="br-15" />
+              </b-form-group>
+              <div class="esm-sig">
+                <img
+                  v-if="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
+                  :src="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
+                  class="sig-thumb"
+                  alt="Race Director signature"
+                />
+                <div v-else class="sig-thumb sig-thumb-empty"><Icon icon="mdi:draw" /> No signature</div>
+                <input ref="rdSignatureInput" type="file" accept="image/png" class="d-none" @change="onRaceDirectorSignatureChange" />
+                <div class="sig-upload-actions">
+                  <button type="button" class="esm-mini" @click="$refs.rdSignatureInput.click()">
+                    <Icon icon="mdi:upload" />
+                    {{ raceDirectorSignaturePreview || raceDirectorSignatureUrl ? "Ganti" : "Choose PNG" }}
+                  </button>
+                  <button
                     v-if="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
-                    :src="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
-                    class="sig-thumb"
-                    alt="Race Director signature"
-                  />
-                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
-
-                  <div class="sig-upload-actions">
-                    <input
-                      ref="rdSignatureInput"
-                      type="file"
-                      accept="image/png"
-                      class="d-none"
-                      @change="onRaceDirectorSignatureChange"
-                    />
-                    <b-button size="sm" variant="outline-primary" @click="$refs.rdSignatureInput.click()">
-                      Choose PNG
-                    </b-button>
-                    <b-button
-                      v-if="raceDirectorSignaturePreview || raceDirectorSignatureUrl"
-                      size="sm"
-                      variant="outline-danger"
-                      @click="removeRaceDirectorSignatureFile"
-                    >
-                      Remove
-                    </b-button>
-                  </div>
+                    type="button"
+                    class="esm-mini esm-mini--danger"
+                    @click="removeRaceDirectorSignatureFile"
+                  >
+                    <Icon icon="mdi:trash-can-outline" />
+                  </button>
                 </div>
               </div>
-            </b-col>
-          </b-row>
-          <b-row>
-            <b-col md="6">
-              <b-form-group label="Chief Judge">
-                <b-form-input
-                  size="sm"
-                  v-model="form.chiefJudge"
-                  placeholder="Enter chief judge name"
-                  class="br-15"
-                />
+            </div>
+
+            <!-- Chief Judge -->
+            <div class="esm-person">
+              <b-form-group label="Chief Judge" label-class="esm-label">
+                <b-form-input v-model="form.chiefJudge" placeholder="Enter name" class="br-15" />
               </b-form-group>
-
-              <div class="sig-upload">
-                <div class="sig-upload-label">Signature (optional, PNG)</div>
-                <div class="sig-upload-row">
-                  <img
+              <div class="esm-sig">
+                <img
+                  v-if="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
+                  :src="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
+                  class="sig-thumb"
+                  alt="Chief Judge signature"
+                />
+                <div v-else class="sig-thumb sig-thumb-empty"><Icon icon="mdi:draw" /> No signature</div>
+                <input ref="cjSignatureInput" type="file" accept="image/png" class="d-none" @change="onChiefJudgeSignatureChange" />
+                <div class="sig-upload-actions">
+                  <button type="button" class="esm-mini" @click="$refs.cjSignatureInput.click()">
+                    <Icon icon="mdi:upload" />
+                    {{ chiefJudgeSignaturePreview || chiefJudgeSignatureUrl ? "Ganti" : "Choose PNG" }}
+                  </button>
+                  <button
                     v-if="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
-                    :src="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
-                    class="sig-thumb"
-                    alt="Chief Judge signature"
-                  />
-                  <div v-else class="sig-thumb sig-thumb-empty">No signature</div>
-
-                  <div class="sig-upload-actions">
-                    <input
-                      ref="cjSignatureInput"
-                      type="file"
-                      accept="image/png"
-                      class="d-none"
-                      @change="onChiefJudgeSignatureChange"
-                    />
-                    <b-button size="sm" variant="outline-primary" @click="$refs.cjSignatureInput.click()">
-                      Choose PNG
-                    </b-button>
-                    <b-button
-                      v-if="chiefJudgeSignaturePreview || chiefJudgeSignatureUrl"
-                      size="sm"
-                      variant="outline-danger"
-                      @click="removeChiefJudgeSignatureFile"
-                    >
-                      Remove
-                    </b-button>
-                  </div>
+                    type="button"
+                    class="esm-mini esm-mini--danger"
+                    @click="removeChiefJudgeSignatureFile"
+                  >
+                    <Icon icon="mdi:trash-can-outline" />
+                  </button>
                 </div>
               </div>
-            </b-col>
-          </b-row>
-        </section>
-
-        <!-- ===================== Signature Result ===================== -->
-        <section class="signature mt-4">
-          <div class="section-title">Signature Result</div>
-          <div class="text-muted small mb-2">
-            Pilih tanda tangan mana yang ikut ditampilkan di hasil cetak (PDF).
+            </div>
           </div>
-          <div class="sig-list">
-            <label class="sig-item">
+
+          <div class="esm-subhead"><Icon icon="mdi:file-sign" /> Tanda Tangan di Hasil Cetak (PDF)</div>
+          <div class="esm-help mb-2">Pilih tanda tangan mana yang ikut ditampilkan di hasil cetak (PDF).</div>
+          <div class="esm-toggles">
+            <label class="esm-toggle" :class="{ on: signatureTechnicalDelegate }">
               <input type="checkbox" v-model="signatureTechnicalDelegate" />
-              <span>Technical Delegate</span>
+              <span class="esm-toggle__box"><Icon icon="mdi:check" /></span>
+              Technical Delegate
             </label>
-            <label class="sig-item">
+            <label class="esm-toggle" :class="{ on: signatureChiefJudge }">
               <input type="checkbox" v-model="signatureChiefJudge" />
-              <span>Chief Judge</span>
+              <span class="esm-toggle__box"><Icon icon="mdi:check" /></span>
+              Chief Judge
             </label>
-            <label class="sig-item">
+            <label class="esm-toggle" :class="{ on: signatureRaceDirector }">
               <input type="checkbox" v-model="signatureRaceDirector" />
-              <span>Race Director</span>
+              <span class="esm-toggle__box"><Icon icon="mdi:check" /></span>
+              Race Director
             </label>
           </div>
         </section>
-      </div>
-
-      <!-- Footer -->
-      <div class="footer-actions">
-        <button type="button" class="btn-outline" @click="show = false">Cancel</button>
-        <button type="button" class="btn-primary" :disabled="saving" @click="onUpdate">
-          {{ saving ? "Updating…" : "Update" }}
-        </button>
       </div>
     </div>
+
+    <!-- Footer (menempel di bawah modal) -->
+    <template #modal-footer>
+      <div class="esm-foot">
+        <span class="esm-foot__hint">
+          <Icon icon="mdi:information-outline" />
+          Perubahan baru tersimpan setelah klik Update.
+        </span>
+        <div class="esm-foot__actions">
+          <button type="button" class="esm-btn esm-btn--ghost" :disabled="saving" @click="show = false">
+            Cancel
+          </button>
+          <button type="button" class="esm-btn esm-btn--primary" :disabled="saving" @click="onUpdate">
+            <b-spinner v-if="saving" small />
+            <Icon v-else icon="mdi:content-save-outline" />
+            {{ saving ? "Updating…" : "Update" }}
+          </button>
+        </div>
+      </div>
+    </template>
   </b-modal>
 </template>
 
@@ -604,6 +523,8 @@ export default {
   },
   data() {
     return {
+      // Tab aktif di navigasi kiri modal (lihat esmTabs).
+      esmTab: "info",
       // ===== Event Information (eventsCollection) =====
       form: {
         levelName: "",
@@ -685,6 +606,26 @@ export default {
   },
 
   computed: {
+    // Navigasi tab modal — badge = jumlah item (kategori terpilih / file media).
+    esmTabs() {
+      const f = this.form || {};
+      const len = (a) => (Array.isArray(a) ? a.length : 0);
+      const catCount =
+        len(f.categoriesEvent) + len(f.categoriesDivision) + len(f.categoriesRace) + len(f.categoriesInitial);
+      const mediaCount =
+        (this.posterPreview || this.posterUrl ? 1 : 0) +
+        len(this.keepEventUrls) +
+        len(this.eventFiles) +
+        len(this.keepSponsorUrls) +
+        len(this.sponsorFiles);
+      return [
+        { key: "info", label: "Informasi Event", icon: "mdi:information-outline" },
+        { key: "schedule", label: "Jadwal & Zona Waktu", icon: "mdi:calendar-clock" },
+        { key: "categories", label: "Kategori Lomba", icon: "mdi:flag-checkered", badge: catCount || null },
+        { key: "media", label: "Media", icon: "mdi:image-multiple-outline", badge: mediaCount || null },
+        { key: "committee", label: "Komite & Tanda Tangan", icon: "mdi:account-tie-outline" },
+      ];
+    },
     show: {
       get: function () { return this.value; },
       set: function (v) { this.$emit("input", v); },
@@ -724,6 +665,7 @@ export default {
         if (!v || !this.eventId) return;
 
         // reset state setiap modal dibuka
+        this.esmTab = "info";
         this.eventFiles = [];
         this.sponsorFiles = [];
         this.existingEventUrls = [];
@@ -1450,3 +1392,555 @@ export default {
   width: 32px; height: 32px; font-weight: 700; line-height: 1;
 }
 </style>
+
+<style>
+/* ===== Event Setting (redesign) — pembungkus modal =====
+   Global krn b-modal dirender di <body> (.modal-content/.modal-body/
+   .modal-footer dibuat BootstrapVue). Kelas berawalan `esm-`. */
+.esm-content {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+.esm-body {
+  background: #f5f8fc;
+}
+.esm-footer {
+  padding: 0;
+  border-top: 1px solid #e6edf6;
+  background: #ffffff;
+}
+</style>
+
+<style scoped>
+/* ===== Event Setting (redesign) — isi modal (ditaruh SETELAH style
+   scoped lama supaya menang atas .dropzone/.gallery/.sig-thumb lama). ===== */
+
+/* Header */
+.esm-head {
+  position: relative;
+  width: 100%;
+  color: #fff;
+}
+.esm-head__bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(520px 200px at 88% 0%, rgba(37, 176, 235, 0.45), transparent 70%),
+    linear-gradient(110deg, #0f2f52 0%, #1c4c7a 55%, #1d7fb8 100%);
+}
+.esm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+.esm-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.esm-head__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 64px 20px 26px;
+}
+.esm-head__icon {
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.esm-head__text {
+  min-width: 0;
+}
+.esm-eyebrow {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #bae6fd;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.esm-title {
+  margin: 5px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.esm-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* Layout: nav kiri + konten */
+.esm-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  min-height: 100%;
+}
+.esm-nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 12px;
+}
+.esm-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.esm-nav__item:hover {
+  background: #ffffff;
+  color: #1c4c7a;
+}
+.esm-nav__item.active {
+  background: #ffffff;
+  border-color: #d6e8fb;
+  color: #1c4c7a;
+  box-shadow: 0 4px 12px rgba(28, 76, 122, 0.1);
+}
+.esm-nav__icon {
+  flex: none;
+  font-size: 18px;
+  color: #94a3b8;
+}
+.esm-nav__item.active .esm-nav__icon {
+  color: #25b0eb;
+}
+.esm-nav__label {
+  flex: 1;
+}
+.esm-nav__badge {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e6f4fd;
+  color: #1c4c7a;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.esm-panels {
+  padding: 18px 22px 22px 6px;
+  min-width: 0;
+}
+.esm-panel {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 16px;
+  padding: 18px 20px 6px;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.05);
+}
+.esm-panel__head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+.esm-panel__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.esm-panel__desc {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.esm-subhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1c4c7a;
+}
+.esm-subhead svg {
+  color: #25b0eb;
+  font-size: 16px;
+}
+.esm-grid {
+  display: grid;
+  gap: 0 14px;
+}
+.esm-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.esm-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.esm-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.esm-panel ::v-deep .esm-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  padding-bottom: 4px;
+}
+.esm-help {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+}
+.esm-hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+/* Tanggal */
+.esm-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: #e6f4fd;
+  color: #1c4c7a;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.esm-date.is-empty {
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.stx-inline-calendar {
+  border: 1px solid #e6edf6;
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+}
+
+/* Zona waktu (segmented) */
+.esm-tz {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 12px;
+  background: #f1f5fb;
+  border: 1px solid #e6edf6;
+  margin-bottom: 8px;
+}
+.esm-tz__btn {
+  min-width: 72px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.esm-tz__btn.active {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(28, 76, 122, 0.25);
+}
+
+/* Media */
+.esm-poster {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.poster-thumb {
+  width: 180px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
+  background: #f8fafc;
+}
+.poster-thumb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #94a3b8;
+  font-size: 12px;
+  border-style: dashed;
+  border-color: #cbd5e1;
+}
+.dropzone {
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #fafcff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.dropzone:hover,
+.dropzone.is-dragover {
+  border-color: #25b0eb;
+  background: #f0f7ff;
+  box-shadow: none;
+}
+.dz-invite {
+  padding: 18px 8px;
+}
+.dz-icon {
+  font-size: 28px;
+  color: #25b0eb;
+  opacity: 1;
+}
+.dz-title {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: #334155;
+}
+.dz-sub {
+  font-size: 11.5px;
+}
+.file-pill {
+  border-radius: 10px;
+}
+.file-del {
+  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+}
+.gallery {
+  margin-top: 12px;
+}
+.thumb {
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
+  overflow: hidden;
+}
+.thumb-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Komite */
+.esm-person {
+  padding: 14px 14px 4px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  border: 1px solid #eef2f7;
+  background: #fbfdff;
+}
+.esm-sig {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 12px;
+  flex-wrap: wrap;
+}
+.sig-thumb {
+  width: 96px;
+  height: 52px;
+  border-radius: 9px;
+  border: 1px solid #e6edf6;
+}
+.sig-thumb-empty {
+  gap: 4px;
+  border-style: dashed;
+}
+.esm-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 14px;
+}
+.esm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.esm-toggle input {
+  display: none;
+}
+.esm-toggle__box {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 13px;
+}
+.esm-toggle.on {
+  border-color: #b9d7f0;
+  background: #f0f7ff;
+  color: #1c4c7a;
+}
+.esm-toggle.on .esm-toggle__box {
+  border-color: transparent;
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+}
+
+.esm-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: 1px solid #d6e3f1;
+  background: #fff;
+  color: #1c4c7a;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.esm-mini:hover {
+  border-color: #25b0eb;
+  background: #f0f7ff;
+}
+.esm-mini--danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.esm-mini--danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* Footer */
+.esm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 22px;
+}
+.esm-foot__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.esm-foot__actions {
+  display: flex;
+  gap: 8px;
+}
+.esm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.esm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.esm-btn--ghost {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.esm-btn--ghost:hover:not(:disabled) {
+  background: #f8fafc;
+}
+.esm-btn--primary {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+.esm-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+
+@media (max-width: 991.98px) {
+  .esm-layout {
+    grid-template-columns: 1fr;
+  }
+  .esm-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 12px 16px 0;
+  }
+  .esm-nav__item {
+    width: auto;
+    white-space: nowrap;
+  }
+  .esm-panels {
+    padding: 12px 16px 18px;
+  }
+  .esm-grid--3,
+  .esm-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .esm-grid--2,
+  .esm-grid--3,
+  .esm-grid--4 {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+

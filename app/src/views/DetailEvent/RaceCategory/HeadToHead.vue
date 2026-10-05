@@ -2491,6 +2491,48 @@ export default {
         return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
       };
 
+      // BUG FIX (2026-10-06): finalis yang finalnya BELUM punya pemenang
+      // dulu tidak masuk top4 sama sekali -> ikut dinomori dari 5 di bagian
+      // "others" (mis. Final B sudah selesai = 3 & 4, tapi kedua tim Final A
+      // = 5 & 6), dan skornya ikut salah di Result & Event Overall. Sekarang
+      // tempat 1-2 / 3-4 TETAP dipesan utk finalisnya; urutan sementara di
+      // dalamnya pakai waktu di babak final itu (kalau sudah ada), lalu nama.
+      // Ditandai _provisional supaya jelas belum pasti.
+      const pushUndecidedFinalists = (match, rows, firstPlace, source) => {
+        const findRow = (nm) =>
+          rows.find(
+            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
+          ) || null;
+        const present = [match.team1, match.team2]
+          .filter((t) => t && t.name)
+          .map((t) => {
+            const rw = findRow(t.name);
+            return {
+              name: t.name,
+              bib: rw ? rw.bib : t.bibTeam || "",
+              timeMs: timeMsFromRow(rw),
+            };
+          })
+          .filter((x) => !top4Keys.has(teamKey(x.name, x.bib)));
+        present.sort((a, b) => {
+          const ta = Number.isFinite(a.timeMs) ? a.timeMs : Number.POSITIVE_INFINITY;
+          const tb = Number.isFinite(b.timeMs) ? b.timeMs : Number.POSITIVE_INFINITY;
+          if (ta !== tb) return ta - tb;
+          return String(a.name).localeCompare(String(b.name));
+        });
+        present.forEach((x, i) => {
+          top4.push({
+            place: firstPlace + i,
+            name: x.name,
+            bib: x.bib,
+            source,
+            timeMs: x.timeMs,
+            provisional: true,
+          });
+          top4Keys.add(teamKey(x.name, x.bib));
+        });
+      };
+
       // ---- Final A → #1 & #2
       if (final && final.matches && final.matches[0]) {
         const fm = final.matches[0];
@@ -2533,6 +2575,8 @@ export default {
             });
             top4Keys.add(kL);
           }
+        } else {
+          pushUndecidedFinalists(fm, finalRows, 1, "FinalA");
         }
       }
 
@@ -2578,6 +2622,8 @@ export default {
             });
             top4Keys.add(kL);
           }
+        } else {
+          pushUndecidedFinalists(bm, bronzeRows, 3, "FinalB");
         }
       }
 
@@ -2651,6 +2697,7 @@ export default {
             bib: x.bib,
             score: this.scoreForRank(x.place), // ← skor dari this.dataScore
             _source: x.source,
+            ...(x.provisional ? { _provisional: true } : {}),
           });
         });
 
@@ -2759,6 +2806,15 @@ export default {
             // pakai bracket dari DB
             this.rounds = res.item.rounds;
             this.showBronze = !!res.item.showBronze;
+            // BUG FIX (2026-10-06): perbaiki pool basi peninggalan bug
+            // re-entrant auto-advance (lihat _autoAdvanceRoundIfComplete) di
+            // SEMUA babak, lalu simpan balik supaya DB ikut bersih.
+            let poolPruned = false;
+            this.rounds.forEach((r) => {
+              if (this._pruneStalePoolEntries(r)) poolPruned = true;
+            });
+            if (this._healBronzeFinal()) poolPruned = true;
+            if (poolPruned) this.saveBracketToDB(true);
             // optional restore settings
             if (res.item.settings && res.item.settings.booyanActive) {
               this.booyanActive = { ...res.item.settings.booyanActive };
@@ -5548,6 +5604,11 @@ export default {
       // map nama → object participant (subset visible)
       const map = new Map(this.visibleParticipants.map((p) => [toKey(p), p]));
 
+      // Snapshot pemenang sebelum evaluasi — lihat saveBracketToDB() di bawah.
+      const winnerKeyOf = (m) =>
+        m && m.winner && m.winner.name ? this._teamIdentityKey(m.winner) : "";
+      const winnersBefore = r.matches.map(winnerKeyOf).join("||");
+
       r.matches.forEach((m) => {
         const n1 = m.team1 && m.team1.name ? m.team1.name.toUpperCase() : "";
         const n2 = m.team2 && m.team2.name ? m.team2.name.toUpperCase() : "";
@@ -5618,6 +5679,14 @@ export default {
 
       this.computePodium();
       this.persistRoundResults();
+      // FITUR (2026-10-06): m.winner dulu cuma hidup di memori sampai ada
+      // saveBracketToDB() dari aksi lain (assign tim/auto-advance) — juara
+      // Final A/Final B (tidak ada babak lanjutan) tidak pernah sampai ke
+      // Live Result sebelum Save Round. Simpan bracket begitu pemenang
+      // match berubah; upsertBracket() sendiri broadcast results:updated.
+      if (r.matches.map(winnerKeyOf).join("||") !== winnersBefore) {
+        this.saveBracketToDB(true);
+      }
       // FITUR (2026-09-29): auto-advance begitu SELURUH match di babak ini
       // sudah punya pemenang — lihat catatan lengkap di
       // _autoAdvanceRoundIfComplete().
@@ -7301,9 +7370,19 @@ export default {
     // - 1 sisi terisi  -> otomatis BYE, tim itu auto-menang, heat dikosongkan
     //   (BYE tidak perlu Heat sama sekali, sesuai permintaan user).
     // - 0 sisi terisi  -> slot kosong total, bukan apa2.
-    _recomputeMatchByeState(match) {
+    _recomputeMatchByeState(match, round) {
       const has1 = !!(match.team1 && match.team1.name);
       const has2 = !!(match.team2 && match.team2.name);
+      // BUG FIX (2026-10-06): Final B = kalah vs kalah Semifinal, TIDAK
+      // MUNGKIN BYE — kalau baru 1 sisi terisi, itu cuma menunggu tim
+      // kalah satunya, bukan auto-menang (dulu tim solo langsung dapat
+      // medali perunggu).
+      if (round && round.bronze && has1 !== has2) {
+        match.bye = false;
+        match.winner = null;
+        match.heat = null;
+        return;
+      }
       if (has1 && has2) {
         // BUG FIX: kalau match ini SEBELUMNYA bye (cuma 1 sisi terisi),
         // match.winner sudah ke-auto-set ke tim solo itu. Begitu sisi kedua
@@ -7401,7 +7480,7 @@ export default {
       // — hasilnya harus tetap ada). Lihat _ensureFreshResultsForRound().
       this._ensureFreshResultsForRound(round);
 
-      this._recomputeMatchByeState(match);
+      this._recomputeMatchByeState(match, round);
 
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
@@ -7543,7 +7622,7 @@ export default {
       // match bubar dari match riil (kalau sebelumnya py Heat, sisi yang
       // TERSISA otomatis jadi BYE lagi lewat _recomputeMatchByeState, yang
       // juga mengosongkan Heat-nya — BYE tidak perlu Heat.
-      this._recomputeMatchByeState(match);
+      this._recomputeMatchByeState(match, round);
 
       this._persistAfterCrossRoundEdit(round);
       this.saveBracketToDB(true);
@@ -7693,8 +7772,31 @@ export default {
     // assignTeamToMatchSlot() KHUSUS kalau slot yang baru diisi ada di
     // babak yang sedang aktif (mis. slot BYE auto-menang).
     _autoAdvanceRoundIfComplete() {
+      // BUG FIX (2026-10-06): fungsi ini RE-ENTRANT tanpa sengaja — tiap
+      // assignTeamToMatchSlot() ke babak berikutnya memanggil
+      // _persistAfterCrossRoundEdit() -> loadRoundResultsForCurrentRound()
+      // -> evaluateHeatWinnersForCurrentRound() -> fungsi ini LAGI, saat
+      // loop _placeTeamsIntoFirstEmptySlots() pemanggil pertama belum
+      // selesai. Panggilan bersarang mengisi slot duluan, lalu loop luar
+      // kehabisan slot & membuang sisa antreannya ke round.pool -> tim yg
+      // SUDAH di slot ikut nyangkut di pool (badge "Menunggu Heat" palsu,
+      // mis. SUMSEL x3/SUMUT x2), dan pool yg tidak kosong itu memblokir
+      // auto-advance babak berikutnya (Final A/B tidak pernah terisi).
+      if (this._autoAdvanceRunning) return;
+      this._autoAdvanceRunning = true;
+      try {
+        this._autoAdvanceRoundIfCompleteInner();
+      } finally {
+        this._autoAdvanceRunning = false;
+      }
+    },
+
+    _autoAdvanceRoundIfCompleteInner() {
       const round = this.currentRound;
       if (!round || round.bronze) return;
+      // Bersihkan dulu sisa entri pool basi (tim yg sebenarnya sudah
+      // menempati slot di babak ini) — data lama dari bug di atas.
+      if (this._pruneStalePoolEntries(round)) this.saveBracketToDB(true);
       if (!round.matches || !round.matches.length || (round.pool || []).length)
         return;
 
@@ -7741,55 +7843,94 @@ export default {
       const newWinners = winners.filter(
         (w) => !nextTakenKeys.has(this._teamIdentityKey(w))
       );
-      if (!newWinners.length) return; // sudah pernah di-auto-advance
 
       // Semifinal -> siapkan Final B dari 2 tim yang kalah — sama pola
-      // dgn advanceToNextRound().
+      // dgn advanceToNextRound(). BUG FIX (2026-10-06): dihitung TERPISAH
+      // dari newWinners (dulu ikut berhenti kalau Final A sudah terisi,
+      // jadi Final B yg baru terisi 1 tim tidak pernah dilengkapi), dan
+      // cuma tim kalah yg BELUM ada di Final B yg ditempatkan.
       const isLeavingSemifinal = !round.bronze && round.size === 4;
-      let bronze = null;
-      let bronzeLosers = [];
-      if (isLeavingSemifinal) {
-        bronze = this.rounds.find((r) => r.bronze) || null;
-        if (bronze) {
-          const bronzeHas1 = !!(
-            bronze.matches[0] &&
-            bronze.matches[0].team1 &&
-            bronze.matches[0].team1.name
-          );
-          const bronzeHas2 = !!(
-            bronze.matches[0] &&
-            bronze.matches[0].team2 &&
-            bronze.matches[0].team2.name
-          );
-          if (!bronzeHas1 || !bronzeHas2) {
-            const losers = round.matches.map((m) => {
-              if (!m.winner) return null;
-              const lose =
-                m.winner.name === (m.team1 && m.team1.name)
-                  ? m.team2
-                  : m.team1;
-              return lose && lose.name ? lose : null;
-            });
-            if (losers[0] && losers[1]) bronzeLosers = [losers[0], losers[1]];
-          }
-        }
+      const bronze = isLeavingSemifinal
+        ? this.rounds.find((r) => r.bronze) || null
+        : null;
+      const bronzeLosers = bronze
+        ? this._missingSemifinalLosers(round, bronze)
+        : [];
+
+      if (!newWinners.length && !bronzeLosers.length) return; // sudah pernah di-auto-advance
+
+      if (newWinners.length) {
+        this._resetParticipantResultsByName(newWinners.map((w) => w.name));
+        this._placeTeamsIntoFirstEmptySlots(next, newWinners);
       }
 
-      this._resetParticipantResultsByName(newWinners.map((w) => w.name));
-      this._placeTeamsIntoFirstEmptySlots(next, newWinners);
-
-      if (bronzeLosers.length === 2) {
+      if (bronzeLosers.length) {
         this._resetParticipantResultsByName(bronzeLosers.map((l) => l.name));
         this._placeTeamsIntoFirstEmptySlots(bronze, bronzeLosers);
       }
 
       this.$bvToast &&
         this.$bvToast.toast(
-          `${newWinners.length} tim otomatis lanjut ke ${next.name}${
-            bronzeLosers.length === 2 ? " (yang kalah otomatis ke Final B)" : ""
-          }.`,
+          newWinners.length
+            ? `${newWinners.length} tim otomatis lanjut ke ${next.name}${
+                bronzeLosers.length ? " (yang kalah otomatis ke Final B)" : ""
+              }.`
+            : `${bronzeLosers.length} tim kalah Semifinal otomatis ke Final B.`,
           { variant: "success", autoHideDelay: 2500, title: "Auto Next Round" }
         );
+    },
+
+    // 2 tim kalah Semifinal (round size 4, semua match sudah py pemenang)
+    // yang BELUM menempati slot Final B. [] kalau Semifinal belum selesai /
+    // Final B sudah lengkap.
+    _missingSemifinalLosers(semi, bronze) {
+      if (!semi || !bronze || !Array.isArray(semi.matches)) return [];
+      const losers = semi.matches.map((m) => {
+        if (!m || !m.winner || !m.winner.name) return null;
+        if (!(m.team1 && m.team1.name) || !(m.team2 && m.team2.name)) return null;
+        const winKey = this._teamIdentityKey(m.winner);
+        const lose =
+          this._teamIdentityKey(m.team1) === winKey ? m.team2 : m.team1;
+        return lose && lose.name ? lose : null;
+      });
+      if (losers.length !== 2 || !losers[0] || !losers[1]) return [];
+      const taken = this._roundSlotKeys(bronze);
+      return losers
+        .filter((l) => !taken.has(this._teamIdentityKey(l)))
+        .map((l) => ({ name: l.name, bibTeam: l.bibTeam || "" }));
+    },
+
+    // Self-heal saat bracket dimuat: Final B yg baru berisi 1 tim kalah
+    // Semifinal (peninggalan race simpan-bracket sebelum diantrikan di main
+    // process) dilengkapi langsung di data bracket + status BYE palsunya
+    // dibersihkan. Return true kalau ada perubahan.
+    _healBronzeFinal() {
+      const bronze = (this.rounds || []).find((r) => r.bronze);
+      const semi = (this.rounds || []).find((r) => !r.bronze && r.size === 4);
+      if (!bronze || !Array.isArray(bronze.matches) || !bronze.matches.length) return false;
+      let changed = false;
+      const match = bronze.matches[0];
+      this._missingSemifinalLosers(semi, bronze).forEach((l) => {
+        const side = !(match.team1 && match.team1.name)
+          ? "team1"
+          : !(match.team2 && match.team2.name)
+          ? "team2"
+          : null;
+        if (!side) return;
+        this.$set(match, side, { name: l.name, bibTeam: l.bibTeam });
+        changed = true;
+      });
+      const has1 = !!(match.team1 && match.team1.name);
+      const has2 = !!(match.team2 && match.team2.name);
+      if (match.bye || (has1 !== has2 && match.winner)) {
+        this._recomputeMatchByeState(match, bronze);
+        if (has1 && has2) {
+          match.bye = false;
+          match.winner = null;
+        }
+        changed = true;
+      }
+      return changed;
     },
 
     // Taruh `teams` ke slot KOSONG PERTAMA (team1 dulu baru team2) di
@@ -7819,8 +7960,52 @@ export default {
         }
       }
       if (queue.length) {
-        round.pool = (round.pool || []).concat(queue);
+        // Jangan masukkan ke pool tim yang SUDAH ada di slot/pool babak ini.
+        const taken = this._roundTakenKeys(round);
+        const leftover = queue.filter((t) => {
+          const k = this._teamIdentityKey(t);
+          if (taken.has(k)) return false;
+          taken.add(k);
+          return true;
+        });
+        if (leftover.length) round.pool = (round.pool || []).concat(leftover);
       }
+    },
+
+    // Identitas (nama+BIB) semua tim yang menempati slot match babak ini.
+    _roundSlotKeys(round) {
+      const keys = new Set();
+      ((round && round.matches) || []).forEach((m) => {
+        if (m && m.team1 && m.team1.name) keys.add(this._teamIdentityKey(m.team1));
+        if (m && m.team2 && m.team2.name) keys.add(this._teamIdentityKey(m.team2));
+      });
+      return keys;
+    },
+
+    _roundTakenKeys(round) {
+      const keys = this._roundSlotKeys(round);
+      ((round && round.pool) || []).forEach((t) => {
+        if (t && t.name) keys.add(this._teamIdentityKey(t));
+      });
+      return keys;
+    },
+
+    // Buang entri round.pool yang basi: tim yg sudah menempati slot match di
+    // babak yg SAMA, atau entri dobel. Return true kalau ada yg dibuang
+    // (pemanggil yg memutuskan perlu saveBracketToDB atau tidak).
+    _pruneStalePoolEntries(round) {
+      if (!round || !Array.isArray(round.pool) || !round.pool.length) return false;
+      const seen = this._roundSlotKeys(round);
+      const cleaned = round.pool.filter((t) => {
+        if (!t || !t.name) return false;
+        const k = this._teamIdentityKey(t);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      if (cleaned.length === round.pool.length) return false;
+      round.pool = cleaned;
+      return true;
     },
 
     advanceToNextRound() {

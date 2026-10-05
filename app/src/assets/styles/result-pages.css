@@ -1,0 +1,252 @@
+/*
+ * Halaman Result (Sprint/Slalom/DRR/H2H/Rafting Cross/Event Overall) —
+ * tampilan layar diseragamkan dgn desain app (navy #1c4c7a / sky #25b0eb).
+ * Imported global di main.js. Selector diawali `div.rp-page` (spesifisitas
+ * lebih tinggi dari style scoped tiap halaman) supaya menang TANPA
+ * mengubah markup/logic. PDF TIDAK terpengaruh: PDF dirender komponen
+ * terpisah (SprintPdf/DrrPdf/…) dgn style-nya sendiri.
+ */
+
+div.rp-page {
+  padding: 8px 24px 40px;
+  background: #f5f8fc;
+  min-height: 100%;
+}
+
+/* ---------- Hero (RaceCategoryHero) di dalam halaman Result ---------- */
+div.rp-page .rch .rch-topbar {
+  margin: 0 0 14px;
+}
+div.rp-page .rch .rch-hero {
+  border-radius: 20px;
+  box-shadow: 0 14px 34px rgba(15, 42, 67, 0.18);
+}
+div.rp-page .rch .rch-hero__inner {
+  padding: 24px 28px;
+}
+
+/* ---------- Toolbar (judul halaman + tombol aksi) ---------- */
+div.rp-page .topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 14px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(15, 42, 67, 0.05);
+}
+div.rp-page .rp-toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+div.rp-page .rp-toolbar-title svg {
+  color: #f59e0b;
+  font-size: 20px;
+}
+div.rp-page .right-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* BUG FIX "tombol mengambang": .action-btn (scoped tiap halaman) memberi
+   padding 8px 16px — ikut terpasang di PEMBUNGKUS <b-dropdown> (div
+   .dropdown), jadi tombol dropdown (Download Result / Switch Category)
+   tergeser ke dalam bingkai tak terlihat, sementara "View Overall"
+   (b-button biasa, tanpa pembungkus) tidak — tingginya/posisinya jadi
+   tidak sejajar. Pembungkus dropdown dinolkan, semua tombol disamakan. */
+div.rp-page .right-actions > .dropdown.action-btn {
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  display: inline-flex;
+}
+div.rp-page .right-actions > .btn,
+div.rp-page .right-actions > .dropdown > .btn {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  margin: 0;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none !important;
+  box-shadow: none;
+}
+/* Tombol yg belum pakai .btn-pill (mis. Print Bracket / Print Overall di
+   Rafting Cross, variant outline-secondary) -> gaya outline brand. */
+div.rp-page .right-actions > .btn:not(.btn-pill),
+div.rp-page .right-actions > .dropdown > .btn:not(.btn-pill) {
+  background: #ffffff;
+  border: 1px solid #d6e3f1;
+  color: #1c4c7a;
+}
+div.rp-page .right-actions > .btn:not(.btn-pill):hover:not(:disabled),
+div.rp-page .right-actions > .dropdown > .btn:not(.btn-pill):hover:not(:disabled) {
+  background: #f0f7ff;
+  border-color: #25b0eb;
+  color: #1c4c7a;
+}
+div.rp-page .right-actions .btn:disabled,
+div.rp-page .right-actions .btn.disabled {
+  opacity: 0.55;
+}
+div.rp-page .right-actions .btn-pill {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-width: 1px;
+}
+div.rp-page .right-actions .btn-pill--solid {
+  background: linear-gradient(135deg, #1c4c7a, #25b0eb);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(28, 76, 122, 0.25);
+}
+div.rp-page .right-actions .btn-pill--solid:hover:not(:disabled),
+div.rp-page .right-actions .btn-pill--solid:focus:not(:disabled) {
+  filter: brightness(1.07);
+  color: #ffffff;
+  transform: none;
+}
+div.rp-page .right-actions .btn-pill--outline {
+  background: #ffffff;
+  border-color: #d6e3f1;
+  color: #1c4c7a;
+}
+div.rp-page .right-actions .btn-pill--outline:hover:not(:disabled),
+div.rp-page .right-actions .btn-pill--outline:focus:not(:disabled) {
+  background: #f0f7ff;
+  border-color: #25b0eb;
+  color: #1c4c7a;
+  transform: none;
+}
+div.rp-page .right-actions .dropdown-menu--pill {
+  border: 1px solid #e6edf6;
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(15, 42, 67, 0.16);
+  padding: 6px;
+}
+div.rp-page .right-actions .dropdown-menu--pill .dropdown-item {
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+/* ---------- Card hasil ---------- */
+div.rp-page .card {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 42, 67, 0.06);
+  padding: 16px 20px 12px;
+}
+div.rp-page .card-back {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+div.rp-page .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #1c4c7a !important;
+  font-weight: 700;
+  text-decoration: none !important;
+}
+div.rp-page .back-link:hover {
+  color: #25b0eb !important;
+}
+div.rp-page .event-header {
+  margin: 18px 0 16px;
+  text-align: center;
+}
+div.rp-page .event-header .event-name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #0f172a;
+}
+div.rp-page .event-header .event-name .muted {
+  color: #0f172a;
+}
+div.rp-page .loading-row {
+  color: #64748b;
+}
+
+/* ---------- Tabel hasil ----------
+   Hanya header, garis & tipografi — TIDAK memberi warna latar ke sel
+   (highlight fungsional per baris/sel tiap halaman tetap berlaku). */
+div.rp-page .table-wrap {
+  border: 1px solid #e6edf6;
+  border-radius: 14px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+div.rp-page .table-wrap .result-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+div.rp-page .table-wrap .result-table thead th {
+  background: linear-gradient(180deg, #1f527f 0%, #1a456c 100%);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  border-bottom: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+div.rp-page .table-wrap .result-table thead tr + tr th {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+div.rp-page .table-wrap .result-table tbody tr {
+  box-shadow: none;
+}
+div.rp-page .table-wrap .result-table tbody td {
+  padding: 12px 14px;
+  border-top: 1px solid #edf2f7;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+div.rp-page .table-wrap .result-table tbody tr:first-child td {
+  border-top: none;
+}
+div.rp-page .table-wrap .result-table tbody tr:hover > td {
+  box-shadow: inset 0 1px 0 #cfe4fb, inset 0 -1px 0 #cfe4fb;
+}
+div.rp-page .table-wrap .result-table .team {
+  font-weight: 700;
+  color: #0f172a;
+}
+div.rp-page .table-wrap .cell-input {
+  border-radius: 9px;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+div.rp-page .table-wrap .cell-input:focus {
+  border-color: #25b0eb;
+  box-shadow: 0 0 0 3px rgba(37, 176, 235, 0.15);
+}
+
+@media (max-width: 767.98px) {
+  div.rp-page {
+    padding: 8px 12px 32px;
+  }
+  div.rp-page .rch .rch-topbar {
+    margin: 0 0 12px;
+  }
+}

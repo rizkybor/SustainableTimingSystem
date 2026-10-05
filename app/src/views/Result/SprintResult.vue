@@ -1,63 +1,18 @@
 <template>
-  <div class="result-wrap p-3 mb-2 mt-5">
-    <!-- HERO -->
-    <section class="detail-hero">
-      <div class="hero-bg"></div>
-      <b-container class="hero-inner">
-        <b-row class="align-items-center">
-          <b-col cols="auto" class="pr-0">
-            <div
-              class="hero-logo d-flex align-items-center justify-content-center"
-            >
-              <template v-if="hasEventLogo">
-                <img
-                  :src="eventLogoUrl"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-              <template v-else>
-                <img
-                  :src="defaultImg"
-                  alt="Event Logo"
-                  class="event-logo-img"
-                />
-              </template>
-            </div>
-          </b-col>
-
-          <b-col>
-            <h2 class="h1 font-weight-bold mb-1 text-white">
-              {{ eventInfo.eventName || "-" }}
-            </h2>
-            <div class="meta text-white-50">
-              <span class="mr-3">
-                <strong class="text-white">Location</strong> :
-                {{ eventInfo.addressCity || "-" }}
-              </span>
-              <span class="mr-3"
-                ><strong class="text-white">River</strong> :
-                {{ eventInfo.riverName || "-" }}</span
-              >
-              <span class="mr-3"
-                ><strong class="text-white">Level</strong> :
-                {{ eventInfo.levelName || "-" }}</span
-              >
-            </div>
-          </b-col>
-        </b-row>
-      </b-container>
-    </section>
+  <div class="result-wrap rp-page">
+    <!-- Breadcrumb + hero bersama (sama dgn halaman Race Category) -->
+    <RaceCategoryHero
+      :event="eventInfo"
+      race-key="SPRINT"
+      race-label="Sprint Result"
+      :logo-url="hasEventLogo ? eventLogoUrl : defaultImg"
+    />
 
     <!-- Top bar -->
     <div class="topbar">
-      <div class="crumbs">
-        <span class="sep">›</span>
-        <router-link :to="`/event-detail/${$route.params.id}`" class="muted">
-          Dashboard
-        </router-link>
-        <span class="sep">›</span>
-        <span class="muted">Sprint Result</span>
+      <div class="rp-toolbar-title">
+        <Icon icon="mdi:trophy-outline" />
+        Sprint Result
       </div>
 
       <div class="right-actions">
@@ -159,13 +114,12 @@
       <b-alert show variant="danger" v-if="error" class="mb-3">{{
         error
       }}</b-alert>
-      <div v-if="loading" class="loading-row">
-        <b-spinner small class="mr-2" /> Loading results...
-      </div>
+      <!-- Skeleton saat data hasil di-fetch -->
+      <ResultTableSkeleton v-if="showResultSkeleton" :cols="11" />
 
       <!-- Empty state -->
       <EmptyStateFull
-        v-if="!loading && results.length === 0"
+        v-if="!showResultSkeleton && results.length === 0"
         :img-src="require('@/assets/images/404.png')"
         title="No data available"
         subtitle="Hasil Sprint belum tersedia untuk kategori ini."
@@ -174,7 +128,7 @@
       />
 
       <!-- Table -->
-      <div v-else class="table-wrap">
+      <div v-else-if="!showResultSkeleton" class="table-wrap">
         <table class="result-table">
           <thead>
             <tr>
@@ -359,6 +313,9 @@
 </template>
 
 <script>
+import ResultTableSkeleton from "@/components/result/ResultTableSkeleton.vue";
+import resultSkeletonMixin from "@/mixins/resultSkeletonMixin";
+import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
 import { ipcRenderer } from "electron";
 import { DEFAULT_PROTEST_TIME, normalizeProtestTime } from "@/utils/protestTime";
 import SprintPdf from "../DetailEvent/ResultComponent/sprint-pdfResult.vue";
@@ -436,6 +393,8 @@ export default {
   name: "SprintResult",
   components: {
     Icon,
+    RaceCategoryHero,
+    ResultTableSkeleton,
     EmptyStateFull,
     SprintPdf,
     VueHtml2pdf,
@@ -443,7 +402,7 @@ export default {
     CountryFlag,
     OfficialStampToggle,
   },
-  mixins: [teamFlagMixin],
+  mixins: [resultSkeletonMixin, teamFlagMixin],
   data() {
     return {
       defaultImg,
@@ -722,7 +681,8 @@ export default {
     }
     this.selectedInitialName = String(q.initialName || "").toUpperCase();
 
-    this.loadSprintResult();
+    await this.loadSprintResult();
+    this.bootDone = true;
   },
   mounted() {},
   methods: {

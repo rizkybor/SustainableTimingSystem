@@ -699,6 +699,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
+import drrLiveStateMixin from "@/mixins/drrLiveStateMixin";
 import photofinishMixin from "@/mixins/photofinishMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
@@ -945,6 +946,7 @@ export default {
     serialPortMixin,
     photofinishMixin,
     raceStickyBarMixin,
+    drrLiveStateMixin,
   ],
   data() {
     return {

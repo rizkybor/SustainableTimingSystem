@@ -144,6 +144,9 @@ const {
   upsertSlalomLiveState,
 } = require("../controllers/INSERT/upsertSlalomLiveState");
 const {
+  upsertDrrLiveState,
+} = require("../controllers/INSERT/upsertDrrLiveState");
+const {
   upsertSlalomTeamStatus,
 } = require("../controllers/INSERT/upsertSlalomTeamStatus");
 const {
@@ -1019,6 +1022,25 @@ function setupIPCMainHandlers() {
   // tulis langsung ke sprintlivepreviews lalu broadcast results:updated
   // supaya Live Result jurysystem langsung refetch. Fire-and-forget.
   // Dikirim oleh sprintLiveStateMixin.js (SprintRace.vue).
+  // Live Result DRR per langkah input — pola sama dgn sprint:live-state.
+  // Dikirim oleh drrLiveStateMixin.js.
+  ipcMain.on("drr:live-state", (_event, payload) => {
+    const b = (payload && payload.bucket) || {};
+    upsertDrrLiveState(payload || {})
+      .then(() => {
+        notifyResultsUpdated({
+          eventId: String(b.eventId || ""),
+          category: "DRR",
+          initialId: String(b.initialId || ""),
+          divisionId: String(b.divisionId || ""),
+          raceId: String(b.raceId || ""),
+        });
+      })
+      .catch((err) => {
+        console.error("⚠️ [drr:live-state] gagal upsert:", err);
+      });
+  });
+
   // Live Result Slalom per langkah input (per tim per Run) — pola sama dgn
   // sprint:live-state di bawah. Dikirim oleh slalomLiveStateMixin.js.
   ipcMain.on("slalom:live-state", (_event, payload) => {

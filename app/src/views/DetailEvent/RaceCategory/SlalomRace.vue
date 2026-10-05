@@ -839,6 +839,7 @@ import CountryFlag from "@/components/common/CountryFlag.vue";
 import teamFlagMixin from "@/mixins/teamFlagMixin";
 import serialPortMixin from "@/mixins/serialPortMixin";
 import raceStickyBarMixin from "@/mixins/raceStickyBarMixin";
+import slalomLiveStateMixin from "@/mixins/slalomLiveStateMixin";
 import { createBucketCache } from "@/utils/localBucketCache";
 import JudgeActionHistoryModal from "@/components/judge/JudgeActionHistoryModal.vue";
 import FieldNotesModal from "@/components/judge/FieldNotesModal.vue";
@@ -1063,7 +1064,7 @@ export default {
     FieldNotesModal,
     ConnectionStatusBadge,
   },
-  mixins: [teamFlagMixin, serialPortMixin, raceStickyBarMixin],
+  mixins: [teamFlagMixin, serialPortMixin, raceStickyBarMixin, slalomLiveStateMixin],
 
   data() {
     return {

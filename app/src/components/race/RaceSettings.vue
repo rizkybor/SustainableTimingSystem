@@ -34,7 +34,7 @@
     <div class="rsm-wrap" v-if="!loading">
       <div>
         <!-- GENERAL: Protest Time -->
-        <div class="rs-card rsm-general mb-3">
+        <div class="rs-card rsm-general">
           <div class="px-3 py-3">
             <div class="h4 font-weight-bold mb-1">General</div>
             <div class="font-weight-bold mb-1">Protest Time</div>
@@ -90,7 +90,7 @@
              bukan selalu Sprint→H2H→Slalom→DRR→RX. -->
         <div class="rs-category-panels">
         <!-- SPRINT -->
-        <div class="rs-card mb-3" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
+        <div class="rs-card mb-3 mt-3" v-if="showSprint" :style="{ order: categoryOrder('SPRINT') }">
           <div class="px-3 py-3">
             <div
               class="h4 font-weight-bold mb-3 rs-section-toggle rs-header-row"

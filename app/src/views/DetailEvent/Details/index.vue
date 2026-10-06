@@ -1360,11 +1360,18 @@ export default {
         /* noop */
       }
       try {
-        const prefix = "h2hRoundResults:" + String(eventId) + "|";
+        // BUG FIX (2026-10-06): dulu cuma Sprint (clearAllForEvent) & H2H —
+        // cache per-bucket Slalom/DRR/Rafting Cross (utils/localBucketCache.js,
+        // key "<ns>:<eventId>|...") tidak ikut dibersihkan, padahal halaman
+        // itu me-MERGE cache di atas data DB saat dibuka -> hasil lama bisa
+        // "hidup lagi" setelah Reset/Restore (dan ikut tersimpan ulang).
+        const prefixes = ["h2hRoundResults:", "slalomLocal:", "drrLocal:", "rxLocal:"].map(
+          (ns) => ns + String(eventId) + "|"
+        );
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.indexOf(prefix) === 0) toRemove.push(key);
+          if (key && prefixes.some((p) => key.indexOf(p) === 0)) toRemove.push(key);
         }
         toRemove.forEach((k) => localStorage.removeItem(k));
       } catch (e) {

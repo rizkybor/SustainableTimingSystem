@@ -132,8 +132,37 @@ function buildEventFilter(eventId, cfg) {
   return { eventId: id };
 }
 
+// Step Reset TAMBAHAN (bukan koleksi; sengaja TIDAK masuk RESET_COLLECTIONS
+// karena daftar itu juga dipakai Backup/Restore): kembalikan status hasil
+// Provisional/Unofficial/Official SELURUH kategori event ini (termasuk status
+// per babak H2H) ke default. BUG FIX (2026-10-06): dulu Reset mengosongkan
+// semua hasil tapi status di eventsCollection tetap, jadi kategori kosong
+// masih ber-stempel OFFICIAL & terkunci dari edit.
+const RESET_EXTRA_STEPS = [
+  { name: "__resultStatus", label: "Status Hasil (Provisional/Unofficial/Official)" },
+];
+
+async function resetResultStatusForEvent(eventId) {
+  const id = String(eventId || "");
+  if (!ObjectId.isValid(id)) return { ok: false, error: "eventId tidak valid" };
+  const db = await getDb();
+  const res = await db.collection("eventsCollection").updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $unset: {
+        resultsStatusByCategory: "",
+        resultsOfficialByCategory: "",
+        resultsOfficialSetAt: "",
+      },
+      $set: { updatedAt: new Date() },
+    }
+  );
+  return { ok: true, collection: "__resultStatus", deletedCount: res.modifiedCount || 0 };
+}
+
 async function deleteOneCollectionForEvent(eventId, collectionName) {
   const id = String(eventId || "");
+  if (collectionName === "__resultStatus") return resetResultStatusForEvent(id);
   const cfg = RESET_COLLECTIONS.find((c) => c.name === collectionName);
   if (!id || !cfg) {
     return { ok: false, error: "eventId atau nama koleksi tidak valid" };
@@ -165,7 +194,7 @@ async function resetEventData(eventId) {
   if (!id) return { ok: false, error: "eventId kosong" };
 
   const deletedCounts = {};
-  for (const cfg of RESET_COLLECTIONS) {
+  for (const cfg of [...RESET_COLLECTIONS, ...RESET_EXTRA_STEPS]) {
     const r = await deleteOneCollectionForEvent(id, cfg.name);
     deletedCounts[cfg.name] = r.ok ? r.deletedCount : 0;
   }
@@ -174,6 +203,7 @@ async function resetEventData(eventId) {
 
 module.exports = {
   RESET_COLLECTIONS,
+  RESET_EXTRA_STEPS,
   buildEventFilter,
   deleteOneCollectionForEvent,
   resetEventData,

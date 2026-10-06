@@ -33,7 +33,7 @@
           <b-col cols="12" lg="7" class="py-2">
             <span class="home-hero__eyebrow">
               <Icon icon="mdi:timer-outline" class="mr-1" />
-              Timing &amp; Results · Arung Jeram
+              Timing &amp; Scoring · FAJI Unofficial
             </span>
             <h1 class="home-hero__title">Sustainable Timing System</h1>
             <p class="home-hero__lead">

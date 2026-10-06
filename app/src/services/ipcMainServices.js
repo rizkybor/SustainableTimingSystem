@@ -163,6 +163,7 @@ const {
   resetEventData,
   deleteOneCollectionForEvent,
   RESET_COLLECTIONS,
+  RESET_EXTRA_STEPS,
 } = require("../controllers/DELETE/resetEventData");
 const { resetH2HDataForEvent } = require("../controllers/DELETE/resetH2HData");
 const { resetSlalomDataForEvent } = require("../controllers/DELETE/resetSlalomData");
@@ -536,7 +537,7 @@ function setupIPCMainHandlers() {
   ipcMain.on("event:reset-data:collections", (event) => {
     event.reply(
       "event:reset-data:collections-reply",
-      RESET_COLLECTIONS.map((c) => ({ name: c.name, label: c.label }))
+      [...RESET_COLLECTIONS, ...RESET_EXTRA_STEPS].map((c) => ({ name: c.name, label: c.label }))
     );
   });
 

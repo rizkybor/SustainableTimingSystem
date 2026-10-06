@@ -21,13 +21,23 @@ export default {
   },
 
   computed: {
-    // Halaman Race Category (Sprint/Slalom/DRR/H2H/Rafting Cross) — widget
-    // chat dibuat transparan di sini supaya tidak menutupi tabel Output
-    // Racetime; halaman lain (Event Detail/Result) tetap seperti biasa.
+    // Halaman Race Category (Sprint/Slalom/DRR/H2H/Rafting Cross) + semua
+    // halaman Result (per kategori & Event Overall) — widget chat dibuat
+    // transparan di sini supaya tidak menutupi tabel; Event Detail biasa.
     isRaceCategoryRoute() {
-      return ["sprint-race", "slalom-race", "drr-race", "head2head-race", "rx-race"].includes(
-        this.$route.name
-      );
+      return [
+        "sprint-race",
+        "slalom-race",
+        "drr-race",
+        "head2head-race",
+        "rx-race",
+        "SprintResult",
+        "SlalomResult",
+        "DrrResult",
+        "HeadToHeadResult",
+        "RxResult",
+        "EventOverallResult",
+      ].includes(this.$route.name);
     },
   },
 

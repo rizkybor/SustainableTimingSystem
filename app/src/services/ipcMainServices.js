@@ -472,7 +472,18 @@ function setupIPCMainHandlers() {
   ipcMain.on("get-events-byid", async (event, datas) => {
     try {
       const data = await getEventById(datas);
-      event.reply("get-events-byid-reply", data);
+      // BUG FIX (2026-10-06): `_id` (ObjectId) tidak bertahan lewat IPC —
+      // structured clone membuang isi internalnya, di renderer jadi `{}`
+      // (String() = "[object Object]"). Akibatnya loadEnabledCategoryKeys()
+      // (eventCategories.js) tidak pernah mengenali balasannya sendiri ->
+      // timeout -> fail-open: panel/kolom SEMUA 5 Race Category tampil walau
+      // event cuma memilih sebagian (mis. kolom Rafting Cross di Event
+      // Overall UAT RAFTING), dan eventId() di Details/index.vue jadi "".
+      // Kirim `_id` sbg string hex supaya bisa dicocokkan & dipakai ulang.
+      event.reply(
+        "get-events-byid-reply",
+        data && data._id ? { ...data, _id: String(data._id) } : data
+      );
     } catch (error) {
       event.reply("get-events-byid-reply", []);
     }

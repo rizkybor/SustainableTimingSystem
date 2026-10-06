@@ -231,16 +231,30 @@
 
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Score by Rank</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.sprint.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow('sprint')"
-              >
-                + Tambah
-              </b-button>
+              <div class="font-weight-bold">
+                Score by Rank
+                <span class="rs-template-badge" v-b-tooltip.hover="'Dipakai sbg template Score by Rank utk Race Category lain'">Template</span>
+              </div>
+              <div class="d-flex align-items-center" style="gap: 6px">
+                <b-button
+                  v-if="templateTargets.length"
+                  size="sm"
+                  variant="outline-secondary"
+                  style="border-radius: 8px"
+                  @click="applySprintScoreTemplateToAll"
+                >
+                  Terapkan ke kategori lain
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.sprint.scoreByRank.length >= maxSprintScoreRows"
+                  @click="addScoreRow('sprint')"
+                >
+                  + Tambah
+                </b-button>
+              </div>
             </div>
             <div
               v-if="draft.sprint.scoreByRank.length"
@@ -505,16 +519,35 @@
 
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Score by Rank</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.h2h.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow('h2h')"
-              >
-                + Tambah
-              </b-button>
+              <div class="font-weight-bold">
+                Score by Rank
+                <span
+                  v-if="matchesSprintTemplate('h2h')"
+                  class="rs-template-badge rs-template-badge--same"
+                  >Sama dgn Sprint</span
+                >
+              </div>
+              <div class="d-flex align-items-center" style="gap: 6px">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  style="border-radius: 8px"
+                  :disabled="matchesSprintTemplate('h2h')"
+                  v-b-tooltip.hover="'Salin daftar Score by Rank + Score Rank berikutnya dari Sprint'"
+                  @click="applySprintScoreTemplate('h2h')"
+                >
+                  Pakai template Sprint
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.h2h.scoreByRank.length >= maxSprintScoreRows"
+                  @click="addScoreRow('h2h')"
+                >
+                  + Tambah
+                </b-button>
+              </div>
             </div>
             <div
               v-if="draft.h2h.scoreByRank.length"
@@ -727,16 +760,35 @@
 
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Score by Rank</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.slalom.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow('slalom')"
-              >
-                + Tambah
-              </b-button>
+              <div class="font-weight-bold">
+                Score by Rank
+                <span
+                  v-if="matchesSprintTemplate('slalom')"
+                  class="rs-template-badge rs-template-badge--same"
+                  >Sama dgn Sprint</span
+                >
+              </div>
+              <div class="d-flex align-items-center" style="gap: 6px">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  style="border-radius: 8px"
+                  :disabled="matchesSprintTemplate('slalom')"
+                  v-b-tooltip.hover="'Salin daftar Score by Rank + Score Rank berikutnya dari Sprint'"
+                  @click="applySprintScoreTemplate('slalom')"
+                >
+                  Pakai template Sprint
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.slalom.scoreByRank.length >= maxSprintScoreRows"
+                  @click="addScoreRow('slalom')"
+                >
+                  + Tambah
+                </b-button>
+              </div>
             </div>
             <div
               v-if="draft.slalom.scoreByRank.length"
@@ -952,16 +1004,35 @@
 
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Score by Rank</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.drr.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow('drr')"
-              >
-                + Tambah
-              </b-button>
+              <div class="font-weight-bold">
+                Score by Rank
+                <span
+                  v-if="matchesSprintTemplate('drr')"
+                  class="rs-template-badge rs-template-badge--same"
+                  >Sama dgn Sprint</span
+                >
+              </div>
+              <div class="d-flex align-items-center" style="gap: 6px">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  style="border-radius: 8px"
+                  :disabled="matchesSprintTemplate('drr')"
+                  v-b-tooltip.hover="'Salin daftar Score by Rank + Score Rank berikutnya dari Sprint'"
+                  @click="applySprintScoreTemplate('drr')"
+                >
+                  Pakai template Sprint
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.drr.scoreByRank.length >= maxSprintScoreRows"
+                  @click="addScoreRow('drr')"
+                >
+                  + Tambah
+                </b-button>
+              </div>
             </div>
             <div
               v-if="draft.drr.scoreByRank.length"
@@ -1200,16 +1271,35 @@
 
             <!-- SCORE BY RANK -->
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="font-weight-bold">Score by Rank</div>
-              <b-button
-                size="sm"
-                variant="outline-primary"
-                style="border-radius: 8px"
-                :disabled="draft.rx.scoreByRank.length >= maxSprintScoreRows"
-                @click="addScoreRow('rx')"
-              >
-                + Tambah
-              </b-button>
+              <div class="font-weight-bold">
+                Score by Rank
+                <span
+                  v-if="matchesSprintTemplate('rx')"
+                  class="rs-template-badge rs-template-badge--same"
+                  >Sama dgn Sprint</span
+                >
+              </div>
+              <div class="d-flex align-items-center" style="gap: 6px">
+                <b-button
+                  size="sm"
+                  variant="outline-secondary"
+                  style="border-radius: 8px"
+                  :disabled="matchesSprintTemplate('rx')"
+                  v-b-tooltip.hover="'Salin daftar Score by Rank + Score Rank berikutnya dari Sprint'"
+                  @click="applySprintScoreTemplate('rx')"
+                >
+                  Pakai template Sprint
+                </b-button>
+                <b-button
+                  size="sm"
+                  variant="outline-primary"
+                  style="border-radius: 8px"
+                  :disabled="draft.rx.scoreByRank.length >= maxSprintScoreRows"
+                  @click="addScoreRow('rx')"
+                >
+                  + Tambah
+                </b-button>
+              </div>
             </div>
             <div
               v-if="draft.rx.scoreByRank.length"
@@ -1747,6 +1837,16 @@ export default {
     showSprint() {
       return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("SPRINT");
     },
+    // Race Category lain yg tampil di modal ini (kategori event) — tujuan
+    // tombol "Terapkan ke kategori lain" di Score by Rank Sprint.
+    templateTargets() {
+      return [
+        { scope: "h2h", label: "Head to Head", show: this.showH2H },
+        { scope: "slalom", label: "Slalom", show: this.showSlalom },
+        { scope: "drr", label: "DRR", show: this.showDrr },
+        { scope: "rx", label: "Rafting Cross", show: this.showRx },
+      ].filter((t) => t.show && this.draft && this.draft[t.scope]);
+    },
     showH2H() {
       return !this.enabledCategoryKeys || this.enabledCategoryKeys.has("HEAD2HEAD");
     },
@@ -2194,6 +2294,73 @@ export default {
       list.push({ ranking: list.length + 1, score: last ? last.score : 0 });
     },
 
+    // TEMPLATE Score by Rank (permintaan user 2026-10-06): pengaturan
+    // Score by Rank milik Sprint dijadikan template yg bisa disalin ke
+    // Race Category lain (H2H/Slalom/DRR/RX) — daftar rank->score DAN
+    // "Score utk Rank N dan seterusnya". Hanya mengubah draft modal ini;
+    // baru tersimpan ke event saat tombol Save diklik (sama spt edit manual).
+    _sprintScoreTemplate() {
+      const sp = (this.draft && this.draft.sprint) || {};
+      return {
+        list: (sp.scoreByRank || []).map((p, i) => ({
+          ranking: i + 1,
+          score: Number(p.score) || 0,
+        })),
+        beyond: Number(sp.defaultScoreBeyondRank) || 0,
+      };
+    },
+
+    matchesSprintTemplate(scope) {
+      const t = this.draft && this.draft[scope];
+      if (!t || !Array.isArray(t.scoreByRank)) return false;
+      const tpl = this._sprintScoreTemplate();
+      if (t.scoreByRank.length !== tpl.list.length) return false;
+      if ((Number(t.defaultScoreBeyondRank) || 0) !== tpl.beyond) return false;
+      return t.scoreByRank.every((p, i) => (Number(p.score) || 0) === tpl.list[i].score);
+    },
+
+    applySprintScoreTemplate(scope, silent = false) {
+      const t = this.draft && this.draft[scope];
+      if (!t) return;
+      const tpl = this._sprintScoreTemplate();
+      this.$set(t, "scoreByRank", tpl.list.map((p) => ({ ...p })));
+      this.$set(t, "defaultScoreBeyondRank", tpl.beyond);
+      if (!silent && this.$bvToast) {
+        this.$bvToast.toast(
+          "Score by Rank disalin dari template Sprint. Klik Save untuk menyimpan.",
+          { variant: "info", autoHideDelay: 2500, title: "Template Sprint" }
+        );
+      }
+    },
+
+    async applySprintScoreTemplateToAll() {
+      const targets = this.templateTargets;
+      if (!targets.length) return;
+      const labels = targets.map((t) => t.label).join(", ");
+      let ok = true;
+      if (this.$bvModal && this.$bvModal.msgBoxConfirm) {
+        ok = await this.$bvModal.msgBoxConfirm(
+          `Score by Rank di ${labels} akan diganti dengan pengaturan Sprint. Lanjutkan?`,
+          {
+            title: "Terapkan template Sprint",
+            okTitle: "Terapkan",
+            cancelTitle: "Batal",
+            okVariant: "primary",
+            centered: true,
+            size: "sm",
+          }
+        );
+      }
+      if (!ok) return;
+      targets.forEach((t) => this.applySprintScoreTemplate(t.scope, true));
+      if (this.$bvToast) {
+        this.$bvToast.toast(
+          `Template Sprint diterapkan ke ${labels}. Klik Save untuk menyimpan.`,
+          { variant: "success", autoHideDelay: 3000, title: "Template Sprint" }
+        );
+      }
+    },
+
     removeScoreRow(scope, idx) {
       const list = this.draft[scope] && this.draft[scope].scoreByRank;
       if (!list || list.length <= 1) return;
@@ -2441,6 +2608,24 @@ export default {
   flex-direction: column;
 }
 
+.rs-template-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  color: #1c4c7a;
+  background: #e6f4fd;
+  border: 1px solid #bfe3f8;
+}
+.rs-template-badge--same {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
 .rs-divider {
   border: none;
   border-top: 1px dashed #d9dee6;

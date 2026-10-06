@@ -12,10 +12,8 @@
       <nav class="ev-crumbs" aria-label="breadcrumb">
         <router-link to="/" class="ev-crumbs__link">
           <Icon icon="mdi:home-outline" />
-          Dashboard
+          Home
         </router-link>
-        <Icon icon="mdi:chevron-right" class="ev-crumbs__sep" />
-        <router-link to="/events" class="ev-crumbs__link">Events</router-link>
         <Icon icon="mdi:chevron-right" class="ev-crumbs__sep" />
         <span class="ev-crumbs__current">{{ events.eventName || "Event" }}</span>
       </nav>

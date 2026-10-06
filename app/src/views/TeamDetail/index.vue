@@ -3,6 +3,7 @@
     <PageHero
       :title="teamName"
       crumb="Team Details"
+      :trail="[{ label: 'All Teams', to: { name: 'create-team' } }]"
       :subtitle="(primaryTypeTeam ? primaryTypeTeam + ' · ' : '') + 'Detail tim, registrasi race & hasilnya'"
       :stats="[
         { label: 'Events', value: eventsGrouped.length },

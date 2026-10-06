@@ -183,7 +183,15 @@
                 </td>
                 <td class="text-center">{{ r.bib || "-" }}</td>
                 <td class="text-center">{{ r.ranked || "-" }}</td>
-                <td class="text-center">{{ r.score || 0 }}</td>
+                <td class="text-center">
+                  <span
+                    v-if="r._pending"
+                    class="text-muted"
+                    v-b-tooltip.hover="'Final belum dipertandingkan — belum ada peringkat & skor'"
+                    >-</span
+                  >
+                  <template v-else>{{ r.score || 0 }}</template>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -547,6 +555,7 @@ export default {
       // fail-open (tampilkan semua kolom kategori)
       enabledCategoryKeys: null,
       results: [],
+      overallRowsRaw: [],
       podium: [],
       showPdf: false,
       eventInfo: {},
@@ -987,6 +996,49 @@ export default {
       };
     },
 
+    // Tabel Overall = h2h_overall.overallRows, TAPI finalis yg finalnya
+    // (Final A / Final B) BELUM punya pemenang di bracket ditampilkan TANPA
+    // peringkat & skor (permintaan user 2026-10-06) — menjaga juga data
+    // Overall lama yg disimpan sebelum aturan ini (pushUndecidedFinalists()
+    // di HeadToHead.vue). Urutan: Final A, Final B, lalu tim lain.
+    _applyOverallRows() {
+      const raw = Array.isArray(this.overallRowsRaw) ? this.overallRowsRaw : [];
+      const keyOf = (name, bib) =>
+        String(name || "").trim().toUpperCase() + "|" + String(bib || "").trim();
+      const rounds = this.bracketRounds || [];
+      const main = rounds.filter((r) => !r.bronze);
+      const last = main[main.length - 1];
+      const finalA =
+        main.length > 1 && last && (last.matches || []).length === 1 ? last : null;
+      const finalB = rounds.find((r) => r.bronze) || null;
+
+      const tierByKey = new Map(); // key -> 1 (Final A) / 3 (Final B), hanya final yg belum diputuskan
+      [
+        [finalA, 1],
+        [finalB, 3],
+      ].forEach(([round, tier]) => {
+        const m = round && round.matches && round.matches[0];
+        if (!m || (m.winner && m.winner.name)) return;
+        [m.team1, m.team2].forEach((t) => {
+          if (t && t.name) tierByKey.set(keyOf(t.name, t.bibTeam), tier);
+        });
+      });
+
+      const rows = raw.map((r) => {
+        const tier = tierByKey.get(keyOf(r.name, r.bib));
+        if (r._pending || tier) {
+          return { ...r, ranked: null, score: null, _pending: true, _tier: tier || 1 };
+        }
+        return { ...r };
+      });
+      const sortKey = (r) =>
+        r._pending ? r._tier + 0.5 : Number(r.ranked) > 0 ? Number(r.ranked) : 999;
+      this.results = rows.sort((a, b) => sortKey(a) - sortKey(b));
+      this.podium = this.results.filter(
+        (r) => !r._pending && Number(r.ranked) > 0 && Number(r.ranked) <= 4
+      );
+    },
+
     async loadH2HResult() {
       const bucket = this.resolveBucket();
       if (
@@ -1009,13 +1061,10 @@ export default {
             const overallRows = Array.isArray(res.item.overallRows)
               ? res.item.overallRows
               : [];
-            this.results = overallRows
-              .slice()
-              .sort((a, b) => (a.ranked || 999) - (b.ranked || 999));
-            this.podium = this.results.filter(
-              (r) => Number(r.ranked) > 0 && Number(r.ranked) <= 4
-            );
+            this.overallRowsRaw = overallRows.slice();
+            this._applyOverallRows();
           } else {
+            this.overallRowsRaw = [];
             this.results = [];
             this.podium = [];
             this.error = (res && res.error) || "";
@@ -1088,6 +1137,7 @@ export default {
         resultsRes && resultsRes.ok && Array.isArray(resultsRes.items)
           ? resultsRes.items
           : [];
+      this._applyOverallRows();
     },
 
     _findRound(id) {
@@ -1567,7 +1617,7 @@ export default {
         "Team Name": r.name || "-",
         BIB: r.bib || "-",
         Ranked: r.ranked || "-",
-        Score: r.score || 0,
+        Score: r._pending ? "-" : r.score || 0,
       }));
 
       const sheets = [{ name: "Overall", rows: overallRows }];

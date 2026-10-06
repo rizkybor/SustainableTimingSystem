@@ -3,6 +3,12 @@
     <PageHero
       title="Judges Activity History"
       crumb="Judges Activity History"
+      :trail="[
+        {
+          label: eventInfo.eventName || 'Event',
+          to: { name: 'detail-event', params: { id: $route.params.id } },
+        },
+      ]"
       icon="mdi:gavel"
       :subtitle="(eventInfo.eventName || 'Event') + ' — semua tindakan juri di event ini'"
       :stats="[

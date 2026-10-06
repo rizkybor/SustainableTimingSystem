@@ -5,11 +5,12 @@
       <nav class="rch-crumbs" aria-label="breadcrumb">
         <router-link to="/" class="rch-crumbs__link">
           <Icon icon="mdi:home-outline" />
-          Dashboard
+          Home
         </router-link>
         <Icon icon="mdi:chevron-right" class="rch-crumbs__sep" />
         <router-link
           :to="{ name: 'detail-event', params: { id: $route.params.id } }"
+          :title="event.eventName || 'Event'"
           class="rch-crumbs__link rch-crumbs__link--event"
         >
           {{ event.eventName || "Event" }}

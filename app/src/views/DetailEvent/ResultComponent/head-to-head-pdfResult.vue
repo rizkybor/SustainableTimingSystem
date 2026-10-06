@@ -195,8 +195,8 @@
                   <CountryFlag :code="flagFor(r.name)" />
                 </td>
                 <td class="text-center">{{ r.bib }}</td>
-                <td class="text-center">{{ r.score }}</td>
-                <td class="text-center">{{ r.ranked }}</td>
+                <td class="text-center">{{ r.score === null || r.score === undefined ? "-" : r.score }}</td>
+                <td class="text-center">{{ r.ranked || "-" }}</td>
               </tr>
             </tbody>
           </table>
@@ -410,8 +410,8 @@
                   <CountryFlag :code="flagFor(r.name)" />
                 </td>
                 <td class="text-center">{{ r.bib }}</td>
-                <td class="text-center">{{ r.score }}</td>
-                <td class="text-center">{{ r.ranked }}</td>
+                <td class="text-center">{{ r.score === null || r.score === undefined ? "-" : r.score }}</td>
+                <td class="text-center">{{ r.ranked || "-" }}</td>
               </tr>
             </tbody>
           </table>

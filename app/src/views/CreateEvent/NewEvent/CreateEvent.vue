@@ -3,6 +3,7 @@
     <PageHero
       title="Create New Event"
       crumb="Create New Event"
+      :trail="[{ label: 'All Events', to: { name: 'events' } }]"
       icon="mdi:calendar-plus"
       subtitle="Informasi event, jadwal & lokasi, kategori lomba, dan komite"
     />

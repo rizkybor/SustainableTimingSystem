@@ -5,8 +5,23 @@
       <nav class="ph-crumbs" aria-label="breadcrumb">
         <router-link to="/" class="ph-crumbs__link">
           <Icon icon="mdi:home-outline" />
-          Dashboard
+          Home
         </router-link>
+        <template v-for="(t, i) in trail">
+          <Icon :key="'sep-' + i" icon="mdi:chevron-right" class="ph-crumbs__sep" />
+          <router-link
+            v-if="t.to"
+            :key="'crumb-' + i"
+            :to="t.to"
+            class="ph-crumbs__link ph-crumbs__link--mid"
+            :title="t.label"
+          >
+            {{ t.label }}
+          </router-link>
+          <span v-else :key="'crumb-' + i" class="ph-crumbs__link ph-crumbs__link--mid">{{
+            t.label
+          }}</span>
+        </template>
         <Icon icon="mdi:chevron-right" class="ph-crumbs__sep" />
         <span class="ph-crumbs__current">{{ crumb || title }}</span>
       </nav>
@@ -67,6 +82,9 @@ export default {
     title: { type: String, required: true },
     subtitle: { type: String, default: "" },
     crumb: { type: String, default: "" },
+    // Level di antara "Home" dan halaman ini: [{ label, to? }] — label
+    // disamakan dgn menu Navbar (All Events / All Teams).
+    trail: { type: Array, default: () => [] },
     icon: { type: String, default: "mdi:view-list" },
     // [{ label, value, tone: "success" | "warning" | "neutral" }]
     stats: { type: Array, default: () => [] },
@@ -125,6 +143,16 @@ export default {
 .ph-crumbs__link:hover {
   color: #1c4c7a;
   text-decoration: none;
+}
+/* Level tengah (mis. nama event panjang) dipotong "…" supaya breadcrumb
+   tetap 1 baris. */
+.ph-crumbs__link--mid {
+  display: inline-block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 .ph-crumbs__sep {
   color: #cbd5e1;

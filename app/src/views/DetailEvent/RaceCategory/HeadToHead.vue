@@ -2495,9 +2495,11 @@ export default {
       // dulu tidak masuk top4 sama sekali -> ikut dinomori dari 5 di bagian
       // "others" (mis. Final B sudah selesai = 3 & 4, tapi kedua tim Final A
       // = 5 & 6), dan skornya ikut salah di Result & Event Overall. Sekarang
-      // tempat 1-2 / 3-4 TETAP dipesan utk finalisnya; urutan sementara di
-      // dalamnya pakai waktu di babak final itu (kalau sudah ada), lalu nama.
-      // Ditandai _provisional supaya jelas belum pasti.
+      // finalis itu TETAP dikeluarkan dari "others" (supaya tim tersingkir
+      // tetap mulai dari 5), tapi BELUM diberi peringkat & skor sama sekali
+      // (permintaan user: jangan ada ranked sebelum Final A/B dipertandingkan)
+      // — ranked/score null + _pending, baru terisi begitu final ada
+      // pemenangnya. Urutan tampil: Final A dulu, lalu Final B.
       const pushUndecidedFinalists = (match, rows, firstPlace, source) => {
         const findRow = (nm) =>
           rows.find(
@@ -2522,12 +2524,13 @@ export default {
         });
         present.forEach((x, i) => {
           top4.push({
-            place: firstPlace + i,
+            place: null,
+            order: firstPlace + i, // utk urutan tampil saja, bukan peringkat
             name: x.name,
             bib: x.bib,
             source,
             timeMs: x.timeMs,
-            provisional: true,
+            pending: true,
           });
           top4Keys.add(teamKey(x.name, x.bib));
         });
@@ -2689,15 +2692,15 @@ export default {
 
       // 1..4 (top4)
       top4
-        .sort((a, b) => a.place - b.place)
+        .sort((a, b) => (a.place || a.order) - (b.place || b.order))
         .forEach((x) => {
           overall.push({
-            ranked: x.place,
+            ranked: x.pending ? null : x.place,
             name: x.name,
             bib: x.bib,
-            score: this.scoreForRank(x.place), // ← skor dari this.dataScore
+            score: x.pending ? null : this.scoreForRank(x.place), // ← skor dari this.dataScore
             _source: x.source,
-            ...(x.provisional ? { _provisional: true } : {}),
+            ...(x.pending ? { _pending: true } : {}),
           });
         });
 
@@ -2815,6 +2818,15 @@ export default {
             });
             if (this._healBronzeFinal()) poolPruned = true;
             if (poolPruned) this.saveBracketToDB(true);
+            // Sinkronkan Overall sekali saat kategori dibuka (memperbaiki
+            // simpanan Overall lama) — hanya kalau sudah ada match selesai.
+            if (
+              this.rounds.some((r) =>
+                (r.matches || []).some((m) => m && m.winner && m.winner.name)
+              )
+            ) {
+              this._autoSyncOverallSoon(3000);
+            }
             // optional restore settings
             if (res.item.settings && res.item.settings.booyanActive) {
               this.booyanActive = { ...res.item.settings.booyanActive };
@@ -3414,12 +3426,13 @@ export default {
     // sukses — dipakai oleh ketiga tombol Save. TIDAK di-await oleh
     // caller (fire-and-forget), persis seperti perilaku aslinya sebelum
     // dirapikan.
-    _saveH2HToDBAndSyncOverall(channel, payload, successMessage) {
+    _saveH2HToDBAndSyncOverall(channel, payload, successMessage, opts = {}) {
+      const silent = !!opts.silent;
       return new Promise((resolve) => {
         ipcRenderer.send(channel, payload);
         ipcRenderer.once(`${channel}-reply`, async (_e, res) => {
           if (res && res.ok) {
-            this.notify("success", successMessage, "Saved");
+            if (!silent) this.notify("success", successMessage, "Saved");
             // Auto-sync ke Overall — dulu ini cuma kejadian kalau tombol
             // "Save Overall (DB)" yang terpisah diklik sendiri, sehingga
             // operator yang cuma terbiasa Save Round tiap babak tidak pernah
@@ -3428,8 +3441,11 @@ export default {
             try {
               await this.upsertEventResultsH2H();
             } catch (err) {
-              this.notify("error", String(err), "Sync Overall Gagal");
+              if (silent) logger.warn("auto-sync overall gagal:", err);
+              else this.notify("error", String(err), "Sync Overall Gagal");
             }
+          } else if (silent) {
+            logger.warn("auto-save overall gagal:", res && res.error);
           } else {
             this.notify(
               "error",
@@ -3588,6 +3604,51 @@ export default {
     },
 
     // === Save Overall (DB) ===
+    // FITUR (2026-10-06): Overall H2H (h2h_overall + kolom H2H di Event
+    // Overall) dulu HANYA ter-update kalau operator klik "Save" di grup
+    // Overall — kalau lupa, Event Overall tetap memakai peringkat lama
+    // (mis. UAT RAFTING: 5 tim tapi rank 5-9 dari simpanan sebelum fix
+    // pushUndecidedFinalists()). Sekarang disimpan otomatis & diam2
+    // (tanpa toast) setiap pemenang match berubah dan sekali saat bracket
+    // kategori dibuka. Debounce + dikunci ke bucket saat dijadwalkan supaya
+    // tidak menulis ke kategori lain kalau operator keburu pindah.
+    _autoSyncOverallSoon(delay = 2000) {
+      clearTimeout(this._autoOverallTimer);
+      const key = this.selectedH2HKey;
+      this._autoOverallTimer = setTimeout(() => {
+        if (this._isDestroyed || this.selectedH2HKey !== key) return;
+        this._autoSyncOverallNow().catch((err) =>
+          logger.warn("auto-sync overall gagal:", err)
+        );
+      }, delay);
+    },
+
+    async _autoSyncOverallNow() {
+      if (this.isSavingOverall || this.isSavingAllRounds) return;
+      let bucket;
+      try {
+        bucket = this._currentBucketOrThrow();
+      } catch (_e) {
+        return;
+      }
+      const key = this.selectedH2HKey;
+      this.isSavingOverall = true;
+      try {
+        await this.hydrateAllRoundsFromDb();
+        if (this.selectedH2HKey !== key) return;
+        const overallPkg = this.buildOverallPackage();
+        if (!overallPkg || !overallPkg.overallRows || !overallPkg.overallRows.length) return;
+        await this._saveH2HToDBAndSyncOverall(
+          "h2h:overall:save",
+          { bucket, overallPkg },
+          "",
+          { silent: true }
+        );
+      } finally {
+        this.isSavingOverall = false;
+      }
+    },
+
     async saveOverallToDB() {
       if (this.isSavingOverall) return;
 
@@ -3640,6 +3701,10 @@ export default {
       var self = this;
 
       function toNumOrNull(v) {
+        // "" / null = belum ada nilai (mis. finalis yg finalnya belum
+        // dipertandingkan) — Number("") & Number(null) === 0, jadi harus
+        // dicek dulu supaya tidak berubah jadi peringkat/skor 0.
+        if (v === "" || v === null || v === undefined) return null;
         var n = Number(v);
         return Number.isFinite(n) ? n : null;
       }
@@ -3704,6 +3769,28 @@ export default {
         var r = overallRows[i] || {};
         var nm = String(r.name || r.team || "");
         var bb = String(r.bib || "");
+        // Finalis yg finalnya belum dipertandingkan (_pending / ranked null):
+        // BELUM py peringkat & skor — dikirim kosong spt kategori yg belum
+        // diikuti (tampil "-"), bukan 0. Catatan: +null === 0, jadi null
+        // harus dicek eksplisit sebelum Number.isFinite.
+        var pending =
+          r._pending || r.ranked === null || r.ranked === undefined || r.ranked === "";
+        if (pending) {
+          var pkey = teamKeyFrom(nm, bb);
+          if (pkey) {
+            incoming.set(pkey, {
+              key: pkey,
+              teamId: teamIdByKey.get(pkey) || "",
+              teamName: nm,
+              bib: bb,
+              h2hCat: { name: K.H2H, rankedByCats: "", scored: "" },
+              totalRanked: null,
+              totalScore: 0,
+            });
+          }
+          i = i + 1;
+          continue;
+        }
         var rk = Number.isFinite(+r.ranked) ? +r.ranked : null;
         var sc = Number.isFinite(+r.score) ? +r.score : scoreForRankLocal(rk);
         var key = teamKeyFrom(nm, bb);
@@ -5686,6 +5773,7 @@ export default {
       // match berubah; upsertBracket() sendiri broadcast results:updated.
       if (r.matches.map(winnerKeyOf).join("||") !== winnersBefore) {
         this.saveBracketToDB(true);
+        this._autoSyncOverallSoon();
       }
       // FITUR (2026-09-29): auto-advance begitu SELURUH match di babak ini
       // sudah punya pemenang — lihat catatan lengkap di

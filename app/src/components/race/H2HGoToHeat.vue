@@ -1,5 +1,5 @@
 <template>
-  <div class="gth" @keydown.esc="open = false">
+  <div class="gth" v-proximity-fade="{ active: !open }" @keydown.esc="open = false">
     <button
       type="button"
       class="gth-fab"

@@ -1103,11 +1103,11 @@
       @update-time="updateTime"
     />
 
-    <div class="ml-5 mt-4">
+    <!-- <div class="ml-5 mt-4">
       <b-button @click="goTo" variant="outline-info" class="btn-action">
         <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
       </b-button>
-    </div>
+    </div> -->
 
     <br /><br />
 
@@ -1323,7 +1323,10 @@
       :navigate="goToHeat"
     />
 
-    <div class="h2h-heat-fab-wrap">
+    <div
+      class="h2h-heat-fab-wrap"
+      v-proximity-fade="{ active: !crossCategoryHeatModalVisible }"
+    >
       <button
         type="button"
         class="h2h-heat-fab"

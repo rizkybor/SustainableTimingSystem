@@ -1,5 +1,10 @@
 <template>
-  <div class="chat-widget">
+  <!-- Transparan saat idle (hanya kalau parent minta, mis. halaman Race
+       Category); tetap jelas saat panel terbuka atau ada pesan belum dibaca. -->
+  <div
+    class="chat-widget"
+    v-proximity-fade="{ active: fadeWhenIdle && !isOpen && !totalUnread }"
+  >
     <!-- FLOATING BUTTON -->
     <button
       type="button"
@@ -9,8 +14,8 @@
       title="Chat dengan Judge"
     >
       <transition name="chat-fab-icon" mode="out-in">
-        <Icon v-if="!isOpen" key="chat" icon="mdi:chat-processing-outline" width="24" height="24" />
-        <Icon v-else key="close" icon="mdi:chevron-down" width="26" height="26" />
+        <Icon v-if="!isOpen" key="chat" icon="mdi:chat-processing-outline" width="32" height="32" />
+        <Icon v-else key="close" icon="mdi:chevron-down" width="34" height="34" />
       </transition>
       <span v-if="!isOpen && totalUnread > 0" class="chat-fab-badge">{{
         totalUnread > 99 ? "99+" : totalUnread
@@ -444,6 +449,9 @@ export default {
   components: { Icon },
   props: {
     eventId: { type: String, default: "" },
+    // true = tombol chat transparan saat idle & jelas saat cursor mendekat
+    // (dipakai di halaman Race Category, lihat views/DetailEvent/index.vue).
+    fadeWhenIdle: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -1224,8 +1232,9 @@ export default {
 
 /* ===== FLOATING BUTTON ===== */
 .chat-fab {
-  width: 58px;
-  height: 58px;
+  /* Diperbesar (2026-10-07): 58px -> 72px, lebih mudah diklik saat race. */
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: none;
   background: linear-gradient(135deg, #1c8fc7 0%, #145f87 100%);
@@ -1256,10 +1265,10 @@ export default {
   color: #fff;
   border: 2px solid #fff;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 1px 5px;
-  min-width: 20px;
+  padding: 1px 6px;
+  min-width: 24px;
   text-align: center;
   box-shadow: 0 2px 6px rgba(229, 72, 77, 0.5);
 }
@@ -1267,13 +1276,13 @@ export default {
   position: absolute;
   bottom: -3px;
   left: -3px;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   background: #e5484d;
   color: #fff;
   border: 2px solid #fff;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -1298,9 +1307,12 @@ export default {
 .chat-panel {
   position: absolute;
   right: 0;
-  bottom: 74px;
-  width: 352px;
-  max-height: 560px;
+  bottom: 88px;
+  /* Diperbesar (2026-10-06): 352x560 -> 440x700. Dibatasi tinggi jendela
+     (dikurangi posisi widget + tombol) supaya kepala panel tidak terpotong
+     di layar/jendela pendek. */
+  width: min(92vw, 440px);
+  max-height: min(calc(100vh - 184px), 700px);
   background: #fff;
   border-radius: 18px;
   box-shadow: 0 20px 48px rgba(15, 30, 45, 0.2), 0 4px 12px rgba(15, 30, 45, 0.08);
@@ -1313,8 +1325,8 @@ export default {
     max-height 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 .chat-panel--expanded {
-  width: min(92vw, 560px);
-  max-height: min(88vh, 760px);
+  width: min(94vw, 720px);
+  max-height: min(calc(100vh - 184px), 880px);
 }
 .chat-panel-fade-enter-active {
   transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -1609,7 +1621,7 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 14px;
-  min-height: 260px;
+  min-height: 340px;
   background-color: #f8fafc;
   background-image: radial-gradient(circle, rgba(24, 116, 165, 0.07) 1px, transparent 1px),
     linear-gradient(to bottom, #f1f5f9, #f8fafc);

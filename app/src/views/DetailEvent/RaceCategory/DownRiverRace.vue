@@ -550,9 +550,9 @@
           </b-col>
         </b-row>
 
-        <b-button @click="goTo()" variant="outline-info" class="btn-action">
+        <!-- <b-button @click="goTo()" variant="outline-info" class="btn-action">
           <Icon icon="ic:baseline-keyboard-double-arrow-left" />Back
-        </b-button>
+        </b-button> -->
       </div>
     </div>
 

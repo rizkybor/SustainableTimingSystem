@@ -810,13 +810,13 @@
           <!-- END SESSION 1  -->
         </div>
 
-        <b-button
+        <!-- <b-button
           @click="goTo"
           variant="outline-secondary"
           class="btn-action mt-2 ml-2"
         >
           <Icon icon="ic:baseline-keyboard-double-arrow-left" /> Back
-        </b-button>
+        </b-button> -->
       </div>
     </div>
   </div>

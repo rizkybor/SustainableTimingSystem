@@ -22,6 +22,9 @@ import BootstrapVue from 'bootstrap-vue'
 
 
 Vue.use(BootstrapVue)
+// Widget mengambang transparan, jelas saat cursor mendekat (lihat utils/proximityFade.js)
+import proximityFade from '@/utils/proximityFade'
+Vue.directive('proximity-fade', proximityFade)
 Vue.config.productionTip = false
 
 new Vue({

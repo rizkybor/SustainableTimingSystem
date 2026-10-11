@@ -65,11 +65,12 @@
                     label-for="sprintBucketSelect"
                     class="mb-0"
                   >
-                    <b-form-select
+                    <BucketButtonGroup
                       id="sprintBucketSelect"
                       :options="sprintOptionsForSelectedInitial"
                       v-model="selectedSprintKey"
                       @change="onSelectSprintBucket"
+                      aria-label="Pilih kategori Sprint"
                     />
                   </b-form-group>
                 </div>
@@ -140,6 +141,8 @@
               <!-- Status realtime juri (posisi seragam di 5 Race Category,
                    selalu terlihat krn ikut sticky bar) -->
               <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+              <!-- Status database + perubahan yg menunggu tersimpan (ulang-coba otomatis) -->
+              <DbStatusBadge class="race-realtime-badge mr-2 mb-1" />
 
               <!-- path pill -->
               <div class="mb-1">
@@ -463,6 +466,8 @@
 </template>
 
 <script>
+import { clockDiff, secondsToClock } from "@/lib/raceTime";
+import { ipcRequest } from "@/utils/ipcRequest";
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
@@ -1181,20 +1186,22 @@ export default {
         const bucket = getBucket();
         if (!bucket || !bucket.eventId) return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 8000);
-          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("judgeReports:getForBucket", {
+        // ipcRequest (src/lib/ipcRequest.js): balasan dicocokkan lewat
+        // __reqId, jadi tidak bisa tertukar dgn permintaan kategori lain yang
+        // berjalan bersamaan (mis. koneksi pulih tepat saat pindah kategori).
+        // Penanganan hasilnya di bawah TIDAK berubah (disetujui user
+        // 2026-10-11 — bagian socket Sprint yang dikunci).
+        const res = await ipcRequest(
+          "judgeReports:getForBucket",
+          {
             category: "sprint",
             eventId: String(bucket.eventId || ""),
             initialId: String(bucket.initialId || ""),
             raceId: String(bucket.raceId || ""),
             divisionId: String(bucket.divisionId || ""),
-          });
-        });
+          },
+          { replyChannel: "judgeReports:getForBucket:reply", timeoutMs: 8000 }
+        );
 
         if (!res || !res.ok || !Array.isArray(res.items)) return;
 
@@ -1318,12 +1325,7 @@ export default {
 
     // sekunder → string "HH:MM:SS.000" biar konsisten dg format timePen lainnya
     secondsToTimeString(totalSec) {
-      const t = Math.max(0, Number(totalSec) || 0);
-      const sec = Math.floor(t % 60);
-      const min = Math.floor((t / 60) % 60);
-      const hr = Math.floor(t / 3600);
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+      return secondsToClock(totalSec);
     },
 
     // PS (Pen. Start) dan PF (Pen. Finish) punya daftar pilihan penalty yang
@@ -1503,17 +1505,19 @@ export default {
 
         this.selectedSprintKey = key;
         localStorage.setItem("currentSprintBucketKey", key);
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once(
-            "teams-sprint-registered:find-reply",
-            (_e, payload) => resolve(payload)
-          );
-          ipcRenderer.send("teams-sprint-registered:find", filters);
-        });
+        // BUG FIX (2026-10-11): dulu ipcRenderer.once() polos — 2 pindah
+        // kategori yang tumpang tindih bisa saling tertukar balasan, dan
+        // balasan LAMA yang datang belakangan menimpa tampilan kategori yang
+        // sedang dipilih. ipcRequest() mencocokkan balasan lewat __reqId;
+        // hasil utk kategori yang sudah tidak dipilih cuma disimpan ke map.
+        const res = await ipcRequest("teams-sprint-registered:find", filters);
+        const stillSelected = this.selectedSprintKey === key;
 
         if (!res || !res.ok) {
-          this.participant = [];
-          this._useSprintBucket(key);
+          if (stillSelected) {
+            this.participant = [];
+            this._useSprintBucket(key);
+          }
           return;
         }
 
@@ -1523,11 +1527,15 @@ export default {
             ? doc.teams.map(normalizeTeamForSprint)
             : [];
         this.sprintBucketMap[key] = { ...b, teams };
-        this._useSprintBucket(key);
+        if (stillSelected) this._useSprintBucket(key);
       } catch {
-        this._useSprintBucket(key);
+        if (this.selectedSprintKey === key) this._useSprintBucket(key);
+      } finally {
+        // dulu di luar try — return lebih awal di atas membuat isLoading
+        // tertinggal true. Hanya utk kategori yg masih dipilih, supaya
+        // balasan lama tidak mematikan loading milik permintaan terbaru.
+        if (!key || this.selectedSprintKey === key) this.isLoading = false;
       }
-      this.isLoading = false;
     },
 
     // ======
@@ -1616,14 +1624,7 @@ export default {
         )
           return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 6000);
-          ipcRenderer.once("get-sprint-result-reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("get-sprint-result", filters);
-        });
+        const res = await ipcRequest("get-sprint-result", filters, { timeoutMs: 6000 });
 
         if (!res || !res.ok || !Array.isArray(res.items) || !res.items.length)
           return;
@@ -1961,33 +1962,8 @@ export default {
     },
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
-      const [h1, m1, s1] = String(waktuAwal).split(":");
-      const [h2, m2, s2] = String(waktuAkhir).split(":");
-
-      const d1 = new Date(0);
-      d1.setUTCHours(
-        +h1 || 0,
-        +m1 || 0,
-        parseInt((s1 || "0").split(".")[0]) || 0,
-        parseInt((s1 || "0").split(".")[1]) || 0
-      );
-      const d2 = new Date(0);
-      d2.setUTCHours(
-        +h2 || 0,
-        +m2 || 0,
-        parseInt((s2 || "0").split(".")[0]) || 0,
-        parseInt((s2 || "0").split(".")[1]) || 0
-      );
-
-      const diff = d2 - d1;
-      const ms = diff % 1000;
-      const sec = Math.floor((diff / 1000) % 60);
-      const min = Math.floor((diff / (1000 * 60)) % 60);
-      const hr = Math.floor(diff / (1000 * 60 * 60));
-
-      const pad2 = (n) => String(n).padStart(2, "0");
-      const pad3 = (n) => String(n).padStart(3, "0");
-      return `${pad2(hr)}:${pad2(min)}:${pad2(sec)}.${pad3(ms)}`;
+      // Lihat src/lib/raceTime.js (diuji: tests/raceTime.test.js).
+      return clockDiff(waktuAwal, waktuAkhir);
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -2135,12 +2111,7 @@ export default {
 
       // --- ambil dokumen event-results yang lama (kalau ada) ---
       function getExisting() {
-        return new Promise(function (resolve) {
-          ipcRenderer.once("event-results:get-reply", function (_e, res) {
-            resolve(res);
-          });
-          ipcRenderer.send("event-results:get", baseFilter);
-        });
+        return ipcRequest("event-results:get", baseFilter);
       }
 
       var existingDoc = null;
@@ -2324,21 +2295,8 @@ export default {
   flex: 1 1 260px;
 }
 
-.sprint-actionbar__select #sprintBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-}
 
-#sprintBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
 
-#sprintBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
 
 /* Switch Sprint Category (.switch-label/.init-tabs/.init-tab) sekarang
    didefinisikan global di race-category-stickybar.css. */

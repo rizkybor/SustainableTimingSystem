@@ -25,6 +25,12 @@ Vue.use(BootstrapVue)
 // Widget mengambang transparan, jelas saat cursor mendekat (lihat utils/proximityFade.js)
 import proximityFade from '@/utils/proximityFade'
 Vue.directive('proximity-fade', proximityFade)
+// Switch Category berupa tombol (pengganti dropdown) di 5 halaman Race Category
+import BucketButtonGroup from '@/components/race/BucketButtonGroup.vue'
+Vue.component('BucketButtonGroup', BucketButtonGroup)
+// Indikator koneksi database + perubahan menunggu (services/dbHealth.js)
+import DbStatusBadge from '@/components/common/DbStatusBadge.vue'
+Vue.component('DbStatusBadge', DbStatusBadge)
 Vue.config.productionTip = false
 
 new Vue({

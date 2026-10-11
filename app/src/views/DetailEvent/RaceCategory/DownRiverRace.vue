@@ -68,11 +68,12 @@
                   </div>
 
                   <b-form-group label-for="drrBucketSelect" class="mb-0">
-                    <b-form-select
+                    <BucketButtonGroup
                       id="drrBucketSelect"
                       :options="drrOptionsForSelectedInitial"
                       v-model="selectedDrrKey"
                       @change="onSelectDrrBucket"
+                      aria-label="Pilih kategori DRR"
                     />
                   </b-form-group>
                 </div>
@@ -143,6 +144,8 @@
               <!-- Status realtime juri (posisi seragam di 5 Race Category,
                    selalu terlihat krn ikut sticky bar) -->
               <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+              <!-- Status database + perubahan yg menunggu tersimpan (ulang-coba otomatis) -->
+              <DbStatusBadge class="race-realtime-badge mr-2 mb-1" />
 
               <!-- path pill -->
               <div class="mb-1">
@@ -686,6 +689,8 @@
 </template>
 
 <script>
+import { clockDiff } from "@/lib/raceTime";
+import { ipcRequest } from "@/utils/ipcRequest";
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
@@ -1839,20 +1844,16 @@ export default {
         const bucket = this.currentBucket || getBucket();
         if (!bucket || !bucket.eventId) return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 8000);
-          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("judgeReports:getForBucket", {
+        const res = await ipcRequest("judgeReports:getForBucket", {
             category: "drr",
             eventId: String(bucket.eventId || ""),
             initialId: String(bucket.initialId || ""),
             raceId: String(bucket.raceId || ""),
             divisionId: String(bucket.divisionId || ""),
+          }, {
+            replyChannel: "judgeReports:getForBucket:reply",
+            timeoutMs: 8000,
           });
-        });
 
         if (!res || !res.ok || !Array.isArray(res.items)) return;
 
@@ -2686,12 +2687,10 @@ export default {
           divisionId: String(this.currentBucket.divisionId || ""),
         };
 
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once("get-drr-result-reply", (_e, payload) => {
-            resolve(payload);
-          });
-          ipcRenderer.send("get-drr-result", filters);
-        });
+        const key = this.activeDrrBucketKey;
+        const res = await ipcRequest("get-drr-result", filters);
+        // Operator sudah pindah kategori selama menunggu -> abaikan.
+        if (this.activeDrrBucketKey !== key) return;
 
         if (!res || !res.ok) return;
         if (!Array.isArray(res.items) || res.items.length === 0) return;
@@ -3315,23 +3314,8 @@ export default {
     },
 
     async hitungSelisihWaktu(a, b) {
-      const [h1, m1, s1d] = String(a).split(":");
-      const [h2, m2, s2d] = String(b).split(":");
-      const s1 = parseInt((s1d || "0").split(".")[0]) || 0;
-      const ms1 = parseInt((s1d || "0").split(".")[1]) || 0;
-      const s2 = parseInt((s2d || "0").split(".")[0]) || 0;
-      const ms2 = parseInt((s2d || "0").split(".")[1]) || 0;
-      const d1 = new Date(0);
-      d1.setUTCHours(+h1 || 0, +m1 || 0, s1, ms1);
-      const d2 = new Date(0);
-      d2.setUTCHours(+h2 || 0, +m2 || 0, s2, ms2);
-      const diff = d2 - d1;
-      const ms = diff % 1000;
-      const sec = Math.floor((diff / 1000) % 60);
-      const min = Math.floor((diff / (1000 * 60)) % 60);
-      const hr = Math.floor(diff / (1000 * 60 * 60));
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+      // Lihat src/lib/raceTime.js (diuji: tests/raceTime.test.js).
+      return clockDiff(a, b);
     },
 
     async tambahWaktu(a, b) {
@@ -3589,12 +3573,7 @@ export default {
 
       // --- ambil dokumen event-results yang lama (kalau ada) ---
       function getExisting() {
-        return new Promise(function (resolve) {
-          ipcRenderer.once("event-results:get-reply", function (_e, res) {
-            resolve(res);
-          });
-          ipcRenderer.send("event-results:get", baseFilter);
-        });
+        return ipcRequest("event-results:get", baseFilter);
       }
 
       var existingDoc = null;
@@ -3866,21 +3845,8 @@ export default {
   flex: 1 1 260px;
 }
 
-.drr-actionbar__select #drrBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-}
 
-#drrBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
 
-#drrBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
 
 /* Switch DRR Category (.switch-label/.init-tabs/.init-tab) sekarang
    didefinisikan global di race-category-stickybar.css. */

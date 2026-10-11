@@ -72,11 +72,12 @@
                   </div>
 
                   <b-form-group label-for="slalomBucketSelect" class="mb-0">
-                    <b-form-select
+                    <BucketButtonGroup
                       id="slalomBucketSelect"
                       :options="slalomOptionsForSelectedInitial"
                       v-model="selectedSlalomKey"
                       @change="onSelectSlalomBucket"
+                      aria-label="Pilih kategori Slalom"
                     />
                   </b-form-group>
                 </div>
@@ -147,6 +148,8 @@
               <!-- Status realtime juri (posisi seragam di 5 Race Category,
                    selalu terlihat krn ikut sticky bar) -->
               <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+              <!-- Status database + perubahan yg menunggu tersimpan (ulang-coba otomatis) -->
+              <DbStatusBadge class="race-realtime-badge mr-2 mb-1" />
 
               <!-- path pill -->
               <div class="mb-1">
@@ -823,6 +826,8 @@
 </template>
 
 <script>
+import { parseClockMs, formatClockMs } from "@/lib/raceTime";
+import { ipcRequest } from "@/utils/ipcRequest";
 import SlalomSession1PdfResult from "../ResultComponent/slalom-pdfResult.vue";
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
@@ -859,27 +864,11 @@ function safeJSON(key, fallback) {
     return fallback;
   }
 }
-function pad(n, w = 2) {
-  return String(n).padStart(w, "0");
-}
-function msToHMSms(ms) {
-  const hr = Math.floor(ms / 3600000);
-  const rem1 = ms % 3600000;
-  const min = Math.floor(rem1 / 60000);
-  const rem2 = ms % 60000;
-  const sec = Math.floor(rem2 / 1000);
-  const mss = rem2 % 1000;
-  return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(mss, 3)}`;
-}
+// Aritmetika waktu: lihat src/lib/raceTime.js (diuji: tests/raceTime.test.js).
+const msToHMSms = formatClockMs;
 function hmsToMs(str) {
-  const parts = String(str || "").split(":");
-  const h = parts[0] != null ? parts[0] : "0";
-  const m = parts[1] != null ? parts[1] : "0";
-  const sMs = parts[2] != null ? parts[2] : "0.000";
-  const sMsParts = String(sMs).split(".");
-  const s = sMsParts[0] != null ? sMsParts[0] : "0";
-  const ms = sMsParts[1] != null ? sMsParts[1] : "0";
-  return +h * 3600000 + +m * 60000 + +s * 1000 + +ms;
+  const v = parseClockMs(str);
+  return Number.isFinite(v) ? v : 0;
 }
 
 /** ===== Slalom specifics (dinamis dari DB) ===== */
@@ -1897,21 +1886,17 @@ export default {
         const bucket = getBucket();
         if (!bucket || !bucket.eventId) return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 8000);
-          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("judgeReports:getForBucket", {
+        const res = await ipcRequest("judgeReports:getForBucket", {
             category: "slalom",
             eventId: String(bucket.eventId || ""),
             initialId: String(bucket.initialId || ""),
             raceId: String(bucket.raceId || ""),
             divisionId: String(bucket.divisionId || ""),
             runNumber: Number(this.activeRun) + 1,
+          }, {
+            replyChannel: "judgeReports:getForBucket:reply",
+            timeoutMs: 8000,
           });
-        });
 
         if (!res || !res.ok || !Array.isArray(res.items)) return;
 
@@ -2097,12 +2082,10 @@ export default {
           divisionId: String(b.divisionId ? b.divisionId : ""),
         };
 
-        var res = await new Promise(function (resolve) {
-          ipcRenderer.once("get-slalom-result-reply", function (_e, payload) {
-            resolve(payload);
-          });
-          ipcRenderer.send("get-slalom-result", filters);
-        });
+        var res = await ipcRequest("get-slalom-result", filters);
+        // Operator sudah pindah kategori selama menunggu -> jangan timpakan
+        // hasil kategori lama ke tabel kategori yang baru.
+        if (this.selectedSlalomKey !== key) return;
 
         if (!res || !res.ok) return;
         if (!Array.isArray(res.items) || res.items.length === 0) return;
@@ -3402,12 +3385,7 @@ export default {
           divisionId: String(b.divisionId || ""),
         };
 
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once("get-slalom-result-reply", (_e, payload) =>
-            resolve(payload)
-          );
-          ipcRenderer.send("get-slalom-result", filters);
-        });
+        const res = await ipcRequest("get-slalom-result", filters);
 
         const rows = [];
         if (res && res.ok && Array.isArray(res.items)) {
@@ -3468,12 +3446,7 @@ export default {
           divisionId: String(b.divisionId || ""),
         };
 
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once("get-slalom-result-reply", (_e, payload) =>
-            resolve(payload)
-          );
-          ipcRenderer.send("get-slalom-result", filters);
-        });
+        const res = await ipcRequest("get-slalom-result", filters);
 
         if (res && res.ok && Array.isArray(res.items)) {
           const doc = res.items[0] || {};
@@ -3625,12 +3598,7 @@ export default {
 
       // --- ambil dokumen event-results yang lama (kalau ada) ---
       function getExisting() {
-        return new Promise(function (resolve) {
-          ipcRenderer.once("event-results:get-reply", function (_e, res) {
-            resolve(res);
-          });
-          ipcRenderer.send("event-results:get", baseFilter);
-        });
+        return ipcRequest("event-results:get", baseFilter);
       }
 
       var existingDoc = null;
@@ -4002,21 +3970,8 @@ export default {
   flex: 1 1 260px;
 }
 
-.slalom-actionbar__select #slalomBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-}
 
-#slalomBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
 
-#slalomBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
 
 /* Switch Slalom Category (.switch-label/.init-tabs/.init-tab) sekarang
    didefinisikan global di race-category-stickybar.css (dipakai bersama

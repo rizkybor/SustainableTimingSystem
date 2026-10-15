@@ -264,7 +264,10 @@ async function duplicateEvent(id) {
   for (let i = 2; taken.has(name); i++) name = `${base} ${i})`;
 
   const now = new Date();
-  const { _id: _omit, createdAt: _c, updatedAt: _u, ...rest } = src;
+  const rest = { ...src };
+  delete rest._id;
+  delete rest.createdAt;
+  delete rest.updatedAt;
   const res = await d
     .collection(COL_EVENTS)
     .insertOne({ ...rest, name, liveVisible: false, duplicatedFrom: srcId, createdAt: now, updatedAt: now });
@@ -285,8 +288,9 @@ async function duplicateEvent(id) {
     if (readouts.length) {
       await d.collection(COL_READOUTS).insertMany(
         readouts.map((r) => {
-          const { _id: _r, ...rr } = r;
-          return { ...rr, eventId: newId, participantId: idMap.get(String(r.participantId)) || "" };
+          const rr = { ...r, eventId: newId, participantId: idMap.get(String(r.participantId)) || "" };
+          delete rr._id;
+          return rr;
         }),
         { ordered: true }
       );
@@ -537,10 +541,8 @@ function resultFor(participant, cls, readout, raceId) {
   if (!readout) {
     return { ...base, status: participant.manualStatus || STATUS.DNS, timeSec: null, time: "-", missing: [], splits: [] };
   }
-  const ev = evaluateCard(readout.card, {
-    controls: courseOf(cls, raceId),
-    scheduledStart: participant.scheduledStart,
-  });
+  // waktu murni dari SI Card — jadwal start (Starting Order) tidak dipakai
+  const ev = evaluateCard(readout.card, { controls: courseOf(cls, raceId) });
   return {
     ...base,
     ...ev,
@@ -744,6 +746,7 @@ function scheduleLivePublish(eventId, delay = LIVE_DEBOUNCE_MS) {
     setTimeout(() => {
       liveTimers.delete(key);
       publishLive(key).catch((err) => {
+        // eslint-disable-next-line no-console
         console.warn("[orienteering] publish live gagal, coba lagi:", err && err.message);
         scheduleLivePublish(key, LIVE_RETRY_MS);
       });

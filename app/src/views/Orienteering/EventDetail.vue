@@ -133,7 +133,6 @@
                 <div class="ori-result__meta">
                   {{ lastRead.result.className }} · SI {{ lastRead.result.siCard }}
                   <span v-if="lastRead.result.club"> · {{ lastRead.result.club }}</span>
-                  <span v-if="lastRead.result.startSource === 'scheduled'"> · start dari jadwal</span>
                 </div>
               </div>
               <div class="ori-result__time">{{ lastRead.result.time }}</div>
@@ -270,7 +269,7 @@
               <b-form-group label="Ranking IOF" label-for="ori-p-rank">
                 <b-form-input id="ori-p-rank" v-model="form.iofRanking" type="number" min="1" placeholder="—" />
               </b-form-group>
-              <b-form-group label="Start Time (WIB)" label-for="ori-p-start" description="Jam start terjadwal; dipakai kalau kartu tidak punya punch Start.">
+              <b-form-group label="Jadwal Start (WIB)" label-for="ori-p-start" description="Starting Order — hanya info jadwal, TIDAK dipakai menghitung waktu (waktu selalu dari SI Card).">
                 <b-form-input id="ori-p-start" v-model="form.scheduledStart" type="time" step="1" />
               </b-form-group>
               <b-form-group label="Status manual" label-for="ori-p-status">
@@ -624,10 +623,11 @@
                     :style="col.style"
                     :aria-sort="rSort.key === col.key ? (rSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'"
                     :title="`Urutkan berdasarkan ${col.label}`"
-                    @click="toggleResultSort(col.key)"
+                    @click="col.sortable !== false && toggleResultSort(col.key)"
                   >
                     {{ col.label }}
                     <Icon
+                      v-if="col.sortable !== false"
                       class="ori-th-sort__icon"
                       :icon="rSort.key !== col.key ? 'mdi:swap-vertical' : rSort.dir === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'"
                     />
@@ -642,6 +642,15 @@
                   <td>{{ r.club || "-" }}</td>
                   <td>{{ r.nationality || "-" }}</td>
                   <td>{{ r.siCard || "—" }}</td>
+                  <td class="text-nowrap small">
+                    <template v-if="r.readAt">
+                      <span v-if="r.start">{{ clockHms(r.start) }}</span>
+                      <span v-else class="text-danger font-weight-bold" title="Kartu tanpa punch Start">tanpa Start</span>
+                      <span class="text-muted"> → </span>
+                      <span>{{ r.finish ? clockHms(r.finish) : "-" }}</span>
+                    </template>
+                    <span v-else class="text-muted">—</span>
+                  </td>
                   <td class="text-right font-weight-bold">{{ r.status === "OK" ? r.time : "-" }}</td>
                   <td class="text-right text-muted">{{ r.rank && r.behindSec ? "+" + fmt(r.behindSec) : "" }}</td>
                   <td>
@@ -652,7 +661,7 @@
                   </td>
                 </tr>
                 <tr v-if="!c.shown.length">
-                  <td colspan="9" class="text-center text-muted py-3">
+                  <td colspan="10" class="text-center text-muted py-3">
                     {{ c.results.length ? "Tidak ada peserta yang cocok dengan filter." : "Belum ada peserta di kategori ini." }}
                   </td>
                 </tr>
@@ -967,6 +976,7 @@ const RESULT_COLUMNS = [
   { key: "club", label: "Club" },
   { key: "nationality", label: "Negara" },
   { key: "si", label: "SI Card" },
+  { key: "punch", label: "Start / Finish (SI)", sortable: false },
   { key: "time", label: "Waktu", right: true },
   { key: "behind", label: "Selisih", right: true },
   { key: "status", label: "Status" },
@@ -982,7 +992,7 @@ const PARTICIPANT_COLUMNS = [
   { key: "si", label: "SI Card" },
   { key: "club", label: "Club" },
   { key: "nationality", label: "Negara" },
-  { key: "start", label: "Start" },
+  { key: "start", label: "Jadwal Start" }, // Starting Order, BUKAN punch SI Card
   { key: "result", label: "Hasil" },
 ];
 const EMPTY_PFILTER = () => ({ classId: "", typeId: "", si: "", status: "", nationality: "" });
@@ -1510,6 +1520,12 @@ export default {
       this.loadResults(); // kartu yg sudah dibaca sebelumnya langsung jadi hasil peserta ini
       if (this.assign.auto && this.participantsWithoutSi.length) this.restartAssign();
       else this.assign.show = false;
+    },
+
+    // jam punch SI Card -> HH:MM:SS
+    clockHms(v) {
+      const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v || ""));
+      return m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}` : "-";
     },
 
     /* ---------- filter & sort peserta ---------- */

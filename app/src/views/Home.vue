@@ -131,6 +131,17 @@
           <Icon icon="mdi:chevron-right" class="quick-card__chev" />
         </button>
 
+        <button type="button" class="quick-card" @click="goTo('orienteering')">
+          <span class="quick-card__icon quick-card__icon--glyph">
+            <Icon icon="mdi:compass-outline" />
+          </span>
+          <span class="quick-card__text">
+            <span class="quick-card__title">Orienteering</span>
+            <span class="quick-card__desc">Event orienteering: kelas & course, registrasi SI Card, readout & hasil.</span>
+          </span>
+          <Icon icon="mdi:chevron-right" class="quick-card__chev" />
+        </button>
+
         <button type="button" class="quick-card quick-card--dev" @click="goTo('si-test')">
           <span class="quick-card__icon quick-card__icon--glyph">
             <Icon icon="mdi:card-account-details-outline" width="26" height="26" />

@@ -214,8 +214,25 @@ function notifyH2HBracketUpdated(payload) {
   }
 }
 
+// Beritahu Live Result Orienteering di sts-jurysystem bahwa snapshot hasil
+// (orienteeringLiveResults) satu event baru saja ditulis ulang.
+function notifyOrienteeringUpdated(payload) {
+  try {
+    const s = getBroadcastSocket();
+    if (!s) return;
+    s.emit("custom:event", {
+      type: "orienteering:updated",
+      ts: new Date().toISOString(),
+      ...payload, // { eventId, deleted? }
+    });
+  } catch (_) {
+    // non-critical
+  }
+}
+
 module.exports = {
   notifyResultsUpdated,
+  notifyOrienteeringUpdated,
   notifyTeamStarted,
   notifyH2HRoundActive,
   notifySlalomTeamStarted,

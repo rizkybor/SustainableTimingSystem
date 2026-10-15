@@ -280,6 +280,44 @@ function showAppAlert(event, options, channel) {
 }
 
 function setupIPCMainHandlers() {
+  // ===================== ORIENTEERING (modul mandiri) =====================
+  // Semua lewat ipcRequest() di renderer -> balasan object (+__reqId otomatis).
+  const ori = require("../controllers/orienteering");
+  const oriHandle = (channel, fn) =>
+    ipcMain.on(channel, async (event, payload) => {
+      try {
+        const data = await fn(payload || {});
+        event.reply(`${channel}-reply`, { ok: true, data });
+      } catch (err) {
+        event.reply(`${channel}-reply`, {
+          ok: false,
+          error: err && err.message ? err.message : String(err),
+        });
+      }
+    });
+  oriHandle("ori:events:list", () => ori.listEvents());
+  oriHandle("ori:event:get", (p) => ori.getEvent(p.id));
+  oriHandle("ori:event:save", (p) => ori.saveEvent(p.event));
+  oriHandle("ori:event:delete", (p) => ori.deleteEvent(p.id));
+  oriHandle("ori:event:duplicate", (p) => ori.duplicateEvent(p.id));
+  oriHandle("ori:classes:save", (p) => ori.saveClasses(p.eventId, p.classes));
+  // per jenis Orienteering (raceId: Sprint/Middle Distance, dst.)
+  oriHandle("ori:participants:list", (p) => ori.listParticipants(p.eventId, p.raceId));
+  oriHandle("ori:participant:save", (p) => ori.saveParticipant(p.participant));
+  oriHandle("ori:participant:delete", (p) => ori.deleteParticipant(p.id));
+  oriHandle("ori:participants:import", (p) =>
+    ori.importParticipants(p.eventId, p.raceId, p.rows, { newCategoryTypeId: p.newCategoryTypeId })
+  );
+  oriHandle("ori:readout:save", (p) => ori.saveReadout(p.eventId, p.raceId, p.card));
+  oriHandle("ori:results:get", (p) => ori.getResults(p.eventId, p.raceId));
+  // snapshot Live Result (sts-jurysystem) — juga otomatis tiap perubahan
+  oriHandle("ori:live:publish", (p) => ori.publishLive(p.eventId));
+  oriHandle("ori:event:reset-summary", (p) => ori.resetSummary(p.eventId));
+  oriHandle("ori:event:reset", (p) => ori.resetEvent(p.eventId, { clearClasses: !!p.clearClasses }));
+  oriHandle("ori:participants:reset", (p) =>
+    ori.resetParticipants(p.eventId, p.raceId, { classId: p.classId, mode: p.mode })
+  );
+
   // Indikator status database + tombol "Coba sekarang" (services/dbHealth.js)
   dbHealth.setupDbHealth(writeRetry);
   // Get all users

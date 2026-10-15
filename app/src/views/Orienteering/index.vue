@@ -41,6 +41,19 @@
             <span class="oc-status" :class="'oc-status--' + statusOf(ev).key">
               <span class="oc-status__dot"></span>{{ statusOf(ev).label }}
             </span>
+            <!-- status tampil di Live Result sts-jurysystem — klik untuk mengubah -->
+            <button
+              type="button"
+              class="oc-live-toggle"
+              :class="ev.liveVisible === false ? 'is-hidden' : 'is-shown'"
+              :title="ev.liveVisible === false
+                ? 'Tidak tampil di Live Result sts-jurysystem — klik untuk menampilkan'
+                : 'Tampil di Live Result sts-jurysystem — klik untuk menyembunyikan'"
+              @click.stop="toggleLive(ev)"
+            >
+              <Icon :icon="ev.liveVisible === false ? 'mdi:eye-off-outline' : 'mdi:broadcast'" />
+              {{ ev.liveVisible === false ? "Tidak tampil di Live Result" : "Tampil di Live Result" }}
+            </button>
             <span v-if="ev.logo && ev.logo.url" class="oc-logo"><img :src="ev.logo.url" :alt="'Logo ' + ev.name" /></span>
             <span v-if="ev.startDate || ev.date" class="oc-date">
               <span class="oc-date__day">{{ dayOf(ev.startDate || ev.date) }}</span>
@@ -331,6 +344,37 @@ export default {
       });
       await this.load();
     },
+    // tampilkan / sembunyikan event di Live Result sts-jurysystem
+    async toggleLive(ev) {
+      const show = ev.liveVisible === false;
+      const ok = await this.$bvModal.msgBoxConfirm(
+        show
+          ? `Tampilkan "${ev.name}" di Live Result sts-jurysystem? Hasilnya bisa dilihat publik.`
+          : `Sembunyikan "${ev.name}" dari Live Result sts-jurysystem? Publik tidak bisa melihat hasilnya lagi (data tidak dihapus).`,
+        {
+          title: show ? "Tampilkan di Live Result" : "Sembunyikan dari Live Result",
+          okTitle: show ? "Tampilkan" : "Sembunyikan",
+          okVariant: show ? "primary" : "danger",
+          cancelTitle: "Batal",
+          centered: true,
+          size: "sm",
+        }
+      );
+      if (!ok) return;
+      const event = { ...ev, liveVisible: show };
+      delete event.participantCount;
+      delete event.breakdown;
+      const res = await ipcRequest("ori:event:save", { event });
+      if (!res || !res.ok) {
+        this.$bvToast.toast((res && res.error) || "Gagal menyimpan.", { variant: "danger", title: "Gagal" });
+        return;
+      }
+      this.$bvToast.toast(
+        show ? `"${ev.name}" sekarang tampil di Live Result.` : `"${ev.name}" disembunyikan dari Live Result.`,
+        { variant: "success", title: "Live Result", solid: true }
+      );
+      await this.load();
+    },
     async confirmDelete(ev) {
       const ok = await this.$bvModal.msgBoxConfirm(
         `Hapus "${ev.name}" beserta ${ev.participantCount || 0} peserta & seluruh hasil baca kartunya? Tidak bisa dibatalkan.`,
@@ -427,6 +471,38 @@ export default {
   inset: 0;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, transparent 38%, transparent 65%, rgba(15, 23, 42, 0.25) 100%);
   pointer-events: none;
+}
+.oc-live-toggle {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.oc-live-toggle.is-shown {
+  background: rgba(4, 120, 87, 0.88);
+  color: #ecfdf5;
+}
+.oc-live-toggle.is-shown:hover {
+  background: rgba(4, 95, 70, 0.96);
+}
+.oc-live-toggle.is-hidden {
+  background: rgba(15, 23, 42, 0.78);
+  color: #fde68a;
+}
+.oc-live-toggle.is-hidden:hover {
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
 }
 .oc-status {
   position: absolute;

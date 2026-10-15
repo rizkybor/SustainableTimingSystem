@@ -73,9 +73,11 @@ export function parseControls(text) {
 
 // Evaluasi satu kartu terhadap course Classic.
 // opts.controls     : [33, 31, 35, ...] urutan pos wajib
-// opts.scheduledStart: "HH:MM:SS" (dipakai kalau kartu tidak punya Start)
+// Waktu HANYA dari SI Card (punch Start & Finish). Jadwal start / Starting
+// Order TIDAK PERNAH dipakai menghitung (aturan user) — kartu tanpa punch
+// Start = NO_START, tanpa waktu.
 // Return {
-//   status, timeSec, time, startSource: "card"|"scheduled"|null,
+//   status, timeSec, time, startSource: "card"|null,
 //   splits: [{ order, code, found, punchTime, cumSec, legSec }],
 //   missing: [{ order, code }], extra: [{ station, time }]
 // }
@@ -83,12 +85,8 @@ export function evaluateCard(card, opts = {}) {
   const controls = Array.isArray(opts.controls) ? opts.controls : [];
   const punches = Array.isArray(card && card.punches) ? card.punches : [];
 
-  let startSec = clockToSeconds(card && card.start);
-  let startSource = startSec !== null ? "card" : null;
-  if (startSec === null && opts.scheduledStart) {
-    startSec = clockToSeconds(opts.scheduledStart);
-    if (startSec !== null) startSource = "scheduled";
-  }
+  const startSec = clockToSeconds(card && card.start);
+  const startSource = startSec !== null ? "card" : null;
   const finishSec = clockToSeconds(card && card.finish);
 
   // Classic: cari tiap pos wajib secara berurutan, maju terus di daftar
@@ -253,7 +251,7 @@ const HEADER_ALIASES = {
   siCard: ["sportidentnumber", "sportident", "sicard", "si", "sinumber", "nomorsicard", "card", "chip"],
 };
 
-const normHeader = (h) => String(h || "").toLowerCase().replace(/[\s_\-]/g, "");
+const normHeader = (h) => String(h || "").toLowerCase().replace(/[\s_-]/g, "");
 
 // Nilai kosong di start list: "", "-", "—", "–", "n/a"
 const isBlankCell = (v) => {
@@ -403,6 +401,10 @@ export function buildCategoryNamesForType(typeName, ages, genders) {
 // Hanya data yang pantas tampil publik (tanpa nomor SI Card / IOF ID /
 // kartu mentah). Peserta yang belum membaca kartu & tanpa status manual
 // ditandai `pending` (masih di lintasan / belum start), BUKAN DNS.
+const clockText = (v) => {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v || "").trim());
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}` : "";
+};
 export function liveRowOf(r) {
   const pending = !r.readAt && r.status === STATUS.DNS && !r.manualStatus;
   return {
@@ -418,11 +420,23 @@ export function liveRowOf(r) {
     time: Number.isFinite(r.timeSec) ? formatDuration(r.timeSec) : "",
     behindSec: Number.isFinite(r.behindSec) ? r.behindSec : null,
     behind: Number.isFinite(r.behindSec) && r.behindSec > 0 ? "+" + formatDuration(r.behindSec) : "",
+    // Jadwal start (Starting Order) — BUKAN waktu start sebenarnya.
+    // `start` = alias lama (dipakai jurysystem versi sebelumnya).
     start: /^\d{1,2}:\d{2}/.test(String(r.scheduledStart || "")) ? String(r.scheduledStart).slice(0, 5) : "",
+    scheduledStart: /^\d{1,2}:\d{2}/.test(String(r.scheduledStart || "")) ? String(r.scheduledStart).slice(0, 5) : "",
+    // Waktu sebenarnya dari punch SI Card (HH:MM:SS); kosong kalau kartu tidak punya punch-nya
+    cardStart: clockText(r.start),
+    cardFinish: clockText(r.finish),
+    // "card" = waktu dari punch Start kartu; null = kartu tanpa punch Start (NO_START)
+    startSource: r.startSource || null,
     missing: Array.isArray(r.missing) ? r.missing.length : 0,
     splits: (Array.isArray(r.splits) ? r.splits : []).map((s) => ({
       order: s.order,
       code: s.code,
+      // found = pos dipunch; cumSec null + found = kartu tanpa punch Start
+      // (pos tetap dikunjungi, hanya waktu kumulatif yang tidak bisa dihitung)
+      found: s.found !== false,
+      punchTime: s.found ? clockText(s.punchTime) : "",
       cumSec: Number.isFinite(s.cumSec) ? s.cumSec : null,
       legSec: Number.isFinite(s.legSec) ? s.legSec : null,
     })),
@@ -436,7 +450,7 @@ export function liveRowOf(r) {
 export function buildLiveSnapshot(results) {
   const classes = ((results && results.classes) || []).map((c) => {
     const all = (c.results || []).map(liveRowOf);
-    // yang belum finish diurutkan spt start list (jam start, No, nama) —
+    // yang belum mulai (kartu belum dibaca) diurutkan spt start list (jadwal start, No, nama) —
     // sebelum/selama lomba publik bisa lihat siapa yang start berikutnya.
     // Yang kosong (tanpa jam / No) di bawah.
     const last = (v) => (v === null || v === undefined || v === "" ? Infinity : v);

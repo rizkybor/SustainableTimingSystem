@@ -123,13 +123,14 @@ test("pos di luar course diabaikan (extra), tetap OK", () => {
   assert.equal(r.extra.length, CARD.punches.length - 2);
 });
 
-test("tanpa Finish -> DNF; tanpa Start -> pakai jadwal, kalau tidak ada -> NO_START", () => {
+test("tanpa Finish -> DNF; tanpa punch Start -> NO_START (jadwal start TIDAK dipakai)", () => {
   assert.equal(evaluateCard({ ...CARD, finish: null }, { controls: COURSE }).status, STATUS.DNF);
-  const sched = evaluateCard({ ...CARD, start: null }, { controls: COURSE, scheduledStart: "15:30:00" });
-  assert.equal(sched.status, STATUS.OK);
-  assert.equal(sched.startSource, "scheduled");
-  assert.equal(sched.time, "49:48");
-  assert.equal(evaluateCard({ ...CARD, start: null }, { controls: COURSE }).status, STATUS.NO_START);
+  // walau opsi jadwal start dikirim (kode lama), waktu tetap hanya dari SI Card
+  const noStart = evaluateCard({ ...CARD, start: null }, { controls: COURSE, scheduledStart: "15:30:00" });
+  assert.equal(noStart.status, STATUS.NO_START);
+  assert.equal(noStart.timeSec, null);
+  assert.equal(noStart.startSource, null);
+  assert.ok(noStart.splits.every((s) => s.cumSec === null)); // split juga tidak dihitung dari jadwal
 });
 
 test("rankClass: OK by waktu (seri = rank sama), lainnya tanpa rank di bawah", () => {
@@ -293,7 +294,7 @@ test("buildLiveSnapshot: data publik saja, belum baca kartu = pending (bukan DNS
   assert.equal(a.behind, "");
   assert.equal(a.siCard, undefined);
   assert.equal(a.iofId, undefined);
-  assert.deepEqual(a.splits, [{ order: 1, code: 31, cumSec: 60, legSec: 60 }]);
+  assert.deepEqual(a.splits, [{ order: 1, code: 31, found: true, punchTime: "10:01:00", cumSec: 60, legSec: 60 }]);
   assert.equal(c.name, "C");
   assert.equal(c.pending, true);
   assert.equal(d.pending, false); // DNS manual dari operator tetap DNS
@@ -419,4 +420,25 @@ test("Type Event per jenis: WRE hanya Middle, National keduanya", () => {
   assert.deepEqual(normalizeTypeRaceIds(["M", "S"], ["S", "M"]), []); // semua = []
   assert.deepEqual(normalizeTypeRaceIds(["M", "X"], ["S", "M"]), ["M"]); // id asing dibuang
   assert.deepEqual(normalizeTypeRaceIds([], ["S", "M"]), []);
+});
+
+test("liveRowOf: jadwal start (Starting Order) terpisah dari start/finish SI Card", () => {
+  const ev = evaluateCard({ start: "09:00:12", finish: "09:23:40", punches: [] }, { controls: [], scheduledStart: "09:00:00" });
+  const [row] = buildLiveSnapshot({
+    classes: [{ classId: "c", className: "M21", results: rankClass([{ name: "A", readAt: new Date(), scheduledStart: "09:00:00", start: "09:00:12", finish: "09:23:40", ...ev }]) }],
+  }).classes[0].rows;
+  assert.equal(row.scheduledStart, "09:00");
+  assert.equal(row.cardStart, "09:00:12");
+  assert.equal(row.cardFinish, "09:23:40");
+  assert.equal(row.startSource, "card");
+  // kartu tanpa punch Start -> NO_START, tanpa waktu (jadwal tidak dihitung)
+  const ev2 = evaluateCard({ start: null, finish: "09:20:00", punches: [] }, { controls: [], scheduledStart: "09:00:00" });
+  const [row2] = buildLiveSnapshot({
+    classes: [{ classId: "c", className: "M21", results: rankClass([{ name: "B", readAt: new Date(), scheduledStart: "09:00:00", start: null, finish: "09:20:00", ...ev2 }]) }],
+  }).classes[0].rows;
+  assert.equal(row2.cardStart, "");
+  assert.equal(row2.startSource, null);
+  assert.equal(row2.status, "NO_START");
+  assert.equal(row2.timeSec, null);
+  assert.equal(row2.rank, null);
 });

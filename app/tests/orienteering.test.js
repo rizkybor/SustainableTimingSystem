@@ -442,3 +442,136 @@ test("liveRowOf: jadwal start (Starting Order) terpisah dari start/finish SI Car
   assert.equal(row2.timeSec, null);
   assert.equal(row2.rank, null);
 });
+
+test("sortResultRows: urut Starting Order (jadwal) — kosong di bawah", () => {
+  const rows = [
+    { participantId: "a", name: "A", status: "OK", timeSec: 700, scheduledStart: "09:10:00" },
+    { participantId: "b", name: "B", status: "OK", timeSec: 600, scheduledStart: "09:02:00" },
+    { participantId: "c", name: "C", status: "DNS", scheduledStart: "" },
+  ];
+  assert.equal(sortResultRows(rows, "start", "asc").map((r) => r.participantId).join(""), "bac");
+  assert.equal(sortResultRows(rows, "start", "desc").map((r) => r.participantId).join(""), "abc");
+});
+
+import { countryCode, flagUrl } from "../src/lib/countryFlag.js";
+test("countryFlag: nama, kode IOC & ISO -> ISO2; tak dikenal -> kosong", () => {
+  assert.equal(countryCode("Indonesia"), "ID");
+  assert.equal(countryCode("INA"), "ID");
+  assert.equal(countryCode(" indonesia "), "ID");
+  assert.equal(countryCode("MAS"), "MY");
+  assert.equal(countryCode("SGP"), "SG");
+  assert.equal(countryCode("Atlantis"), "");
+  assert.equal(flagUrl("INA", 20), "https://flagcdn.com/w20/id.png");
+  assert.equal(flagUrl(""), "");
+});
+
+import { normalizeResultOverride, evaluateWithOverride, parseAdjust } from "../src/lib/orienteering.js";
+test("Edit Hasil: normalisasi input koreksi", () => {
+  assert.equal(normalizeResultOverride({}), null); // tidak ada koreksi
+  assert.throws(() => normalizeResultOverride({ status: "DSQ" }), /Alasan/); // alasan wajib
+  assert.throws(() => normalizeResultOverride({ start: "25:00", note: "x" }), /Start tidak valid/);
+  assert.deepEqual(normalizeResultOverride({ start: "9:00", adjust: "+1:30", status: "ok", note: " jam rusak " }), {
+    start: "09:00:00", finish: "", adjustSec: 90, status: "OK", punches: {}, note: "jam rusak",
+  });
+  assert.equal(parseAdjust("-0:45"), -45);
+  assert.equal(parseAdjust("1:02:00"), 3720);
+  assert.equal(parseAdjust("30"), 30);
+});
+
+test("Edit Hasil: koreksi start/finish, penalti, status — kartu mentah tidak berubah", () => {
+  const card = { start: "10:00:00", finish: "10:20:00", punches: [{ station: 31, time: "10:05:00" }] };
+  const opts = { controls: [31, 32] }; // 32 terlewat -> MP
+  const auto = evaluateWithOverride(card, null, opts);
+  assert.equal(auto.status, "MP");
+  assert.equal(auto.edited, false);
+  // pos 32 ternyata rusak -> operator paksa OK + penalti 1 menit
+  const ok = evaluateWithOverride(card, { status: "OK", adjustSec: 60, note: "unit 32 rusak" }, opts);
+  assert.equal(ok.status, "OK");
+  assert.equal(ok.timeSec, 21 * 60);
+  assert.equal(ok.autoStatus, "MP");
+  assert.equal(ok.edited, true);
+  // kartu tanpa punch Start: operator isi start dari backup
+  const noStart = evaluateWithOverride({ ...card, start: null }, { start: "10:01:00", note: "backup" }, { controls: [31] });
+  assert.equal(noStart.status, "OK");
+  assert.equal(noStart.timeSec, 19 * 60);
+  assert.equal(noStart.startEdited, true);
+  assert.equal(card.start, "10:00:00"); // kartu asli tidak tersentuh
+  // kartu hilang: start & finish manual
+  const lost = evaluateWithOverride(null, { start: "10:00:00", finish: "10:30:00", status: "OK", note: "kartu hilang" }, { controls: [31] });
+  assert.equal(lost.timeSec, 1800);
+  assert.equal(lost.status, "OK");
+  // paksa OK tanpa waktu -> tidak mungkin, tetap status hitungan
+  assert.equal(evaluateWithOverride({ start: null, finish: null, punches: [] }, { status: "OK", note: "x" }, {}).status, "DNF");
+  // status saja tanpa kartu
+  assert.equal(evaluateWithOverride(null, { status: "DSQ", note: "x" }, {}).status, "DSQ");
+});
+
+test("Edit Hasil: rank diurutkan ulang otomatis setelah koreksi", () => {
+  const card = (fin) => ({ start: "10:00:00", finish: fin, punches: [] });
+  const rows = [
+    { name: "A", ...evaluateWithOverride(card("10:20:00"), null, {}) },
+    { name: "B", ...evaluateWithOverride(card("10:22:00"), null, {}) },
+  ];
+  assert.deepEqual(rankClass(rows).map((r) => `${r.rank}${r.name}`), ["1A", "2B"]);
+  // A kena penalti 3 menit -> B jadi #1
+  rows[0] = { name: "A", ...evaluateWithOverride(card("10:20:00"), { adjustSec: 180, note: "penalti" }, {}) };
+  assert.deepEqual(rankClass(rows).map((r) => `${r.rank}${r.name}`), ["1B", "2A"]);
+});
+
+import { buildSplitTable } from "../src/lib/orienteering.js";
+test("buildSplitTable: waktu kumulatif/leg per pos + peringkat leg, leg tercepat, finish", () => {
+  const ctl = [31, 32];
+  const card = (p1, p2, fin) => ({
+    start: "10:00:00",
+    finish: fin,
+    punches: [p1 && { station: 31, time: p1 }, p2 && { station: 32, time: p2 }].filter(Boolean),
+  });
+  const rows = rankClass([
+    { name: "A", ...evaluateCard(card("10:02:00", "10:06:00", "10:07:00"), { controls: ctl }) }, // leg 2:00, 4:00, 1:00
+    { name: "B", ...evaluateCard(card("10:03:00", "10:05:00", "10:06:30"), { controls: ctl }) }, // leg 3:00, 2:00, 1:30
+    { name: "C", ...evaluateCard(card("10:01:30", null, "10:05:00"), { controls: ctl }) }, // pos 32 terlewat -> MP
+  ]);
+  const t = buildSplitTable(rows, ctl.length);
+  const by = Object.fromEntries(t.map((x) => [x.row.name, x.legs]));
+  assert.equal(by.A.length, 3); // 2 pos + finish
+  assert.equal(by.C[0].legRank, 1); // C tercepat ke pos 1 (1:30)
+  assert.equal(by.C[0].best, true);
+  assert.equal(by.A[0].legRank, 2);
+  assert.equal(by.B[1].legSec, 120);
+  assert.equal(by.B[1].best, true); // B tercepat pos 1->2
+  assert.equal(by.C[1].missed, true);
+  assert.equal(by.C[1].legRank, null);
+  assert.equal(by.B[1].cumRank, 1); // B di depan di pos 2 (5:00 vs 6:00)
+  assert.equal(by.A[2].legSec, 60); // leg ke Finish
+  assert.equal(by.A[2].best, true);
+  assert.equal(by.B[2].cumSec, 390); // waktu akhir = kumulatif finish
+  assert.equal(by.C[2].cumSec, null); // MP tidak punya waktu resmi
+});
+
+test("Edit split per pos: jam punch dikoreksi / dianggap dipunch -> status & split dihitung ulang", () => {
+  const card = { start: "10:00:00", finish: "10:20:00", punches: [{ station: 31, time: "10:05:00" }, { station: 33, time: "10:15:00" }] };
+  const opts = { controls: [31, 32, 33] }; // 32 terlewat -> MP
+  assert.equal(evaluateWithOverride(card, null, opts).status, "MP");
+  assert.throws(() => normalizeResultOverride({ punches: { 2: "99:00" }, note: "x" }), /Jam pos 2/);
+  // pos 32: jam dari unit backup 10:09:30
+  const ov1 = normalizeResultOverride({ punches: { 2: "10:09:30" }, note: "backup unit 32" });
+  const a = evaluateWithOverride(card, ov1, opts);
+  assert.equal(a.status, "OK");
+  assert.equal(a.missing.length, 0);
+  assert.equal(a.splits[1].cumSec, 570);
+  assert.equal(a.splits[1].legSec, 270); // 10:05:00 -> 10:09:30
+  assert.equal(a.splits[2].legSec, 330); // 10:09:30 -> 10:15:00 (leg berikutnya ikut dihitung ulang)
+  assert.equal(a.splits[1].edited, true);
+  assert.equal(a.timeSec, 1200); // waktu total tetap Finish - Start
+  assert.equal(a.autoSplits[1].found, false); // split asli tetap tercatat
+  // pos 32 dianggap dipunch tanpa waktu (unit rusak)
+  const b = evaluateWithOverride(card, normalizeResultOverride({ punches: { 2: "ok" }, note: "unit rusak" }), opts);
+  assert.equal(b.status, "OK");
+  assert.equal(b.splits[1].found, true);
+  assert.equal(b.splits[1].cumSec, null);
+  assert.equal(b.splits[2].legSec, 600); // leg pos 31 -> 33 (melewati pos tanpa waktu)
+  // koreksi jam pos yang sudah dipunch
+  const c = evaluateWithOverride(card, normalizeResultOverride({ punches: { 1: "10:04:00", 2: "OK" }, note: "jam unit 31 salah" }), opts);
+  assert.equal(c.splits[0].cumSec, 240);
+  assert.equal(card.punches[0].time, "10:05:00"); // kartu mentah tidak berubah
+});

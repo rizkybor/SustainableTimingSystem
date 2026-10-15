@@ -9,7 +9,8 @@
 //                                          courses: { raceId: [kode pos] },  course PER JENIS
 //                                          controls }] }               (lama, cadangan courseOf())
 //   orienteeringParticipants { eventId, raceId, name, classId, siCard (Number|null), startNo, bib, iofId,
-//                              iofRanking, club, nationality, scheduledStart, manualStatus }
+//                              iofRanking, club, nationality, scheduledStart, manualStatus,
+//                              resultOverride? (Edit Hasil: koreksi operator, kartu mentah tetap) }
 //   orienteeringReadouts     { eventId, raceId, siCard, participantId, card (mentah), readAt }
 //
 // Start list, SI Card, readout & hasil terpisah PER JENIS (raceId) — orang
@@ -21,7 +22,6 @@
 const { ObjectId } = require("mongodb");
 const { getDb } = require("./index");
 const {
-  evaluateCard,
   rankClass,
   courseOf,
   participantMatchKeys,
@@ -31,6 +31,8 @@ const {
   classAppliesToRace,
   classesForRace,
   normalizeTypeRaceIds,
+  evaluateWithOverride,
+  normalizeResultOverride,
   STATUS,
 } = require("../lib/orienteering");
 const { notifyOrienteeringUpdated } = require("./socketBroadcast");
@@ -538,18 +540,67 @@ function resultFor(participant, cls, readout, raceId) {
     scheduledStart: participant.scheduledStart || "",
     readAt: readout ? readout.readAt : null,
   };
-  if (!readout) {
-    return { ...base, status: participant.manualStatus || STATUS.DNS, timeSec: null, time: "-", missing: [], splits: [] };
+  const ov = participant.resultOverride || null;
+  const card = readout ? readout.card : null;
+  const overrideInfo = {
+    override: ov,
+    editNote: ov ? ov.note || "" : "",
+    editedAt: ov ? ov.editedAt || null : null,
+    // punch ASLI kartu (sebelum koreksi) — ditampilkan di modal Edit Hasil
+    cardStart: (card && card.start) || null,
+    cardFinish: (card && card.finish) || null,
+  };
+  // waktu dari SI Card (jadwal start tidak dipakai) + koreksi operator kalau ada
+  const ev = evaluateWithOverride(readout ? readout.card : null, ov, { controls: courseOf(cls, raceId) });
+  if (!ev) {
+    return { ...base, ...overrideInfo, edited: false, status: participant.manualStatus || STATUS.DNS, timeSec: null, time: "-", missing: [], splits: [] };
   }
-  // waktu murni dari SI Card — jadwal start (Starting Order) tidak dipakai
-  const ev = evaluateCard(readout.card, { controls: courseOf(cls, raceId) });
   return {
     ...base,
     ...ev,
-    status: participant.manualStatus === STATUS.DSQ ? STATUS.DSQ : ev.status,
-    start: readout.card && readout.card.start,
-    finish: readout.card && readout.card.finish,
+    ...overrideInfo,
+    // status koreksi operator > DSQ manual > hasil hitungan
+    status: ov && ov.status ? ev.status : participant.manualStatus === STATUS.DSQ ? STATUS.DSQ : ev.status,
   };
+}
+
+// Edit Hasil: simpan / hapus koreksi operator utk 1 peserta (per jenis).
+// override null / kosong = hapus koreksi (kembali ke hasil SI Card murni).
+// Hasil & peringkat dihitung ulang otomatis (getResults selalu re-rank)
+// lalu Live Result dipublikasikan ulang.
+async function saveResultOverride(participantId, input) {
+  const _id = oid(participantId);
+  if (!_id) throw new Error("Peserta tidak valid");
+  const d = await db();
+  const p = await d.collection(COL_PARTICIPANTS).findOne({ _id });
+  if (!p) throw new Error("Peserta tidak ditemukan");
+  const ov = input === null ? null : normalizeResultOverride(input);
+  if (!ov) {
+    await d.collection(COL_PARTICIPANTS).updateOne({ _id }, { $unset: { resultOverride: "" }, $set: { updatedAt: new Date() } });
+  } else {
+    // paksa OK hanya boleh kalau ada waktu (start & finish dari kartu / koreksi)
+    if (ov.status === STATUS.OK) {
+      const ev = await getEvent(p.eventId);
+      const cls = ev && (ev.classes || []).find((c) => c.id === p.classId);
+      const readout = p.siCard
+        ? await d
+            .collection(COL_READOUTS)
+            .find({ eventId: p.eventId, ...raceFilter(p.raceId || ""), siCard: p.siCard })
+            .sort({ readAt: -1 })
+            .limit(1)
+            .next()
+        : null;
+      const check = evaluateWithOverride(readout ? readout.card : null, { ...ov, status: "" }, { controls: courseOf(cls, p.raceId || "") });
+      if (!check || !Number.isFinite(check.timeSec)) {
+        throw new Error("Status OK butuh waktu Start & Finish — isi koreksi Start/Finish dulu");
+      }
+    }
+    await d
+      .collection(COL_PARTICIPANTS)
+      .updateOne({ _id }, { $set: { resultOverride: { ...ov, editedAt: new Date() }, updatedAt: new Date() } });
+  }
+  scheduleLivePublish(p.eventId);
+  return { ok: true, override: ov };
 }
 
 // Simpan 1 hasil baca kartu ke jenis `raceId`, cocokkan ke peserta jenis itu
@@ -687,7 +738,10 @@ async function resetParticipants(eventId, raceId, opts = {}) {
     participants = (
       await d
         .collection(COL_PARTICIPANTS)
-        .updateMany({ _id: { $in: ids }, siCard: { $in: siCards } }, { $set: { siCard: null, updatedAt: new Date() } })
+        .updateMany(
+          { _id: { $in: ids }, siCard: { $in: siCards } },
+          { $set: { siCard: null, updatedAt: new Date() }, $unset: { resultOverride: "" } }
+        )
     ).modifiedCount || 0;
   }
 
@@ -763,6 +817,7 @@ module.exports = {
   publishLive,
   resetEvent,
   resetParticipants,
+  saveResultOverride,
   duplicateEvent,
   resetSummary,
   listEvents,

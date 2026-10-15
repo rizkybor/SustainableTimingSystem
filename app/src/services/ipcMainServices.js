@@ -310,6 +310,8 @@ function setupIPCMainHandlers() {
   );
   oriHandle("ori:readout:save", (p) => ori.saveReadout(p.eventId, p.raceId, p.card));
   oriHandle("ori:results:get", (p) => ori.getResults(p.eventId, p.raceId));
+  // Edit Hasil (koreksi operator; override null = hapus koreksi)
+  oriHandle("ori:result:override", (p) => ori.saveResultOverride(p.participantId, p.override));
   // snapshot Live Result (sts-jurysystem) — juga otomatis tiap perubahan
   oriHandle("ori:live:publish", (p) => ori.publishLive(p.eventId));
   oriHandle("ori:event:reset-summary", (p) => ori.resetSummary(p.eventId));

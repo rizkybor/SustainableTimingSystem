@@ -406,7 +406,7 @@ const clockText = (v) => {
   return m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}` : "";
 };
 export function liveRowOf(r) {
-  const pending = !r.readAt && r.status === STATUS.DNS && !r.manualStatus;
+  const pending = !r.readAt && r.status === STATUS.DNS && !r.manualStatus && !r.edited;
   return {
     rank: r.rank || null,
     name: r.name || "",
@@ -429,6 +429,9 @@ export function liveRowOf(r) {
     cardFinish: clockText(r.finish),
     // "card" = waktu dari punch Start kartu; null = kartu tanpa punch Start (NO_START)
     startSource: r.startSource || null,
+    // dikoreksi operator (Edit Hasil) — ditampilkan sbg tanda "Edited"
+    edited: !!r.edited,
+    editNote: r.edited ? String(r.editNote || "") : "",
     missing: Array.isArray(r.missing) ? r.missing.length : 0,
     splits: (Array.isArray(r.splits) ? r.splits : []).map((s) => ({
       order: s.order,
@@ -484,7 +487,7 @@ export function buildLiveSnapshot(results) {
 export const NOT_READ = "NOT_READ";
 export function participantResultKey(result) {
   if (!result) return NOT_READ;
-  if (result.status === STATUS.DNS && !result.readAt && !result.manualStatus) return NOT_READ;
+  if (result.status === STATUS.DNS && !result.readAt && !result.manualStatus && !result.edited) return NOT_READ;
   return result.status;
 }
 
@@ -578,7 +581,15 @@ export function sortParticipants(list, key, dir = "asc", ctx = {}) {
 export function sortResultRows(rows, key = "rank", dir = "asc") {
   const list = (rows || []).slice();
   if (!key || key === "rank") return dir === "desc" ? list.reverse() : list;
-  const map = { name: "name", bib: "bib", club: "club", nationality: "nationality", si: "si", status: "result" };
+  const map = {
+    name: "name",
+    bib: "bib",
+    club: "club",
+    nationality: "nationality",
+    si: "si",
+    status: "result",
+    start: "start", // Starting Order (jadwal start) — hanya urutan tampilan
+  };
   if (map[key]) return sortParticipants(list, map[key], dir, { resultOf: (r) => r });
   const sign = dir === "desc" ? -1 : 1;
   const val = (r) => {
@@ -672,4 +683,177 @@ export function normalizeTypeRaceIds(raceIds, allRaceIds) {
   const all = (allRaceIds || []).filter(Boolean);
   const picked = Array.from(new Set((Array.isArray(raceIds) ? raceIds : []).filter((id) => all.includes(id))));
   return !picked.length || picked.length === all.length ? [] : all.filter((id) => picked.includes(id));
+}
+
+/* ======================= Edit Hasil (koreksi operator) ======================= */
+
+// Koreksi hasil oleh operator, disimpan TERPISAH dari kartu mentah
+// (participant.resultOverride) supaya bisa dibatalkan & selalu tercatat:
+//   { start, finish: "HH:MM:SS" (menggantikan punch kartu),
+//     adjustSec: ±detik (penalti / koreksi waktu),
+//     status: OK|MP|DNF|DSQ|DNS|NO_START (menggantikan status otomatis),
+//     punches: { "<urutan pos>": "HH:MM:SS" | "OK" }  (edit split per pos:
+//       jam punch pos dikoreksi, atau "OK" = dianggap dipunch tanpa waktu),
+//     note: alasan (wajib), editedAt }
+export const OVERRIDE_STATUSES = ["OK", "MP", "DNF", "DSQ", "DNS", "NO_START"];
+
+function clockOrEmpty(v, label) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59 || Number(m[3] || 0) > 59) {
+    throw new Error(`${label} tidak valid (format HH:MM:SS)`);
+  }
+  return `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}`;
+}
+
+// "+1:30", "-0:45", "90", "-1:02:00" -> detik (bertanda)
+export function parseAdjust(v) {
+  const s = String(v === undefined || v === null ? "" : v).trim();
+  if (!s || s === "0" || s === "+0" || s === "-0") return 0;
+  const m = /^([+-])?(?:(\d+):)?(?:(\d+):)?(\d+)$/.exec(s);
+  if (!m) throw new Error("Koreksi waktu tidak valid (contoh: +1:30 atau -0:45)");
+  const parts = [m[2], m[3], m[4]].filter((x) => x !== undefined).map(Number);
+  const sec = parts.reduce((acc, n) => acc * 60 + n, 0);
+  return m[1] === "-" ? -sec : sec;
+}
+
+// Normalisasi input form -> objek override, atau null (= tidak ada koreksi).
+export function normalizeResultOverride(input) {
+  const o = input || {};
+  const start = clockOrEmpty(o.start, "Start");
+  const finish = clockOrEmpty(o.finish, "Finish");
+  const adjustSec = typeof o.adjustSec === "number" ? Math.round(o.adjustSec) : parseAdjust(o.adjust);
+  if (Math.abs(adjustSec) > 24 * 3600) throw new Error("Koreksi waktu terlalu besar");
+  const status = String(o.status || "").trim().toUpperCase();
+  if (status && !OVERRIDE_STATUSES.includes(status)) throw new Error("Status tidak valid");
+  const punches = {};
+  Object.entries(o.punches && typeof o.punches === "object" ? o.punches : {}).forEach(([order, v]) => {
+    const n = Number(order);
+    const val = String(v === undefined || v === null ? "" : v).trim();
+    if (!Number.isInteger(n) || n < 1 || !val) return;
+    punches[n] = val.toUpperCase() === "OK" ? "OK" : clockOrEmpty(val, `Jam pos ${n}`);
+  });
+  const note = String(o.note || "").trim().slice(0, 300);
+  if (!start && !finish && !adjustSec && !status && !Object.keys(punches).length) return null;
+  if (!note) throw new Error("Alasan / catatan koreksi wajib diisi");
+  return { start, finish, adjustSec, status, punches, note };
+}
+
+// Edit split per pos: terapkan koreksi jam punch / "dianggap dipunch" ke
+// hasil evaluateCard, lalu hitung ulang waktu kumulatif, leg, pos terlewat
+// & status. Waktu total tetap Finish − Start (punch pos tidak mengubahnya).
+function patchSplits(ev, card, punches) {
+  const startSec = clockToSeconds(card && card.start);
+  const finishSec = clockToSeconds(card && card.finish);
+  const splits = ev.splits.map((sp) => {
+    const v = punches[sp.order];
+    if (!v) return { ...sp };
+    if (v === "OK") return { ...sp, found: true, punchTime: sp.found ? sp.punchTime : null, edited: true, accepted: !sp.found };
+    return { ...sp, found: true, punchTime: v, edited: true, accepted: false };
+  });
+  let prev = startSec;
+  splits.forEach((sp) => {
+    const ps = sp.found && sp.punchTime ? clockToSeconds(sp.punchTime) : null;
+    sp.cumSec = startSec !== null && ps !== null ? elapsed(startSec, ps) : null;
+    sp.legSec = prev !== null && ps !== null ? elapsed(prev, ps) : null;
+    if (ps !== null) prev = ps;
+  });
+  const missing = splits.filter((sp) => !sp.found).map((sp) => ({ order: sp.order, code: sp.code }));
+  let status = STATUS.OK;
+  if (finishSec === null) status = STATUS.DNF;
+  else if (startSec === null) status = STATUS.NO_START;
+  else if (missing.length) status = STATUS.MP;
+  return {
+    ...ev,
+    splits,
+    missing,
+    status,
+    finishLegSec: prev !== null && finishSec !== null ? elapsed(prev, finishSec) : null,
+  };
+}
+
+// Evaluasi kartu + koreksi operator. card boleh null (mis. kartu hilang —
+// operator isi start & finish manual). Return evaluasi spt evaluateCard +
+// { edited, autoStatus, autoTimeSec, start, finish, startEdited, finishEdited }.
+export function evaluateWithOverride(card, override, opts = {}) {
+  const ov = override || null;
+  const hasTimes = !!(ov && (ov.start || ov.finish));
+  if (!card && !hasTimes) {
+    if (!ov || !ov.status) return null;
+    return {
+      status: ov.status, timeSec: null, time: "-", startSource: null, splits: [], missing: [], extra: [],
+      edited: true, autoStatus: null, autoTimeSec: null, start: null, finish: null, startEdited: false, finishEdited: false,
+    };
+  }
+  const src = card ? { ...card } : { start: null, finish: null, punches: [] };
+  if (ov && ov.start) src.start = ov.start;
+  if (ov && ov.finish) src.finish = ov.finish;
+  let ev = evaluateCard(src, opts);
+  const auto = card ? evaluateCard(card, opts) : null;
+  if (ov && ov.punches && Object.keys(ov.punches).length) ev = patchSplits(ev, src, ov.punches);
+  let timeSec = ev.timeSec;
+  if (ov && ov.adjustSec && Number.isFinite(timeSec)) timeSec = Math.max(0, timeSec + ov.adjustSec);
+  // status paksa OK tanpa waktu tidak masuk akal -> tetap status hasil hitungan
+  let status = ov && ov.status ? ov.status : ev.status;
+  if (status === STATUS.OK && !Number.isFinite(timeSec)) status = ev.status;
+  return {
+    ...ev,
+    timeSec,
+    time: formatDuration(timeSec),
+    status,
+    edited: !!ov,
+    autoStatus: auto ? auto.status : null,
+    autoTimeSec: auto ? auto.timeSec : null,
+    // split ASLI kartu (sebelum koreksi) — utk form edit split
+    autoSplits: auto ? auto.splits : [],
+    start: src.start || null,
+    finish: src.finish || null,
+    startEdited: !!(ov && ov.start),
+    finishEdited: !!(ov && ov.finish),
+  };
+}
+
+/* ===================== Tabel split antar pos (tab Hasil) ===================== */
+
+// rows: hasil rankClass() satu kategori (punya splits[] & finishLegSec).
+// Return per baris: legs[] = { cumSec, legSec, legRank, cumRank, best, missed }
+// utk tiap pos course + 1 leg terakhir ke Finish (index terakhir).
+// legRank = peringkat waktu leg itu di antara peserta yang punya waktunya;
+// cumRank = posisi (waktu kumulatif) di pos tsb; best = leg tercepat.
+export function buildSplitTable(rows, controlCount) {
+  const n = Math.max(0, Number(controlCount) || 0);
+  const legsOf = (r) => {
+    const splits = Array.isArray(r.splits) ? r.splits : [];
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const s = splits[i] || {};
+      out.push({
+        cumSec: Number.isFinite(s.cumSec) ? s.cumSec : null,
+        legSec: Number.isFinite(s.legSec) ? s.legSec : null,
+        missed: s.found === false,
+      });
+    }
+    out.push({
+      cumSec: r.status === STATUS.OK && Number.isFinite(r.timeSec) ? r.timeSec : null,
+      legSec: Number.isFinite(r.finishLegSec) ? r.finishLegSec : null,
+      missed: false,
+    });
+    return out;
+  };
+  const table = (rows || []).map((r) => ({ row: r, legs: legsOf(r) }));
+  const rankBy = (idx, key, out) => {
+    const vals = table.map((t) => t.legs[idx][key]).filter((v) => v !== null).sort((a, b) => a - b);
+    table.forEach((t) => {
+      const v = t.legs[idx][key];
+      t.legs[idx][out] = v === null ? null : vals.indexOf(v) + 1; // seri = peringkat sama
+    });
+    return vals.length ? vals[0] : null;
+  };
+  for (let i = 0; i <= n; i++) {
+    const bestLeg = rankBy(i, "legSec", "legRank");
+    rankBy(i, "cumSec", "cumRank");
+    table.forEach((t) => (t.legs[i].best = bestLeg !== null && t.legs[i].legSec === bestLeg));
+  }
+  return table;
 }

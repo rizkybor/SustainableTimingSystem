@@ -399,7 +399,18 @@
                   <span v-else class="ori-status ori-status--muted">Belum ada</span>
                 </td>
                 <td>{{ p.club || "-" }}</td>
-                <td>{{ p.nationality || "-" }}</td>
+                <td class="text-nowrap">
+                  <img
+                    v-if="flagOf(p.nationality)"
+                    :src="flagOf(p.nationality)"
+                    :alt="p.nationality"
+                    :title="p.nationality"
+                    class="ori-flag"
+                    loading="lazy"
+                    @error="$event.target.style.display = 'none'"
+                  />
+                  {{ p.nationality || "-" }}
+                </td>
                 <td>{{ (p.scheduledStart || "").slice(0, 5) || "-" }}</td>
                 <td>
                   <template v-if="resultByParticipant[p._id]">
@@ -410,6 +421,7 @@
                       {{ resultByParticipant[p._id].time }}
                     </span>
                   </template>
+                  <span v-else class="text-muted">-</span>
                 </td>
                 <td class="text-right text-nowrap">
                   <button type="button" class="ori-icon-btn" title="Edit" @click="editParticipant(p)">
@@ -588,6 +600,14 @@
                 </template>
               </span>
               <b-form-checkbox v-model="rFilter.hideEmpty" switch class="small">Sembunyikan kategori kosong</b-form-checkbox>
+              <div class="ori-view-toggle ml-auto" role="group" aria-label="Tampilan hasil">
+                <button type="button" :class="{ on: rView === 'summary' }" @click="rView = 'summary'">
+                  <Icon icon="mdi:format-list-numbered" /> Ringkas
+                </button>
+                <button type="button" :class="{ on: rView === 'splits' }" @click="rView = 'splits'">
+                  <Icon icon="mdi:map-marker-path" /> Split per pos
+                </button>
+              </div>
               <button v-if="hasRFilter" type="button" class="ori-pfilter__clear" @click="clearRFilter">
                 <Icon icon="mdi:filter-remove-outline" /> Reset filter
               </button>
@@ -612,7 +632,7 @@
                 Course belum diatur — semua kartu dianggap OK
               </span>
             </div>
-            <table class="ori-table">
+            <table v-if="rView === 'summary'" class="ori-table">
               <thead>
                 <tr>
                   <th
@@ -632,6 +652,7 @@
                       :icon="rSort.key !== col.key ? 'mdi:swap-vertical' : rSort.dir === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'"
                     />
                   </th>
+                  <th class="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -640,8 +661,22 @@
                   <td class="font-weight-bold">{{ r.name }}</td>
                   <td>{{ r.bib || "-" }}</td>
                   <td>{{ r.club || "-" }}</td>
-                  <td>{{ r.nationality || "-" }}</td>
-                  <td>{{ r.siCard || "—" }}</td>
+                  <td class="text-nowrap">
+                    <img
+                      v-if="flagOf(r.nationality)"
+                      :src="flagOf(r.nationality)"
+                      :alt="r.nationality"
+                      :title="r.nationality"
+                      class="ori-flag"
+                      loading="lazy"
+                      @error="$event.target.style.display = 'none'"
+                    />
+                    {{ r.nationality || "-" }}
+                  </td>
+                  <td>{{ r.siCard || "-" }}</td>
+                  <td class="text-nowrap small text-muted" title="Jadwal start (Starting Order) — info, tidak dipakai menghitung">
+                    {{ (r.scheduledStart || "").slice(0, 5) || "-" }}
+                  </td>
                   <td class="text-nowrap small">
                     <template v-if="r.readAt">
                       <span v-if="r.start">{{ clockHms(r.start) }}</span>
@@ -649,24 +684,107 @@
                       <span class="text-muted"> → </span>
                       <span>{{ r.finish ? clockHms(r.finish) : "-" }}</span>
                     </template>
-                    <span v-else class="text-muted">—</span>
+                    <span v-else class="text-muted">-</span>
                   </td>
                   <td class="text-right font-weight-bold">{{ r.status === "OK" ? r.time : "-" }}</td>
-                  <td class="text-right text-muted">{{ r.rank && r.behindSec ? "+" + fmt(r.behindSec) : "" }}</td>
+                  <td class="text-right text-muted">{{ r.rank && r.behindSec ? "+" + fmt(r.behindSec) : "-" }}</td>
                   <td>
                     <span class="ori-status" :class="'ori-status--' + statusTone(r.status)">{{ statusLabel(r.status) }}</span>
                     <span v-if="r.status === 'MP'" class="small text-muted ml-1">
                       ({{ r.missing.map((m) => m.code).join(", ") }})
                     </span>
+                    <span v-if="r.edited" class="ori-edited ml-1" :title="'Dikoreksi operator: ' + (r.editNote || '-')">
+                      <Icon icon="mdi:pencil" /> Diedit
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <button type="button" class="ori-icon-btn" title="Edit hasil" @click="openResultEdit(r, c)">
+                      <Icon icon="mdi:pencil-outline" />
+                    </button>
                   </td>
                 </tr>
                 <tr v-if="!c.shown.length">
-                  <td colspan="10" class="text-center text-muted py-3">
+                  <td colspan="12" class="text-center text-muted py-3">
                     {{ c.results.length ? "Tidak ada peserta yang cocok dengan filter." : "Belum ada peserta di kategori ini." }}
                   </td>
                 </tr>
               </tbody>
             </table>
+            <!-- Split per pos: waktu kumulatif + leg tiap pos course, peringkat leg -->
+            <div v-else class="ori-split-wrap">
+              <table class="ori-table ori-split">
+                <thead>
+                  <tr>
+                    <th class="ori-split__sticky ori-split__rank">Rank</th>
+                    <th class="ori-split__sticky ori-split__name">Nama</th>
+                    <th v-for="(code, i) in c.controls" :key="'h' + i" class="text-center">
+                      {{ i + 1 }}<small class="d-block ori-split__code">({{ code }})</small>
+                    </th>
+                    <th class="text-center">F<small class="d-block ori-split__code">Finish</small></th>
+                    <th>Status</th>
+                    <th class="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="t in splitRowsOf(c)" :key="t.row.participantId">
+                    <td class="ori-split__sticky ori-split__rank font-weight-bold">{{ t.row.rank || "-" }}</td>
+                    <td class="ori-split__sticky ori-split__name">
+                      <div class="font-weight-bold text-nowrap">
+                        <img
+                          v-if="flagOf(t.row.nationality)"
+                          :src="flagOf(t.row.nationality)"
+                          :alt="t.row.nationality"
+                          :title="t.row.nationality"
+                          class="ori-flag"
+                          @error="$event.target.style.display = 'none'"
+                        />{{ t.row.name }}
+                      </div>
+                      <small class="text-muted text-nowrap">{{ t.row.club || "-" }}</small>
+                    </td>
+                    <td
+                      v-for="(leg, i) in t.legs"
+                      :key="'l' + i"
+                      class="ori-split__cell"
+                      :class="{
+                        'is-best': leg.best,
+                        'is-missed': leg.missed,
+                        'is-edited': t.row.splits[i] && t.row.splits[i].edited,
+                        'is-clickable': i < c.controls.length,
+                      }"
+                      :title="i < c.controls.length ? 'Klik untuk edit split pos ' + (i + 1) : ''"
+                      @click="i < c.controls.length && openResultEdit(t.row, c, i + 1)"
+                    >
+                      <template v-if="leg.missed"><span class="ori-split__miss">terlewat</span></template>
+                      <template v-else-if="leg.cumSec !== null || leg.legSec !== null">
+                        <div class="ori-split__cum">
+                          {{ leg.cumSec !== null ? fmt(leg.cumSec) : "-" }}
+                          <span v-if="leg.cumRank" class="ori-split__pos">({{ leg.cumRank }})</span>
+                        </div>
+                        <div class="ori-split__leg">
+                          {{ leg.legSec !== null ? "+" + fmt(leg.legSec) : "" }}
+                          <span v-if="leg.legRank" class="ori-split__lrank">{{ leg.legRank }}</span>
+                        </div>
+                      </template>
+                      <span v-else class="text-muted">-</span>
+                    </td>
+                    <td class="text-nowrap">
+                      <span class="ori-status" :class="'ori-status--' + statusTone(t.row.status)">{{ statusLabel(t.row.status) }}</span>
+                      <span v-if="t.row.edited" class="ori-edited ml-1" :title="'Dikoreksi operator: ' + (t.row.editNote || '-')">
+                        <Icon icon="mdi:pencil" />
+                      </span>
+                    </td>
+                    <td class="text-right">
+                      <button type="button" class="ori-icon-btn" title="Edit hasil" @click="openResultEdit(t.row, c)">
+                        <Icon icon="mdi:pencil-outline" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!c.shown.length">
+                    <td :colspan="c.controls.length + 5" class="text-center text-muted py-3">Tidak ada peserta.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
           </template>
         </section>
@@ -726,6 +844,123 @@
           <ul class="small mb-0">
             <li v-for="e in importState.errors" :key="e.rowNo">Baris {{ e.rowNo }}<span v-if="e.name"> ({{ e.name }})</span>: {{ e.message }}</li>
           </ul>
+        </div>
+      </template>
+    </b-modal>
+
+    <!-- ===== Edit Hasil (koreksi operator; kartu mentah tidak diubah) ===== -->
+    <b-modal
+      v-model="resEdit.show"
+      :title="resEdit.row ? `Edit Hasil — ${resEdit.row.name}` : 'Edit Hasil'"
+      size="lg"
+      centered
+      no-close-on-backdrop
+      hide-footer
+    >
+      <template v-if="resEdit.row">
+        <div class="ori-redit-head">
+          <span class="ori-type-mini">{{ resEdit.cls.className }}</span>
+          <span class="text-muted small">{{ activeRaceName }} · SI {{ resEdit.row.siCard || "—" }}</span>
+          <span v-if="resEdit.row.edited" class="ori-edited ml-auto"><Icon icon="mdi:pencil" /> Sudah dikoreksi</span>
+        </div>
+
+        <div class="ori-redit-orig">
+          <div class="ori-redit-orig__title">Data asli dari SI Card</div>
+          <div class="ori-redit-grid">
+            <div><small>Start</small><b>{{ resEdit.row.cardStart ? clockHms(resEdit.row.cardStart) : "tidak ada" }}</b></div>
+            <div><small>Finish</small><b>{{ resEdit.row.cardFinish ? clockHms(resEdit.row.cardFinish) : "tidak ada" }}</b></div>
+            <div><small>Waktu</small><b>{{ resEdit.row.autoTimeSec !== null && resEdit.row.autoTimeSec !== undefined ? fmt(resEdit.row.autoTimeSec) : "-" }}</b></div>
+            <div><small>Status otomatis</small><b>{{ resEdit.row.autoStatus ? statusLabel(resEdit.row.autoStatus) : "Belum baca kartu" }}</b></div>
+          </div>
+        </div>
+
+        <div class="ori-form__grid mt-3">
+          <b-form-group label="Start (koreksi)" label-for="ori-re-start" description="Kosong = pakai punch kartu">
+            <b-form-input id="ori-re-start" v-model="resEdit.form.start" type="time" step="1" />
+          </b-form-group>
+          <b-form-group label="Finish (koreksi)" label-for="ori-re-finish" description="Kosong = pakai punch kartu">
+            <b-form-input id="ori-re-finish" v-model="resEdit.form.finish" type="time" step="1" />
+          </b-form-group>
+          <b-form-group label="Koreksi waktu (±)" label-for="ori-re-adj" description="Penalti/bonus, mis. +1:00 atau -0:30">
+            <b-form-input id="ori-re-adj" v-model="resEdit.form.adjust" placeholder="+0:00" />
+          </b-form-group>
+          <b-form-group label="Status" label-for="ori-re-status">
+            <b-form-select id="ori-re-status" v-model="resEdit.form.status" :options="resultStatusOptions" />
+          </b-form-group>
+        </div>
+        <!-- Edit split per pos -->
+        <div v-if="resEdit.cls.controls.length" class="ori-redit-splits">
+          <div class="ori-redit-orig__title">Split per pos ({{ resEdit.cls.controls.length }} pos)</div>
+          <table class="ori-redit-stable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Kode</th>
+                <th>Punch kartu</th>
+                <th>Jam punch (koreksi)</th>
+                <th title="Unit pos rusak / punch tidak terekam">Dianggap dipunch</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(code, i) in resEdit.cls.controls"
+                :key="i"
+                :class="{ 'is-missed': !origPunch(i + 1), 'is-edited': punchEdited(i + 1) }"
+              >
+                <td class="font-weight-bold">{{ i + 1 }}</td>
+                <td>{{ code }}</td>
+                <td class="text-nowrap">
+                  <span v-if="origPunch(i + 1)">{{ clockHms(origPunch(i + 1)) }}</span>
+                  <span v-else class="text-danger font-weight-bold">terlewat</span>
+                </td>
+                <td>
+                  <b-form-input
+                    :id="'ori-re-p' + (i + 1)"
+                    v-model="resEdit.form.punches[i + 1].time"
+                    type="time"
+                    step="1"
+                    size="sm"
+                    class="ori-redit-time"
+                  />
+                </td>
+                <td class="text-center">
+                  <b-form-checkbox v-model="resEdit.form.punches[i + 1].ok" :disabled="!!resEdit.form.punches[i + 1].time" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <small class="text-muted">
+            Kosong = pakai punch kartu. Isi jam untuk mengoreksi / menambah punch pos, atau centang "Dianggap dipunch"
+            bila unit pos rusak (tanpa waktu). Status MP/OK & split dihitung ulang otomatis.
+          </small>
+        </div>
+
+        <b-form-group label-for="ori-re-note" class="mt-3">
+          <template #label>Alasan / catatan koreksi <span class="text-danger" title="Wajib diisi">*</span></template>
+          <b-form-input id="ori-re-note" v-model="resEdit.form.note" maxlength="300" placeholder="mis. unit pos 33 rusak, punch tercatat di backup" />
+        </b-form-group>
+
+        <div class="ori-redit-preview">
+          <Icon icon="mdi:calculator-variant-outline" />
+          <span>Pratinjau waktu: <b>{{ resultEditPreview }}</b></span>
+          <span class="text-muted small ml-auto">Peringkat diurutkan ulang otomatis setelah disimpan.</span>
+        </div>
+        <p v-if="resEdit.error" class="text-danger small mb-2">{{ resEdit.error }}</p>
+
+        <div class="d-flex mt-3" style="gap: 6px">
+          <button
+            v-if="resEdit.row.edited"
+            type="button"
+            class="ori-btn ori-btn--danger-ghost"
+            :disabled="resEdit.saving"
+            @click="saveResultEdit(true)"
+          >
+            <Icon icon="mdi:restore" /> Hapus koreksi
+          </button>
+          <button type="button" class="ori-btn ori-btn--ghost ml-auto" @click="resEdit.show = false">Batal</button>
+          <button type="button" class="ori-btn ori-btn--primary" :disabled="resEdit.saving" @click="saveResultEdit(false)">
+            <Icon icon="mdi:content-save-outline" /> {{ resEdit.saving ? "Menyimpan…" : "Simpan & Hitung Ulang" }}
+          </button>
         </div>
       </template>
     </b-modal>
@@ -963,10 +1198,16 @@ import {
   sortParticipants,
   NOT_READ,
   sortResultRows,
+  OVERRIDE_STATUSES,
+  buildSplitTable,
+  clockToSeconds,
+  elapsed,
+  parseAdjust,
   classesForRace,
   classAppliesToRace,
   typeAppliesToRace,
 } from "@/lib/orienteering";
+import { flagUrl } from "@/lib/countryFlag";
 
 // kolom tab Hasil yang bisa di-sort (key = sortResultRows())
 const RESULT_COLUMNS = [
@@ -976,6 +1217,7 @@ const RESULT_COLUMNS = [
   { key: "club", label: "Club" },
   { key: "nationality", label: "Negara" },
   { key: "si", label: "SI Card" },
+  { key: "start", label: "Starting Order" }, // jadwal start — info saja, TIDAK dihitung
   { key: "punch", label: "Start / Finish (SI)", sortable: false },
   { key: "time", label: "Waktu", right: true },
   { key: "behind", label: "Selisih", right: true },
@@ -1050,6 +1292,8 @@ export default {
       pSort: { key: "", dir: "asc" }, // "" = urutan bawaan (kategori, No, nama)
       participantColumns: PARTICIPANT_COLUMNS,
       rFilter: EMPTY_RFILTER(),
+      rView: "summary", // "summary" | "splits" (waktu antar pos)
+      resEdit: { show: false, row: null, cls: null, form: {}, saving: false, error: "" },
       rSort: { key: "rank", dir: "asc" },
       resultColumns: RESULT_COLUMNS,
       showEntry: false,
@@ -1196,6 +1440,28 @@ export default {
             .filter((c) => (filtering || f.hideEmpty ? c.shown.length : true)),
         }))
         .filter((g) => g.items.length);
+    },
+    resultStatusOptions() {
+      return [{ value: "", text: "Otomatis (dari SI Card)" }].concat(
+        OVERRIDE_STATUSES.map((s) => ({ value: s, text: this.statusLabel(s) }))
+      );
+    },
+    // pratinjau sederhana: (finish - start) + koreksi; status final dihitung server
+    resultEditPreview() {
+      const r = this.resEdit.row;
+      if (!r) return "-";
+      const f = this.resEdit.form;
+      if (f.status && f.status !== "OK") return this.statusLabel(f.status);
+      const st = clockToSeconds(f.start || r.cardStart);
+      const fi = clockToSeconds(f.finish || r.cardFinish);
+      if (st === null || fi === null) return st === null ? "Tanpa Start" : "Tanpa Finish";
+      let adj = 0;
+      try {
+        adj = parseAdjust(f.adjust);
+      } catch (_e) {
+        return "koreksi waktu tidak valid";
+      }
+      return this.fmt(Math.max(0, elapsed(st, fi) + adj));
     },
     resultShownCount() {
       return this.filteredResultGroups.reduce((n, g) => n + g.items.reduce((m, c) => m + c.shown.length, 0), 0);
@@ -1522,6 +1788,89 @@ export default {
       else this.assign.show = false;
     },
 
+    // tabel split satu kategori (urutan = urutan tampil / sort aktif)
+    splitRowsOf(c) {
+      return buildSplitTable(c.shown, c.controls.length);
+    },
+
+    /* ---------- Edit Hasil ---------- */
+    openResultEdit(r, cls, focusOrder) {
+      const ov = r.override || {};
+      const adj = Number(ov.adjustSec) || 0;
+      const punches = {};
+      (cls.controls || []).forEach((_code, i) => {
+        const v = (ov.punches || {})[i + 1] || "";
+        punches[i + 1] = { time: v && v !== "OK" ? v : "", ok: v === "OK" };
+      });
+      this.resEdit = {
+        show: true,
+        row: r,
+        cls,
+        saving: false,
+        error: "",
+        form: {
+          start: ov.start || "",
+          finish: ov.finish || "",
+          adjust: adj ? `${adj < 0 ? "-" : "+"}${formatDuration(Math.abs(adj))}` : "",
+          status: ov.status || "",
+          note: ov.note || "",
+          punches,
+        },
+      };
+      if (focusOrder) {
+        this.$nextTick(() =>
+          setTimeout(() => {
+            const el = document.getElementById(`ori-re-p${focusOrder}`);
+            if (el) el.focus();
+          }, 300)
+        );
+      }
+    },
+    // punch asli kartu utk pos ke-n (sebelum koreksi)
+    origPunch(order) {
+      const sp = ((this.resEdit.row && this.resEdit.row.autoSplits) || []).find((x) => x.order === order);
+      return sp && sp.found ? sp.punchTime : "";
+    },
+    punchEdited(order) {
+      const p = this.resEdit.form.punches && this.resEdit.form.punches[order];
+      return !!(p && (p.time || p.ok));
+    },
+    async saveResultEdit(clear) {
+      if (clear) {
+        const ok = await this.$bvModal.msgBoxConfirm(
+          `Hapus koreksi hasil ${this.resEdit.row.name}? Hasil kembali murni dari SI Card.`,
+          { title: "Hapus koreksi", okTitle: "Hapus", cancelTitle: "Batal", okVariant: "danger", centered: true, size: "sm" }
+        );
+        if (!ok) return;
+      }
+      this.resEdit.saving = true;
+      this.resEdit.error = "";
+      const res = await ipcRequest("ori:result:override", {
+        participantId: this.resEdit.row.participantId,
+        override: clear
+          ? null
+          : {
+              ...this.resEdit.form,
+              punches: Object.fromEntries(
+                Object.entries(this.resEdit.form.punches || {}).map(([order, p]) => [order, p.time || (p.ok ? "OK" : "")])
+              ),
+            },
+      });
+      this.resEdit.saving = false;
+      if (!res || !res.ok) {
+        this.resEdit.error = (res && res.error) || "Gagal menyimpan (cek koneksi database).";
+        return;
+      }
+      const name = this.resEdit.row.name;
+      this.resEdit.show = false;
+      await this.loadResults(); // dihitung & diperingkat ulang otomatis
+      this.toast(clear ? `Koreksi ${name} dihapus.` : `Hasil ${name} dikoreksi — peringkat diperbarui.`, "success", "Edit Hasil");
+    },
+
+    // bendera kecil dari Nationality ("Indonesia", "INA", "MAS", …); tak dikenal -> ""
+    flagOf(nationality) {
+      return flagUrl(nationality, 40);
+    },
     // jam punch SI Card -> HH:MM:SS
     clockHms(v) {
       const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v || ""));
@@ -1969,12 +2318,24 @@ export default {
           Club: r.club || "",
           Nationality: r.nationality || "",
           "SI Card": r.siCard || "",
+          "Starting Order": (r.scheduledStart || "").slice(0, 5),
+          "Start (SI Card)": r.start || "",
+          "Finish (SI Card)": r.finish || "",
           Waktu: r.status === "OK" ? r.time : "",
           Selisih: r.rank && r.behindSec ? "+" + formatDuration(r.behindSec) : "",
           Status: this.statusLabel(r.status),
           "Type Event": c.typeName || "",
           Kategori: c.className,
           "Pos terlewat": (r.missing || []).map((m) => m.code).join(", "),
+          Koreksi: r.edited ? r.editNote || "ya" : "",
+          // split antar pos: waktu kumulatif & leg tiap pos course
+          ...Object.fromEntries(
+            (r.splits || []).flatMap((sp) => [
+              [`P${sp.order} (${sp.code})`, sp.found === false ? "terlewat" : sp.cumSec !== null ? formatDuration(sp.cumSec) : ""],
+              [`Leg ${sp.order}`, sp.legSec !== null && sp.legSec !== undefined ? formatDuration(sp.legSec) : ""],
+            ])
+          ),
+          "Leg Finish": Number.isFinite(r.finishLegSec) ? formatDuration(r.finishLegSec) : "",
         })),
         };
       });
@@ -2416,6 +2777,124 @@ export default {
   font-size: 0.75rem;
   line-height: 1.5;
 }
+.ori-flag {
+  width: 18px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.ori-view-toggle {
+  display: inline-flex;
+  border: 1px solid #dde6f1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.ori-view-toggle button {
+  border: none;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ori-view-toggle button.on {
+  background: #1c4c7a;
+  color: #fff;
+}
+.ori-split-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+}
+.ori-split th,
+.ori-split td {
+  white-space: nowrap;
+}
+.ori-split__sticky {
+  position: sticky;
+  z-index: 1;
+  background: #fff;
+}
+.ori-split thead .ori-split__sticky {
+  background: #1c4c7a; /* = .ori-table th */
+  z-index: 2;
+}
+.ori-split__rank {
+  left: 0;
+  min-width: 52px;
+}
+.ori-split__name {
+  left: 52px;
+  min-width: 180px;
+  box-shadow: 1px 0 0 #e6edf6;
+}
+.ori-split__code {
+  font-weight: 600;
+  opacity: 0.75;
+}
+.ori-split__cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  min-width: 78px;
+}
+.ori-split__cum {
+  font-weight: 700;
+  color: #0f172a;
+}
+.ori-split__pos {
+  font-weight: 500;
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+.ori-split__leg {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+.ori-split__lrank {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.ori-split__cell.is-best {
+  background: #ecfdf5;
+}
+.ori-split__cell.is-best .ori-split__leg {
+  color: #047857;
+  font-weight: 800;
+}
+.ori-split__cell.is-best .ori-split__lrank {
+  background: #10b981;
+  color: #fff;
+}
+.ori-split__cell.is-clickable {
+  cursor: pointer;
+}
+.ori-split__cell.is-clickable:hover {
+  box-shadow: inset 0 0 0 2px #93c5fd;
+}
+.ori-split__cell.is-edited {
+  background: #fff7ed;
+}
+.ori-split__cell.is-missed {
+  background: #fef2f2;
+}
+.ori-split__miss {
+  color: #dc2626;
+  font-weight: 800;
+  font-size: 0.75rem;
+}
 .ori-pfilter {
   display: flex;
   flex-wrap: wrap;
@@ -2833,6 +3312,97 @@ export default {
 .ori-hero-actions .ori-btn--light-danger:hover {
   background: rgba(220, 38, 38, 0.45);
   color: #fff;
+}
+/* badge & modal Edit Hasil */
+.ori-edited {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  white-space: nowrap;
+}
+.ori-redit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ori-redit-orig {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+.ori-redit-orig__title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+.ori-redit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ori-redit-grid small {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+.ori-redit-grid b {
+  font-variant-numeric: tabular-nums;
+}
+.ori-redit-splits {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.ori-redit-stable {
+  width: 100%;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+.ori-redit-stable th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 800;
+  padding: 4px 6px;
+}
+.ori-redit-stable td {
+  padding: 3px 6px;
+  border-top: 1px solid #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+.ori-redit-stable tr.is-missed td {
+  background: #fef2f2;
+}
+.ori-redit-stable tr.is-edited td {
+  background: #fff7ed;
+}
+.ori-redit-time {
+  max-width: 140px;
+}
+.ori-redit-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
 }
 /* modal Daftarkan SI Card (di-teleport ke <body>) */
 .ori-asg-top {

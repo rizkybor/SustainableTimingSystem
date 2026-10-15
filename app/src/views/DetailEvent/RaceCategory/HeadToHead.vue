@@ -64,11 +64,12 @@
                   </div>
 
                   <b-form-group label-for="h2hBucketSelect" class="mb-0">
-                    <b-form-select
+                    <BucketButtonGroup
                       id="h2hBucketSelect"
                       :options="h2hOptionsForSelectedInitial"
                       v-model="selectedH2HKey"
                       @change="onSelectH2HBucket"
+                      aria-label="Pilih kategori Head to Head"
                     />
                   </b-form-group>
                 </div>
@@ -139,6 +140,8 @@
               <!-- Status realtime juri (posisi seragam di 5 Race Category,
                    selalu terlihat krn ikut sticky bar) -->
               <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+              <!-- Status database + perubahan yg menunggu tersimpan (ulang-coba otomatis) -->
+              <DbStatusBadge class="race-realtime-badge mr-2 mb-1" />
 
               <!-- path pill -->
               <div class="mb-1">
@@ -1571,6 +1574,14 @@
 </template>
 
 <script>
+import { clockDiff, secondsToClock } from "@/lib/raceTime";
+import { ipcRequest } from "@/utils/ipcRequest";
+import {
+  computeOverallPlacements,
+  missingSemifinalLosers,
+  pruneStalePool,
+  roundSlotKeys,
+} from "@/lib/h2hBracket";
 import { ipcRenderer } from "electron";
 import OperationTimePanel from "@/components/race/OperationTeamPanel.vue";
 import RaceCategoryHero from "@/components/race/RaceCategoryHero.vue";
@@ -2477,250 +2488,15 @@ export default {
       return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
     },
     buildOverallPlacingsFromLastRound() {
-      const rounds = this.rounds || [];
-      if (!rounds.length) return [];
-
-      const final = this.getFinalRound && this.getFinalRound();
-      const bronze = this.getBronzeRound && this.getBronzeRound();
-
-      const top4 = [];
-      const top4Keys = new Set();
-
-      const teamKey = (name, bib) =>
-        String(name || "").toUpperCase() + "|" + String(bib || "");
-
-      const timeMsFromRow = (row) => {
-        const t = row && (row.total || row.race) ? row.total || row.race : "";
-        return this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t);
-      };
-
-      // BUG FIX (2026-10-06): finalis yang finalnya BELUM punya pemenang
-      // dulu tidak masuk top4 sama sekali -> ikut dinomori dari 5 di bagian
-      // "others" (mis. Final B sudah selesai = 3 & 4, tapi kedua tim Final A
-      // = 5 & 6), dan skornya ikut salah di Result & Event Overall. Sekarang
-      // finalis itu TETAP dikeluarkan dari "others" (supaya tim tersingkir
-      // tetap mulai dari 5), tapi BELUM diberi peringkat & skor sama sekali
-      // (permintaan user: jangan ada ranked sebelum Final A/B dipertandingkan)
-      // — ranked/score null + _pending, baru terisi begitu final ada
-      // pemenangnya. Urutan tampil: Final A dulu, lalu Final B.
-      const pushUndecidedFinalists = (match, rows, firstPlace, source) => {
-        const findRow = (nm) =>
-          rows.find(
-            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
-          ) || null;
-        const present = [match.team1, match.team2]
-          .filter((t) => t && t.name)
-          .map((t) => {
-            const rw = findRow(t.name);
-            return {
-              name: t.name,
-              bib: rw ? rw.bib : t.bibTeam || "",
-              timeMs: timeMsFromRow(rw),
-            };
-          })
-          .filter((x) => !top4Keys.has(teamKey(x.name, x.bib)));
-        present.sort((a, b) => {
-          const ta = Number.isFinite(a.timeMs) ? a.timeMs : Number.POSITIVE_INFINITY;
-          const tb = Number.isFinite(b.timeMs) ? b.timeMs : Number.POSITIVE_INFINITY;
-          if (ta !== tb) return ta - tb;
-          return String(a.name).localeCompare(String(b.name));
-        });
-        present.forEach((x, i) => {
-          top4.push({
-            place: null,
-            order: firstPlace + i, // utk urutan tampil saja, bukan peringkat
-            name: x.name,
-            bib: x.bib,
-            source,
-            timeMs: x.timeMs,
-            pending: true,
-          });
-          top4Keys.add(teamKey(x.name, x.bib));
-        });
-      };
-
-      // ---- Final A → #1 & #2
-      if (final && final.matches && final.matches[0]) {
-        const fm = final.matches[0];
-        const t1 = fm.team1 && fm.team1.name ? fm.team1.name : "";
-        const t2 = fm.team2 && fm.team2.name ? fm.team2.name : "";
-
-        const finalRows = this.buildRoundRows(final);
-        const findRow = (nm) =>
-          finalRows.find(
-            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
-          ) || null;
-
-        if (fm.winner && fm.winner.name) {
-          const winner = fm.winner.name;
-          const loser = (winner === t1 ? t2 : t1) || "";
-
-          const rwW = findRow(winner);
-          const rwL = findRow(loser);
-
-          const kW = teamKey(winner, rwW ? rwW.bib : "");
-          const kL = teamKey(loser, rwL ? rwL.bib : "");
-
-          if (winner) {
-            top4.push({
-              place: 1,
-              name: winner,
-              bib: rwW ? rwW.bib : "",
-              source: "FinalA",
-              timeMs: timeMsFromRow(rwW),
-            });
-            top4Keys.add(kW);
-          }
-          if (loser) {
-            top4.push({
-              place: 2,
-              name: loser,
-              bib: rwL ? rwL.bib : "",
-              source: "FinalA",
-              timeMs: timeMsFromRow(rwL),
-            });
-            top4Keys.add(kL);
-          }
-        } else {
-          pushUndecidedFinalists(fm, finalRows, 1, "FinalA");
-        }
-      }
-
-      // ---- Final B (Bronze) → #3 & #4
-      if (bronze && bronze.matches && bronze.matches[0]) {
-        const bm = bronze.matches[0];
-        const t1 = bm.team1 && bm.team1.name ? bm.team1.name : "";
-        const t2 = bm.team2 && bm.team2.name ? bm.team2.name : "";
-
-        const bronzeRows = this.buildRoundRows(bronze);
-        const findRow = (nm) =>
-          bronzeRows.find(
-            (r) => String(r.team).toUpperCase() === String(nm).toUpperCase()
-          ) || null;
-
-        if (bm.winner && bm.winner.name) {
-          const winner = bm.winner.name; // #3
-          const loser = (winner === t1 ? t2 : t1) || ""; // #4
-
-          const rwW = findRow(winner);
-          const rwL = findRow(loser);
-
-          const kW = teamKey(winner, rwW ? rwW.bib : "");
-          const kL = teamKey(loser, rwL ? rwL.bib : "");
-
-          if (winner && !top4Keys.has(kW)) {
-            top4.push({
-              place: 3,
-              name: winner,
-              bib: rwW ? rwW.bib : "",
-              source: "FinalB",
-              timeMs: timeMsFromRow(rwW),
-            });
-            top4Keys.add(kW);
-          }
-          if (loser && !top4Keys.has(kL)) {
-            top4.push({
-              place: 4,
-              name: loser,
-              bib: rwL ? rwL.bib : "",
-              source: "FinalB",
-              timeMs: timeMsFromRow(rwL),
-            });
-            top4Keys.add(kL);
-          }
-        } else {
-          pushUndecidedFinalists(bm, bronzeRows, 3, "FinalB");
-        }
-      }
-
-      // ---- Tim lainnya: pakai LAST ROUND REACHED
-      const lastRowByTeam = new Map(); // key → { row, roundIdx, roundId, roundName }
-
-      for (let ri = 0; ri < rounds.length; ri++) {
-        const r = rounds[ri];
-        if (r && r.bronze) continue; // bronze sudah diambil untuk top4
-
-        const rows = this.buildRoundRows(r);
-        rows.forEach((row) => {
-          const key = teamKey(row.team, row.bib);
-          if (top4Keys.has(key)) return;
-
-          const prev = lastRowByTeam.get(key);
-          if (!prev || ri > prev.roundIdx) {
-            lastRowByTeam.set(key, {
-              row,
-              roundIdx: ri,
-              roundId: r.id,
-              roundName: r.name,
-            });
-          }
-        });
-      }
-
-      const others = Array.from(lastRowByTeam.values()).map((v) => ({
-        name: v.row.team,
-        bib: v.row.bib,
-        sourceRoundId: String(v.roundId),
-        sourceRoundName: v.roundName,
-        timeMs: timeMsFromRow(v.row),
-        roundIdx: v.roundIdx,
-      }));
-
-      // Urut "others" (ranked 5 dst, atas permintaan user 2026-10-02):
-      // dikelompokkan dulu per babak tersingkir (roundIdx lebih besar =
-      // tersingkir di babak LEBIH AKHIR = rank lebih baik/lebih kecil),
-      // BARU di dalam kelompok babak yang sama diurutkan waktu tercepat
-      // → duluan. Sebelumnya waktu dipakai LANGSUNG lintas semua babak
-      // tersingkir (baris `roundIdx` di bawah ini sengaja dikomentari) —
-      // akibatnya tim yang tersingkir di Round 1 tapi waktunya kebetulan
-      // cepat bisa rank di atas tim yang tersingkir di Semifinal, padahal
-      // tim Semifinal jelas lebih jauh melaju. `rounds` yang dipakai
-      // membangun `lastRowByTeam` di atas sudah scoped ke bucket (Division
-      // Categories+Race Categories+Initial Categories) yang sedang dibuka
-      // operator — jadi urutan ini otomatis per-bucket, bukan event-wide.
-      others.sort((a, b) => {
-        if (a.roundIdx !== b.roundIdx) return b.roundIdx - a.roundIdx;
-        const ta = Number.isFinite(a.timeMs)
-          ? a.timeMs
-          : Number.POSITIVE_INFINITY;
-        const tb = Number.isFinite(b.timeMs)
-          ? b.timeMs
-          : Number.POSITIVE_INFINITY;
-        if (ta !== tb) return ta - tb;
-        return String(a.name).localeCompare(String(b.name));
+      // Logika murni di src/lib/h2hBracket.js (diuji: tests/h2hBracket.test.js).
+      return computeOverallPlacements({
+        rounds: this.rounds || [],
+        finalRound: this.getFinalRound ? this.getFinalRound() : null,
+        bronzeRound: this.getBronzeRound ? this.getBronzeRound() : null,
+        rowsForRound: (r) => this.buildRoundRows(r),
+        parseTimeMs: (t) => (this._parseTimeMs ? this._parseTimeMs(t) : this.parsesTime(t)),
+        scoreForRank: (rank) => this.scoreForRank(rank),
       });
-
-      // Gabungkan jadi overallRows + hitung score dari ranking final
-      const overall = [];
-
-      // 1..4 (top4)
-      top4
-        .sort((a, b) => (a.place || a.order) - (b.place || b.order))
-        .forEach((x) => {
-          overall.push({
-            ranked: x.pending ? null : x.place,
-            name: x.name,
-            bib: x.bib,
-            score: x.pending ? null : this.scoreForRank(x.place), // ← skor dari this.dataScore
-            _source: x.source,
-            ...(x.pending ? { _pending: true } : {}),
-          });
-        });
-
-      // 5..N (others)
-      let rank = 5;
-      others.forEach((o) => {
-        overall.push({
-          ranked: rank,
-          name: o.name,
-          bib: o.bib,
-          score: this.scoreForRank(rank), // ← skor dari this.dataScore
-          _source: o.sourceRoundName,
-        });
-        rank++;
-      });
-
-      return overall;
     },
     // ---- BRACKET SAVE/LOAD ----
     _currentBucketOrThrow() {
@@ -3825,12 +3601,7 @@ export default {
 
       // ambil existing doc (jika ada)
       function getExisting() {
-        return new Promise(function (resolve) {
-          ipcRenderer.once("event-results:get-reply", function (_e, res) {
-            resolve(res);
-          });
-          ipcRenderer.send("event-results:get", baseFilter);
-        });
+        return ipcRequest("event-results:get", baseFilter);
       }
 
       var existingDoc = null;
@@ -5825,13 +5596,7 @@ export default {
       );
     },
     secondsToTimeString(totalSec) {
-      const t = Math.max(0, Number(totalSec) || 0);
-      const ms = 0;
-      const sec = Math.floor(t % 60);
-      const min = Math.floor((t / 60) % 60);
-      const hr = Math.floor(t / 3600);
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+      return secondsToClock(totalSec);
     },
 
     getBooyanMode() {
@@ -6215,21 +5980,17 @@ export default {
         const r = this.currentRound;
         if (!bucket || !bucket.eventId || !r) return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 8000);
-          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("judgeReports:getForBucket", {
+        const res = await ipcRequest("judgeReports:getForBucket", {
             category: "h2h",
             eventId: String(bucket.eventId || ""),
             initialId: String(bucket.initialId || ""),
             raceId: String(bucket.raceId || ""),
             divisionId: String(bucket.divisionId || ""),
             roundId: String(r.id),
+          }, {
+            replyChannel: "judgeReports:getForBucket:reply",
+            timeoutMs: 8000,
           });
-        });
 
         if (!res || !res.ok || !Array.isArray(res.items)) return;
 
@@ -7975,20 +7736,7 @@ export default {
     // yang BELUM menempati slot Final B. [] kalau Semifinal belum selesai /
     // Final B sudah lengkap.
     _missingSemifinalLosers(semi, bronze) {
-      if (!semi || !bronze || !Array.isArray(semi.matches)) return [];
-      const losers = semi.matches.map((m) => {
-        if (!m || !m.winner || !m.winner.name) return null;
-        if (!(m.team1 && m.team1.name) || !(m.team2 && m.team2.name)) return null;
-        const winKey = this._teamIdentityKey(m.winner);
-        const lose =
-          this._teamIdentityKey(m.team1) === winKey ? m.team2 : m.team1;
-        return lose && lose.name ? lose : null;
-      });
-      if (losers.length !== 2 || !losers[0] || !losers[1]) return [];
-      const taken = this._roundSlotKeys(bronze);
-      return losers
-        .filter((l) => !taken.has(this._teamIdentityKey(l)))
-        .map((l) => ({ name: l.name, bibTeam: l.bibTeam || "" }));
+      return missingSemifinalLosers(semi, bronze); // src/lib/h2hBracket.js
     },
 
     // Self-heal saat bracket dimuat: Final B yg baru berisi 1 tim kalah
@@ -8065,12 +7813,7 @@ export default {
 
     // Identitas (nama+BIB) semua tim yang menempati slot match babak ini.
     _roundSlotKeys(round) {
-      const keys = new Set();
-      ((round && round.matches) || []).forEach((m) => {
-        if (m && m.team1 && m.team1.name) keys.add(this._teamIdentityKey(m.team1));
-        if (m && m.team2 && m.team2.name) keys.add(this._teamIdentityKey(m.team2));
-      });
-      return keys;
+      return roundSlotKeys(round); // src/lib/h2hBracket.js
     },
 
     _roundTakenKeys(round) {
@@ -8085,18 +7828,10 @@ export default {
     // babak yg SAMA, atau entri dobel. Return true kalau ada yg dibuang
     // (pemanggil yg memutuskan perlu saveBracketToDB atau tidak).
     _pruneStalePoolEntries(round) {
-      if (!round || !Array.isArray(round.pool) || !round.pool.length) return false;
-      const seen = this._roundSlotKeys(round);
-      const cleaned = round.pool.filter((t) => {
-        if (!t || !t.name) return false;
-        const k = this._teamIdentityKey(t);
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
-      if (cleaned.length === round.pool.length) return false;
-      round.pool = cleaned;
-      return true;
+      if (!round) return false;
+      const res = pruneStalePool(round); // src/lib/h2hBracket.js
+      if (res.changed) round.pool = res.pool;
+      return res.changed;
     },
 
     advanceToNextRound() {
@@ -8457,31 +8192,8 @@ export default {
     },
 
     async hitungSelisihWaktu(waktuAwal, waktuAkhir) {
-      const [h1, m1, s1] = String(waktuAwal).split(":");
-      const [h2, m2, s2] = String(waktuAkhir).split(":");
-
-      const d1 = new Date(0);
-      d1.setUTCHours(
-        +h1 || 0,
-        +m1 || 0,
-        parseInt((s1 || "0").split(".")[0]) || 0,
-        parseInt((s1 || "0").split(".")[1]) || 0
-      );
-      const d2 = new Date(0);
-      d2.setUTCHours(
-        +h2 || 0,
-        +m2 || 0,
-        parseInt((s2 || "0").split(".")[0]) || 0,
-        parseInt((s2 || "0").split(".")[1]) || 0
-      );
-
-      const diff = d2 - d1;
-      const ms = diff % 1000;
-      const sec = Math.floor((diff / 1000) % 60);
-      const min = Math.floor((diff / (1000 * 60)) % 60);
-      const hr = Math.floor(diff / (1000 * 60 * 60));
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+      // Lihat src/lib/raceTime.js (diuji: tests/raceTime.test.js).
+      return clockDiff(waktuAwal, waktuAkhir);
     },
 
     async tambahWaktu(waktuA, waktuB) {
@@ -8556,21 +8268,8 @@ export default {
   flex: 1 1 260px;
 }
 
-.h2h-actionbar__select #h2hBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-}
 
-#h2hBucketSelect {
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
 
-#h2hBucketSelect:hover {
-  border-color: rgb(0, 180, 255);
-  box-shadow: 0 0 30px rgba(0, 180, 255, 0.5);
-}
 
 /* Switch Head to Head Category (.switch-label/.init-tabs/.init-tab)
    sekarang didefinisikan global di race-category-stickybar.css. */

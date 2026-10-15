@@ -22,6 +22,8 @@ import AdminUserManagement from "../views/Users/AdminUserManagement.vue";
 import AllEvent from "../views/Event/AllEvent.vue";
 import Unlock from "@/views/Unlock.vue";
 import SiCardTest from "@/views/SiCardTest/index.vue";
+import OrienteeringEvents from "@/views/Orienteering/index.vue";
+import OrienteeringEventDetail from "@/views/Orienteering/EventDetail.vue";
 import MicroGateTest from "@/views/MicroGateTest/index.vue";
 import { isUnlocked } from "@/utils/auth";
 
@@ -41,6 +43,9 @@ const routes = [
   { path: "/team-create", name: "create-team", component: CreateTeam },
   { path: "/team", name: "team-detail", component: TeamDetail },
   { path: "/si-test", name: "si-card-test", component: SiCardTest },
+  // Modul Orienteering mandiri (terpisah dari event rafting)
+  { path: "/orienteering", name: "orienteering", component: OrienteeringEvents },
+  { path: "/orienteering/:id", name: "orienteering-event", component: OrienteeringEventDetail },
   { path: "/microgate-test", name: "microgate-test", component: MicroGateTest },
 
   {

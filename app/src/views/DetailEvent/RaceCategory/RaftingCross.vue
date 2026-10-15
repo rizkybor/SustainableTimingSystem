@@ -46,11 +46,12 @@
                   class="mb-0 sprint-actionbar__select"
                 >
                   <div class="switch-label mb-1">Switch RX Category:</div>
-                  <b-form-select
+                  <BucketButtonGroup
                     id="rxBucketSelect"
                     :options="rxBucketOptions"
                     v-model="selectedRxKey"
                     @change="onSelectRxBucket"
+                    aria-label="Pilih kategori Rafting Cross"
                   />
                 </b-form-group>
               </div>
@@ -148,6 +149,8 @@
               <!-- Status realtime juri (posisi seragam di 5 Race Category,
                    selalu terlihat krn ikut sticky bar) -->
               <ConnectionStatusBadge class="race-realtime-badge mr-2 mb-1" />
+              <!-- Status database + perubahan yg menunggu tersimpan (ulang-coba otomatis) -->
+              <DbStatusBadge class="race-realtime-badge mr-2 mb-1" />
 
               <!-- path pill -->
               <div class="mb-1">
@@ -444,6 +447,8 @@
 </template>
 
 <script>
+import { clockDiff, clockAdd, secondsToClock } from "@/lib/raceTime";
+import { ipcRequest } from "@/utils/ipcRequest";
 import { ipcRenderer } from "electron";
 import { Icon } from "@iconify/vue2";
 import EmptyCard from "@/components/cards/card-empty.vue";
@@ -958,12 +963,11 @@ export default {
         this.selectedRxKey = key;
         localStorage.setItem("currentRxBucketKey", key);
 
-        const res = await new Promise((resolve) => {
-          ipcRenderer.once("teams-rx-registered:find-reply", (_e, payload) =>
-            resolve(payload)
-          );
-          ipcRenderer.send("teams-rx-registered:find", filters);
-        });
+        // BUG FIX (2026-10-11): dulu ipcRenderer.once() polos (balasan bisa
+        // tertukar antar kategori) — sekarang dicocokkan lewat __reqId, dan
+        // balasan utk kategori yang sudah tidak dipilih diabaikan.
+        const res = await ipcRequest("teams-rx-registered:find", filters);
+        if (this.selectedRxKey !== key) return;
 
         const doc =
           res && res.ok && Array.isArray(res.items) ? res.items[0] : null;
@@ -1018,58 +1022,16 @@ export default {
       return h * 3600 * 1000 + m * 60 * 1000 + s * 1000;
     },
     tambahWaktu(waktuA, waktuB) {
-      const psA = String(waktuA || "0:0:0").split(":");
-      const psB = String(waktuB || "0:0:0").split(":");
-      const msA =
-        (+psA[0] || 0) * 3600000 + (+psA[1] || 0) * 60000 + (parseFloat(psA[2]) || 0) * 1000;
-      const msB =
-        (+psB[0] || 0) * 3600000 + (+psB[1] || 0) * 60000 + (parseFloat(psB[2]) || 0) * 1000;
-      const total = msA + msB;
-      const hr = Math.floor(total / 3600000);
-      const rem = total % 3600000;
-      const min = Math.floor(rem / 60000);
-      const rem2 = rem % 60000;
-      const sec = Math.floor(rem2 / 1000);
-      const ms = rem2 % 1000;
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+      return clockAdd(waktuA, waktuB);
     },
     hitungSelisihWaktu(waktuAwal, waktuAkhir) {
-      const [h1, m1, s1] = String(waktuAwal).split(":");
-      const [h2, m2, s2] = String(waktuAkhir).split(":");
-
-      const d1 = new Date(0);
-      d1.setUTCHours(
-        +h1 || 0,
-        +m1 || 0,
-        parseInt((s1 || "0").split(".")[0]) || 0,
-        parseInt((s1 || "0").split(".")[1]) || 0
-      );
-      const d2 = new Date(0);
-      d2.setUTCHours(
-        +h2 || 0,
-        +m2 || 0,
-        parseInt((s2 || "0").split(".")[0]) || 0,
-        parseInt((s2 || "0").split(".")[1]) || 0
-      );
-
-      const diff = d2 - d1;
-      const ms = diff % 1000;
-      const sec = Math.floor((diff / 1000) % 60);
-      const min = Math.floor((diff / (1000 * 60)) % 60);
-      const hr = Math.floor(diff / (1000 * 60 * 60));
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+      // Lihat src/lib/raceTime.js (diuji: tests/raceTime.test.js).
+      return clockDiff(waktuAwal, waktuAkhir);
     },
     // sekunder → string "HH:MM:SS.000" — sama pola dgn secondsToTimeString()
     // di kategori lain.
     secondsToTimeString(totalSec) {
-      const t = Math.max(0, Number(totalSec) || 0);
-      const sec = Math.floor(t % 60);
-      const min = Math.floor((t / 60) % 60);
-      const hr = Math.floor(t / 3600);
-      const pad = (n, w = 2) => String(n).padStart(w, "0");
-      return `${pad(hr)}:${pad(min)}:${pad(sec)}.000`;
+      return secondsToClock(totalSec);
     },
     // BUG FIX: dulu cari `val` di this.dataPenalties (daftar GLOBAL) via
     // lookup by value — kalau `val` berasal dari Pilihan Pen. Gate 1/Gate 2
@@ -1204,20 +1166,16 @@ export default {
         const bucket = this.currentBucket();
         if (!bucket || !bucket.eventId) return;
 
-        const res = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => resolve(null), 8000);
-          ipcRenderer.once("judgeReports:getForBucket:reply", (_e, payload) => {
-            clearTimeout(timeoutId);
-            resolve(payload);
-          });
-          ipcRenderer.send("judgeReports:getForBucket", {
+        const res = await ipcRequest("judgeReports:getForBucket", {
             category: "rx",
             eventId: String(bucket.eventId || ""),
             initialId: String(bucket.initialId || ""),
             raceId: String(bucket.raceId || ""),
             divisionId: String(bucket.divisionId || ""),
+          }, {
+            replyChannel: "judgeReports:getForBucket:reply",
+            timeoutMs: 8000,
           });
-        });
 
         if (!res || !res.ok || !Array.isArray(res.items)) return;
 
@@ -1666,11 +1624,7 @@ export default {
         });
       });
 
-      const getExisting = () =>
-        new Promise((resolve) => {
-          ipcRenderer.once("event-results:get-reply", (_e, res) => resolve(res));
-          ipcRenderer.send("event-results:get", baseFilter);
-        });
+      const getExisting = () => ipcRequest("event-results:get", baseFilter);
 
       let existingDoc = null;
       try {
@@ -1789,18 +1743,17 @@ export default {
         this.rounds = [];
         return;
       }
-      await new Promise((resolve) => {
-        ipcRenderer.once("rx:bracket:get-reply", (_e, res) => {
-          const fresh =
-            res && res.ok && res.item && Array.isArray(res.item.rounds) && res.item.rounds.length
-              ? res.item.rounds
-              : [];
-          this.rounds = rxBucketCache.merge(fresh, rxBucketCache.load(this.selectedRxKey));
-          this.currentRoundIndex = this.rounds.length ? 0 : -1;
-          resolve();
-        });
-        ipcRenderer.send("rx:bracket:get", bucket);
-      });
+      // ipcRequest (src/lib/ipcRequest.js): balasan dicocokkan lewat __reqId;
+      // abaikan kalau operator sudah pindah kategori selama menunggu.
+      const key = this.selectedRxKey;
+      const res = await ipcRequest("rx:bracket:get", bucket);
+      if (this.selectedRxKey !== key) return;
+      const fresh =
+        res && res.ok && res.item && Array.isArray(res.item.rounds) && res.item.rounds.length
+          ? res.item.rounds
+          : [];
+      this.rounds = rxBucketCache.merge(fresh, rxBucketCache.load(key));
+      this.currentRoundIndex = this.rounds.length ? 0 : -1;
     },
     saveBracket() {
       if (typeof ipcRenderer === "undefined" || !this.rounds.length) return;

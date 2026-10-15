@@ -1,4 +1,62 @@
 const { ipcMain, dialog, app, shell } = require("electron");
+// Gemakan `__reqId` otomatis di semua balasan handler (lihat
+// src/lib/ipcRequest.js) — HARUS dipasang sebelum ipcMain.on() pertama di
+// file ini, termasuk handler yang didaftarkan langsung saat file dimuat.
+const { installReqIdEcho } = require("../lib/ipcRequest");
+installReqIdEcho(ipcMain);
+// Ulang-coba otomatis utk tulisan fire-and-forget (status Start, babak
+// aktif H2H, Live Result) saat koneksi DB/internet putus — lihat
+// src/lib/retryQueue.js. Dulu cukup console.error lalu hilang.
+const { createRetryQueue } = require("../lib/retryQueue");
+const dbHealth = require("./dbHealth");
+const writeRetry = createRetryQueue({
+  onChange: (n) => dbHealth.setPending(n), // indikator "N perubahan menunggu"
+  onRecovered: (key, attempts) =>
+    console.log(`✅ [retry] tersimpan setelah percobaan ke-${attempts + 1}: ${key}`),
+  onGiveUp: (key, err) =>
+    console.error(`❌ [retry] menyerah: ${key}`, err && err.message ? err.message : err),
+});
+// Identitas penulisan (per Event+Division+Race+Initial + tim/run/babak) —
+// tulisan baru dgn identitas sama menggantikan versi lama di antrean.
+function retryKey(prefix, p, fields) {
+  const src = p || {};
+  return [prefix]
+    .concat(fields.map((k) => (src[k] === undefined || src[k] === null ? "" : String(src[k]))))
+    .join("|");
+}
+const TEAM_FIELDS = ["eventId", "initialId", "raceId", "divisionId", "teamId", "bibTeam", "runNumber"];
+const BUCKET_FIELDS = ["eventId", "initialId", "raceId", "divisionId"];
+function runWithRetry(label, key, task) {
+  writeRetry.run(key, task).then((ok) => {
+    if (!ok) console.warn(`⚠️ [${label}] gagal, dicoba ulang otomatis: ${key}`);
+  });
+}
+// Live Result per langkah: tulis gabungan dulu (cepat); kalau gagal, pecah
+// per tim & ulang-coba — versi terbaru per tim yang menang.
+function liveStateWithRetry(channel, category, upsertFn, payload) {
+  const p = payload || {};
+  const b = p.bucket || {};
+  const rows = Array.isArray(p.rows) ? p.rows : [];
+  const notify = () =>
+    notifyResultsUpdated({
+      eventId: String(b.eventId || ""),
+      category,
+      initialId: String(b.initialId || ""),
+      divisionId: String(b.divisionId || ""),
+      raceId: String(b.raceId || ""),
+    });
+  const keyOf = (row) =>
+    retryKey(channel, { ...b, teamId: row && (row.teamId || row.bibTeam) }, BUCKET_FIELDS.concat("teamId"));
+  const seqs = rows.map((r) => writeRetry.cancel(keyOf(r)));
+  upsertFn(p)
+    .then(notify)
+    .catch((err) => {
+      console.warn(`⚠️ [${channel}] gagal, dicoba ulang otomatis per tim:`, err && err.message);
+      rows.forEach((r, i) =>
+        writeRetry.retryLater(keyOf(r), () => upsertFn({ ...p, rows: [r] }).then(notify), seqs[i])
+      );
+    });
+}
 const { EJSON } = require("bson");
 const path = require("path");
 const fs = require("fs");
@@ -222,6 +280,46 @@ function showAppAlert(event, options, channel) {
 }
 
 function setupIPCMainHandlers() {
+  // ===================== ORIENTEERING (modul mandiri) =====================
+  // Semua lewat ipcRequest() di renderer -> balasan object (+__reqId otomatis).
+  const ori = require("../controllers/orienteering");
+  const oriHandle = (channel, fn) =>
+    ipcMain.on(channel, async (event, payload) => {
+      try {
+        const data = await fn(payload || {});
+        event.reply(`${channel}-reply`, { ok: true, data });
+      } catch (err) {
+        event.reply(`${channel}-reply`, {
+          ok: false,
+          error: err && err.message ? err.message : String(err),
+        });
+      }
+    });
+  oriHandle("ori:events:list", () => ori.listEvents());
+  oriHandle("ori:event:get", (p) => ori.getEvent(p.id));
+  oriHandle("ori:event:save", (p) => ori.saveEvent(p.event));
+  oriHandle("ori:event:delete", (p) => ori.deleteEvent(p.id));
+  oriHandle("ori:event:duplicate", (p) => ori.duplicateEvent(p.id));
+  oriHandle("ori:classes:save", (p) => ori.saveClasses(p.eventId, p.classes));
+  // per jenis Orienteering (raceId: Sprint/Middle Distance, dst.)
+  oriHandle("ori:participants:list", (p) => ori.listParticipants(p.eventId, p.raceId));
+  oriHandle("ori:participant:save", (p) => ori.saveParticipant(p.participant));
+  oriHandle("ori:participant:delete", (p) => ori.deleteParticipant(p.id));
+  oriHandle("ori:participants:import", (p) =>
+    ori.importParticipants(p.eventId, p.raceId, p.rows, { newCategoryTypeId: p.newCategoryTypeId })
+  );
+  oriHandle("ori:readout:save", (p) => ori.saveReadout(p.eventId, p.raceId, p.card));
+  oriHandle("ori:results:get", (p) => ori.getResults(p.eventId, p.raceId));
+  // snapshot Live Result (sts-jurysystem) — juga otomatis tiap perubahan
+  oriHandle("ori:live:publish", (p) => ori.publishLive(p.eventId));
+  oriHandle("ori:event:reset-summary", (p) => ori.resetSummary(p.eventId));
+  oriHandle("ori:event:reset", (p) => ori.resetEvent(p.eventId, { clearClasses: !!p.clearClasses }));
+  oriHandle("ori:participants:reset", (p) =>
+    ori.resetParticipants(p.eventId, p.raceId, { classId: p.classId, mode: p.mode })
+  );
+
+  // Indikator status database + tombol "Coba sekarang" (services/dbHealth.js)
+  dbHealth.setupDbHealth(writeRetry);
   // Get all users
   ipcMain.on("users:getAll", async (event) => {
     try {
@@ -1016,9 +1114,9 @@ function setupIPCMainHandlers() {
     // cuma broadcast socket) supaya flag "sudah Start" tetap tersimpan
     // walau tidak ada tab juri Sprint yang online saat ini. Lihat
     // upsertSprintTeamStatus.js.
-    upsertSprintTeamStatus(payload || {}).catch((err) => {
-      console.error("⚠️ [sprint:team-started] gagal upsert langsung:", err);
-    });
+    runWithRetry("sprint:team-started", retryKey("sprint:team-started", payload, TEAM_FIELDS), () =>
+      upsertSprintTeamStatus(payload || {})
+    );
   });
 
   // Broadcast LIVE PREVIEW begitu satu team Sprint genuinely selesai
@@ -1037,56 +1135,17 @@ function setupIPCMainHandlers() {
   // Live Result DRR per langkah input — pola sama dgn sprint:live-state.
   // Dikirim oleh drrLiveStateMixin.js.
   ipcMain.on("drr:live-state", (_event, payload) => {
-    const b = (payload && payload.bucket) || {};
-    upsertDrrLiveState(payload || {})
-      .then(() => {
-        notifyResultsUpdated({
-          eventId: String(b.eventId || ""),
-          category: "DRR",
-          initialId: String(b.initialId || ""),
-          divisionId: String(b.divisionId || ""),
-          raceId: String(b.raceId || ""),
-        });
-      })
-      .catch((err) => {
-        console.error("⚠️ [drr:live-state] gagal upsert:", err);
-      });
+    liveStateWithRetry("drr:live-state", "DRR", upsertDrrLiveState, payload);
   });
 
   // Live Result Slalom per langkah input (per tim per Run) — pola sama dgn
   // sprint:live-state di bawah. Dikirim oleh slalomLiveStateMixin.js.
   ipcMain.on("slalom:live-state", (_event, payload) => {
-    const b = (payload && payload.bucket) || {};
-    upsertSlalomLiveState(payload || {})
-      .then(() => {
-        notifyResultsUpdated({
-          eventId: String(b.eventId || ""),
-          category: "SLALOM",
-          initialId: String(b.initialId || ""),
-          divisionId: String(b.divisionId || ""),
-          raceId: String(b.raceId || ""),
-        });
-      })
-      .catch((err) => {
-        console.error("⚠️ [slalom:live-state] gagal upsert:", err);
-      });
+    liveStateWithRetry("slalom:live-state", "SLALOM", upsertSlalomLiveState, payload);
   });
 
   ipcMain.on("sprint:live-state", (_event, payload) => {
-    const b = (payload && payload.bucket) || {};
-    upsertSprintLiveState(payload || {})
-      .then(() => {
-        notifyResultsUpdated({
-          eventId: String(b.eventId || ""),
-          category: "SPRINT",
-          initialId: String(b.initialId || ""),
-          divisionId: String(b.divisionId || ""),
-          raceId: String(b.raceId || ""),
-        });
-      })
-      .catch((err) => {
-        console.error("⚠️ [sprint:live-state] gagal upsert:", err);
-      });
+    liveStateWithRetry("sprint:live-state", "SPRINT", upsertSprintLiveState, payload);
   });
 
   // Broadcast LIVE PREVIEW begitu satu team DRR genuinely selesai (Start &
@@ -1116,9 +1175,10 @@ function setupIPCMainHandlers() {
     // broadcast socket) supaya babak aktif/Heat tetap tersimpan walau
     // tidak ada tab juri H2H yang online saat ini. Lihat
     // upsertH2HActiveRound.js.
-    upsertH2HActiveRound(payload || {}).catch((err) => {
-      console.error("⚠️ [h2h:round-active] gagal upsert langsung:", err);
-    });
+    // Babak aktif: satu per bucket — versi terbaru yang menang.
+    runWithRetry("h2h:round-active", retryKey("h2h:round-active", payload, BUCKET_FIELDS), () =>
+      upsertH2HActiveRound(payload || {})
+    );
   });
 
   // Broadcast LIVE begitu operator mengisi Start Time satu baris Slalom
@@ -1131,17 +1191,17 @@ function setupIPCMainHandlers() {
     // cuma broadcast socket) supaya flag "sudah Start" tetap tersimpan
     // walau tidak ada tab juri Slalom yang online saat ini. Lihat
     // upsertSlalomTeamStatus.js.
-    upsertSlalomTeamStatus(payload || {}).catch((err) => {
-      console.error("⚠️ [slalom:team-started] gagal upsert langsung:", err);
-    });
+    runWithRetry("slalom:team-started", retryKey("slalom:team-started", payload, TEAM_FIELDS), () =>
+      upsertSlalomTeamStatus(payload || {})
+    );
   });
 
   // Flag "team sudah Start" DRR — dibangun LANGSUNG dgn direct-write ke
   // drrteamstatuses (bukan relay browser juri), lihat upsertDRRTeamStatus.js.
   ipcMain.on("drr:team-started", (_event, payload) => {
-    upsertDRRTeamStatus(payload || {}).catch((err) => {
-      console.error("⚠️ [drr:team-started] gagal upsert langsung:", err);
-    });
+    runWithRetry("drr:team-started", retryKey("drr:team-started", payload, TEAM_FIELDS), () =>
+      upsertDRRTeamStatus(payload || {})
+    );
   });
 
   // Simpan Fouls Report (murni informasi, TIDAK mengubah penalty resmi)
@@ -1620,8 +1680,13 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-sprint-registered:find", async (event, filters) => {
+    // __reqId digemakan balik (dipakai ipcRequest() di renderer) — handler ini
+    // pakai event.sender.send, jadi tidak tercakup echo otomatis di atas.
     const res = await getRegisteredSprint(filters || {});
-    event.sender.send("teams-sprint-registered:find-reply", res);
+    event.sender.send("teams-sprint-registered:find-reply", {
+      ...res,
+      __reqId: filters && filters.__reqId,
+    });
   });
 
   ipcMain.on("teams-slalom-registered:find", async (event, filters) => {
@@ -1642,8 +1707,12 @@ function setupIPCMainHandlers() {
   });
 
   ipcMain.on("teams-rx-registered:find", async (event, filters) => {
+    // __reqId digemakan balik (lihat teams-sprint-registered:find di atas).
     const res = await getRegisteredRX(filters || {});
-    event.sender.send("teams-rx-registered:find-reply", res);
+    event.sender.send("teams-rx-registered:find-reply", {
+      ...res,
+      __reqId: filters && filters.__reqId,
+    });
   });
 
   // =========================
@@ -1886,12 +1955,28 @@ ipcMain.on("h2h:bracket:save", async (e, payload) => {
   // di renderer akan salah menangkap balasan milik request lain karena
   // semuanya berbagi channel "h2h:bracket:save-reply" yang sama.
   const reqId = payload && payload.__reqId;
+  const { bucket, rounds, showBronze, settings } = payload || {};
+  // Simpan bracket = tulis SELURUH dokumen -> cocok utk ulang-coba "versi
+  // terbaru menang" saat koneksi putus (banyak simpanan H2H otomatis &
+  // diam2: assign tim, pemenang, auto-advance). Versi lama yang masih
+  // mengantre dibatalkan oleh simpanan baru ini.
+  const key = retryKey("h2h:bracket", bucket, BUCKET_FIELDS);
+  const seq = writeRetry.cancel(key);
+  const task = () => upsertBracket(bucket, rounds, { showBronze, settings });
   try {
-    const { bucket, rounds, showBronze, settings } = payload || {};
-    const result = await upsertBracket(bucket, rounds, { showBronze, settings });
+    const result = await task();
     e.reply("h2h:bracket:save-reply", { ...result, __reqId: reqId });
   } catch (err) {
-    e.reply("h2h:bracket:save-reply", { ok: false, error: String(err), __reqId: reqId });
+    const retrying = writeRetry.retryLater(key, task, seq);
+    console.warn("⚠️ [h2h:bracket:save] gagal, dicoba ulang otomatis:", key, String(err));
+    e.reply("h2h:bracket:save-reply", {
+      ok: false,
+      retrying,
+      error: retrying
+        ? "Koneksi database bermasalah — bracket disimpan ulang otomatis begitu koneksi pulih."
+        : String(err),
+      __reqId: reqId,
+    });
   }
 });
 
@@ -1960,14 +2045,23 @@ ipcMain.on("rx:bracket:get", async (e, bucket) => {
 });
 
 ipcMain.on("rx:bracket:save", async (e, payload) => {
+  // Sama pola h2h:bracket:save — ulang-coba otomatis, versi terbaru menang.
+  const { bucket, rounds, settings } = payload || {};
+  const key = retryKey("rx:bracket", bucket, BUCKET_FIELDS);
+  const seq = writeRetry.cancel(key);
+  const task = () => rxUpsertBracket(bucket, rounds, { settings });
   try {
-    const { bucket, rounds, settings } = payload;
-    e.reply(
-      "rx:bracket:save-reply",
-      await rxUpsertBracket(bucket, rounds, { settings })
-    );
+    e.reply("rx:bracket:save-reply", await task());
   } catch (err) {
-    e.reply("rx:bracket:save-reply", { ok: false, error: String(err) });
+    const retrying = writeRetry.retryLater(key, task, seq);
+    console.warn("⚠️ [rx:bracket:save] gagal, dicoba ulang otomatis:", key, String(err));
+    e.reply("rx:bracket:save-reply", {
+      ok: false,
+      retrying,
+      error: retrying
+        ? "Koneksi database bermasalah — bracket disimpan ulang otomatis begitu koneksi pulih."
+        : String(err),
+    });
   }
 });
 

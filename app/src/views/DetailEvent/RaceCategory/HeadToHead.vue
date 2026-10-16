@@ -2078,7 +2078,7 @@ export default {
       return getBucket();
     },
     // Label "BAGAN X TIM" sesuai jumlah tim terdaftar di kategori aktif —
-    // mengikuti penamaan resmi di app/BAGAN HEAD TO HEAD CLEAR.pdf.
+    // mengikuti penamaan resmi di app/bagan-h2h.pdf.
     bracketSizeLabel() {
       const t = (this.participantArr || []).length;
       return t > 0 ? `BAGAN ${t} TIM` : "";

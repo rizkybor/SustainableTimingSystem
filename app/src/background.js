@@ -1,7 +1,8 @@
 "use strict";
 
 import { app, protocol, BrowserWindow, ipcMain, nativeImage, screen } from "electron";
-import createProtocol from "vue-cli-plugin-electron-builder/lib/createProtocol";
+// handler app:// sendiri (MIME audio + privilege stream) — lihat createAppProtocol.js
+import createProtocol, { APP_SCHEME_PRIVILEGES } from "./createAppProtocol";
 import path from "path";
 import { pathToFileURL } from "url";
 
@@ -30,7 +31,7 @@ setupPhotofinish();
 const { setupLongrange } = require("./services/longrangeMain");
 setupLongrange();
 
-protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { secure: true, standard: true } }]);
+protocol.registerSchemesAsPrivileged([APP_SCHEME_PRIVILEGES]);
 
 function resolveIcon() {
   let file = process.platform === "win32" ? "icon.ico" : "icon.png";
@@ -109,6 +110,9 @@ function createMain(preloadPath) {
       nodeIntegration: true,
       contextIsolation: false,
       plugins: true,
+      // tone (bip Orienteering, notifikasi chat) dipicu kartu SI / socket,
+      // bukan klik pengguna — jangan sampai diblokir kebijakan autoplay
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
 

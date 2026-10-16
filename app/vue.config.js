@@ -37,8 +37,8 @@ module.exports = {
         extraResources: [
           { from: "src/assets/icons", to: "assets/icons" },
           {
-            from: "BAGAN HEAD TO HEAD CLEAR.pdf",
-            to: "docs/BAGAN HEAD TO HEAD CLEAR.pdf",
+            from: "bagan-h2h.pdf",
+            to: "docs/bagan-h2h.pdf",
           },
         ],
         asarUnpack: ["**/*.node"],

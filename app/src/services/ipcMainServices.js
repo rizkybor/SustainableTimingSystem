@@ -1382,7 +1382,7 @@ function setupIPCMainHandlers() {
   // Ambil isi PDF panduan pengisian bagan Head to Head sbg data URL, utk
   // ditampilkan inline (modal) di renderer — bukan dibuka di app eksternal
   ipcMain.handle("file:get-h2h-guide-pdf", async function () {
-    const file = "BAGAN HEAD TO HEAD CLEAR.pdf";
+    const file = "bagan-h2h.pdf";
     // Dev (electron:serve): electron dijalankan dgn cwd "dist_electron",
     // jadi app.getAppPath() = <project root>/dist_electron — PDF-nya ada
     // satu level di atas, di root project (tempat file sumber ini disimpan).

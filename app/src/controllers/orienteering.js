@@ -799,7 +799,13 @@ function scheduleLivePublish(eventId, delay = LIVE_DEBOUNCE_MS) {
     key,
     setTimeout(() => {
       liveTimers.delete(key);
-      publishLive(key).catch((err) => {
+      publishLive(key).catch(async (err) => {
+        // event dihapus saat publish berjalan -> bersihkan sisa snapshot, jangan coba lagi
+        const stillThere = await getEvent(key).catch(() => true);
+        if (!stillThere) {
+          await publishLive(key).catch(() => {});
+          return;
+        }
         // eslint-disable-next-line no-console
         console.warn("[orienteering] publish live gagal, coba lagi:", err && err.message);
         scheduleLivePublish(key, LIVE_RETRY_MS);

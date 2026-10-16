@@ -32,9 +32,10 @@ import {
 import XLSX from "xlsx";
 import { readFileSync } from "node:fs";
 
-// Start List resmi dari user (MUBLOC VI 2026 Middle Distance) — 113 peserta.
+// Contoh Start List ANONIM (format sama dgn Start List resmi MUBLOC VI 2026:
+// BOM, "—" = belum punya SI Card, nama/club ber-koma dalam kutip, Ranking IOF).
 const SAMPLE_CSV = new URL(
-  "../src/views/Orienteering/MUBLOC_VI_2026_Middle_Distance_Starting_List_VALIDATED.csv",
+  "./fixtures/startlist_sample.csv",
   import.meta.url
 );
 const sheetRows = (buf) => {
@@ -181,14 +182,14 @@ test("normalizeStartTime", () => {
   assert.equal(normalizeStartTime("25:00"), null);
 });
 
-test("impor Start List asli MUBLOC VI 2026: 113 peserta, 6 kategori, SI opsional", () => {
+test("impor Start List (format resmi): 10 peserta, 6 kategori, SI opsional", () => {
   const { rows, errors, missingColumns } = normalizeImportRows(sheetRows(readFileSync(SAMPLE_CSV)));
   assert.deepEqual(missingColumns, []);
   assert.deepEqual(errors, []);
-  assert.equal(rows.length, 113);
+  assert.equal(rows.length, 10);
   const cats = [...new Set(rows.map((r) => r.category))];
   assert.deepEqual(cats.sort(), ["M20", "M21 Novice", "M21E", "W20", "W21 Novice", "W21E"]);
-  assert.equal(rows.filter((r) => r.siCard === null).length, 72); // "—" = belum punya SI Card
+  assert.equal(rows.filter((r) => r.siCard === null).length, 6); // "—" = belum punya SI Card
   const first = rows[0];
   assert.deepEqual(
     { ...first, rowNo: undefined },
@@ -197,19 +198,19 @@ test("impor Start List asli MUBLOC VI 2026: 113 peserta, 6 kategori, SI opsional
       category: "M21E",
       startNo: 1,
       scheduledStart: "08:30:00",
-      name: "RIDHO PUTRA WIBOWO",
-      iofId: "57288",
+      name: "PESERTA SATU",
+      iofId: "90001",
       iofRanking: null,
-      bib: "193",
-      club: "MAHAPALA UNNES",
+      bib: "101",
+      club: "Klub Contoh A",
       nationality: "Indonesia",
       siCard: null,
     }
   );
-  const quoted = rows.find((r) => r.name === "YU, Tsz Wai"); // nama dgn koma (dikutip)
-  assert.equal(quoted.siCard, 8199246);
+  const quoted = rows.find((r) => r.name === "LAST, First Name"); // nama dgn koma (dikutip)
+  assert.equal(quoted.siCard, 8100001);
   assert.equal(quoted.iofRanking, 880);
-  assert.equal(rows.find((r) => r.bib === "186").club, "Sispala Palteks, SMK Pustek Serpong");
+  assert.equal(rows.find((r) => r.bib === "106").club, "Sispala Contoh, SMK Contoh");
 });
 
 test("normalizeImportRows: header alias, baris kosong, error per baris", () => {
@@ -241,18 +242,6 @@ test("courseOf: course per jenis, cadangan ke controls lama", () => {
   assert.deepEqual(courseOf(cls, "LONG"), [1, 2]); // belum diatur -> controls lama
   assert.deepEqual(courseOf({ controls: [5] }, ""), [5]);
   assert.deepEqual(courseOf(null, "x"), []);
-});
-
-test("impor Start List asli MUBLOC VI 2026 Sprint Distance: 115 peserta tanpa error", () => {
-  const url = new URL(
-    "../src/views/Orienteering/MUBLOC_VI_2026_Sprint_Distance_Starting_List_VALIDATED.csv",
-    import.meta.url
-  );
-  const { rows, errors } = normalizeImportRows(sheetRows(readFileSync(url)));
-  assert.deepEqual(errors, []);
-  assert.equal(rows.length, 115);
-  assert.equal(rows.filter((r) => r.siCard === null).length, 74);
-  assert.deepEqual([...new Set(rows.map((r) => r.category))].sort(), ["M20", "M21 Novice", "M21E", "W20", "W21 Novice", "W21E"]);
 });
 
 test("typeNameForCategory: akhiran E setelah angka = World Ranking Event", () => {

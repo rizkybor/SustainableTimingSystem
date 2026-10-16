@@ -41,3 +41,7 @@ PHOTOFINISH.md
 Featured.md
 Draft FAJI Peraturan Penyelenggaraan Kompetisi Arung Jeram Indonesia 2026_V4.docx
 bagan-h2h.pdf
+# start list peserta asli (data pribadi: nama, IOF ID) — jangan di-commit;
+# contoh anonim utk tes ada di tests/fixtures/
+src/views/Orienteering/*.csv
+*Starting_List*.csv

@@ -629,3 +629,17 @@ test("Edit split + LCS: koreksi lama (pos 'dianggap dipunch') tetap sah — kasu
   assert.equal(r.splits[1].accepted, true); // pos 2 dianggap dipunch (tanpa waktu)
   assert.equal(r.splits[1].cumSec, null);
 });
+
+import { testCourse } from "../src/lib/orienteering.js";
+test("Uji Course: cocokkan punch kartu uji dgn urutan course tanpa hitung waktu", () => {
+  const card = { start: null, finish: null, punches: punchesOf([35, 34, 31, 33, 99]) };
+  const ok = testCourse(card, [35, 34, 31, 33]);
+  assert.equal(ok.ok, true); // start/finish tidak diperlukan
+  assert.equal(ok.matched, 4);
+  assert.deepEqual(ok.extra.map((e) => e.station), [99]);
+  const wrongOrder = testCourse(card, [35, 31, 34, 33]); // course salah urutan
+  assert.equal(wrongOrder.ok, false);
+  assert.equal(wrongOrder.missing.length, 1);
+  assert.equal(testCourse(card, []).ok, false); // course kosong = belum diatur
+  assert.equal(testCourse({ punches: [] }, [31]).missing[0].code, 31);
+});

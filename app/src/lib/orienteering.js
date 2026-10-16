@@ -905,3 +905,33 @@ export function buildSplitTable(rows, controlCount) {
   }
   return table;
 }
+
+/* ====================== Uji Course (tanpa menghitung hasil) ====================== */
+
+// Bandingkan punch SI Card uji dengan urutan course (Classic, pencocokan LCS
+// yang sama dgn hasil resmi). Murni pemeriksaan urutan pos — start/finish &
+// waktu diabaikan, TIDAK ada yang disimpan.
+// Return { ok, total, matched, missing:[{order,code}], extra:[{station,time}],
+//          rows:[{ order, code, found, punchTime, punchIndex }] }
+export function testCourse(card, controls) {
+  const ctl = (controls || []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const punches = Array.isArray(card && card.punches) ? card.punches : [];
+  const idx = matchControlsLCS(ctl, punches);
+  const used = new Set(idx.filter((j) => j !== -1));
+  const rows = ctl.map((code, i) => ({
+    order: i + 1,
+    code,
+    found: idx[i] !== -1,
+    punchTime: idx[i] !== -1 ? punches[idx[i]].time || "" : "",
+    punchIndex: idx[i],
+  }));
+  const missing = rows.filter((r) => !r.found).map((r) => ({ order: r.order, code: r.code }));
+  return {
+    ok: ctl.length > 0 && missing.length === 0,
+    total: ctl.length,
+    matched: ctl.length - missing.length,
+    missing,
+    extra: punches.filter((_p, j) => !used.has(j)).map((p) => ({ station: Number(p.station), time: p.time || "" })),
+    rows,
+  };
+}

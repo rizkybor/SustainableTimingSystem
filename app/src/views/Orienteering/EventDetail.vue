@@ -41,6 +41,10 @@
               <span class="ori-pill__dot"></span>
               {{ isConnected ? (isReadingCard ? "Membaca kartu…" : "Terhubung") : "Tidak terhubung" }}
             </span>
+            <span v-if="ctest.active" class="ori-pill ori-pill--warn">
+              <Icon icon="mdi:flask-outline" /> Mode Uji Course aktif — kartu tidak disimpan
+              <button type="button" class="ori-link ml-1" @click="stopCourseTest">matikan</button>
+            </span>
             <span v-if="captureForForm" class="ori-pill ori-pill--warn">
               <Icon icon="mdi:card-search-outline" /> Tempelkan kartu peserta untuk mengisi nomor SI Card
               <button type="button" class="ori-link ml-1" @click="captureForForm = false">batal</button>
@@ -486,6 +490,108 @@
             Isi kode pos dipisah koma/spasi, mis. <code>33, 31, 35, 34, 37</code>. Pos yang sama boleh muncul lebih
             dari sekali. Mengubah course otomatis menghitung ulang hasil.
           </div>
+
+          <!-- ===== Uji Course: tap SI Card sungguhan, TIDAK menyimpan / menghitung hasil ===== -->
+          <div class="ori-ctest" :class="{ 'is-active': ctest.active }">
+            <div class="ori-ctest__head">
+              <Icon icon="mdi:flask-outline" class="ori-ctest__icon" />
+              <div class="ori-ctest__title">
+                <b>Uji Course dengan SI Card</b>
+                <small>
+                  Punch pos-pos course dengan kartu uji, lalu baca kartunya. Urutan dicek terhadap course
+                  {{ activeRaceName }} (termasuk yang belum disimpan) — tidak ada hasil yang disimpan atau dihitung.
+                </small>
+              </div>
+              <button
+                v-if="!ctest.active"
+                type="button"
+                class="ori-btn ori-btn--primary ml-auto text-nowrap"
+                :disabled="!classDraftGroups.length"
+                @click="startCourseTest('')"
+              >
+                <Icon icon="mdi:play" /> Mulai Uji Course
+              </button>
+              <button v-else type="button" class="ori-btn ori-btn--danger-ghost ml-auto text-nowrap" @click="stopCourseTest">
+                <Icon icon="mdi:stop" /> Selesai
+              </button>
+            </div>
+
+            <template v-if="ctest.active">
+              <div v-if="!ctest.card" class="ori-ctest__wait">
+                <Icon icon="mdi:contactless-payment-circle-outline" />
+                <span v-if="isConnected">
+                  Tempelkan SI Card uji ke reader…
+                  <span v-if="ctest.classId" class="text-muted">
+                    (dicek ke {{ classNameOf(ctest.classId) }} &amp; semua kategori lain)
+                  </span>
+                </span>
+                <span v-else class="text-danger">Hubungkan SI Card Reader dulu di panel atas.</span>
+              </div>
+
+              <template v-else>
+                <div class="ori-ctest__card">
+                  <span class="ori-asg-card"><Icon icon="mdi:card-bulleted-outline" /> {{ ctest.card.card_number }}</span>
+                  <span class="text-muted small">dibaca {{ ctest.at }} · {{ (ctest.card.punches || []).length }} punch</span>
+                  <button type="button" class="ori-link ml-auto" @click="ctest.card = null">Uji kartu lain</button>
+                </div>
+
+                <div class="ori-ctest__punches">
+                  <span class="ori-ctest__lbl">Urutan punch kartu:</span>
+                  <span v-for="(p, i) in ctest.card.punches || []" :key="i" class="ori-chip">{{ i + 1 }}·{{ p.station }}</span>
+                  <span v-if="!(ctest.card.punches || []).length" class="text-muted small">(tidak ada punch pos)</span>
+                </div>
+
+                <div class="ori-ctest__classes">
+                  <button
+                    v-for="t in ctestResults"
+                    :key="t.c.id"
+                    type="button"
+                    class="ori-ctest__cls"
+                    :class="{ ok: t.res.ok, empty: !t.res.total, on: ctestSelected && ctestSelected.c.id === t.c.id }"
+                    @click="ctest.classId = t.c.id"
+                  >
+                    <b>{{ t.c.name || "(tanpa nama)" }}</b>
+                    <span v-if="!t.res.total">course belum diatur</span>
+                    <span v-else-if="t.res.ok"><Icon icon="mdi:check-circle" /> cocok {{ t.res.total }} pos</span>
+                    <span v-else>{{ t.res.missing.length }} pos tidak cocok</span>
+                  </button>
+                </div>
+
+                <div v-if="ctestSelected && ctestSelected.res.total" class="ori-ctest__detail">
+                  <div class="ori-ctest__verdict" :class="ctestSelected.res.ok ? 'ok' : 'bad'">
+                    <Icon :icon="ctestSelected.res.ok ? 'mdi:check-decagram' : 'mdi:alert-octagon'" />
+                    <template v-if="ctestSelected.res.ok">
+                      Course <b>{{ ctestSelected.c.name }}</b> sesuai — semua {{ ctestSelected.res.total }} pos ditemukan berurutan.
+                    </template>
+                    <template v-else>
+                      Course <b>{{ ctestSelected.c.name }}</b>: {{ ctestSelected.res.matched }}/{{ ctestSelected.res.total }} pos cocok —
+                      tidak cocok: {{ ctestSelected.res.missing.map((m) => `${m.order}(${m.code})`).join(", ") }}
+                    </template>
+                  </div>
+                  <table class="ori-redit-stable">
+                    <thead>
+                      <tr><th>#</th><th>Kode course</th><th>Punch kartu</th><th>Hasil</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in ctestSelected.res.rows" :key="r.order" :class="{ 'is-missed': !r.found }">
+                        <td class="font-weight-bold">{{ r.order }}</td>
+                        <td>{{ r.code }}</td>
+                        <td>{{ r.found ? clockHms(r.punchTime) + " (punch ke-" + (r.punchIndex + 1) + ")" : "-" }}</td>
+                        <td>
+                          <span v-if="r.found" class="text-success font-weight-bold"><Icon icon="mdi:check" /> sesuai</span>
+                          <span v-else class="text-danger font-weight-bold">tidak dipunch / salah urutan</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-if="ctestSelected.res.extra.length" class="small text-muted">
+                    Punch tidak terpakai (di luar course / salah urutan):
+                    <span v-for="(e, i) in ctestSelected.res.extra" :key="i" class="ori-chip ori-chip--warn">{{ e.station }}</span>
+                  </div>
+                </div>
+              </template>
+            </template>
+          </div>
           <div v-for="g in classDraftGroups" :key="g.typeId || '__none'" class="ori-type-group">
             <div class="ori-type-group__head">
               <span class="ori-type-tag">{{ g.typeName }}</span>
@@ -502,7 +608,16 @@
                   {{ participantCountByClass[c.id] || 0 }} peserta di {{ activeRaceName }}</span>
                 <button
                   type="button"
-                  class="ori-icon-btn ml-auto"
+                  class="ori-btn ori-btn--ghost ml-auto text-nowrap ori-btn--sm"
+                  :disabled="!parseControls(c.controlsText).length"
+                  :title="parseControls(c.controlsText).length ? 'Uji course kategori ini dengan SI Card' : 'Isi course dulu'"
+                  @click="startCourseTest(c.id)"
+                >
+                  <Icon icon="mdi:flask-outline" /> Uji
+                </button>
+                <button
+                  type="button"
+                  class="ori-icon-btn"
                   :disabled="!participantCountByClass[c.id]"
                   :title="`Reset peserta & SI Card kategori ini (${activeRaceName})`"
                   @click="openResetParticipants(c.id)"
@@ -1200,6 +1315,7 @@ import {
   sortResultRows,
   OVERRIDE_STATUSES,
   buildSplitTable,
+  testCourse,
   clockToSeconds,
   runElapsed,
   parseAdjust,
@@ -1238,7 +1354,24 @@ const PARTICIPANT_COLUMNS = [
   { key: "result", label: "Hasil" },
 ];
 const EMPTY_PFILTER = () => ({ classId: "", typeId: "", si: "", status: "", nationality: "" });
-import tone from "@/assets/tone/tone_message.mp3";
+// Tone khusus Orienteering (bukan tone_message.mp3 yg dipakai modul lain)
+import toneRight from "@/assets/tone/orienteering_bip_right.wav";
+import toneWrong from "@/assets/tone/orienteering_bip_wrong.wav";
+
+// Audio dibuat sekali & dipakai ulang supaya bunyi langsung keluar saat kartu dibaca
+const ORI_TONES = {};
+function playOriTone(ok) {
+  try {
+    const key = ok ? "right" : "wrong";
+    if (!ORI_TONES[key]) ORI_TONES[key] = new Audio(ok ? toneRight : toneWrong);
+    const a = ORI_TONES[key];
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (_e) {
+    /* noop — perangkat tanpa audio */
+  }
+}
 
 const EMPTY_FORM = () => ({
   _id: "",
@@ -1297,6 +1430,8 @@ export default {
       rSort: { key: "rank", dir: "asc" },
       resultColumns: RESULT_COLUMNS,
       showEntry: false,
+      // Uji Course: kartu uji dibandingkan dgn course, TIDAK disimpan / dihitung
+      ctest: { active: false, card: null, at: "", classId: "" },
       // widget Daftarkan SI Card (step: read -> pick | used)
       assign: {
         show: false, step: "read", card: null, owner: null, moveFrom: null,
@@ -1355,6 +1490,18 @@ export default {
     // Type & kategori yang dipertandingkan di jenis aktif
     raceTypes() {
       return this.types.filter((t) => typeAppliesToRace(t, this.activeRaceId));
+    },
+    // hasil uji course: kartu uji vs course (draft) tiap kategori jenis aktif
+    ctestResults() {
+      if (!this.ctest.card) return [];
+      const items = this.classDraftGroups.reduce((all, g) => all.concat(g.items), []);
+      return items
+        .map((c) => ({ c, res: testCourse(this.ctest.card, parseControls(c.controlsText)) }))
+        .sort((a, b) => Number(b.res.ok) - Number(a.res.ok) || a.res.missing.length - b.res.missing.length);
+    },
+    ctestSelected() {
+      const list = this.ctestResults;
+      return list.find((t) => t.c.id === this.ctest.classId) || list.find((t) => t.res.total) || null;
     },
     hiddenRaceTypes() {
       return this.types.filter((t) => !typeAppliesToRace(t, this.activeRaceId));
@@ -1645,6 +1792,13 @@ export default {
       return [{ value: "", text: "Semua negara" }].concat(list.map((n) => ({ value: n, text: n })));
     },
   },
+  watch: {
+    // mode Uji Course hanya utk tab Kategori & Course — jangan sampai kartu
+    // peserta sungguhan "terserap" di tab lain
+    tab(v) {
+      if (v !== "classes" && this.ctest.active) this.stopCourseTest();
+    },
+  },
   async mounted() {
     await this.reloadAll();
     this.refreshPorts();
@@ -1747,11 +1901,12 @@ export default {
       const n = Number(cardNumber);
       if (!Number.isInteger(n) || n <= 0) {
         this.toast("Nomor kartu tidak terbaca, coba tempel ulang.", "danger", "Daftarkan SI Card");
-        return;
+        return false;
       }
       const owner = this.participants.find((p) => Number(p.siCard) === n) || null;
       Object.assign(this.assign, { card: n, owner, moveFrom: null, manual: "", step: owner ? "used" : "pick" });
       if (!owner) this.$nextTick(() => this.$refs.assignSearch && this.$refs.assignSearch.focus());
+      return !owner; // kartu sudah dipakai peserta lain -> bip salah
     },
     assignMoveFromOwner() {
       Object.assign(this.assign, { moveFrom: this.assign.owner, owner: null, step: "pick" });
@@ -2008,6 +2163,19 @@ export default {
       if (!t || !(t.raceIds || []).length || this.races.length < 2) return "";
       return "Hanya " + this.races.filter((r) => t.raceIds.includes(r.id)).map((r) => r.name).join(" & ");
     },
+    /* ---------- Uji Course ---------- */
+    startCourseTest(classId) {
+      this.captureForForm = false;
+      this.ctest = { active: true, card: null, at: "", classId: classId || "" };
+      if (!this.isConnected) this.toast("Hubungkan SI Card Reader dulu untuk membaca kartu uji.", "warning", "Uji Course");
+    },
+    stopCourseTest() {
+      this.ctest = { active: false, card: null, at: "", classId: "" };
+    },
+    classNameOf(id) {
+      const c = this.classDraft.find((x) => x.id === id);
+      return c ? c.name : "-";
+    },
     savedCourse(c, raceId) {
       const saved = this.classes.find((x) => x.id === c.id);
       return saved ? courseOf(saved, raceId) : [];
@@ -2027,6 +2195,7 @@ export default {
       await this.onRaceChange(id);
     },
     async onRaceChange(id) {
+      this.stopCourseTest();
       try {
         localStorage.setItem(RACE_KEY(this.eventId), id);
       } catch (_e) {
@@ -2098,18 +2267,24 @@ export default {
         this.isConnecting = false;
       }
     },
-    beep() {
-      try {
-        new Audio(tone).play();
-      } catch (_e) {
-        /* noop */
-      }
+    // bip benar / bip salah (tone khusus Orienteering)
+    beep(ok = true) {
+      playOriTone(!!ok);
     },
+    // Bunyi diputar SETELAH hasil kartu diketahui: benar = hasil baik,
+    // salah = ada masalah (MP/DNF/No Start, kartu belum terdaftar, gagal simpan, dst.)
     async onCard(card) {
-      this.beep();
       // widget Daftarkan SI Card terbuka -> kartu dipakai utk assign, BUKAN readout
       if (this.assign.show) {
-        this.handleAssignCard(card.card_number);
+        const ready = this.handleAssignCard(card.card_number);
+        this.beep(ready);
+        return;
+      }
+      // Uji Course: hanya dicocokkan ke course, TIDAK disimpan sbg readout
+      if (this.ctest.active) {
+        this.ctest.card = card;
+        this.ctest.at = new Date().toLocaleTimeString("id-ID");
+        this.$nextTick(() => this.beep(!!(this.ctestSelected && this.ctestSelected.res.ok)));
         return;
       }
       if (this.captureForForm) {
@@ -2117,9 +2292,12 @@ export default {
         this.form.siCard = String(card.card_number || "");
         this.tab = "participants";
         this.toast(`Nomor SI Card ${card.card_number} terisi.`, "info");
+        this.beep(!!card.card_number);
         return;
       }
-      await this.saveReadout(card, this.activeRaceId);
+      const saved = await this.saveReadout(card, this.activeRaceId);
+      const entry = saved ? this.lastRead : null;
+      this.beep(!!(entry && !entry.unknown && entry.result && entry.result.status === "OK"));
     },
     async saveReadout(card, raceId) {
       const res = await ipcRequest("ori:readout:save", { eventId: this.eventId, raceId, card });
@@ -2983,6 +3161,126 @@ export default {
   background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
+}
+.ori-ctest {
+  border: 1px dashed #c4b5fd;
+  background: #faf5ff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.ori-ctest.is-active {
+  border-style: solid;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+.ori-ctest__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ori-ctest__icon {
+  font-size: 1.6rem;
+  color: #7c3aed;
+  flex: none;
+}
+.ori-ctest__title b {
+  display: block;
+  color: #0f172a;
+}
+.ori-ctest__title small {
+  color: #64748b;
+}
+.ori-ctest__wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 600;
+}
+.ori-ctest__card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.ori-ctest__punches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.ori-ctest__lbl {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 4px;
+}
+.ori-ctest__classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ori-ctest__cls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+.ori-ctest__cls b {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+.ori-ctest__cls.ok {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.ori-ctest__cls.empty {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+.ori-ctest__cls.on {
+  box-shadow: 0 0 0 2px #7c3aed;
+}
+.ori-ctest__detail {
+  margin-top: 10px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+}
+.ori-ctest__verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+}
+.ori-ctest__verdict.ok {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.ori-ctest__verdict.bad {
+  background: #fef2f2;
+  color: #991b1b;
+}
+.ori-btn--sm {
+  padding: 3px 9px;
+  font-size: 0.78rem;
 }
 .ori-crace {
   border: 1px solid #cfe3f7;

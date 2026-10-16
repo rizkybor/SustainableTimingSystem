@@ -575,3 +575,57 @@ test("Edit split per pos: jam punch dikoreksi / dianggap dipunch -> status & spl
   assert.equal(c.splits[0].cumSec, 240);
   assert.equal(card.punches[0].time, "10:05:00"); // kartu mentah tidak berubah
 });
+
+import { matchControlsLCS, runElapsed } from "../src/lib/orienteering.js";
+// Course & urutan punch NYATA dari event UAT TEST (M21, Sprint Distance)
+const UAT_COURSE = [35, 34, 31, 33, 42, 37, 36, 38, 39, 48, 44, 49, 46, 47, 45];
+const punchesOf = (codes) => codes.map((station, i) => ({ station, time: `15:${String(31 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}` }));
+const missedOf = (codes) =>
+  evaluateCard({ start: "15:30:00", finish: "16:10:00", punches: punchesOf(codes) }, { controls: UAT_COURSE }).missing.map((m) => m.code);
+
+test("Classic LCS: pos yang dikunjungi sesuai urutan tidak salah ditandai terlewat (data UAT)", () => {
+  // RIZKY: course lengkap -> OK, tanpa pos terlewat
+  assert.deepEqual(missedOf(UAT_COURSE), []);
+  // LARA: ...48,44,43,46,45,49 -> pencocokan rakus dulu mengambil 49 & menandai 46,45 terlewat (8 pos);
+  // yang benar 7 pos terlewat dan 46,45 tercatat dikunjungi
+  const lara = missedOf([35, 34, 31, 42, 48, 44, 43, 46, 45, 49]);
+  assert.equal(lara.length, 7);
+  assert.ok(!lara.includes(46) && !lara.includes(45));
+  // SEPTI: rakus = 8 terlewat; LCS = 7
+  assert.equal(missedOf([35, 34, 31, 35, 37, 39, 40, 38, 42, 49, 43, 44, 48, 46, 45, 47]).length, 7);
+  // pos dobel di course (31 dua kali) tetap butuh 2 punch berurutan
+  assert.deepEqual(matchControlsLCS([31, 32, 31], [{ station: 31 }, { station: 32 }, { station: 31 }]), [0, 1, 2]);
+  assert.deepEqual(matchControlsLCS([31, 32, 31], [{ station: 31 }, { station: 32 }]), [0, 1, -1]);
+  // punch paling awal dipilih bila ada beberapa yang cocok
+  assert.deepEqual(matchControlsLCS([35, 34], [{ station: 35 }, { station: 35 }, { station: 34 }]), [0, 2]);
+  assert.deepEqual(matchControlsLCS([], [{ station: 31 }]), []);
+});
+
+test("SI5 12 jam & lewat tengah malam: waktu lari tetap benar", () => {
+  // SI5 tanpa AM/PM: start 11:50, finish 12:10 tercatat 00:10 -> 20 menit, bukan 12:20
+  const si5 = evaluateCard({ start: "11:50:00", finish: "00:10:00", punches: [{ station: 31, time: "11:58:00" }] }, { controls: [31] });
+  assert.equal(si5.timeSec, 20 * 60);
+  assert.equal(si5.splits[0].cumSec, 8 * 60);
+  assert.equal(si5.finishLegSec, 12 * 60);
+  // lari melewati tengah malam (kartu 24 jam)
+  assert.equal(runElapsed(clockToSeconds("23:50:00"), clockToSeconds("00:20:00")), 30 * 60);
+  // pecahan detik dipotong (aturan IOF: detik penuh)
+  assert.equal(clockToSeconds("15:30:54.7"), clockToSeconds("15:30:54"));
+});
+
+test("Edit split + LCS: koreksi lama (pos 'dianggap dipunch') tetap sah — kasus nyata AMBON UAT", () => {
+  const punches = punchesOf([34, 33, 31, 42, 35, 39, 38, 40, 37, 36, 43, 44, 49, 48, 45, 46, 47]);
+  const card = { start: "15:30:00", finish: "16:10:00", punches };
+  const ov = normalizeResultOverride({
+    punches: { 2: "OK", 3: "OK", 4: "OK", 5: "OK", 8: "OK", 9: "OK", 11: "OK", 12: "OK", 15: "OK" },
+    note: "alat timing tidak bunyi",
+  });
+  const r = evaluateWithOverride(card, ov, { controls: UAT_COURSE });
+  assert.equal(r.status, "OK");
+  assert.equal(r.missing.length, 0);
+  // pos yang tidak dikoreksi tetap memakai punch kartu
+  assert.equal(r.splits[0].found, true); // 35
+  assert.ok(r.splits[0].punchTime);
+  assert.equal(r.splits[1].accepted, true); // pos 2 dianggap dipunch (tanpa waktu)
+  assert.equal(r.splits[1].cumSec, null);
+});

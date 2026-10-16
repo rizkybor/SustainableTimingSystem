@@ -1201,7 +1201,7 @@ import {
   OVERRIDE_STATUSES,
   buildSplitTable,
   clockToSeconds,
-  elapsed,
+  runElapsed,
   parseAdjust,
   classesForRace,
   classAppliesToRace,
@@ -1461,7 +1461,7 @@ export default {
       } catch (_e) {
         return "koreksi waktu tidak valid";
       }
-      return this.fmt(Math.max(0, elapsed(st, fi) + adj));
+      return this.fmt(Math.max(0, runElapsed(st, fi) + adj));
     },
     resultShownCount() {
       return this.filteredResultGroups.reduce((n, g) => n + g.items.reduce((m, c) => m + c.shown.length, 0), 0);

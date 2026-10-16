@@ -33,7 +33,8 @@ const DAY = 24 * 3600;
 // hari. null/invalid -> null.
 export function clockToSeconds(value) {
   if (value === null || value === undefined) return null;
-  const m = String(value).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/);
+  // pecahan detik (mis. "15:30:54.5") diabaikan/dipotong — aturan IOF: detik penuh
+  const m = String(value).match(/(\d{1,2}):(\d{2})(?::(\d{2})(?:[.,]\d+)?)?\s*$/);
   if (!m) return null;
   const h = Number(m[1]);
   const mi = Number(m[2]);
@@ -48,6 +49,16 @@ export function elapsed(a, b) {
   if (a === null || b === null) return null;
   const d = b - a;
   return d >= 0 ? d : d + DAY;
+}
+
+// Selisih waktu LARI (start->pos->finish). SI Card lama (SI5) menyimpan jam
+// format 12 jam tanpa AM/PM, jadi lari yang melewati jam 12 siang (mis. start
+// 11:50, finish tercatat 00:10) terbaca +12 jam. Satu lari orienteering
+// tidak mungkin >= 12 jam -> koreksi kelebihan 12 jam itu.
+const HALF_DAY = 12 * 3600;
+export function runElapsed(a, b) {
+  const d = elapsed(a, b);
+  return d !== null && d >= HALF_DAY ? d - HALF_DAY : d;
 }
 
 // detik -> "M:SS" / "H:MM:SS" (gaya hasil orienteering)
@@ -71,6 +82,41 @@ export function parseControls(text) {
     .filter((n) => Number.isInteger(n) && n > 0);
 }
 
+// Pasangkan pos course ke punch kartu: hasil[i] = index punch utk pos ke-i,
+// atau -1 (terlewat). Memaksimalkan jumlah pos yang cocok sesuai urutan
+// (LCS); bila seri, pos dicocokkan ke punch paling awal.
+export function matchControlsLCS(controls, punches) {
+  const n = controls.length;
+  const m = punches.length;
+  const st = punches.map((p) => Number(p && p.station));
+  // L[i][j] = jumlah cocok maksimal utk controls[i..] vs punches[j..]
+  const L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    const code = Number(controls[i]);
+    for (let j = m - 1; j >= 0; j--) {
+      L[i][j] = st[j] === code ? Math.max(1 + L[i + 1][j + 1], L[i][j + 1], L[i + 1][j]) : Math.max(L[i][j + 1], L[i + 1][j]);
+    }
+  }
+  const out = new Array(n).fill(-1);
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const code = Number(controls[i]);
+    let pick = -1;
+    for (let k = j; k < m; k++) {
+      if (st[k] === code && 1 + L[i + 1][k + 1] === L[i][j]) {
+        pick = k;
+        break;
+      }
+    }
+    if (pick !== -1) {
+      out[i] = pick;
+      j = pick + 1;
+    }
+    // tidak cocok -> pos terlewat; L[i+1][j] === L[i][j] terjamin oleh DP
+  }
+  return out;
+}
+
 // Evaluasi satu kartu terhadap course Classic.
 // opts.controls     : [33, 31, 35, ...] urutan pos wajib
 // Waktu HANYA dari SI Card (punch Start & Finish). Jadwal start / Starting
@@ -89,30 +135,30 @@ export function evaluateCard(card, opts = {}) {
   const startSource = startSec !== null ? "card" : null;
   const finishSec = clockToSeconds(card && card.finish);
 
-  // Classic: cari tiap pos wajib secara berurutan, maju terus di daftar
-  // punch (punch lain di antaranya diabaikan). Pos yang tidak ditemukan
-  // setelah posisi terakhir = terlewat; pencarian pos berikutnya tetap
-  // lanjut dari posisi terakhir yg cocok (jadi 1 pos terlewat tidak
-  // otomatis menggagalkan semua pos sesudahnya).
-  const used = new Set();
-  let cursor = 0;
+  // Classic: pos wajib harus dikunjungi SESUAI URUTAN; punch lain di
+  // antaranya diabaikan. Pencocokan memakai urutan bersama terpanjang (LCS)
+  // supaya jumlah pos yang cocok MAKSIMAL — pencocokan "rakus" (ambil punch
+  // pertama yg cocok) bisa salah menandai pos yang sebenarnya dikunjungi
+  // sebagai terlewat bila peserta salah urutan di tengah course. Bila ada
+  // beberapa pilihan, dipilih punch paling awal.
+  // opts.skipOrders: urutan pos (1-based) yang sudah dikoreksi operator (Edit
+  // split) — tidak ikut dicocokkan ke punch kartu, supaya punch yang ada
+  // dipakai utk pos lain; nilainya diisi oleh patchSplits().
+  const skip = new Set((opts.skipOrders || []).map(Number));
+  const active = controls.map((_c, i) => i).filter((i) => !skip.has(i + 1));
+  const sub = matchControlsLCS(active.map((i) => controls[i]), punches);
+  const matchIdx = controls.map(() => -1);
+  active.forEach((i, k) => (matchIdx[i] = sub[k]));
+  const used = new Set(matchIdx.filter((j) => j !== -1));
   let prevSec = startSec;
   const splits = controls.map((code, i) => {
-    let found = -1;
-    for (let j = cursor; j < punches.length; j++) {
-      if (Number(punches[j].station) === Number(code)) {
-        found = j;
-        break;
-      }
-    }
+    const found = matchIdx[i];
     if (found === -1) {
       return { order: i + 1, code, found: false, punchTime: null, cumSec: null, legSec: null };
     }
-    used.add(found);
-    cursor = found + 1;
     const ps = clockToSeconds(punches[found].time);
-    const cumSec = startSec !== null && ps !== null ? elapsed(startSec, ps) : null;
-    const legSec = prevSec !== null && ps !== null ? elapsed(prevSec, ps) : null;
+    const cumSec = startSec !== null && ps !== null ? runElapsed(startSec, ps) : null;
+    const legSec = prevSec !== null && ps !== null ? runElapsed(prevSec, ps) : null;
     if (ps !== null) prevSec = ps;
     return { order: i + 1, code, found: true, punchTime: punches[found].time, cumSec, legSec };
   });
@@ -120,8 +166,8 @@ export function evaluateCard(card, opts = {}) {
   const missing = splits.filter((s) => !s.found).map((s) => ({ order: s.order, code: s.code }));
   const extra = punches.filter((_p, j) => !used.has(j)).map((p) => ({ station: p.station, time: p.time }));
 
-  const timeSec = startSec !== null && finishSec !== null ? elapsed(startSec, finishSec) : null;
-  const finishLegSec = prevSec !== null && finishSec !== null ? elapsed(prevSec, finishSec) : null;
+  const timeSec = startSec !== null && finishSec !== null ? runElapsed(startSec, finishSec) : null;
+  const finishLegSec = prevSec !== null && finishSec !== null ? runElapsed(prevSec, finishSec) : null;
 
   let status = STATUS.OK;
   if (finishSec === null) status = STATUS.DNF;
@@ -749,14 +795,14 @@ function patchSplits(ev, card, punches) {
   const splits = ev.splits.map((sp) => {
     const v = punches[sp.order];
     if (!v) return { ...sp };
-    if (v === "OK") return { ...sp, found: true, punchTime: sp.found ? sp.punchTime : null, edited: true, accepted: !sp.found };
+    if (v === "OK") return { ...sp, found: true, punchTime: null, edited: true, accepted: true };
     return { ...sp, found: true, punchTime: v, edited: true, accepted: false };
   });
   let prev = startSec;
   splits.forEach((sp) => {
     const ps = sp.found && sp.punchTime ? clockToSeconds(sp.punchTime) : null;
-    sp.cumSec = startSec !== null && ps !== null ? elapsed(startSec, ps) : null;
-    sp.legSec = prev !== null && ps !== null ? elapsed(prev, ps) : null;
+    sp.cumSec = startSec !== null && ps !== null ? runElapsed(startSec, ps) : null;
+    sp.legSec = prev !== null && ps !== null ? runElapsed(prev, ps) : null;
     if (ps !== null) prev = ps;
   });
   const missing = splits.filter((sp) => !sp.found).map((sp) => ({ order: sp.order, code: sp.code }));
@@ -769,7 +815,7 @@ function patchSplits(ev, card, punches) {
     splits,
     missing,
     status,
-    finishLegSec: prev !== null && finishSec !== null ? elapsed(prev, finishSec) : null,
+    finishLegSec: prev !== null && finishSec !== null ? runElapsed(prev, finishSec) : null,
   };
 }
 
@@ -789,9 +835,11 @@ export function evaluateWithOverride(card, override, opts = {}) {
   const src = card ? { ...card } : { start: null, finish: null, punches: [] };
   if (ov && ov.start) src.start = ov.start;
   if (ov && ov.finish) src.finish = ov.finish;
-  let ev = evaluateCard(src, opts);
+  const fixed = ov && ov.punches ? Object.keys(ov.punches).map(Number) : [];
+  // pos yang dikoreksi operator tidak ikut dicocokkan ke punch kartu
+  let ev = evaluateCard(src, fixed.length ? { ...opts, skipOrders: fixed } : opts);
   const auto = card ? evaluateCard(card, opts) : null;
-  if (ov && ov.punches && Object.keys(ov.punches).length) ev = patchSplits(ev, src, ov.punches);
+  if (fixed.length) ev = patchSplits(ev, src, ov.punches);
   let timeSec = ev.timeSec;
   if (ov && ov.adjustSec && Number.isFinite(timeSec)) timeSec = Math.max(0, timeSec + ov.adjustSec);
   // status paksa OK tanpa waktu tidak masuk akal -> tetap status hasil hitungan

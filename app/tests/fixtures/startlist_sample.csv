@@ -1,0 +1,11 @@
+﻿Category,No,Start Time (WIB),Full Name,IOF ID,Ranking IOF,BIB,Club,Nationality,Sportident Number
+M21E,1,08:30,PESERTA SATU,90001,,101,Klub Contoh A,Indonesia,—
+M21E,2,08:32,Runner Two,90002,,102,,China,—
+M21E,3,08:34,"LAST, First Name",90003,880,103,Example OC,Hong Kong,8100001
+W21E,1,08:31,Peserta Dua,90004,512,104,Klub Contoh B,Indonesia,8100002
+W21E,2,08:33,Runner Four,,,105,,Malaysia,—
+M20,1,09:00,Peserta Tiga,,,106,"Sispala Contoh, SMK Contoh",Indonesia,8100003
+W20,1,09:01,Peserta Empat,,,107,Klub Contoh C,Indonesia,—
+M21 Novice,1,09:10,Peserta Lima,,,108,Klub Contoh A,Indonesia,8100004
+W21 Novice,1,09:11,Peserta Enam,,,109,Klub Contoh D,Indonesia,—
+M21 Novice,2,09:12,Peserta Tujuh,,,110,,Indonesia,—

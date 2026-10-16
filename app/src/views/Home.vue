@@ -132,8 +132,8 @@
         </button>
 
         <button type="button" class="quick-card" @click="goTo('orienteering')">
-          <span class="quick-card__icon quick-card__icon--glyph">
-            <Icon icon="mdi:compass-outline" />
+          <span class="quick-card__icon">
+            <ControlFlagIcon :size="34" />
           </span>
           <span class="quick-card__text">
             <span class="quick-card__title">Orienteering</span>
@@ -279,10 +279,11 @@
 import { Icon } from "@iconify/vue2";
 import { ipcRenderer } from "electron";
 import defaultImg from "@/assets/images/default-first.jpeg";
+import ControlFlagIcon from "@/components/common/ControlFlagIcon.vue";
 
 export default {
   name: "SustainableTimingSystemHome",
-  components: { Icon },
+  components: { Icon, ControlFlagIcon },
   data() {
     return {
       showIntro: false,

@@ -3,10 +3,12 @@
     <PageHero
       title="Orienteering"
       crumb="Orienteering"
-      icon="mdi:compass-outline"
       subtitle="Event orienteering mandiri — kelas & course, registrasi SI Card, readout kartu, dan hasil per kelas"
       :stats="stats"
     >
+      <template #icon>
+        <span class="ph-icon ori-hero-icon"><ControlFlagIcon :size="34" /></span>
+      </template>
       <template #actions>
         <button type="button" class="ori-btn ori-btn--primary" @click="openCreate">
           <Icon icon="mdi:plus" /> Event Baru
@@ -21,7 +23,7 @@
         <button type="button" class="ori-btn ori-btn--ghost ml-2" @click="load">Coba lagi</button>
       </div>
       <div v-else-if="!events.length" class="ori-empty">
-        <Icon icon="mdi:compass-outline" class="ori-empty__icon" />
+        <ControlFlagIcon :size="56" class="ori-empty__icon" />
         <p class="mb-1 font-weight-bold">Belum ada event orienteering</p>
         <p class="text-muted mb-3">Buat event pertama untuk mulai mendaftarkan peserta & SI Card.</p>
         <button type="button" class="ori-btn ori-btn--primary" @click="openCreate">
@@ -35,7 +37,7 @@
           <div class="oc-cover" :class="{ 'oc-cover--empty': !(ev.image && ev.image.url) }">
             <img v-if="ev.image && ev.image.url" :src="ev.image.url" :alt="ev.name" loading="lazy" />
             <div v-else class="oc-cover__placeholder">
-              <Icon icon="mdi:compass-rose" />
+              <ControlFlagIcon :size="88" class="oc-cover__flag" />
             </div>
             <div class="oc-cover__shade"></div>
             <span class="oc-status" :class="'oc-status--' + statusOf(ev).key">
@@ -171,6 +173,7 @@
 
 <script>
 import PageHero from "@/components/common/PageHero.vue";
+import ControlFlagIcon from "@/components/common/ControlFlagIcon.vue";
 import OriEventForm from "@/components/orienteering/OriEventForm.vue";
 import { ipcRequest } from "@/utils/ipcRequest";
 
@@ -193,7 +196,7 @@ const EMPTY_FORM = () => ({
 
 export default {
   name: "OrienteeringEvents",
-  components: { PageHero, OriEventForm },
+  components: { PageHero, OriEventForm, ControlFlagIcon },
   data() {
     return {
       events: [],
@@ -799,10 +802,25 @@ export default {
 .ori-empty--error {
   color: #b91c3c;
 }
+/* kotak ikon hero (slot #icon PageHero dirender di scope halaman ini,
+   jadi style .ph-icon milik PageHero yg scoped tidak berlaku di sini) */
+.ori-hero-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .ori-empty__icon {
-  font-size: 42px;
-  color: #94a3b8;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+.oc-cover__flag {
+  opacity: 0.55;
 }
 .ori-btn {
   display: inline-flex;

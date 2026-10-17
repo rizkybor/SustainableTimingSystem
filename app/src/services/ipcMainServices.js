@@ -305,6 +305,8 @@ function setupIPCMainHandlers() {
   oriHandle("ori:participants:list", (p) => ori.listParticipants(p.eventId, p.raceId));
   oriHandle("ori:participant:save", (p) => ori.saveParticipant(p.participant));
   oriHandle("ori:participant:delete", (p) => ori.deleteParticipant(p.id));
+  // Import SI Card dari CSV SPORTident (Entries) — pasang nomor SI Card ke peserta
+  oriHandle("ori:participants:assign-si", (p) => ori.assignSiCards(p.eventId, p.raceId, p.items));
   oriHandle("ori:participants:import", (p) =>
     ori.importParticipants(p.eventId, p.raceId, p.rows, { newCategoryTypeId: p.newCategoryTypeId })
   );

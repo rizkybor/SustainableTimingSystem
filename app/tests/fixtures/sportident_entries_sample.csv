@@ -1,0 +1,11 @@
+RaceNumber,CardNumbers,MembershipNumbers,Name,Category,Club,Country,CourseClass,StartTime,StartTimePreference,EnvelopeNumber,NonCompetitive,Seeded,NotUsed,Handicap,RegistrationNotes,SiEntriesIDs,Eligibility,SocialMedia,GenderDOB,Forenames,Surnames,NotUsed,NotUsed,NotUsed,NotUsed,CustomField1,CustomField2,CustomField3,CustomField4,CustomField5,CustomField6,CustomField7,CustomField8,CustomField9,CustomField10
+101,8100001,90001,Peserta Satu,,Klub A,IDN,M21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+102,8100002,90002,peserta  DUA,,Klub B,IDN,w21e,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+103,8100009,,Peserta Tiga,,Klub C,IDN,M20,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+104,8100004,,Peserta Empat,,,MYS,W20,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+105,,,Peserta Lima,,,IDN,M20,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+106,8100006,,Peserta E P,,,IDN,M21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+107,8100007;8100077,,Peserta Tujuh,,,IDN,M21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+108,8100008,,Peserta Delapan,,,IDN,M21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+109,8100008,,Peserta Sembilan,,,IDN,M21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,
+110,8100010,,Peserta Sepuluh,,,IDN,W21E,,,,N,,,,,,,,,,,,,,,,,,,,,,,,

@@ -395,8 +395,20 @@ export function participantMatchKeys(p, categoryName) {
   const keys = [];
   if (p.bib) keys.push("bib:" + String(p.bib).trim().toUpperCase());
   if (p.iofId) keys.push("iof:" + String(p.iofId).trim());
-  keys.push("name:" + String(p.name || "").trim().toUpperCase() + "|" + String(categoryName || "").trim().toUpperCase());
+  keys.push("name:" + String(p.name || "").trim().toUpperCase() + "|" + categoryKey(categoryName));
   return keys;
+}
+
+// Kunci pembanding nama kategori: tidak peka huruf besar/kecil & spasi, dan
+// sebutan panjang Novice = singkatan "N" (aturan user): "M21 Novice" ==
+// "M21N", "W21 novice" == "W21N".
+export function categoryKey(name) {
+  return String(name === undefined || name === null ? "" : name)
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase()
+    .replace(/^([MW]\d+)\s*NOVICE$/, "$1N");
 }
 
 /* ===================== Jenis Orienteering (race) ===================== */
@@ -934,4 +946,202 @@ export function testCourse(card, controls) {
     extra: punches.filter((_p, j) => !used.has(j)).map((p) => ({ station: Number(p.station), time: p.time || "" })),
     rows,
   };
+}
+
+/* ============ Import SI Card dari SPORTident (Entries CSV) ============ */
+
+// Kolom ekspor peserta (Entries) SPORTident — urutan & nama persis spt file
+// asli, dipakai juga utk "Template SPORTident".
+export const SPORTIDENT_COLUMNS = [
+  "RaceNumber", "CardNumbers", "MembershipNumbers", "Name", "Category", "Club", "Country", "CourseClass",
+  "StartTime", "StartTimePreference", "EnvelopeNumber", "NonCompetitive", "Seeded", "NotUsed", "Handicap",
+  "RegistrationNotes", "SiEntriesIDs", "Eligibility", "SocialMedia", "GenderDOB", "Forenames", "Surnames",
+  "NotUsed", "NotUsed", "NotUsed", "NotUsed", "CustomField1", "CustomField2", "CustomField3", "CustomField4",
+  "CustomField5", "CustomField6", "CustomField7", "CustomField8", "CustomField9", "CustomField10",
+];
+
+const normKey = (s) => String(s === undefined || s === null ? "" : s).normalize("NFKC").trim().replace(/\s+/g, " ").toUpperCase();
+
+// Baris CSV SPORTident -> { rowNo, name, category, siCard, bib, club, country }
+// Kolom yg DIBACA hanya: Name, Club, Country, CourseClass (= Kategori),
+// RaceNumber (= BIB) + CardNumbers (nomor SI Card). Kolom lain (mis.
+// MembershipNumbers) diabaikan.
+// CardNumbers boleh berisi >1 kartu ("8611237;8611238") -> kartu pertama.
+// Return { entries, errors:[{rowNo,name,message}], missingColumns }
+export function parseSiEntries(rawRows) {
+  const list = Array.isArray(rawRows) ? rawRows : [];
+  const keys = new Set(list.length ? Object.keys(list[0]).map((k) => normKey(k)) : []);
+  const missingColumns = ["NAME", "COURSECLASS", "CARDNUMBERS"].filter((k) => !keys.has(k)).map((k) =>
+    k === "NAME" ? "Name" : k === "COURSECLASS" ? "CourseClass" : "CardNumbers"
+  );
+  const get = (row, col) => {
+    const k = Object.keys(row).find((x) => normKey(x) === normKey(col));
+    return k === undefined ? "" : String(row[k] === undefined || row[k] === null ? "" : row[k]).trim();
+  };
+  const entries = [];
+  const errors = [];
+  list.forEach((row, i) => {
+    const rowNo = i + 2; // baris 1 = header
+    const name = get(row, "Name").replace(/\s+/g, " ");
+    const category = get(row, "CourseClass");
+    const cardRaw = get(row, "CardNumbers");
+    if (!name && !category && !cardRaw) return; // baris kosong
+    let siCard = null;
+    if (cardRaw) {
+      const first = cardRaw.split(/[;,\s/]+/).find(Boolean);
+      const n = Number(first);
+      if (!Number.isInteger(n) || n <= 0) {
+        errors.push({ rowNo, name, message: `Nomor SI Card "${cardRaw}" tidak valid` });
+        return;
+      }
+      siCard = n;
+    }
+    if (!name || !category) {
+      errors.push({ rowNo, name, message: "Nama / CourseClass kosong" });
+      return;
+    }
+    entries.push({ rowNo, name, category, siCard, bib: get(row, "RaceNumber"), club: get(row, "Club"), country: get(row, "Country") });
+  });
+  return { entries, errors, missingColumns };
+}
+
+// Rencana assign SI Card utk SATU jenis. Cocok HANYA bila nama & kategori
+// sama (tidak peka huruf besar/kecil & spasi ganda) — aturan user.
+// participants: [{ _id, name, classId, siCard, bib, iofId }]
+// classNameOf(classId) -> nama kategori
+// raceClasses (opsional): [{ id, name }] kategori yg dipertandingkan di jenis
+//   ini — dipakai utk menawarkan "Peserta baru".
+// Return { items, summary }; item = { entry, status, selected, participant?,
+//   suggestion?, suggestionBy?, conflictWith?, prevSiCard?, newClassId?, required? }
+//   status:
+//     assign   SI dipasang ke peserta tanpa SI           (dicentang)
+//     change   SI peserta diganti                          (dicentang)
+//     remove   SI dikosongkan di file, peserta masih punya (TIDAK dicentang,
+//              kecuali kartunya dipindah ke peserta lain di file yg sama)
+//     new      nama belum ada di jenis ini & kategorinya ada -> ditambahkan
+//              sbg peserta baru dari Name/CourseClass/Club/Country (dicentang)
+//     same | nocard               tidak ada perubahan
+//     notfound (+ saran: nama sama di kategori lain, atau BIB sama — harus
+//              dicentang manual; pencocokan otomatis tetap nama+kategori)
+//     conflict | dupcard | ambiguous   tidak bisa diterapkan
+export function planSiAssign(entries, participants, classNameOf, raceClasses) {
+  const ps = participants || [];
+  const cls = classNameOf || (() => "");
+  const classByName = new Map((raceClasses || []).map((c) => [categoryKey(c.name), c]));
+  const byNameCat = new Map();
+  ps.forEach((p) => {
+    const k = `${normKey(p.name)}|${categoryKey(cls(p.classId))}`;
+    byNameCat.set(k, (byNameCat.get(k) || []).concat(p));
+  });
+  const cardCount = new Map();
+  (entries || []).forEach((e) => e.siCard && cardCount.set(e.siCard, (cardCount.get(e.siCard) || 0) + 1));
+
+  const items = (entries || []).map((entry) => {
+    const hits = byNameCat.get(`${normKey(entry.name)}|${categoryKey(entry.category)}`) || [];
+    const one = hits.length === 1 ? hits[0] : null;
+    if (entry.siCard && cardCount.get(entry.siCard) > 1) return { entry, status: "dupcard", participant: one };
+    if (hits.length > 1) return { entry, status: "ambiguous" };
+    if (!one) {
+      // nama sama tapi kategori beda -> kemungkinan kategori diubah; saran manual
+      const sug = ps.filter((p) => normKey(p.name) === normKey(entry.name));
+      if (sug.length === 1) {
+        return { entry, status: "notfound", suggestion: sug[0], suggestionBy: `nama sama, kategori ${cls(sug[0].classId)}` };
+      }
+      if (sug.length > 1) return { entry, status: "ambiguous" };
+      // BIB (RaceNumber) sama -> mis. nama disingkat di SPORTident
+      const byBib = entry.bib ? ps.find((p) => normKey(p.bib) === normKey(entry.bib)) : null;
+      if (byBib) return { entry, status: "notfound", suggestion: byBib, suggestionBy: `BIB ${entry.bib}` };
+      const c = classByName.get(categoryKey(entry.category));
+      if (c) return { entry, status: "new", newClassId: c.id };
+      return { entry, status: "notfound", suggestion: null, reason: raceClasses ? "Kategori belum ada di jenis ini" : "" };
+    }
+    if (!entry.siCard) return { entry, status: one.siCard ? "remove" : "nocard", participant: one, prevSiCard: one.siCard || null };
+    if (Number(one.siCard) === entry.siCard) return { entry, status: "same", participant: one };
+    return { entry, status: one.siCard ? "change" : "assign", participant: one, prevSiCard: one.siCard || null };
+  });
+
+  // kartu sudah dipakai peserta LAIN: boleh hanya bila pemilik itu di file yg
+  // sama ikut melepas kartunya (dapat kartu lain = change, atau dikosongkan =
+  // remove -> otomatis wajib dicentang). Selain itu = bentrok.
+  const itemOf = new Map(items.filter((it) => it.participant).map((it) => [it.participant._id, it]));
+  items.forEach((it) => {
+    if (!["assign", "change", "new"].includes(it.status)) return;
+    const selfId = it.participant ? it.participant._id : null;
+    const owner = ps.find((p) => Number(p.siCard) === it.entry.siCard && p._id !== selfId);
+    if (!owner) return;
+    const ownerItem = itemOf.get(owner._id);
+    if (ownerItem && ownerItem.status === "change") return;
+    if (ownerItem && ownerItem.status === "remove") {
+      ownerItem.required = true; // pindah kartu: pemilik lama wajib dilepas
+      return;
+    }
+    it.status = "conflict";
+    it.conflictWith = owner;
+  });
+  items.forEach((it) => {
+    it.selected = it.status === "assign" || it.status === "change" || it.status === "new" || (it.status === "remove" && !!it.required);
+  });
+
+  const summary = items.reduce((m, it) => ((m[it.status] = (m[it.status] || 0) + 1), m), {});
+  return { items, summary };
+}
+
+// Item rencana yg dicentang -> payload utk controller assignSiCards
+export function siApplyPayload(items) {
+  return (items || [])
+    .filter((it) => it.selected)
+    .map((it) => {
+      if (it.status === "new") {
+        const e = it.entry;
+        return {
+          create: { name: e.name, classId: it.newClassId, bib: e.bib || "", club: e.club || "", nationality: e.country || "" },
+          siCard: e.siCard || null,
+        };
+      }
+      if (it.status === "remove") return { participantId: it.participant._id, siCard: null };
+      if (it.status === "notfound" && it.suggestion) return { participantId: it.suggestion._id, siCard: it.entry.siCard };
+      if (it.status === "assign" || it.status === "change") return { participantId: it.participant._id, siCard: it.entry.siCard };
+      return null;
+    })
+    .filter(Boolean);
+}
+
+// Daftar peserta 1 jenis -> baris CSV format SPORTident (Template SPORTident)
+export function toSportidentRows(participants, classNameOf) {
+  const cls = classNameOf || (() => "");
+  return (participants || []).map((p) => {
+    const row = {};
+    SPORTIDENT_COLUMNS.forEach((c, i) => (row[`${c}#${i}`] = ""));
+    row["RaceNumber#0"] = p.bib || "";
+    row["CardNumbers#1"] = p.siCard ? String(p.siCard) : "";
+    row["MembershipNumbers#2"] = p.iofId || "";
+    row["Name#3"] = p.name || "";
+    row["Club#5"] = p.club || "";
+    row["Country#6"] = p.nationality || "";
+    row["CourseClass#7"] = cls(p.classId);
+    row["NonCompetitive#11"] = "N";
+    return SPORTIDENT_COLUMNS.map((c, i) => row[`${c}#${i}`]);
+  });
+}
+
+// baris (array) -> teks CSV (kutip bila perlu)
+export function toCsv(header, rows) {
+  const q = (v) => {
+    const s = String(v === undefined || v === null ? "" : v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [header, ...rows].map((r) => r.map(q).join(",")).join("\r\n") + "\r\n";
+}
+
+// Byte file CSV -> teks. UTF-8 (dgn/tanpa BOM) bila valid; selain itu
+// Windows-1252 (ekspor SPORTident / Excel Windows, mis. "Malmö"). Tanpa ini
+// pembaca xlsx menganggap CSV UTF-8 tanpa BOM sbg Latin-1 -> "JÃ¶rg", dan
+// nama ber-huruf khusus tidak pernah cocok.
+export function decodeCsvBytes(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(u8).replace(/^\uFEFF/, "");
+  } catch (_e) {
+    return new TextDecoder("windows-1252").decode(u8);
+  }
 }

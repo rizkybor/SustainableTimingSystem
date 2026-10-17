@@ -27,6 +27,7 @@ const {
   participantMatchKeys,
   typeNameForCategory,
   buildLiveSnapshot,
+  categoryKey,
   participantBreakdown,
   classAppliesToRace,
   classesForRace,
@@ -427,11 +428,12 @@ async function importParticipants(eventId, raceId, rows, opts = {}) {
     return t.id;
   };
   const classes = (event.classes || []).map((c) => ({ ...c }));
-  const classByName = new Map(classes.map((c) => [c.name.trim().toUpperCase(), c]));
+  // kunci kategori: "M21 Novice" == "M21N" (lihat categoryKey) -> tidak membuat kategori dobel
+  const classByName = new Map(classes.map((c) => [categoryKey(c.name), c]));
   const createdCategories = [];
   let classesChanged = false;
   list.forEach((r) => {
-    const key = clean(r.category).toUpperCase();
+    const key = categoryKey(r.category);
     if (!key) return;
     const existingCls = classByName.get(key);
     if (!existingCls) {
@@ -474,7 +476,7 @@ async function importParticipants(eventId, raceId, rows, opts = {}) {
   const errors = [];
   const now = new Date();
   for (const r of list) {
-    const cls = classByName.get(clean(r.category).toUpperCase());
+    const cls = classByName.get(categoryKey(r.category));
     const doc = participantDoc({ ...r, classId: cls ? cls.id : "" });
     if (!doc.name || !doc.classId) {
       errors.push({ rowNo: r.rowNo, name: r.name, message: "Nama/kategori kosong" });
@@ -520,6 +522,111 @@ async function importParticipants(eventId, raceId, rows, opts = {}) {
   }
   scheduleLivePublish(String(eventId));
   return { inserted, updated, errors, createdCategories, createdTypes, event: await getEvent(eventId) };
+}
+
+// Import SI Card (SPORTident) utk 1 jenis. items (hasil pratinjau yg sudah
+// dikonfirmasi operator, lib planSiAssign + siApplyPayload):
+//   { participantId, siCard }        pasang / ganti SI Card
+//   { participantId, siCard: null }  lepas SI Card (dikosongkan di file)
+//   { create: {name,classId,bib,iofId,club,nationality}, siCard|null }  peserta baru
+// Divalidasi ulang di sini: peserta milik event & jenis ini, kategori peserta
+// baru dipertandingkan di jenis ini, dan 1 SI Card = 1 peserta per jenis
+// SETELAH semua perubahan (pindah/tukar kartu dlm 1 file boleh). Disimpan
+// bertahap (lepas -> pasang -> buat baru) supaya unique index
+// eventId+raceId+siCard tidak bentrok di tengah jalan.
+async function assignSiCards(eventId, raceId, items) {
+  const id = clean(eventId);
+  if (!oid(id)) throw new Error("Event tidak valid");
+  const rid = clean(raceId);
+  const event = await getEvent(id);
+  if (!event) throw new Error("Event tidak ditemukan");
+  const d = await db();
+  const ps = await listParticipants(id, rid);
+  const byId = new Map(ps.map((p) => [p._id, p]));
+  const errors = [];
+  const want = new Map(); // participantId -> siCard | null
+  const creates = []; // { doc, siCard }
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    const raw = it && it.siCard;
+    const n = raw === null || raw === undefined || raw === "" ? null : Number(raw);
+    if (n !== null && (!Number.isInteger(n) || n <= 0)) {
+      errors.push({ name: (it.create && it.create.name) || "", message: "Nomor SI Card tidak valid" });
+      return;
+    }
+    if (it && it.create) {
+      const doc = participantDoc({ ...it.create, siCard: n });
+      const cls = (event.classes || []).find((c) => c.id === doc.classId);
+      if (!doc.name || !cls) return errors.push({ name: doc.name, message: "Nama / kategori tidak valid" });
+      if (!classAppliesToRace(event, cls, rid)) return errors.push({ name: doc.name, message: `Kategori ${cls.name} tidak dipertandingkan di jenis ini` });
+      creates.push({ doc, siCard: n });
+      return;
+    }
+    const p = byId.get(clean(it && it.participantId));
+    if (!p) return errors.push({ participantId: it && it.participantId, message: "Peserta tidak ditemukan di jenis ini" });
+    want.set(p._id, n);
+  });
+
+  // keadaan akhir: kartu -> pemilik (peserta lama + peserta baru)
+  const finalOwner = new Map();
+  ps.forEach((p) => {
+    const card = want.has(p._id) ? want.get(p._id) : p.siCard ? Number(p.siCard) : null;
+    if (!card) return;
+    if (finalOwner.has(card)) {
+      const other = byId.get(finalOwner.get(card));
+      const who = want.has(p._id) ? p : other;
+      errors.push({ participantId: who._id, name: who.name, message: `SI Card ${card} juga dipakai ${who === p ? other.name : p.name}` });
+      want.delete(who._id);
+      return;
+    }
+    finalOwner.set(card, p._id);
+  });
+  const okCreates = creates.filter((c) => {
+    if (!c.siCard) return true;
+    if (finalOwner.has(c.siCard)) {
+      errors.push({ name: c.doc.name, message: `SI Card ${c.siCard} sudah dipakai ${byId.get(finalOwner.get(c.siCard)).name}` });
+      return false;
+    }
+    finalOwner.set(c.siCard, `new:${c.doc.name}`);
+    return true;
+  });
+
+  const changes = [...want.entries()].filter(([pid, card]) => (byId.get(pid).siCard ? Number(byId.get(pid).siCard) : null) !== card);
+  const now = new Date();
+  if (changes.length) {
+    // tahap 1: lepas kartu lama (+ koreksi hasil yg merujuk kartu lama)
+    await d.collection(COL_PARTICIPANTS).updateMany(
+      { _id: { $in: changes.map(([pid]) => oid(pid)) } },
+      { $set: { siCard: null, updatedAt: now }, $unset: { resultOverride: "" } }
+    );
+    // tahap 2: pasang kartu baru
+    for (const [pid, card] of changes) {
+      if (!card) continue;
+      try {
+        await d.collection(COL_PARTICIPANTS).updateOne({ _id: oid(pid) }, { $set: { siCard: card, updatedAt: now } });
+      } catch (err) {
+        errors.push({ participantId: pid, name: byId.get(pid).name, message: (err && err.message) || "Gagal menyimpan" });
+      }
+    }
+  }
+  // tahap 3: peserta baru
+  let created = 0;
+  for (const c of okCreates) {
+    try {
+      await d.collection(COL_PARTICIPANTS).insertOne({ ...c.doc, eventId: id, raceId: rid, createdAt: now, updatedAt: now });
+      created++;
+    } catch (err) {
+      errors.push({ name: c.doc.name, message: (err && err.message) || "Gagal menambah peserta" });
+    }
+  }
+  scheduleLivePublish(id);
+  return {
+    assigned: changes.filter(([pid, card]) => card && !byId.get(pid).siCard).length,
+    changed: changes.filter(([pid, card]) => card && byId.get(pid).siCard).length,
+    removed: changes.filter(([, card]) => !card).length,
+    created,
+    unchanged: want.size - changes.length,
+    errors,
+  };
 }
 
 /* =========================== READOUTS =========================== */
@@ -823,6 +930,7 @@ module.exports = {
   publishLive,
   resetEvent,
   resetParticipants,
+  assignSiCards,
   saveResultOverride,
   duplicateEvent,
   resetSummary,

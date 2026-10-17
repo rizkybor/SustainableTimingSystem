@@ -308,6 +308,34 @@
               <input ref="importFile" type="file" accept=".csv,.xlsx,.xls" class="d-none" @change="onImportFile" />
             </div>
           </div>
+
+          <!-- Import SI Card dari CSV SPORTident (Entries) -->
+          <div class="ori-import ori-import--si">
+            <div>
+              <div class="ori-section-title mb-1"><Icon icon="mdi:card-account-details-outline" /> Import SI Card (SPORTident)</div>
+              <div class="small text-muted">
+                File peserta dari SPORTident — dibaca kolom Name, CourseClass (= kategori), RaceNumber (= BIB),
+                Club, Country &amp; CardNumbers (SI Card). Nomor SI Card
+                dipasang ke peserta <b>{{ activeRaceName }}</b> bila <b>nama &amp; kategori sama</b>; peserta yang
+                tidak cocok ditampilkan dulu untuk dicek.
+              </div>
+            </div>
+            <div class="d-flex" style="gap: 6px">
+              <button
+                type="button"
+                class="ori-btn ori-btn--ghost text-nowrap"
+                :disabled="!participants.length"
+                title="Unduh peserta jenis ini dalam format CSV SPORTident"
+                @click="downloadSportidentTemplate"
+              >
+                <Icon icon="mdi:download-outline" /> Template SPORTident
+              </button>
+              <button type="button" class="ori-btn ori-btn--primary text-nowrap" @click="$refs.siImportFile.click()">
+                <Icon icon="mdi:upload-outline" /> Upload CSV SPORTident
+              </button>
+              <input ref="siImportFile" type="file" accept=".csv,.xlsx,.xls" class="d-none" @change="onSiImportFile" />
+            </div>
+          </div>
           </div>
 
           <div class="d-flex align-items-center justify-content-between mt-3 mb-2" style="gap: 8px">
@@ -1080,6 +1108,105 @@
       </template>
     </b-modal>
 
+    <!-- ===== Pratinjau Import SI Card (SPORTident) ===== -->
+    <b-modal
+      v-model="siImport.show"
+      :title="`Import SI Card — ${activeRaceName}`"
+      size="xl"
+      centered
+      scrollable
+      :ok-title="siImport.running ? 'Menyimpan…' : `Terapkan ${siApplyItems.length} perubahan`"
+      cancel-title="Batal"
+      :ok-disabled="siImport.running || !siApplyItems.length"
+      @ok.prevent="confirmSiImport"
+    >
+      <p class="small text-muted mb-2">
+        File: <b>{{ siImport.fileName }}</b> · {{ siImport.items.length }} baris. Nomor SI Card hanya dipasang bila
+        <b>nama &amp; kategori</b> sama dengan peserta {{ activeRaceName }}.
+      </p>
+      <div v-if="siImport.missing.length" class="ori-alert mb-2">
+        <Icon icon="mdi:alert-outline" /> Kolom wajib tidak ditemukan: <b>{{ siImport.missing.join(", ") }}</b>. Pastikan file
+        adalah ekspor peserta (Entries) dari SPORTident.
+      </div>
+      <div class="ori-si-sum">
+        <span v-for="k in SI_STATUS_ORDER" v-show="siSummary[k]" :key="k" class="ori-si-pill" :class="'is-' + k">
+          {{ SI_STATUS_LABEL[k] }}: <b>{{ siSummary[k] }}</b>
+        </span>
+      </div>
+      <div class="ori-si-filter">
+        <b-form-checkbox v-model="siImport.hideOk" switch class="small">Sembunyikan yang sudah sama / tanpa SI Card</b-form-checkbox>
+      </div>
+      <table class="ori-table ori-si-table">
+        <thead>
+          <tr>
+            <th style="width: 34px"></th>
+            <th>Baris</th>
+            <th>Nama (file)</th>
+            <th>Kategori</th>
+            <th>BIB</th>
+            <th>Club · Country</th>
+            <th>SI Card</th>
+            <th>Peserta di STiming</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(it, i) in siVisibleItems" :key="i" :class="'is-' + it.status">
+            <td class="text-center">
+              <b-form-checkbox
+                v-if="siSelectable(it)"
+                v-model="it.selected"
+                :disabled="!!it.required"
+                :title="
+                  it.required
+                    ? 'Wajib: kartunya dipindah ke peserta lain di file ini'
+                    : it.status === 'notfound'
+                    ? 'Pakai saran ini'
+                    : it.status === 'remove'
+                    ? 'Lepas SI Card peserta ini'
+                    : 'Terapkan baris ini'
+                "
+              />
+            </td>
+            <td class="text-muted">{{ it.entry.rowNo }}</td>
+            <td class="font-weight-bold">{{ it.entry.name }}</td>
+            <td>{{ it.entry.category }}</td>
+            <td>{{ it.entry.bib || "-" }}</td>
+            <td class="small">{{ [it.entry.club, it.entry.country].filter(Boolean).join(" · ") || "-" }}</td>
+            <td class="text-nowrap">{{ it.entry.siCard || "-" }}</td>
+            <td>
+              <template v-if="it.status === 'new'">
+                <span class="text-success font-weight-bold">+ ditambahkan sbg peserta baru</span>
+                <small class="d-block text-muted">{{ it.entry.club || "-" }} · {{ it.entry.country || "-" }}</small>
+              </template>
+              <template v-else-if="it.participant">
+                {{ it.participant.name }}
+                <small v-if="it.status === 'change'" class="d-block text-muted">SI lama: {{ it.prevSiCard }}</small>
+                <small v-if="it.status === 'remove'" class="d-block text-muted">
+                  SI sekarang: {{ it.prevSiCard }}{{ it.required ? " — dipindah ke peserta lain di file ini" : "" }}
+                </small>
+              </template>
+              <template v-else-if="it.suggestion">
+                <span class="text-muted">Saran ({{ it.suggestionBy }}):</span> <b>{{ it.suggestion.name }}</b>
+                <small class="d-block text-muted">{{ classShort(it.suggestion.classId).name }} · BIB {{ it.suggestion.bib || "-" }}</small>
+              </template>
+              <span v-else class="text-muted">{{ it.reason || "-" }}</span>
+            </td>
+            <td>
+              <span class="ori-si-pill" :class="'is-' + it.status">{{ SI_STATUS_LABEL[it.status] }}</span>
+              <small v-if="it.conflictWith" class="d-block text-danger">dipakai {{ it.conflictWith.name }}</small>
+            </td>
+          </tr>
+          <tr v-if="!siVisibleItems.length">
+            <td colspan="9" class="text-center text-muted py-3">Tidak ada baris untuk ditampilkan.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="siImport.errors.length" class="small text-danger mt-2">
+        Baris dilewati: {{ siImport.errors.map((e) => `${e.rowNo} (${e.message})`).join("; ") }}
+      </div>
+    </b-modal>
+
     <!-- ===== Daftarkan SI Card cepat: baca kartu dulu -> assign ke peserta tanpa SI Card ===== -->
     <b-modal
       v-model="assign.show"
@@ -1307,6 +1434,13 @@ import {
   STATUS_LABEL,
   IMPORT_COLUMNS,
   normalizeImportRows,
+  parseSiEntries,
+  planSiAssign,
+  siApplyPayload,
+  toSportidentRows,
+  toCsv,
+  decodeCsvBytes,
+  SPORTIDENT_COLUMNS,
   courseOf,
   typeNameForCategory,
   filterParticipants,
@@ -1403,6 +1537,21 @@ export default {
       tab: "readout",
       activeRaceId: "",
       importState: { show: false, fileName: "", rows: [], errors: [], missing: [], running: false },
+      // Import SI Card (SPORTident)
+      siImport: { show: false, fileName: "", items: [], errors: [], missing: [], running: false, hideOk: true },
+      SI_STATUS_ORDER: ["new", "assign", "change", "remove", "notfound", "conflict", "dupcard", "ambiguous", "same", "nocard"],
+      SI_STATUS_LABEL: {
+        new: "Peserta baru",
+        assign: "Dipasang",
+        remove: "SI dihapus di file",
+        change: "Ganti SI lama",
+        same: "Sudah sama",
+        nocard: "Tanpa SI Card",
+        notfound: "Tidak cocok",
+        conflict: "Bentrok",
+        dupcard: "SI dobel di file",
+        ambiguous: "Nama ganda",
+      },
       // reader
       ports: [],
       selectedPath: "",
@@ -1731,6 +1880,20 @@ export default {
         .filter((c) => count(c.id))
         .map((c) => ({ value: c.id, text: `${c.name} (${count(c.id)})` }));
       return [{ value: "", text: `Semua kategori (${this.participantsWithoutSi.length})` }].concat(opts);
+    },
+    siSummary() {
+      return this.siImport.items.reduce((m, it) => ((m[it.status] = (m[it.status] || 0) + 1), m), {});
+    },
+    siVisibleItems() {
+      const order = this.SI_STATUS_ORDER;
+      return this.siImport.items
+        .filter((it) => !this.siImport.hideOk || !["same", "nocard"].includes(it.status))
+        .slice()
+        .sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || a.entry.rowNo - b.entry.rowNo);
+    },
+    // baris yg akan diterapkan: dipasang/ganti (default dicentang) + saran yg dicentang operator
+    siApplyItems() {
+      return siApplyPayload(this.siImport.items.filter((it) => this.siSelectable(it)));
     },
     participantCtx() {
       const byId = new Map(this.classes.map((c) => [c.id, c]));
@@ -2552,9 +2715,7 @@ export default {
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const wb = XLSX.read(new Uint8Array(reader.result), { type: "array", raw: true });
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const raw = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+          const raw = this.readSheetRows(reader.result, file.name);
           const { rows, errors, missingColumns } = normalizeImportRows(raw);
           this.importState = { show: true, fileName: file.name, rows, errors, missing: missingColumns, running: false };
         } catch (err) {
@@ -2563,6 +2724,89 @@ export default {
       };
       reader.readAsArrayBuffer(file);
     },
+    // baca CSV/Excel -> baris objek. CSV di-decode sendiri (UTF-8 / Windows-1252)
+    // supaya nama ber-huruf khusus tidak rusak.
+    readSheetRows(arrayBuffer, fileName) {
+      const isCsv = /\.csv$/i.test(fileName || "");
+      const wb = isCsv
+        ? XLSX.read(decodeCsvBytes(new Uint8Array(arrayBuffer)), { type: "string", raw: true })
+        : XLSX.read(new Uint8Array(arrayBuffer), { type: "array", raw: true });
+      return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
+    },
+
+    /* ---------- Import SI Card (SPORTident) ---------- */
+    siSelectable(it) {
+      return ["assign", "change", "new", "remove"].includes(it.status) || (it.status === "notfound" && !!it.suggestion);
+    },
+    onSiImportFile(e) {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const raw = this.readSheetRows(reader.result, file.name);
+          const { entries, errors, missingColumns } = parseSiEntries(raw);
+          // kategori yg dipertandingkan di jenis aktif -> boleh tambah peserta baru
+          const raceClasses = this.raceClasses.map((c) => ({ id: c.id, name: c.name }));
+          const { items } = planSiAssign(entries, this.participants, (id) => this.classShort(id).name, raceClasses);
+          // default pilihan dari rencana (dipasang/ganti/baru dicentang; saran & "SI dihapus"
+          // harus dicentang manual, kecuali pelepasan wajib krn kartu dipindah)
+          items.forEach((it) => this.$set(it, "selected", !!it.selected));
+          this.siImport = { show: true, fileName: file.name, items, errors, missing: missingColumns, running: false, hideOk: true };
+        } catch (err) {
+          this.toast("File tidak bisa dibaca: " + ((err && err.message) || err), "danger", "Import SI Card");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    },
+    async confirmSiImport() {
+      const items = this.siApplyItems;
+      if (!items.length) return;
+      this.siImport.running = true;
+      const res = await ipcRequest(
+        "ori:participants:assign-si",
+        { eventId: this.eventId, raceId: this.activeRaceId, items },
+        { timeoutMs: 120000 }
+      );
+      this.siImport.running = false;
+      if (!res || !res.ok) {
+        this.toast((res && res.error) || "Gagal menyimpan (cek koneksi database).", "danger", "Import SI Card");
+        return;
+      }
+      const d = res.data;
+      this.siImport.show = false;
+      await this.loadParticipants();
+      this.loadResults();
+      const msg =
+        [
+          d.created ? `${d.created} peserta baru ditambahkan` : "",
+          `${d.assigned} SI Card dipasang`,
+          d.changed ? `${d.changed} diganti` : "",
+          d.removed ? `${d.removed} SI dilepas` : "",
+        ]
+          .filter(Boolean)
+          .join(", ") +
+        (d.unchanged ? `, ${d.unchanged} sudah sama` : "") +
+        (d.errors.length ? `. ${d.errors.length} gagal: ${d.errors.map((x) => `${x.name || "?"} (${x.message})`).join("; ")}` : ".");
+      this.toast(msg, d.errors.length ? "warning" : "success", "Import SI Card");
+    },
+    // peserta jenis aktif dalam format CSV SPORTident (spt file ekspor SPORTident)
+    downloadSportidentTemplate() {
+      const rows = toSportidentRows(this.participants, (id) => this.classShort(id).name);
+      const csv = toCsv(SPORTIDENT_COLUMNS, rows);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Data Peserta ${this.activeRaceName} - ${this.event.name}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 1000);
+    },
+
     async confirmImport() {
       this.importState.running = true;
       const res = await ipcRequest(
@@ -3610,6 +3854,57 @@ export default {
 .ori-hero-actions .ori-btn--light-danger:hover {
   background: rgba(220, 38, 38, 0.45);
   color: #fff;
+}
+/* Import SI Card (SPORTident) */
+.ori-si-sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ori-si-filter {
+  margin-bottom: 6px;
+}
+.ori-si-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  white-space: nowrap;
+}
+.ori-si-pill.is-assign {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+.ori-si-pill.is-new {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+.ori-si-pill.is-remove,
+.ori-si-pill.is-change {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+.ori-si-pill.is-notfound,
+.ori-si-pill.is-conflict,
+.ori-si-pill.is-dupcard,
+.ori-si-pill.is-ambiguous {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.ori-si-table tr.is-notfound td,
+.ori-si-table tr.is-conflict td,
+.ori-si-table tr.is-dupcard td,
+.ori-si-table tr.is-ambiguous td {
+  background: #fffafa;
 }
 /* badge & modal Edit Hasil */
 .ori-edited {

@@ -632,3 +632,167 @@ test("Uji Course: cocokkan punch kartu uji dgn urutan course tanpa hitung waktu"
   assert.equal(testCourse(card, []).ok, false); // course kosong = belum diatur
   assert.equal(testCourse({ punches: [] }, [31]).missing[0].code, 31);
 });
+
+import { parseSiEntries, planSiAssign, siApplyPayload, toSportidentRows, toCsv, SPORTIDENT_COLUMNS } from "../src/lib/orienteering.js";
+test("Import SI Card SPORTident: parse format Entries + rencana assign (nama & kategori harus sama)", () => {
+  const raw = sheetRows(readFileSync(new URL("./fixtures/sportident_entries_sample.csv", import.meta.url)));
+  const { entries, errors, missingColumns } = parseSiEntries(raw);
+  assert.deepEqual(missingColumns, []);
+  assert.deepEqual(errors, []);
+  assert.equal(entries.length, 10);
+  assert.equal(entries.find((e) => e.name === "Peserta Tujuh").siCard, 8100007); // multi kartu -> pertama
+  const satu = entries.find((e) => e.name === "Peserta Satu");
+  assert.equal(satu.club, "Klub A");
+  assert.equal(satu.country, "IDN");
+  assert.equal(satu.bib, "101"); // RaceNumber = BIB
+  assert.equal(satu.iofId, undefined); // MembershipNumbers tidak dibaca
+
+  const CLS = { C1: "M21E", C2: "W21E", C3: "M20", C4: "W20" };
+  const ps = [
+    { _id: "p1", name: "Peserta Satu", classId: "C1", siCard: null, bib: "101" },
+    { _id: "p2", name: "Peserta Dua", classId: "C2", siCard: 8100002, bib: "102" },
+    { _id: "p3", name: "Peserta Tiga", classId: "C3", siCard: 8100003, bib: "103" },
+    { _id: "p4", name: "Peserta Empat", classId: "C4", siCard: null, bib: "104" },
+    { _id: "p5", name: "Peserta Lima", classId: "C3", siCard: 8100004, bib: "105" },
+    { _id: "p6", name: "Peserta Enam Panjang", classId: "C1", siCard: null, bib: "106" },
+    { _id: "p7", name: "Peserta Tujuh", classId: "C1", siCard: null, bib: "107" },
+    { _id: "p8", name: "Peserta Delapan", classId: "C1", siCard: null, bib: "108" },
+    { _id: "p9", name: "Peserta Sembilan", classId: "C1", siCard: null, bib: "109" },
+    { _id: "p10", name: "Peserta Sepuluh", classId: "C1", siCard: null, bib: "999" },
+  ];
+  const { items, summary } = planSiAssign(entries, ps, (id) => CLS[id]);
+  const st = Object.fromEntries(items.map((it) => [it.entry.name, it.status]));
+  assert.equal(st["Peserta Satu"], "assign");
+  assert.equal(st["peserta DUA"], "same"); // huruf besar/kecil & spasi ganda tidak masalah
+  assert.equal(st["Peserta Tiga"], "change");
+  assert.equal(items.find((it) => it.entry.name === "Peserta Tiga").prevSiCard, 8100003);
+  // 8100004 milik Peserta Lima, yg di file dikosongkan -> kartu DIPINDAH, bukan bentrok
+  assert.equal(st["Peserta Empat"], "assign");
+  assert.equal(st["Peserta Lima"], "remove");
+  const lima = items.find((it) => it.entry.name === "Peserta Lima");
+  assert.equal(lima.required, true);
+  assert.equal(lima.selected, true);
+  assert.equal(st["Peserta E P"], "notfound"); // nama disingkat -> TIDAK otomatis
+  const ep = items.find((it) => it.entry.name === "Peserta E P");
+  assert.equal(ep.suggestion._id, "p6"); // nama disingkat -> saran via BIB (manual)
+  assert.equal(ep.suggestionBy, "BIB 106");
+  assert.equal(st["Peserta Tujuh"], "assign");
+  assert.equal(st["Peserta Delapan"], "dupcard");
+  assert.equal(st["Peserta Sembilan"], "dupcard");
+  assert.equal(st["Peserta Sepuluh"], "notfound"); // kategori beda -> tidak cocok otomatis
+  const sep = items.find((it) => it.entry.name === "Peserta Sepuluh");
+  assert.equal(sep.suggestion._id, "p10"); // saran: nama sama di kategori lain (manual)
+  assert.match(sep.suggestionBy, /kategori M21E/);
+  assert.equal(summary.assign, 3); // Satu, Tujuh, Empat (pindah kartu)
+
+  // tukar kartu antar 2 peserta dalam 1 file = bukan bentrok
+  const swap = planSiAssign(
+    [{ name: "A", category: "M21E", siCard: 2 }, { name: "B", category: "M21E", siCard: 1 }],
+    [{ _id: "a", name: "A", classId: "C1", siCard: 1 }, { _id: "b", name: "B", classId: "C1", siCard: 2 }],
+    (id) => CLS[id]
+  );
+  assert.deepEqual(swap.items.map((it) => it.status), ["change", "change"]);
+
+  assert.deepEqual(parseSiEntries([{ RaceNumber: "1", Name: "X", CourseClass: "M21E", CardNumbers: "abc" }]).errors[0].rowNo, 2);
+  assert.deepEqual(parseSiEntries([{ Foo: 1 }]).missingColumns, ["Name", "CourseClass", "CardNumbers"]);
+});
+
+test("Template SPORTident: kolom & isi sama format file SPORTident", () => {
+  const rows = toSportidentRows(
+    [{ name: "Nama, Koma", classId: "C1", siCard: 8100001, bib: "101", iofId: "9001", club: "Klub", nationality: "IDN" }],
+    () => "M21E"
+  );
+  assert.equal(rows[0].length, SPORTIDENT_COLUMNS.length);
+  const csv = toCsv(SPORTIDENT_COLUMNS, rows);
+  assert.ok(csv.startsWith("RaceNumber,CardNumbers,MembershipNumbers,Name,"));
+  assert.ok(csv.includes('101,8100001,9001,"Nama, Koma",,Klub,IDN,M21E,,,,N'));
+  // bisa dibaca balik oleh parser import
+  const back = parseSiEntries(sheetRows(Buffer.from(csv)));
+  assert.equal(back.entries[0].name, "Nama, Koma");
+  assert.equal(back.entries[0].siCard, 8100001);
+});
+
+test("Import SI Card: upload ulang file yg sama dgn data berbeda (update / peserta baru / pindah kartu)", () => {
+  const CLS = { C1: "M21E", C2: "W21E" };
+  const raceClasses = [{ id: "C1", name: "M21E" }, { id: "C2", name: "W21E" }];
+  const ps = [
+    { _id: "a", name: "Andi", classId: "C1", siCard: 1001, bib: "1" },
+    { _id: "b", name: "Budi", classId: "C1", siCard: null, bib: "2" },
+    { _id: "c", name: "Citra", classId: "C2", siCard: 1003, bib: "3" },
+  ];
+  const E = (name, category, siCard, bib = "", iofId = "") => ({ name, category, siCard, bib, iofId, club: "K", country: "IDN" });
+  const plan = (entries) => planSiAssign(entries, ps, (id) => CLS[id], raceClasses).items;
+  const st = (entries) => plan(entries).map((it) => it.status).join(",");
+
+  // file sama persis -> tidak ada yg diterapkan
+  const same = plan([E("Andi", "M21E", 1001), E("Budi", "M21E", null), E("Citra", "W21E", 1003)]);
+  assert.equal(same.map((it) => it.status).join(), "same,nocard,same");
+  assert.deepEqual(siApplyPayload(same), []);
+  // update SI & SI baru
+  assert.equal(st([E("Andi", "M21E", 1009), E("Budi", "M21E", 1002)]), "change,assign");
+  // peserta BARU (nama, BIB & IOF tdk dikenal, kategori ada) -> ditambahkan, dicentang
+  const add = plan([E("Dewi", "W21E", 1004, "4", "77")]);
+  assert.equal(add[0].status, "new");
+  assert.equal(add[0].selected, true);
+  assert.deepEqual(siApplyPayload(add), [
+    { create: { name: "Dewi", classId: "C2", bib: "4", club: "K", nationality: "IDN" }, siCard: 1004 }, // Name/CourseClass/RaceNumber/Club/Country
+  ]);
+  // peserta baru tanpa SI Card tetap bisa ditambahkan
+  assert.equal(plan([E("Eka", "M21E", null, "5")])[0].status, "new");
+  // nama beda tapi BIB sudah dipakai peserta lain -> saran, bukan peserta baru
+  assert.equal(plan([E("Andy", "M21E", 1001, "1")])[0].suggestion._id, "a");
+  // kategori belum ada -> tidak ditambahkan otomatis
+  const noCat = plan([E("Fajar", "M20", 1005, "6")])[0];
+  assert.equal(noCat.status, "notfound");
+  assert.match(noCat.reason, /Kategori belum ada/);
+  // nama sama tapi kategori berubah -> saran manual, BUKAN peserta baru (cegah dobel)
+  const moved = plan([E("Citra", "M21E", 1003)])[0];
+  assert.equal(moved.status, "notfound");
+  assert.equal(moved.suggestion._id, "c");
+  // SI dikosongkan di file -> "remove", tidak dicentang
+  const rm = plan([E("Andi", "M21E", null)])[0];
+  assert.equal(rm.status, "remove");
+  assert.equal(rm.selected, false);
+  // kartu Andi dipindah ke Budi (Andi dikosongkan) -> pindah, Andi wajib dilepas
+  const mv = plan([E("Andi", "M21E", null), E("Budi", "M21E", 1001)]);
+  assert.equal(mv.map((it) => it.status).join(), "remove,assign");
+  assert.equal(mv[0].selected, true);
+  assert.deepEqual(siApplyPayload(mv), [{ participantId: "a", siCard: null }, { participantId: "b", siCard: 1001 }]);
+  // kartu Andi diklaim Budi tapi Andi tidak ada di file -> bentrok
+  assert.equal(st([E("Budi", "M21E", 1001)]), "conflict");
+  // peserta baru memakai kartu orang lain -> bentrok
+  assert.equal(st([E("Dewi", "W21E", 1003, "4")]), "conflict");
+});
+
+import { decodeCsvBytes } from "../src/lib/orienteering.js";
+test("decodeCsvBytes: UTF-8 (dgn/tanpa BOM) & Windows-1252 terbaca benar", () => {
+  const csv = "Name,CourseClass\nJörg Müller Ñandú,M21E\n";
+  const utf8 = Buffer.from(csv, "utf8");
+  assert.equal(decodeCsvBytes(utf8), csv);
+  assert.equal(decodeCsvBytes(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), utf8])), csv);
+  assert.equal(decodeCsvBytes(Buffer.from(csv, "latin1")), csv); // ekspor SPORTident (Windows)
+  assert.equal(decodeCsvBytes(Buffer.from("Malm\xf6 Ok \xd7", "latin1")), "Malmö Ok ×");
+  const rows = parseSiEntries(XLSX.utils.sheet_to_json(XLSX.read(decodeCsvBytes(utf8), { type: "string", raw: true }).Sheets.Sheet1, { defval: "", raw: false }));
+  assert.equal(rows.missingColumns.length, 1); // CardNumbers tidak ada di contoh ini
+});
+
+import { categoryKey } from "../src/lib/orienteering.js";
+test("Kategori Novice: M21N == M21 Novice, W21N == W21 Novice (import SI & Start List)", () => {
+  assert.equal(categoryKey("M21 Novice"), "M21N");
+  assert.equal(categoryKey(" w21  novice "), "W21N");
+  assert.equal(categoryKey("M21N"), "M21N");
+  assert.equal(categoryKey("M21E"), "M21E"); // E (elite) tidak berubah
+  assert.equal(categoryKey("Novice Open"), "NOVICE OPEN"); // hanya pola M/W + umur
+  // SPORTident "M21N" cocok dgn kategori STiming "M21 Novice" (dan sebaliknya)
+  const ps = [{ _id: "x", name: "Andi", classId: "N1", siCard: null }];
+  const it = planSiAssign([{ name: "Andi", category: "M21N", siCard: 555 }], ps, () => "M21 Novice").items[0];
+  assert.equal(it.status, "assign");
+  const it2 = planSiAssign([{ name: "Andi", category: "M21 Novice", siCard: 555 }], ps, () => "M21N").items[0];
+  assert.equal(it2.status, "assign");
+  // peserta baru "W21N" masuk ke kategori "W21 Novice" yg sudah ada (tidak buat kategori baru)
+  const nw = planSiAssign([{ name: "Baru", category: "W21N", siCard: 7 }], [], () => "", [{ id: "WN", name: "W21 Novice" }]).items[0];
+  assert.equal(nw.status, "new");
+  assert.equal(nw.newClassId, "WN");
+  // kunci pencocokan Start List juga setara
+  assert.deepEqual(participantMatchKeys({ name: "Andi" }, "M21 Novice"), participantMatchKeys({ name: "Andi" }, "M21N"));
+});
